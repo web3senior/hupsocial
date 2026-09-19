@@ -150,6 +150,10 @@ $secondary-color: #9e481d;
   --warning-800: #92400e;
   --warning-900: #78350f;
 
+  // The premium mark. Same value as the fill baked into public/icons/blue-checkmark.svg, so
+  // an icon standing in for the badge never drifts from the badge itself.
+  --premium-500: #0095f6;
+
   --success-50: #ecfdf5;
   --success-100: #d1fae5;
   --success-200: #a7f3d0;

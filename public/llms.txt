@@ -1,6 +1,6 @@
 # Hup
 
-> Hup is a decentralized social network for onchain and underground communities. Posts, comments, reposts, likes, and the follow graph are written to smart contracts on nine EVM chains; content bodies live on IPFS or 0G Storage; an offchain indexer turns the resulting event log into fast feeds. There is no account, email, or password — a wallet is the identity, and the social graph is portable to any client that reads the same contracts.
+> Hup is a social network for onchain communities where any post can be a paid download: the buyer's payment is held in escrow and released only when the seller publishes the decryption key, or refunded to the buyer if they never do. Posts, comments, reposts, likes, and the follow graph are written to smart contracts on nine EVM chains; content bodies live on IPFS; an offchain indexer turns the resulting event log into fast feeds. A wallet is the identity — bring one, or sign in with an email that mints an embedded wallet — and the social graph is portable to any client that reads the same contracts.
 
 Hup runs at https://hup.social. It is a live multichain product, not a demo or a testnet-only
 prototype. This file orients language models and agents that answer questions about Hup or build
@@ -17,8 +17,8 @@ on top of it.
   deliberately offchain — private, high-frequency, or query-shaped data that would be expensive to
   store and meaningless as trustless state.
 - **Content addressing.** Only a pointer is stored onchain. `ipfs://…` resolves through a gateway,
-  `0G://…` through the 0G Storage proxy, and anything else renders as plain text. Post bodies are a
-  versioned JSON document of typed elements (text, media items with CID, alt text, and MIME type).
+  and anything else renders as plain text. Post bodies are a versioned JSON document of typed
+  elements (text, media items with CID, alt text, and MIME type).
 - **Stable URLs across redeploys.** Post IDs in URLs (`/networks/{chainId}/{postId}`) are offchain
   public IDs that the backend maps to a contract deployment plus that contract's local ID. Deploying
   a new core contract restarts its internal counter at 1 but does not break a single existing link.
@@ -106,8 +106,10 @@ authoritative should be read from the contracts directly.
   features are staged before they ship.
 - **Gas is real.** Posting, commenting, and profile updates are transactions and cost network fees.
   Relayers and burner sessions can subsidize or streamline the signature, not eliminate execution.
-- **Wallet, not signup.** There is no registration, email, or password. Losing access to the wallet
-  means losing the ability to write as that identity; the content itself stays readable forever.
+- **Wallet, not username.** There is no username to pick. Either connect a wallet you already have,
+  or sign in with an email, which mints an embedded wallet whose key is split between the device and
+  the server. Losing access to the wallet means losing the ability to write as that identity; the
+  content itself stays readable forever.
 - **Public by construction.** Every post, like, follow, and membership transaction is in a chain log
   permanently. Deleting a post clears it from the app and flips its onchain state, but the original
   transaction and its content pointer remain in the history.

@@ -9,6 +9,7 @@ import clsx from 'clsx'
 import { ArrowSquareOutIcon, CopySimpleIcon, EyeIcon, EyeSlashIcon } from '@phosphor-icons/react'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 import { getPostById } from '@/lib/api'
 import { amountOf, assetOf, explorerTxUrl, getKindMeta, hrefOf, shortAddress } from './activityModel'
 import styles from './ActivityRow.module.scss'
@@ -365,7 +366,7 @@ function ActorLink({ address }) {
   const name = resolved || shortAddress(address)
 
   return (
-    <Link href={`/${address}`} className={styles.row__actor} onClick={(event) => event.stopPropagation()}>
+    <Link href={profilePath(address, profile?.username)} className={styles.row__actor} onClick={(event) => event.stopPropagation()}>
       {name}
     </Link>
   )

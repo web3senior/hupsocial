@@ -16,8 +16,10 @@ import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useFaviconBadge } from '@/hooks/useFaviconBadge'
 import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
+import { openConnect } from '@/lib/connectDialog'
 import BatchLikeTrigger from './BatchLikeTrigger'
 import NativePopover from './ui/NativePopover'
 import Tooltip from './ui/Tooltip'
@@ -25,6 +27,12 @@ import NavBadge from './ui/NavBadge'
 import Avatar from './ui/Avatar'
 import { GitHub } from './Icons'
 import styles from './Aside.module.scss'
+
+// A visible tab revalidates on focus and on every client-side navigation, so its tick only has to
+// cover a reader sitting still on one page. A hidden tab polls for one reason — raising the
+// favicon badge — and nobody is waiting on it, so it ticks far more slowly.
+const NOTIFICATION_POLL_MS = 120_000
+const HIDDEN_NOTIFICATION_POLL_MS = 300_000
 
 const NAV_COMPONENTS = {
   'new-post': NewPost,
@@ -129,10 +137,10 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
             className={clsx(styles.link, styles.moreButton)}
             aria-label={item.name}
             onClick={() => {
-              // The composer can only publish with a wallet behind it — say so here rather than
-              // letting the author write a whole post into a dialog that cannot submit
+              // The composer can only publish with a wallet behind it — offer the chooser here
+              // rather than letting the author write a whole post into a dialog that cannot submit
               if (!canCompose) {
-                toast('Please connect wallet', 'error')
+                if (!openConnect()) toast('Please connect wallet', 'error')
                 return
               }
               setIsComponentOpen(true)
@@ -199,15 +207,20 @@ export default function Aside() {
     isConnected && address ? `/api/v1/notifications?wallet_address=${address}&filter=inbox&limit=1` : null,
     (url) => fetch(url).then((r) => r.json()),
     // refreshWhenHidden keeps the poll alive in a background tab — without it the favicon badge
-    // could never appear for anything that arrives while the user is away.
-    { refreshInterval: 60_000, revalidateOnFocus: true, refreshWhenHidden: true }
+    // could never appear while the user is away. SWR re-reads a function interval on each tick,
+    // which is what lets the hidden tab hold the badge without polling at the visible rate.
+    {
+      refreshInterval: () => (typeof document !== 'undefined' && document.hidden ? HIDDEN_NOTIFICATION_POLL_MS : NOTIFICATION_POLL_MS),
+      revalidateOnFocus: true,
+      refreshWhenHidden: true,
+    }
   )
   const unreadCount = notifData?.success ? (notifData.meta?.unread_count ?? 0) : 0
 
   useFaviconBadge(unreadCount)
 
   // Client-side navigation fires no focus event and never remounts the layout, so without this the
-  // badge only moves on the 60s poll tick.
+  // badge only moves on the poll tick.
   useEffect(() => {
     revalidateUnread()
   }, [pathname, revalidateUnread])
@@ -229,19 +242,20 @@ export default function Aside() {
   const { profile } = useProfile(isConnected && address ? address : null)
 
   const navLinks = useMemo(() => {
-    const profilePath = isConnected && address ? `/${address}` : '/connect'
+    // The viewer's own handle once they have claimed one — the sidebar is where they see it most
+    const myProfilePath = isConnected && address ? profilePath(address, profile?.username) : '/connect'
 
     return [
       ...navItems.map(normalizeNavItem).filter((item) => item.type === 'divider' || item.path || item.component),
       {
         id: 'profile',
         name: 'Profile',
-        path: profilePath,
+        path: myProfilePath,
         icon: UserIcon,
         avatarSrc: isConnected && address ? profile?.profileImage : null,
       },
     ]
-  }, [address, isConnected, navItems, profile?.profileImage])
+  }, [address, isConnected, navItems, profile?.profileImage, profile?.username])
 
   const isMobileLayout = !isWideScreen
   const isExpanded = isMobileLayout ? isMobileMenuOpen : isMenuOpen
@@ -536,7 +550,9 @@ export default function Aside() {
               className={clsx(styles.link, isActivePath(pathname, '/networks') && styles.linkActive)}
               aria-label="Networks"
               aria-current={isActivePath(pathname, '/networks') ? 'page' : undefined}
-              onClick={closeSidebar}
+              // Mobile only, like every other nav row: on desktop the expanded sidebar is a state the
+              // user set, and folding it away on a plain navigation loses it for the rest of the session
+              onClick={isMobileLayout ? closeSidebar : undefined}
             >
               <div className={styles.iconWrapper}>
                 <StackIcon size={20} weight={isActivePath(pathname, '/networks') ? 'fill' : 'regular'} />
@@ -555,7 +571,7 @@ export default function Aside() {
             className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])}
             onClick={() => {
               if (!canCompose) {
-                toast('Please connect wallet', 'error')
+                if (!openConnect()) toast('Please connect wallet', 'error')
                 return
               }
               setIsComponentOpen(true)

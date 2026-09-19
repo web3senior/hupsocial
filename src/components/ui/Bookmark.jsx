@@ -9,6 +9,7 @@ import { toast } from '@/components/NextToast'
 import { getPostById } from '@/lib/api'
 import { getBookmarkFoldersKey } from '@/lib/savedPostsKey'
 import Counter from './Counter'
+import { openConnect } from '@/lib/connectDialog'
 import NativePopover from './NativePopover'
 import Tooltip from './Tooltip'
 import postStyles from '../Post.module.scss'
@@ -237,7 +238,7 @@ export const Bookmark = ({ post }) => {
       onBeforeToggle={(e) => {
         if (e.newState === 'open' && !isConnected) {
           e.preventDefault()
-          toast('Please connect wallet', 'error')
+          if (!openConnect()) toast('Please connect wallet', 'error')
         }
       }}
       trigger={

@@ -9,7 +9,11 @@ import { useEffect, useState, useCallback, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView, getUserBadges, getCountries } from '@/lib/api'
 import { ORIGIN_OPTIONS } from '@/config/originOptions'
+import { INTEREST_OPTIONS, MAX_INTERESTS, normalizeInterests } from '@/config/interestOptions'
+import InterestIcon from '@/components/ui/InterestIcon'
+import ProfileInterests from './ProfileInterests'
 import { isCountryCode } from '@/lib/origin'
+import { usePremium } from '@/hooks/usePremium'
 import { initHupContract, initStatusContract, getStatus, getMaxLength } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
@@ -23,6 +27,7 @@ import { lukso } from 'wagmi/chains'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
 import { InfoIcon, ThreeDotIcon } from '@/components/Icons'
+import { SealCheckIcon } from '@phosphor-icons/react'
 import ProfileInsights from '@/components/ProfileInsights'
 import UPlogo from '@/../public/up.png'
 import { uploadFileToIPFS } from '@/lib/ipfs'
@@ -35,6 +40,7 @@ import { useProfile } from '@/hooks/useProfile'
 import { handleBrokenAvatar } from '@/lib/utils'
 import AgentBadge from '@/components/ui/AgentBadge'
 import Avatar from '@/components/ui/Avatar'
+import UsernameField from '@/components/UsernameField'
 import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { ProfileQRCode } from './ProfileQRCode'
@@ -145,9 +151,20 @@ const useProfileFeed = ({ wallet, viewer, postType }) => {
   return { posts, total, hasMore, isFetching, isLoaded, loadMore }
 }
 
-export default function UserProfile() {
+// What an unset colour input shows. Picking it still counts as choosing — the field only
+// writes an accent once the editor actually moves it.
+const DEFAULT_ACCENT = '#0095f6'
+
+/**
+ * @param {Object} props
+ * @param {string} [props.address] The wallet this page is about, already resolved from the route
+ *   segment — which may have been a handle. Everything below is keyed by address, never by what
+ *   was in the URL.
+ */
+export default function UserProfile({ address: routeAddress }) {
   const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
+  const profileAddress = routeAddress || params.wallet
   const router = useRouter()
   const { address: evmAddress } = useConnection()
   // The viewer is the wallet for the active network; the balance card stays EVM
@@ -158,8 +175,8 @@ export default function UserProfile() {
     address: evmAddress,
   })
 
-  const postsFeed = useProfileFeed({ wallet: params.wallet, viewer: address, postType: 'original' })
-  const repostsFeed = useProfileFeed({ wallet: params.wallet, viewer: address, postType: 'repost' })
+  const postsFeed = useProfileFeed({ wallet: profileAddress, viewer: address, postType: 'original' })
+  const repostsFeed = useProfileFeed({ wallet: profileAddress, viewer: address, postType: 'repost' })
 
   const TABS_DATA = [
     { id: 'posts', label: 'Posts', count: postsFeed.total },
@@ -195,8 +212,8 @@ export default function UserProfile() {
   }, [activeFeedLoadMore])
 
   useEffect(() => {
-    recordProfileView(params.wallet, address || null)
-  }, [params.wallet])
+    recordProfileView(profileAddress, address || null)
+  }, [profileAddress])
 
   const handlePostPrefetch = (postId, chainId) => {
     router.prefetch(`/networks/${chainId}/${postId}`)
@@ -215,10 +232,10 @@ export default function UserProfile() {
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`} data-width={`small`}>
           <div className={`${styles.profileWrapper}`}>
-            <Profile addr={params.wallet} />
+            <Profile addr={profileAddress} />
 
             {/* Ensure posts and the list exist before mounting */}
-            {postsFeed.posts?.list?.length > 0 && <ProfileInsights addr={params.wallet} posts={postsFeed.posts} />}
+            {postsFeed.posts?.list?.length > 0 && <ProfileInsights addr={profileAddress} posts={postsFeed.posts} />}
           </div>
 
           <section className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>
@@ -452,6 +469,21 @@ const Profile = ({ addr }) => {
   // every replacement the user saved after it.
   useEffect(() => setCoverFailed(false), [profile?.profileHeader])
 
+  /* A profile opened by address writes its handle into the address bar once it knows it. Plenty of
+     links can only carry an address — an @mention stores one by design, and so does every link
+     shared before its owner claimed a handle — and they all land on the right page either way;
+     this is what makes the URL they leave behind the canonical one. replaceState rather than a
+     route change: the page is already the right page, so re-running the route would cost a
+     loading state to arrive back where it is. */
+  useEffect(() => {
+    if (!profile?.username || typeof window === 'undefined') return
+
+    const canonical = `/@${profile.username}`
+    if (decodeURIComponent(window.location.pathname) === canonical) return
+
+    window.history.replaceState(null, '', `${canonical}${window.location.search}${window.location.hash}`)
+  }, [profile?.username])
+
   // The connected chain decides follow vs unfollow — that is where the tx lands, and the
   // cross-network aggregate can disagree with it (indexer lag, or a follow made on another chain).
   const followerSystemAddress = activeChain?.[1]?.followerSystem
@@ -571,7 +603,10 @@ const Profile = ({ addr }) => {
 
   if (isLoading) return <ProfileSkeleton />
 
-  const targetWallet = params?.wallet || addr || ''
+  /* The resolved address leads: the route segment can be a handle, and everything below — the
+     explorer link, the share link, and which side of the self-view check this page is on — is
+     about the wallet, never about what was typed in the URL. */
+  const targetWallet = addr || params?.wallet || ''
   const displayWalletString = shortAddress(targetWallet)
 
   const explorerBaseUrl = activeChain?.[0]?.blockExplorers?.default?.url || 'https://etherscan.io'
@@ -597,7 +632,12 @@ const Profile = ({ addr }) => {
 
       <FollowListDialog ref={followListDialogRef} addr={addr} />
 
-      <section className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}>
+      {/* A premium accent overrides the chain colour for this card only, the same way
+          networkColorStyle scopes a chain's — :root keeps speaking for the connected wallet. */}
+      <section
+        className={`${styles.profile} relative flex flex-column align-items-start justify-content-start gap-1`}
+        style={profile?.accent ? { '--network-color-primary': profile.accent, '--network-color-text': '#fff' } : undefined}
+      >
         {isCelebratingBirthday && <BirthdayConfetti burst={birthdayBurstKey} />}
 
         {/* The cover — a Universal Profile's LSP3 backgroundImage, or the one set here. It runs
@@ -631,6 +671,10 @@ const Profile = ({ addr }) => {
                 </div>
               )}
             </div>
+
+            {/* The handle leads and the address follows it: one is how people refer to this
+                account, the other is what it actually is. */}
+            {profile.username && <span className={styles.profile__handle}>{`@${profile.username}`}</span>}
 
             <code className={styles.profile__wallet}>
               <Link href={walletExplorerUrl} target="_blank" rel="noopener noreferrer">
@@ -723,11 +767,11 @@ const Profile = ({ addr }) => {
                   </div>
                 )}
 
-                <ProfileQRCode profileUrl={`https://hup.social/${addr}`} styles={styles} />
+                <ProfileQRCode profileUrl={`https://hup.social/${profile.username ? `@${profile.username}` : addr}`} styles={styles} />
 
                 <a
                   className={styles.profile__llmsLink}
-                  href={`/${addr}/llms.txt`}
+                  href={`${profile.username ? `/@${profile.username}` : `/${addr}`}/llms.txt`}
                   target="_blank"
                   rel="noopener noreferrer"
                   title="This profile as plain text for AI agents"
@@ -739,7 +783,13 @@ const Profile = ({ addr }) => {
             </li>
 
             <li className="w-100">
-              <ProfileLink targetWallet={targetWallet} displayWalletString={displayWalletString} />
+              <ProfileLink targetWallet={targetWallet} displayWalletString={displayWalletString} username={profile.username} />
+            </li>
+
+            {/* Down here rather than in the header: up there it shared a column with the avatar,
+                which is half the card, and a row of cards had a third of the width to sit in. */}
+            <li className="w-100">
+              <ProfileInterests interests={profile.interests} />
             </li>
 
             {isConnected && (
@@ -776,7 +826,7 @@ const Profile = ({ addr }) => {
   )
 }
 
-const ProfileLink = ({ targetWallet, displayWalletString }) => {
+const ProfileLink = ({ targetWallet, displayWalletString, username }) => {
   const [copied, setCopied] = useState(false)
   const timeoutRef = useRef(null)
 
@@ -808,12 +858,16 @@ const ProfileLink = ({ targetWallet, displayWalletString }) => {
 
   return (
     <div className={styles.profileLink}>
-      <span className={styles.profileLink__text}>hup.social/{displayWalletString}</span>
+      {/* The handle is the link worth copying wherever there is one: it is short enough to read out
+          and it survives this profile moving between wallets. */}
+      {/* The handle is the link worth reading out wherever there is one — and it stays right
+          even if this profile is later opened by address. */}
+      <span className={styles.profileLink__text}>hup.social/{username ? `@${username}` : displayWalletString}</span>
 
       <button
         type="button"
         className={styles.profileLink__copyButton}
-        onClick={() => copyToClipboard(`https://hup.social/${targetWallet}`)}
+        onClick={() => copyToClipboard(`https://hup.social/${username ? `@${username}` : targetWallet}`)}
         aria-label="Copy profile link to clipboard"
         title="Copy to clipboard"
       >
@@ -1144,6 +1198,8 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   const [error, setError] = useState(null)
   const [isPending, setIsPending] = useState(false)
   const [tags, setTags] = useState({ list: parseSafeList(profile?.tags) })
+  // Picked from a catalogue rather than typed, so the stored value is always a list of slugs
+  const [interests, setInterests] = useState(() => normalizeInterests(profile?.interests))
   const [links, setLinks] = useState({ list: linksToRows(profile?.links) })
   // The community tag worn beside the name. `badgesLoaded` is not cosmetic: without it a failed
   // fetch would submit an empty picker as an explicit "wear nothing" and quietly strip a badge
@@ -1151,6 +1207,10 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   const [badges, setBadges] = useState([])
   const [badgesLoaded, setBadgesLoaded] = useState(false)
   const [selectedBadge, setSelectedBadge] = useState(profile?.badge ?? null)
+  // The profile's own accent, a premium perk. Empty string means "no accent", which is what
+  // the save sends to clear one — the colour input itself cannot express absence.
+  const [accent, setAccent] = useState(profile?.accent ?? '')
+  const { isPremium } = usePremium()
   // The country half of the origin picker, from the same table the save validates against. The
   // onchain half ships with the build, so the picker is usable the instant the modal opens and
   // this only fills in the rest.
@@ -1392,10 +1452,16 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     const removesCover = !coverUri && coverCleared
     formData.set('removeProfileHeader', removesCover ? '1' : '')
     formData.set('tags', JSON.stringify(tags.list))
+    formData.set('interests', JSON.stringify(interests))
     formData.set('links', JSON.stringify(links.list))
 
     const badge = badgeField()
     if (badge !== null) formData.set('badge', badge)
+
+    /* Sent only when this account can actually set one. The colour input is unmounted for a
+       non-premium editor, and an absent field leaves the stored colour alone — which is what
+       keeps a lapsed subscriber's accent from being wiped by an unrelated save. */
+    if (isPremium) formData.set('accent', accent || '')
 
     /* Awaited rather than read off state, so a save made moments after the modal opened still
        syncs. The check is memoised, so it costs nothing once it has answered. */
@@ -1518,6 +1584,15 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
 
   const removeTag = (e, tagToRemove) => {
     setTags({ list: tags.list.filter((tag) => tag !== tagToRemove) })
+  }
+
+  /* Deselecting always works; selecting stops at the cap, so the row on the profile stays one
+     line of cards rather than becoming a second bio. */
+  const toggleInterest = (slug) => {
+    setInterests((current) => {
+      if (current.includes(slug)) return current.filter((entry) => entry !== slug)
+      return current.length >= MAX_INTERESTS ? current : [...current, slug]
+    })
   }
 
   const addLink = (e) => {
@@ -1703,6 +1778,14 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
               <small className={styles.profileModal__avatarHint}>Tap to change photo</small>
             </div>
 
+            {/* Username — saves itself, against its own signature, so it sits outside the form's
+                fields even while it sits among them. */}
+            <UsernameField
+              address={profile?.wallet_address}
+              username={profile?.username}
+              onClaimed={() => mutate?.()}
+            />
+
             {/* Name */}
             <div className={styles.profileModal__field}>
               <label className={styles.profileModal__label}>Name</label>
@@ -1773,6 +1856,40 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
               <small className={styles.profileModal__badgeHint}>Shown next to your name on your profile. Leave it unset to keep it to yourself.</small>
             </div>
 
+            {/* Accent — a premium perk, so the field is a link to /premium until it is bought.
+                Rendered rather than hidden: an unexplained absence reads as a missing feature. */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label} htmlFor="pm-accent">
+                Accent colour
+              </label>
+              {isPremium ? (
+                <div className={styles.profileModal__accentRow}>
+                  <input
+                    id="pm-accent"
+                    name="accent"
+                    type="color"
+                    className={styles.profileModal__accentInput}
+                    value={accent || DEFAULT_ACCENT}
+                    onChange={(e) => setAccent(e.target.value)}
+                  />
+                  <code className={styles.profileModal__accentValue}>{accent || 'Not set'}</code>
+                  {accent && (
+                    <button type="button" className={styles.profileModal__accentClear} onClick={() => setAccent('')}>
+                      Clear
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <Link href="/premium" className={styles.profileModal__accentLocked}>
+                  <SealCheckIcon size={14} weight="fill" />
+                  Choose your own colour with Premium
+                </Link>
+              )}
+              <small className={styles.profileModal__badgeHint}>
+                Themes your profile page instead of the connected chain&apos;s colour.
+              </small>
+            </div>
+
             {/* Community tag — only offered when the wallet actually belongs somewhere that grants one */}
             {badges.length > 0 && (
               <div className={styles.profileModal__field}>
@@ -1839,6 +1956,36 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                   Add
                 </button>
               </div>
+            </div>
+
+            {/* Interests */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label}>Interests</label>
+              <div className={styles.profileModal__interests}>
+                {INTEREST_OPTIONS.map((option) => {
+                  const picked = interests.includes(option.slug)
+
+                  return (
+                    <button
+                      key={`interest-${option.slug}`}
+                      type="button"
+                      className={clsx(styles.profileModal__interest, picked && styles['profileModal__interest--picked'])}
+                      /* The chip wears the card's own gradient once picked, so the row in the
+                         modal and the row on the profile are recognisably the same object. */
+                      style={picked ? { '--interest-from': option.gradient[0], '--interest-to': option.gradient[1] } : undefined}
+                      aria-pressed={picked}
+                      disabled={!picked && interests.length >= MAX_INTERESTS}
+                      onClick={() => toggleInterest(option.slug)}
+                    >
+                      <InterestIcon slug={option.slug} size={14} weight={picked ? 'fill' : 'regular'} />
+                      {option.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <small className={styles.profileModal__badgeHint}>
+                {interests.length} of {MAX_INTERESTS} picked. They show as cards under your bio.
+              </small>
             </div>
 
             {/* Links */}

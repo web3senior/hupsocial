@@ -19,6 +19,7 @@ import clsx from 'clsx'
 import NativeDialog from '@/components/ui/NativeDialog'
 import { toast } from '@/components/NextToast'
 import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 import { getActiveChain } from '@/lib/communication'
 import { chunk, describeDropped } from '@/lib/batchLike'
 import { MAX_BATCH_FOLLOW_COUNT, preflightSelection, readFollowingSet } from '@/lib/batchFollow'
@@ -453,7 +454,7 @@ const ProfileRow = ({ profileAddress, following, followStateLoading, isSelected,
         />
       )}
 
-      <Link href={`/${profileAddress}`} className={styles.row__profile} onClick={onNavigate}>
+      <Link href={profilePath(profileAddress, profile?.username)} className={styles.row__profile} onClick={onNavigate}>
         <figure className={styles.row__avatar}>
           <Avatar src={profile.profileImage} size={44} alt={profile.name} />
         </figure>

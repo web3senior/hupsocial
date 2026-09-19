@@ -1,0 +1,8 @@
+.premiumBadge {
+  display: inline-block;
+  flex-shrink: 0; // A mark never pays for a long name beside it
+  // The width/height attributes carry the size; this keeps the glyph square if a parent
+  // stylesheet tries to stretch it.
+  object-fit: contain;
+  vertical-align: middle;
+}

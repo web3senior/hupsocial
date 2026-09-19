@@ -30,6 +30,7 @@ const matchesQuery = (item, needle) =>
   !needle ||
   item.address.toLowerCase().includes(needle) ||
   (item.name || '').toLowerCase().includes(needle) ||
+  (item.username || '').toLowerCase().includes(needle) ||
   (item.ensName || '').toLowerCase().includes(needle)
 
 /**

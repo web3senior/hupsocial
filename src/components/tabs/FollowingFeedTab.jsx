@@ -11,6 +11,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { PostCard } from '@/components/Post'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
 import FeedError from '@/components/ui/FeedError'
+import { openConnect } from '@/lib/connectDialog'
 import styles from '@/app/page.module.scss'
 
 const POSTS_PAGE_SIZE = 20
@@ -96,7 +97,19 @@ export default function FollowingFeedTab() {
   if (!mounted) return null
 
   if (!isConnected) {
-    return <EmptyState message="Connect your wallet to see posts from people you follow." />
+    return (
+      <EmptyState
+        align="center"
+        size="lg"
+        action={
+          <button type="button" onClick={() => openConnect()}>
+            Connect
+          </button>
+        }
+      >
+        Connect your wallet to see posts from people you follow.
+      </EmptyState>
+    )
   }
 
   if (loadError) {
@@ -116,11 +129,11 @@ export default function FollowingFeedTab() {
   }
 
   if (isLoaded && !followingSupported) {
-    return <EmptyState message={`Following isn't available on ${activeChain?.name ?? 'this network'} yet. Try switching networks.`} />
+    return <EmptyState>{`Following isn't available on ${activeChain?.name ?? 'this network'} yet. Try switching networks.`}</EmptyState>
   }
 
   if (isLoaded && posts.list.length === 0) {
-    return <EmptyState message="No posts yet from wallets you follow." />
+    return <EmptyState>No posts yet from wallets you follow.</EmptyState>
   }
 
   return (

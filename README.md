@@ -1,6 +1,43 @@
 # Hup
 
-# Hup Unified Protocol Architecture
+Hup is a social app where any post can be a paid download. The buyer's payment is held in escrow and
+released only when the seller publishes the decryption key — or refunded to the buyer if they never
+do. Posts, comments, reposts, likes and the follow graph are written to smart contracts on nine EVM
+chains; content bodies live on IPFS; an offchain indexer turns the event log into fast feeds.
+
+Live at **https://hup.social**.
+
+## Running it
+
+```bash
+pnpm install
+cp .env.example .env    # then fill it in
+pnpm dev:ssl            # https://localhost:3000, self-signed cert
+```
+
+Indexing is a separate service (**cidex**) that owns all event scanning and writes the tables this
+app reads. Nothing in here scans a chain log.
+
+## Layout
+
+| Path | What's there |
+| --- | --- |
+| `src/app` | Routes. `api/v1` is the app's own API. |
+| `src/components` | Shared UI. Modals go through `ui/NativeDialog`, menus through `ui/NativePopover`. |
+| `src/config` | Chains, per-chain contract addresses, gasless policy, sections. |
+| `src/contracts` | Solidity sources and the Foundry workspace. |
+| `src/lib` | Chain access, IPFS, storage, formatting. |
+
+`AGENTS.md` holds the conventions this repo is held to — read it before writing code.
+
+---
+
+# Design notes
+
+Everything below is the running design record for the protocol and its extensions, kept in one file
+on purpose so each decision sits next to the reasoning behind it.
+
+## Unified protocol architecture
 
 By treating all social interactions as a single `Content` primitive, Hup operates through a single, highly efficient smart contract.
 
@@ -22,17 +59,16 @@ By moving the actual text and media to **IPFS** and only keeping the `Content` s
 ### One potential risk: The 24KB Limit
 The only reason to keep them split would be if your code exceeds the **24KB limit**. However, since you are now using **one** struct and **one** set of logic to handle all three types, your code will actually be *shorter* than when you had two separate systems. You should have plenty of room.
 
-**Verdict:** Merge them. It makes the Hup protocol much more "elegant" and easier to deploy across multiple chains. One contract, one protocol, any EVM.
-
-Shall we draft the final unified contract structure?
+**Verdict:** merged. One contract, one protocol, any EVM — easier to deploy across chains than two separate systems.
 
 
 # Contract
 
 ## Extensions
-I can create another contract later for storage if i need right? it will act like attach data to posts but by the creator not owner of the contract
 
-Yes, absolutely. You can 100% decouple additional data layers and build them as standalone contracts later. This is actually a highly recommended Web3 architectural pattern called Pluggable Storage or an Extension Registry.
+Additional data layers are decoupled and built as standalone contracts, attaching data to posts as
+the post's creator rather than the contract owner — the pattern usually called Pluggable Storage or
+an Extension Registry.
 
 ## Interfaces
 How it works architecturally

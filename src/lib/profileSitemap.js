@@ -1,4 +1,5 @@
 import pool from '@/lib/db'
+import { hasColumn } from '@/lib/schema'
 
 /**
  * Which profiles are worth pointing a crawler at.
@@ -41,9 +42,13 @@ export async function countListableProfiles() {
 /** One sitemap's worth of profiles, in a stable order so chunk boundaries hold between builds. */
 export async function listProfiles(chunk) {
   const offset = Math.max(0, Number(chunk) || 0) * PROFILES_PER_SITEMAP
+  /* The handle is what the page canonicalizes to, so it is what belongs in the sitemap — listing
+     the address form of a profile that has one would contradict its own canonical tag. Probed,
+     because production is migrated by hand. */
+  const handled = (await hasColumn('users', 'username_key')) ? ', u.username' : ''
   try {
     const [rows] = await pool.execute(
-      `SELECT u.wallet_address, u.lastUpdate
+      `SELECT u.wallet_address, u.lastUpdate${handled}
        FROM users u
        WHERE ${LISTABLE}
        ORDER BY u.wallet_address ASC

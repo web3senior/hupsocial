@@ -6,6 +6,7 @@ import useSWRImmutable from 'swr/immutable'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useConnect, useConnection, useConnectors } from 'wagmi'
 import { EMAIL_CONNECTOR_ID, openEmailLogin } from '@/lib/embeddedWallet/connector'
+import { setConnectHandler } from '@/lib/connectDialog'
 import { isFramedByGridHost, UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
@@ -18,6 +19,8 @@ import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import { SOLANA_CHAINS, SOLANA_ICON_URL } from '@/config/solana'
 import { setNetworkColor } from '@/config/wagmi'
+import { profilePath } from '@/lib/username'
+import { markFirstConnect } from '@/lib/firstConnect'
 import styles from './ConnectWallet.module.scss'
 
 // Matches the sm breakpoint in styles/components/_responsive.scss
@@ -120,10 +123,16 @@ export const ConnectWallet = () => {
     if (ensuredProfileRef.current === walletAddress) return
     ensuredProfileRef.current = walletAddress
 
-    ensureProfile(walletAddress).catch((error) => {
-      console.error('Failed to create user profile:', error.message)
-      ensuredProfileRef.current = null
-    })
+    ensureProfile(walletAddress)
+      .then((row) => {
+        // The one moment a wallet is new: the username prompt reads this to know whether it is
+        // part of arriving or an ask made of an account that has been here for months.
+        if (row?.is_new_account) markFirstConnect(walletAddress)
+      })
+      .catch((error) => {
+        console.error('Failed to create user profile:', error.message)
+        ensuredProfileRef.current = null
+      })
   }, [isEvmConnected, evmAddress])
 
   return !mounted ? null : (
@@ -157,14 +166,19 @@ export function WalletConnectPanel() {
   // Bumped on every close so WalletOptions remounts with fresh mutation state
   // (no stale "connection rejected" error on the next open).
   const [session, setSession] = useState(0)
+  const popoverRef = useRef(null)
 
   // Stable identity: NativePopover re-subscribes its listeners whenever this changes
   const handleToggle = useCallback((event) => {
     if (event.newState === 'closed') setSession((s) => s + 1)
   }, [])
 
+  // The wide-viewport twin of the dialog's registration — this is the surface a signed-out
+  // desktop visitor gets, so without it openConnect() would only work on a phone
+  useEffect(() => setConnectHandler(() => popoverRef.current?.open()))
+
   return (
-    <NativePopover trigger={<ConnectTrigger />} placement="bottom-end" className={styles.walletPanel} onToggle={handleToggle}>
+    <NativePopover ref={popoverRef} trigger={<ConnectTrigger />} placement="bottom-end" className={styles.walletPanel} onToggle={handleToggle}>
       {({ close }) => <WalletPanelContent session={session} onConnected={close} />}
     </NativePopover>
   )
@@ -186,6 +200,9 @@ export const WalletConnectDialog = forwardRef(function WalletConnectDialog(_, re
     }),
     []
   )
+
+  // Lets a like, a composer button or a trade card open the chooser instead of only saying no
+  useEffect(() => setConnectHandler(() => dialogRef.current?.open()))
 
   const close = () => dialogRef.current?.close()
 
@@ -380,7 +397,7 @@ export function Profile({ addr }) {
     )
 
   return (
-    <Link href={`/${addr}`}>
+    <Link href={profilePath(addr, profile.username)}>
       <figure className={`${styles.pfp} relative d-f-c flex-column grid--gap-050 rounded`} title={profile.name}>
         <Avatar alt={profile.name || `PFP`} src={profile.profileImage} size={38} className={`rounded`} />
       </figure>

@@ -595,6 +595,14 @@
     margin-inline-start: 4px;
   }
 
+  &__handle {
+    display: block;
+    font-size: var(--system-15-font-size);
+    font-weight: 500;
+    color: var(--text-muted);
+    word-break: break-all;
+  }
+
   &__wallet {
     position: relative;
     top: 0.2em;
@@ -1384,6 +1392,107 @@
   &__badgeHint {
     font-size: var(--system-12-font-size);
     color: var(--text-muted);
+  }
+
+  // Interest picker: the same pill as the badge options above, in a box that scrolls rather than
+  // pushing the rest of the form down — thirty of them is a screen on its own.
+  &__interests {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    max-height: 9.5rem;
+    padding: 0.1rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  &__interest {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    font-size: var(--system-11-font-size);
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+      background-color 0.15s,
+      border-color 0.15s,
+      color 0.15s;
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+      background: var(--hover);
+    }
+
+    // At the cap the unpicked ones stop reading as offers, rather than silently doing nothing
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    &--picked {
+      background-image: linear-gradient(135deg, var(--interest-from), var(--interest-to));
+      border-color: transparent;
+      color: #fff;
+    }
+  }
+
+  // Accent picker
+  &__accentRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__accentInput {
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+
+    // The UA draws its own padded swatch inside the control; strip it so the circle is the colour
+    &::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    &::-webkit-color-swatch {
+      border: none;
+      border-radius: 50%;
+    }
+
+    &::-moz-color-swatch {
+      border: none;
+      border-radius: 50%;
+    }
+  }
+
+  &__accentValue {
+    font-size: var(--system-12-font-size);
+    color: var(--text-muted);
+  }
+
+  &__accentClear {
+    all: unset;
+    cursor: pointer;
+    font-size: var(--system-12-font-size);
+    color: var(--text-muted);
+    text-decoration: underline;
+  }
+
+  &__accentLocked {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--system-12-font-size);
+    // Same amber the premium mark uses, so the lock and the badge read as one feature
+    color: var(--premium-500, #0095f6);
   }
 
   // Links

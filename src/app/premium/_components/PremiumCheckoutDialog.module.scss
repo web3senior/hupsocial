@@ -1,0 +1,162 @@
+/* Chrome for the NativeDialog root — the primitive only supplies centering + animation */
+.checkout {
+  --premium-accent: var(--network-color-primary, var(--premium-500, #0095f6));
+  --premium-accent-text: var(--network-color-text, #fff);
+
+  padding: var(--native-popover-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    /* The native dialog caps itself at calc(100% - 6px - 2em); subtract that plus the
+       dialog's own border and padding so the body never forces horizontal scroll */
+    width: min(380px, calc(100vw - 6px - 2em - 2px - 2 * var(--native-popover-padding, 1rem)));
+    max-height: 82svh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 {
+      font-size: var(--font-size-16, 1rem);
+      margin: 0;
+    }
+  }
+
+  &__close {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    padding: 0.25rem;
+    border-radius: 50%;
+    color: var(--text-muted, #888);
+
+    &:hover {
+      background: var(--background);
+    }
+  }
+
+  &__summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.8rem;
+    border-radius: var(--global-border-radius, 12px);
+    background: var(--background);
+    margin: 0;
+
+    > div {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    dt {
+      color: var(--text-muted, #888);
+      font-size: var(--font-size-13, 0.8125rem);
+    }
+
+    dd {
+      margin: 0;
+      font-size: var(--font-size-14, 0.875rem);
+      text-align: right;
+    }
+  }
+
+  &__muted {
+    color: var(--text-muted, #888);
+    font-weight: 400;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+
+    > span {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: var(--text-muted, #888);
+      font-size: var(--font-size-13, 0.8125rem);
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius, 12px);
+      background: var(--background);
+      color: inherit;
+      font: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+
+      &:focus-visible {
+        outline: none;
+        border-color: var(--premium-accent);
+      }
+    }
+  }
+
+  &__chainWarning {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: var(--global-border-radius, 12px);
+    background: color-mix(in srgb, #f59e0b 12%, transparent);
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-12, 0.75rem);
+
+    svg {
+      flex-shrink: 0;
+      color: #f59e0b;
+    }
+  }
+
+  &__switchChain {
+    all: unset;
+    cursor: pointer;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: var(--premium-accent);
+    color: var(--premium-accent-text);
+    font-size: var(--font-size-12, 0.75rem);
+  }
+
+  &__submit {
+    all: unset;
+    cursor: pointer;
+    text-align: center;
+    padding: 0.7rem 1rem;
+    border-radius: 999px;
+    background: var(--premium-accent);
+    color: var(--premium-accent-text);
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
+
+  &__note {
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-11, 0.7rem);
+    line-height: 1.5;
+  }
+}

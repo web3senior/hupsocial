@@ -16,11 +16,13 @@ import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
 import AgentBadge from './ui/AgentBadge'
 import Avatar from './ui/Avatar'
+import PremiumBadge from './ui/PremiumBadge'
 import ProfilePortfolio from './ProfilePortfolio'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
 import NativePopover from './ui/NativePopover'
 import clsx from 'clsx'
 import UPlogo from '@/../public/up.png'
+import { openConnect } from '@/lib/connectDialog'
 import styles from './Profile.module.scss'
 
 export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, fingerprint = true, className }) {
@@ -29,7 +31,11 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   const [popoverOpened, setPopoverOpened] = useState(false)
 
   // Derived check for layout variations sharing the full metadata sub-row
-  const isFullLike = variant === 'full' || variant === 'fullWithoutTime'
+  const isFullLike = variant === 'full' || variant === 'fullWithoutTime' || variant === 'stacked'
+
+  // A card lays the identity out in a column under the picture, where the handle reads as the
+  // second line of the same label rather than a mark trailing the name
+  const handleUnderName = variant === 'stacked'
 
   // The picture's laid-out size, handed to the stylesheet so the shimmer that stands in for it
   // reserves the same box and the fingerprint keeps its proportion. Only `imageOnly` surfaces
@@ -54,11 +60,19 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   // Name plus a short address discriminator, the way non-UP handles are shown.
   // The address can be absent when the profile fetch failed, so fall back to the
   // creator prop — an upstream hiccup must not take the whole list down with it.
+  //
+  // A claimed username retires that discriminator: it exists only because display names are
+  // neither unique nor chosen, and the handle on the line below is both.
   const displayName = useMemo(() => {
     if (profile?.fullName) return profile.fullName
+    if (profile?.username) return profile.name
     const walletAddress = profile?.wallet_address || creator
     return walletAddress ? `${profile?.name}#${addressTag(walletAddress)}` : profile?.name
   }, [profile, creator])
+
+  // The canonical page for this account: its handle wherever there is one, so a link copied out
+  // of a feed is the same link the profile itself canonicalizes to.
+  const profileHref = profile?.username ? `/@${profile.username}` : creator ? `/${creator}` : '#'
 
   const handleUniversalProfile = (e) => {
     e.stopPropagation()
@@ -102,7 +116,9 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
           name={profile.name}
           profileImage={profile.profileImage}
           address={creator}
-          size={Math.round(size / 2)}
+          // Half the picture on a byline, but capped: past a 48px avatar the mark is a
+          // discriminator beside a face, not a second picture competing with it
+          size={Math.min(24, Math.round(size / 2))}
           className={clsx(styles.imageWrapper__fingerprint)}
         />
       )}
@@ -133,7 +149,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
         </NativePopover>
       ) : (
         <Link
-          href={creator ? `/${creator}` : '#'}
+          href={profileHref}
           className={styles.imageWrapper}
           onClick={(e) => e.stopPropagation()}
           aria-label={`Open the profile of ${profile.name}`}
@@ -146,14 +162,17 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
         <div className={clsx(styles.nameColumn, 'flex flex-column align-items-start justify-content-center gap-025')}>
           <div className={styles.nameRow}>
             <Link
-              href={creator ? `/${creator}` : '#'}
+              href={profileHref}
               className={styles.name}
               onClick={(e) => e.stopPropagation()}
-              onMouseEnter={() => creator && router.prefetch(`/${creator}`)}
-              onFocus={() => creator && router.prefetch(`/${creator}`)}
+              onMouseEnter={() => creator && router.prefetch(profileHref)}
+              onFocus={() => creator && router.prefetch(profileHref)}
             >
               {displayName}
             </Link>
+            {/* Straight after the name, the way a paid mark is read everywhere else. It is a
+                claim about the account, not about the post's chain, so it takes no chain colour. */}
+            <PremiumBadge premium={profile.premium} />
             <CommunityBadge badge={profile.badge} iconOnly />
             {/* The automated mark sits ahead of the chain and Universal Profile glyphs: those two
                 say where a post came from, this one says what published it. */}
@@ -168,11 +187,22 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
                 <Image alt={`Universal Profile`} src={UPlogo} width={14} height={14} />
               </div>
             )}
-            {/* Timestamp remains completely exclusive to the standard 'full' layout variant */}
-            {variant === 'full' && createdAt && <small className={styles.createdAt}>{toRelativeTime(createdAt)}</small>}
+            {/* On the name's own line, after the marks and before the time: a handle is part of
+                how an account is named, not a second fact about it. */}
+            {profile.username && !handleUnderName && <span className={styles.handle}>{`@${profile.username}`}</span>}
+            {/* Timestamp remains completely exclusive to the standard 'full' layout variant.
+                The separator only appears between two words — after a handle, never after a mark. */}
+            {variant === 'full' && createdAt && (
+              <small className={styles.createdAt}>
+                {profile.username ? `· ${toRelativeTime(createdAt)}` : toRelativeTime(createdAt)}
+              </small>
+            )}
           </div>
 
-          {isFullLike && creator && <code className={styles.address}>{truncatedAddress}</code>}
+          {/* The address only stands in where there is no handle — with one, the line above
+              already says who this is. */}
+          {isFullLike && creator && !profile.username && <code className={styles.address}>{truncatedAddress}</code>}
+          {isFullLike && handleUnderName && profile.username && <span className={styles.handle}>{`@${profile.username}`}</span>}
         </div>
       )}
     </div>
@@ -257,7 +287,7 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
   const handleFollow = (e) => {
     e.stopPropagation()
     if (!isConnected) {
-      toast(`Please connect wallet`, `error`)
+      if (!openConnect()) toast(`Please connect wallet`, `error`)
       return
     }
     if (!followerSystemAddress) {

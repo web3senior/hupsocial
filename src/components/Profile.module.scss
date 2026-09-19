@@ -209,6 +209,19 @@
   }
 }
 
+// The handle sits on the name's line, so it reads as part of the name — quieter than it, and
+// it gives before the timestamp does when the row runs out of width.
+.handle {
+  font-weight: 400;
+  line-height: 1;
+  font-size: var(--system-13-font-size);
+  color: var(--gray-400);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .createdAt {
   padding-left: 0.25rem;
   font-weight: 400;

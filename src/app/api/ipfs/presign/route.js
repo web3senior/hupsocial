@@ -16,6 +16,8 @@ import { PinataSDK } from 'pinata'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { shortUploadError } from '@/lib/uploadErrors'
+import { FREE_VIDEO_MB, PREMIUM_VIDEO_MB } from '@/lib/premium'
+import { readPremium } from '@/lib/premiumServer'
 
 const pinata = new PinataSDK({ pinataJwt: process.env.PINATA_JWT })
 
@@ -24,7 +26,15 @@ export const dynamic = 'force-dynamic'
 /* This route is unauthenticated, so the ceiling is enforced here rather than trusted from the
    client. Kept in step with MAX_VIDEO_SIZE_MB in NewPost.jsx, plus headroom for the container
    overhead a re-muxed upload can carry. */
-const MAX_UPLOAD_BYTES = 105 * 1024 * 1024
+const MAX_UPLOAD_BYTES = (FREE_VIDEO_MB + 5) * 1024 * 1024
+
+/* What a premium subscriber may upload instead. The claim is a plain `address` in the body and
+   this route has no session to check it against, so a caller who names someone else's premium
+   wallet gets the larger ceiling too — premium addresses are public. That is a soft gate on
+   purpose: it bounds the abuse to one oversized file rather than pretending to be auth. Making
+   it binding needs the signed-nonce flow /api/v1/auth/nonce already implements for push
+   notifications, which is a separate change. */
+const MAX_PREMIUM_UPLOAD_BYTES = (PREMIUM_VIDEO_MB + 5) * 1024 * 1024
 
 const SIGNED_URL_TTL_SECONDS = 600
 
@@ -85,17 +95,23 @@ async function pinataPresign({ name, mimeType, size }) {
 
 export async function POST(request) {
   try {
-    const { name, mimeType, size } = await request.json()
+    const { name, mimeType, size, address } = await request.json()
 
     const declaredSize = Number(size)
     if (!Number.isInteger(declaredSize) || declaredSize <= 0) {
       return NextResponse.json({ error: 'A positive integer size is required' }, { status: 400 })
     }
-    if (declaredSize > MAX_UPLOAD_BYTES) {
-      return NextResponse.json(
-        { error: `File exceeds the ${Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))}MB upload limit` },
-        { status: 413 }
-      )
+
+    /* Only asked when the file actually needs the larger ceiling, so an ordinary upload still
+       costs zero database work. */
+    let ceiling = MAX_UPLOAD_BYTES
+    if (declaredSize > MAX_UPLOAD_BYTES && address) {
+      const status = await readPremium(address).catch(() => null)
+      if (status?.premium) ceiling = MAX_PREMIUM_UPLOAD_BYTES
+    }
+
+    if (declaredSize > ceiling) {
+      return NextResponse.json({ error: `File exceeds the ${Math.floor(ceiling / (1024 * 1024))}MB upload limit` }, { status: 413 })
     }
 
     if (filebaseConfigured()) {

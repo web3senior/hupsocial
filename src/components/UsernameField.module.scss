@@ -1,0 +1,106 @@
+// Chrome matched to the profile modal's own fields, so the one control that saves itself still
+// reads as part of the form it sits in.
+.username {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+
+  &__label {
+    font-size: var(--system-12-font-size);
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  &__row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  &__inputWrap {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 0 0.75rem;
+    transition: border-color 0.15s;
+
+    &:focus-within {
+      border-color: var(--color-primary);
+    }
+
+    &--available {
+      border-color: var(--status-success);
+    }
+
+    &--taken,
+    &--invalid {
+      border-color: var(--status-error);
+    }
+  }
+
+  &__prefix {
+    font-size: var(--system-14-font-size);
+    color: var(--text-muted);
+  }
+
+  &__input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.5rem 0 0.5rem 0.15rem;
+    background: transparent;
+    border: 0;
+    outline: none;
+    font-family: inherit;
+    font-size: var(--system-14-font-size);
+    color: var(--text);
+
+    &::placeholder {
+      color: var(--text-muted);
+    }
+  }
+
+  &__claim {
+    flex-shrink: 0;
+    padding: 0 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    background: var(--text);
+    color: var(--background);
+    font-family: inherit;
+    font-size: var(--system-13-font-size);
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+  }
+
+  &__hint {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+    min-height: 1.1rem;
+    font-size: var(--system-12-font-size);
+    color: var(--text-muted);
+    word-break: break-word;
+
+    &--available {
+      color: var(--status-success);
+    }
+
+    &--taken,
+    &--invalid {
+      color: var(--status-error);
+    }
+  }
+}

@@ -2,6 +2,7 @@ import { getProfile } from '@/lib/api'
 import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
 import { summarizePost } from '@/lib/postSummary'
+import { resolveInterests } from '@/config/interestOptions'
 
 /**
  * @file (user)/[wallet]/llms.txt/route.js
@@ -134,11 +135,13 @@ export async function GET(request, { params }) {
   const bio = oneLine(profile.description)
   const tags = asList(profile.tags).filter((tag) => typeof tag === 'string' && tag.trim() !== '')
   const links = asList(profile.links).filter((link) => link?.url)
+  // Catalogue slugs, printed as the words the cards on the profile show
+  const interests = resolveInterests(profile.interests).map((interest) => interest.label)
 
   /* Loading a profile writes its users row, so nearly every address ever viewed has one — blank.
      Answering for those would hand a crawler an unbounded supply of empty pages, one per address
      in existence. An account is only described here once it has said or done something. */
-  const hasIdentity = Boolean(profile.name || bio || tags.length > 0 || links.length > 0)
+  const hasIdentity = Boolean(profile.name || bio || tags.length > 0 || links.length > 0 || interests.length > 0)
   const hasActivity = Boolean(activity && (activity.posts > 0 || activity.followers > 0 || activity.following > 0))
   if (!hasIdentity && !hasActivity) return notFound()
 
@@ -152,9 +155,12 @@ export async function GET(request, { params }) {
     '',
     '## Identity',
     '',
-    `- Profile: ${BASE_URL}/${address}`,
+    `- Profile: ${BASE_URL}/${profile.username ? `@${profile.username}` : address}`,
     `- Address: ${address}`,
   )
+
+  // The one name on this account that is unique and that its owner claimed with a signature
+  if (profile.username) lines.push(`- Username: @${profile.username}`)
 
   /* Only ever asserted, never denied: the LUKSO indexer answering with nothing is indistinguishable
      here from an account that is genuinely an EOA, and guessing wrong misdescribes the account. */
@@ -165,6 +171,8 @@ export async function GET(request, { params }) {
   if (profile.origin?.label) lines.push(`- Origin: ${profile.origin.label}`)
   if (profile.badge?.name) lines.push(`- Community badge: ${profile.badge.name}`)
   if (profile.agent?.label) lines.push(`- Automated: this account declares itself ${profile.agent.label}`)
+
+  if (interests.length > 0) lines.push(`- Interests: ${interests.join(', ')}`)
 
   if (tags.length > 0) lines.push(`- Tags: ${tags.join(', ')}`)
 

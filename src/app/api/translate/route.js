@@ -6,6 +6,8 @@
 // each one takes a different amount of text per request.
 
 import { NextResponse } from 'next/server'
+import { FREE_TRANSLATIONS_PER_DAY } from '@/lib/premium'
+import { readPremium } from '@/lib/premiumServer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,6 +22,36 @@ const TOTAL_BUDGET = 25000
 const RETRY_DELAYS = [600, 1600]
 
 const cache = new Map()
+
+/* Free callers get a daily allowance; premium is unmetered (lib/premium.js owns both numbers).
+   Counted per IP rather than per wallet because the claim would otherwise be free to make, and
+   held in memory rather than in a table: the counter is per process, so a caller spread across
+   serverless instances gets more than their share. That is the right trade for a soft comfort
+   limit — it costs no database work on the hot path, and a cached translation (the common case
+   for a popular post) never touches it at all. */
+const usage = new Map()
+
+const spendTranslation = (key) => {
+  const today = new Date().toISOString().slice(0, 10)
+  const entry = usage.get(key)
+
+  if (!entry || entry.day !== today) {
+    usage.set(key, { day: today, count: 1 })
+    /* One day's worth of keys at a time — without this the map is a slow leak. */
+    if (usage.size > 5000) {
+      for (const [candidate, value] of usage) {
+        if (value.day !== today) usage.delete(candidate)
+      }
+    }
+    return 1
+  }
+
+  entry.count += 1
+  return entry.count
+}
+
+const callerKey = (request) =>
+  (request.headers.get('x-forwarded-for') || '').split(',')[0].trim() || request.headers.get('x-real-ip') || 'unknown'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -204,6 +236,23 @@ export async function POST(request) {
   const cacheKey = `${target}|${text}`
   const cached = readCache(cacheKey)
   if (cached) return NextResponse.json(cached, { headers: { 'Cache-Control': 'private, max-age=86400' } })
+
+  /* Only a translation that will actually cost an upstream call is metered, and only when the
+     caller is not premium. The wallet is a claim this route cannot verify, so it is checked
+     against the indexed subscription rather than trusted — a wrong address simply falls back
+     to the free allowance. */
+  const address = typeof payload?.address === 'string' ? payload.address : null
+  const status = address ? await readPremium(address).catch(() => null) : null
+
+  if (!status?.premium && FREE_TRANSLATIONS_PER_DAY !== null) {
+    const spent = spendTranslation(callerKey(request))
+    if (spent > FREE_TRANSLATIONS_PER_DAY) {
+      return NextResponse.json(
+        { error: `You've used today's ${FREE_TRANSLATIONS_PER_DAY} free translations. Premium removes the limit.`, premiumRequired: true },
+        { status: 429 },
+      )
+    }
+  }
 
   try {
     const result = await translateText(text, target)

@@ -11,6 +11,7 @@ import { initHupContract } from '@/lib/communication'
 import { getPostById, recordPostView } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 import abi from '@/abi/post.json'
 import { getActiveChain } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
@@ -475,7 +476,7 @@ const RepostLabel = ({ walletAddress }) => {
   const displayName = profile?.name || truncatedAddress
 
   return (
-    <Link href={`/${walletAddress}`} className={styles.post__repostLabel} onClick={(e) => e.stopPropagation()}>
+    <Link href={profilePath(walletAddress, profile?.username)} className={styles.post__repostLabel} onClick={(e) => e.stopPropagation()}>
       <RepeatIcon width={16} height={16} />
       <span className={styles.post__repostLabel__name}>{displayName}</span>
       {` Reposted`}
@@ -638,6 +639,9 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
   const publicClient = usePublicClient()
   const { signTypedDataAsync } = useSignTypedData()
   const sellPopoverRef = useRef(null)
+  // Buyers who have paid and are still waiting for their key. Named in the menu because the escrow
+  // is reclaimable after 24h, so "Sell" alone gives the seller no reason to open the dialog in time.
+  const [pendingGrants, setPendingGrants] = useState(0)
   // A Solana post is owned and deleted by the Solana wallet, an EVM post by the EVM one
   const solanaWallet = useSolanaWallet()
   const isSolanaPost = isSolanaNetworkId(item.network_id)
@@ -816,8 +820,12 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
               {isOwner && (
                 <MenuItem
                   icon={<TagIcon size={20} />}
-                  label="Sell"
-                  description="List this post for sale"
+                  label={pendingGrants > 0 ? `Sell · ${pendingGrants} waiting` : 'Sell'}
+                  description={
+                    pendingGrants > 0
+                      ? `${pendingGrants} buyer${pendingGrants === 1 ? '' : 's'} paid and ${pendingGrants === 1 ? 'is' : 'are'} waiting for a key`
+                      : 'List this post for sale'
+                  }
                   onClick={(e) => {
                     e.stopPropagation()
                     sellPopoverRef.current?.open()
@@ -869,7 +877,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
           </div>
         )}
       </NativePopover>
-      <SellItemPopover ref={sellPopoverRef} item={item} />
+      <SellItemPopover ref={sellPopoverRef} item={item} onPendingCount={setPendingGrants} />
       {showEmbedModal && <EmbedPostDialog item={item} onClose={() => setShowEmbedModal(false)} />}
     </>
   )
@@ -1142,17 +1150,22 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
 
 // Google's endpoint sends no CORS header and answers browsers with a redirect, so the
 // call has to leave from our own origin
-const translationFetcher = async ([text, targetLang]) => {
+const translationFetcher = async ([text, targetLang, address]) => {
   if (!text) return ''
 
   const res = await fetch('/api/translate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, target: targetLang }),
+    // The wallet lifts the free daily allowance for a premium reader; the route verifies it
+    body: JSON.stringify({ text, target: targetLang, address: address ?? null }),
   })
 
   if (!res.ok) {
-    throw new Error('Translation pipeline network response failed')
+    // The daily-allowance refusal carries a sentence worth showing, unlike a provider failure
+    const body = await res.json().catch(() => null)
+    const error = new Error(body?.premiumRequired ? body.error : 'Translation pipeline network response failed')
+    error.premiumRequired = Boolean(body?.premiumRequired)
+    throw error
   }
 
   const data = await res.json()
@@ -1176,6 +1189,7 @@ function handleBodyLinkClick(event, router) {
 
 export function PostText({ sourceText, postId, styles, renderMarkdown, isCollapsible = false, baseClassName }) {
   const router = useRouter()
+  const { address: readerAddress } = useActiveWallet()
   const [showTranslation, setShowTranslation] = useState(false)
   const contentRef = useRef(null)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -1191,7 +1205,7 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
   // language is part of the SWR key, so switching it in Settings re-translates and caches
   // each language separately instead of serving the previous one.
   const { data: translatedText, error: translationError, isValidating: isTranslating, mutate: retryTranslation } = useSWR(
-    showTranslation && sourceText ? [sourceText, preferredLanguage] : null,
+    showTranslation && sourceText ? [sourceText, preferredLanguage, readerAddress ?? null] : null,
     translationFetcher,
     {
       revalidateOnFocus: false,
@@ -1220,6 +1234,11 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
     e.stopPropagation()
     // A failed translation leaves the original on screen, so the same button retries
     if (showTranslation && translationError) {
+      // Retrying a spent daily allowance just spends another request on the same refusal
+      if (translationError.premiumRequired) {
+        toast(translationError.message, 'info')
+        return
+      }
       retryTranslation()
       return
     }
@@ -1275,7 +1294,10 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
             {isTranslating
               ? 'Translating...'
               : showTranslation && translationError
-                ? 'Translation unavailable — retry'
+                ? // The allowance refusal is a different thing from a provider failing, and retrying it is pointless
+                  translationError.premiumRequired
+                  ? 'Daily limit reached'
+                  : 'Translation unavailable — retry'
                 : showTranslation && translatedText
                   ? 'See original'
                   : 'Translate'}

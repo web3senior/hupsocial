@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import useSWR from 'swr'
 import clsx from 'clsx'
 import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 import { getPostById } from '@/lib/api'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
@@ -170,7 +171,7 @@ function Sentence({ group }) {
 
   return (
     <>
-      <Link href={`/${firstActor}`} className={styles.row__actorName} onClick={(event) => event.stopPropagation()}>
+      <Link href={profilePath(firstActor, profile?.username)} className={styles.row__actorName} onClick={(event) => event.stopPropagation()}>
         {name}
       </Link>
       {others > 0 && <span className={styles.row__others}> and {compactNumber.format(others)} {others === 1 ? 'other' : 'others'}</span>}
@@ -185,7 +186,7 @@ function ActorAvatar({ address }) {
   if (!profile) return <span className={clsx(styles.row__avatar, styles['row__avatar--pending'])} />
 
   return (
-    <Link href={`/${address}`} className={styles.row__avatar} onClick={(event) => event.stopPropagation()} title={profile.fullName || profile.name}>
+    <Link href={profilePath(address, profile.username)} className={styles.row__avatar} onClick={(event) => event.stopPropagation()} title={profile.fullName || profile.name}>
       <Avatar src={profile.profileImage} alt={profile.name} size={32} />
     </Link>
   )

@@ -1,5 +1,14 @@
 import { getProfile } from '@/lib/api'
 import { ImageResponse } from 'next/og'
+import { toFetchable, toPngDataUri } from '@/lib/ogImage'
+import { resolveAvatarImageUrl } from '@/lib/storageHelper'
+
+// The avatar's laid-out box, and how long it is worth waiting for. A profile picture on a dead or
+// slow gateway used to be handed to satori as a bare remote <img>, which meant the whole card hung
+// on it and then failed — so a shared profile unfurled with no image at all. Fetched through our
+// own proxy with a budget instead: past it, the card draws the initial and still ships.
+const AVATAR_SLOT_PX = 180
+const AVATAR_TIMEOUT_MS = 2500
 
 // Define explicit dimensions for the Open Graph image asset
 export const size = {
@@ -13,6 +22,7 @@ export const contentType = 'image/png'
 // Dynamic image generation entry point matching your route parameters
 export default async function Image({ params }) {
   const { wallet } = await params
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'http://localhost:3000'
 
   try {
     // Fetch profile data matching the page setup
@@ -27,6 +37,15 @@ export default async function Image({ params }) {
         { ...size }
       )
     }
+
+    const avatar = await toPngDataUri(
+      toFetchable(resolveAvatarImageUrl(profile.profileImage, AVATAR_SLOT_PX), baseUrl),
+      AVATAR_SLOT_PX * 2,
+      AVATAR_TIMEOUT_MS,
+      { background: '#0f172a' }
+    )
+
+    const initial = (profile.name || profile.wallet_address || '?').trim().charAt(0).toUpperCase()
 
     // Return the custom styled card for the user profile
     return new ImageResponse(
@@ -45,19 +64,39 @@ export default async function Image({ params }) {
             padding: '40px',
           }}
         >
-          {/* Hexagonal or rounded profile container fallback */}
-          {profile.profileImage && (
+          {avatar ? (
             <img
-              src={profile.profileImage}
+              src={avatar}
               alt={profile.name}
+              width={AVATAR_SLOT_PX}
+              height={AVATAR_SLOT_PX}
               style={{
-                width: '180px',
-                height: '180px',
+                width: `${AVATAR_SLOT_PX}px`,
+                height: `${AVATAR_SLOT_PX}px`,
                 borderRadius: '50%',
                 marginBottom: '30px',
                 border: '4px solid #3b82f6',
+                objectFit: 'cover',
               }}
             />
+          ) : (
+            <div
+              style={{
+                width: `${AVATAR_SLOT_PX}px`,
+                height: `${AVATAR_SLOT_PX}px`,
+                borderRadius: '50%',
+                marginBottom: '30px',
+                border: '4px solid #3b82f6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#1e293b',
+                fontSize: '88px',
+                fontWeight: 'bold',
+              }}
+            >
+              {initial}
+            </div>
           )}
           
           <h1 style={{ fontSize: '64px', fontWeight: 'bold', margin: '0 0 10px 0' }}>
@@ -65,7 +104,9 @@ export default async function Image({ params }) {
           </h1>
           
           <p style={{ fontSize: '32px', color: '#94a3b8', margin: '0' }}>
-            {`@${profile.wallet_address.slice(0, 6)}...${profile.wallet_address.slice(-4)}`}
+            {profile.username
+              ? `@${profile.username}`
+              : `@${profile.wallet_address.slice(0, 6)}...${profile.wallet_address.slice(-4)}`}
           </p>
         </div>
       ),

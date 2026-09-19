@@ -1,64 +1,8 @@
-import OpenAI from 'openai'
+// Retired: an unauthenticated proxy onto OPENAI_API_KEY with no caller in the app.
 import { NextResponse } from 'next/server'
 
-// Initialize the client.
-// It automatically picks up GEMINI_API_KEY from your .env file.
-const client = new OpenAI()
+export const dynamic = 'force-dynamic'
 
-export async function POST(req) {
-  try {
-    // Extract prompt from the request body
-    const { profile, posts } = await req.json()
-
-    if (!profile || !posts) {
-      return NextResponse.json({ error: 'Profile and posts are required' }, { status: 400 })
-    }
-
-    const systemPrompt = `
-  You are an expert Web3 Cultural Analyst. Your task is to analyze a user's onchain persona based on their profile and social activity.
-
-  ### DATA TO ANALYZE:
-  - Name: ${profile.name}
-  - Bio: ${profile.bio}
-  - Recent Activity: ${posts}
-
-  ### SCORING LOGIC:
-  1. **Degen (0-100):** High scores for memecoin mentions, high-frequency trading, NFT flipping, "apeing" into new projects, and use of slang like "LFG", "GM", or "Moon".
-  2. **Builder (0-100):** High scores for technical terms (Solidity, Rust, SDKs), hackathon participation (ETHGlobal), mentions of building/shipping, and GitHub activity.
-  3. **Researcher (0-100):** High scores for long-form analysis, governance voting, whitepaper discussions, DAO participation, and educational content.
-
-  ### OUTPUT REQUIREMENTS:
-  - **Summary:** A sharp, insightful 2-sentence breakdown of who they are in the ecosystem. Avoid generic "This user is active" filler.
-  - **Web3 Vibe:** A creative, 2-4 word "Archetype" title (e.g., "The Stealth Alpha Hunter", "Protocol Architect", "Governance Minimalist", "High-Stakes Yield Farmer").
-  - **Format:** Return ONLY a valid JSON object. No markdown blocks, no extra text.
-
-  JSON structure:
-  {
-    "summary": "string",
-    "web3_vibe": "string",
-    "scores": {
-        "degen": number,
-        "builder": number,
-        "researcher": number
-    }
-  }
-`
-
-    // Generate content using the new SDK syntax
-    const response = await client.responses.create({
-      model: 'gpt-5-nano',
-      input: systemPrompt,
-    })
-
-    const text = response.output_text
-
-    // Return the response text
-    return NextResponse.json(JSON.parse(text))
-  } catch (error) {
-    console.error('Gemini API Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to generate content', details: error.message },
-      { status: 500 }
-    )
-  }
+export async function POST() {
+  return NextResponse.json({ error: 'This endpoint has been retired.' }, { status: 410 })
 }

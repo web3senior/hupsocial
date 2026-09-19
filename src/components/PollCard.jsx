@@ -18,6 +18,7 @@ import pollsAbi from '@/abis/HupPolls.json'
 import { toast } from '@/components/NextToast'
 import PollTimer from '@/components/PollTimer'
 import ProgressBar from '@/components/ui/ProgressBar'
+import { openConnect } from '@/lib/connectDialog'
 import styles from './PollCard.module.scss'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
@@ -119,7 +120,7 @@ export default function PollCard({ pollRef }) {
    */
   const castVote = async (optionIndex) => {
     if (!isConnected || !address) {
-      toast('Connect your wallet to vote', 'error')
+      if (!openConnect()) toast('Connect your wallet to vote', 'error')
       return
     }
     if (!pollsAddress) {

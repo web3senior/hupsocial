@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { MEMBER_ROW_SQL } from '@/lib/members'
+import { hasColumn } from '@/lib/schema'
 
 export const runtime = 'nodejs'
 
@@ -225,15 +226,21 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     baseConditions: ['f.is_following = 1'],
   })
 
+  /* A row links to its profile, and a profile with a handle is linked by it. Probed rather than
+     named outright: naming a column production has not migrated yet would reject this entire
+     query — see cidex/scripts/add-usernames.sql. */
+  const handleColumn = (await hasColumn('users', 'username_key')) ? 'u.username' : 'NULL'
+
   /* Construct base query fields to execute dynamic window rank sequencing */
   const queryBase = `
-    SELECT 
+    SELECT
       ranked.*,
       ROW_NUMBER() OVER (ORDER BY ${SORTS[sort]}) AS global_rank
     FROM (
       SELECT
         wallets.wallet_address,
         NULLIF(u.name, '') AS display_name,
+        ${handleColumn} AS username,
         u.description,
         u.profileImage AS profile_image,
         COALESCE(followers.follower_count, 0) AS follower_count,
@@ -474,6 +481,8 @@ function serializeLeader(row, rank) {
     rank,
     wallet_address: wallet,
     display_name: row.display_name || formatWallet(wallet),
+    // What a row's links point at, wherever this wallet has claimed one
+    username: row.username || null,
     description: row.description || '',
     profile_image: row.profile_image || null,
     follower_count: toNumber(row.follower_count),

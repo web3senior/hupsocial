@@ -48,7 +48,7 @@ export const recipientFromInput = (input) => ({
 
 /** Builds a field value from a picked suggestion. */
 export const recipientFromSuggestion = (suggestion) => ({
-  input: suggestion.name || suggestion.ensName || suggestion.address,
+  input: suggestion.username ? `@${suggestion.username}` : suggestion.name || suggestion.ensName || suggestion.address,
   address: suggestion.address,
   profile: suggestion,
 })
@@ -92,6 +92,7 @@ export function readRecentRecipients(owner) {
       .map((item) => ({
         address: normalizeAddress(item?.address || ''),
         name: item?.name || null,
+        username: item?.username || null,
         avatar: item?.avatar || null,
         ensName: item?.ensName || null,
         followerCount: null,
@@ -116,7 +117,13 @@ export function rememberRecipient(owner, recipient) {
   if (!holder || !address || typeof window === 'undefined') return
 
   const next = [
-    { address, name: recipient.name || null, avatar: recipient.avatar || null, ensName: recipient.ensName || null },
+    {
+      address,
+      name: recipient.name || null,
+      username: recipient.username || null,
+      avatar: recipient.avatar || null,
+      ensName: recipient.ensName || null,
+    },
     ...readRecentRecipients(holder).filter((item) => item.address !== address),
   ].slice(0, MAX_RECENTS)
 

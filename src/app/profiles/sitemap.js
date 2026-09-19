@@ -23,15 +23,17 @@ export default async function sitemap({ id }) {
 
   return profiles.flatMap((row) => {
     const lastModified = row.lastUpdate ? new Date(row.lastUpdate) : undefined
+    // The same path the page canonicalizes to, so the two never disagree
+    const path = row.username ? `@${row.username}` : row.wallet_address
     return [
       {
-        url: `${baseUrl}/${row.wallet_address}`,
+        url: `${baseUrl}/${path}`,
         lastModified,
         changeFrequency: 'weekly',
         priority: 0.6,
       },
       {
-        url: `${baseUrl}/${row.wallet_address}/llms.txt`,
+        url: `${baseUrl}/${path}/llms.txt`,
         lastModified,
         changeFrequency: 'daily',
         priority: 0.5,

@@ -8,6 +8,8 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { FREE_INSIGHTS_DAYS } from '@/lib/premium'
+import { readPremium } from '@/lib/premiumServer'
 
 export const runtime = 'nodejs'
 
@@ -16,6 +18,7 @@ const PERIOD_DAYS = {
   '14d': 14,
   '30d': 30,
   '90d': 90,
+  '365d': 365,
 }
 
 export async function GET(request, { params }) {
@@ -28,7 +31,20 @@ export async function GET(request, { params }) {
     }
 
     const wallet = address.toLowerCase()
-    const days = PERIOD_DAYS[searchParams.get('period')] || 30
+    const requestedDays = PERIOD_DAYS[searchParams.get('period')] || 30
+
+    /* The long windows are a premium perk. Clamped rather than refused: a picker that has
+       drifted out of step with a lapsed subscription should still answer with a chart, and the
+       flag on the response is what lets the page say why it is shorter than what was asked for. */
+    let days = requestedDays
+    let clamped = false
+    if (requestedDays > FREE_INSIGHTS_DAYS) {
+      const status = await readPremium(wallet).catch(() => null)
+      if (!status?.premium) {
+        days = FREE_INSIGHTS_DAYS
+        clamped = true
+      }
+    }
 
     // Anchor "today" to the DB's own clock rather than Node's — DATE_FORMAT() below reflects the
     // DB session's timezone, so building the day range off Date.now() (UTC) could disagree with it
@@ -60,6 +76,7 @@ export async function GET(request, { params }) {
         posts_by_network: networkBreakdown.postsByNetwork,
         engagement_by_network: networkBreakdown.engagementByNetwork,
       },
+      meta: { days, requested_days: requestedDays, clamped },
     })
   } catch (error) {
     console.error('[INSIGHTS_FETCH_ERROR]:', error.message)

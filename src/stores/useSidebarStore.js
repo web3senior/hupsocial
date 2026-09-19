@@ -19,6 +19,7 @@ import {
   PlusIcon,
   PlayCircleIcon,
   PulseIcon,
+  SealCheckIcon,
   SquaresFourIcon,
   StorefrontIcon,
   TrophyIcon,
@@ -32,6 +33,20 @@ import { SECTIONS, sectionLanding, sectionPaths } from '@/config/sections'
 // Grouped by what the user came to do, not by which contract backs the page: a row
 // with `activePaths` is a section (config/sections.js) whose member routes are
 // reached through the tab strip on its pages, and it stays highlighted on all of them.
+// Rows that do nothing without a wallet behind them, so a signed-out visitor never sees them.
+// Tighten this to hide more of the surface from a stranger; every other row stays browsable.
+const WALLET_ONLY_NAV = new Set(['new-post', 'notifications', 'saved', 'activity', 'insights', 'revenue'])
+
+// Filtering a group empty leaves its divider drawing a line under nothing, so drop any divider
+// that ends up leading, trailing, or doubled.
+const withoutStrandedDividers = (items) =>
+  items.filter((item, index, list) => {
+    if (item.type !== 'divider') return true
+    const previous = list[index - 1]
+    const next = list.slice(index + 1).find((entry) => entry.type !== 'divider')
+    return Boolean(previous) && previous.type !== 'divider' && Boolean(next)
+  })
+
 export const NAV_ITEMS_SCHEMA = [
   { id: 'foryou', name: 'For you', path: '/', icon: HouseIcon },
   { id: 'shorts', name: 'Shorts', path: '/shorts', icon: PlayCircleIcon },
@@ -60,13 +75,17 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
   { id: 'divider-secondary', type: 'divider' },
-  { id: 'chat', name: 'Chat', path: '/chat', icon: ChatCircleIcon, badge: 'beta' },
+  // Chat is out of the nav until it is deployed: contracts.chat is '' on all ten chains, so the
+  // page can only ever fail, and a BETA badge on a broken row reads as a broken product.
+  // { id: 'chat', name: 'Chat', path: '/chat', icon: ChatCircleIcon, badge: 'beta' },
   { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
   // Reads with Insights as a pair: what the network did, then what you did.
   { id: 'activity', name: 'Activity', path: '/activity', icon: PulseIcon },
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
   // Your own sales, so it sits with the rest of your account rather than in the market block
   { id: 'revenue', name: 'Money', path: '/revenue', icon: CurrencyDollarIcon },
+  // Last in the account block: what you pay Hup, under everything Hup pays you.
+  { id: 'premium', name: 'Premium', path: '/premium', icon: SealCheckIcon },
 ]
 
 // Baskets migrated from the pre-wallet era live under this key until the
@@ -244,7 +263,9 @@ export const useSidebarStore = create(
 
       // The basket lives in the floating heart (components/BatchLikeTrigger) rather than a
       // nav row, so the schema needs no per-item badge wiring
-      getNavItems: () => NAV_ITEMS_SCHEMA,
+      // Takes the viewer's address: the argument was already being passed and silently dropped,
+      // so every stranger got all twenty rows including the ones that only answer with a wallet.
+      getNavItems: (address) => (address ? NAV_ITEMS_SCHEMA : withoutStrandedDividers(NAV_ITEMS_SCHEMA.filter((item) => !WALLET_ONLY_NAV.has(item.id)))),
     }),
     {
       name: 'hup-sidebar-state',

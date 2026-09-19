@@ -10,6 +10,7 @@ import Aside from './Aside'
 import Footer from './Footer'
 import InstallAppDialog from './InstallAppDialog'
 import EmailLoginDialog from './EmailLoginDialog'
+import UsernameGate from './UsernameGate'
 import EmbeddedTxConfirm from './EmbeddedTxConfirm'
 import VaultUnlockDialog from './VaultUnlockDialog'
 import ComposerRecovery from './ComposerRecovery'
@@ -51,6 +52,9 @@ export default function ClientLayout({ children }) {
         <main className={styles.main}>{children}</main>
         <Footer />
         <InstallAppDialog />
+        {/* A connected wallet with no handle is asked for one here — required on a first
+            connect, an ask with a Later for the accounts that predate handles */}
+        <UsernameGate />
         {/* Email embedded wallet surfaces: the login flow and its extension-popup stand-in */}
         <EmailLoginDialog />
         <EmbeddedTxConfirm />

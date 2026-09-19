@@ -5,6 +5,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { usePostStats } from '@/hooks/usePostStats'
 import { toast } from '@/components/NextToast'
 import { TipIcon } from '@/components/Icons'
+import { openConnect } from '@/lib/connectDialog'
 import Counter from './Counter'
 import Tooltip from './Tooltip'
 import styles from './Tip.module.scss'
@@ -52,7 +53,7 @@ export const Tip = ({ post, onTip }) => {
     e.stopPropagation()
 
     if (!isConnected) {
-      toast(`Please connect wallet`, `error`)
+      if (!openConnect()) toast(`Please connect wallet`, `error`)
       return
     }
 

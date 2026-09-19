@@ -12,6 +12,7 @@ import { clampFeeBps, formatAmount } from '@/lib/uniswap'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { describeRouterRevert } from '@/lib/uniswap-v4'
 import { getChainIconUrl } from '@/lib/chains'
+import { openConnect } from '@/lib/connectDialog'
 import { canTradeOnSolana, isSolanaNetworkId, solanaChainFor } from '@/config/solana'
 import { isMint } from '@/lib/solanaSwap'
 import useTokenSwap, { canSwapOn, useTokenIdentity } from '@/hooks/useTokenSwap'
@@ -339,7 +340,7 @@ export default function TokenTradeCard({ trade, author }) {
         connectSolana?.(solanaWallets[0].name)?.catch?.(() => {})
         return
       }
-      toast(onSolana ? 'Connect a Solana wallet to trade' : 'Connect your wallet to trade', 'error')
+      if (!openConnect()) toast(onSolana ? 'Connect a Solana wallet to trade' : 'Connect your wallet to trade', 'error')
       return
     }
     if (isWrongChain) {

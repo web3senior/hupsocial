@@ -11,6 +11,7 @@ import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
+import { openConnect } from '@/lib/connectDialog'
 import styles from './Footer.module.scss'
 
 // Gesture tuning for the auto-hide. Below the jitter floor a scroll is trackpad noise or a
@@ -104,7 +105,7 @@ export default function Footer() {
         // Same gate as the sidebar: no wallet, no composer
         action: () => {
           if (!isConnected) {
-            toast('Please connect wallet', 'error')
+            if (!openConnect()) toast('Please connect wallet', 'error')
             return
           }
           setIsComponentOpen(true)

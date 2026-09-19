@@ -1,0 +1,71 @@
+// Chrome only — NativeDialog owns centring, the backdrop and modality.
+.gate {
+  width: min(400px, calc(100vw - 28px));
+  padding: 1.5rem;
+  border: 0;
+  color: var(--text);
+  background: var(--background);
+  border-radius: 22px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  flex-direction: column;
+  gap: 0.75rem;
+
+  // Only the open state's display — a bare `display: flex` would override the UA's
+  // `display: none` on the closed dialog and flash it before showModal() runs
+  &[open] {
+    display: flex;
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--surface-muted);
+    color: var(--text);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--system-18-font-size);
+    font-weight: 700;
+  }
+
+  &__copy {
+    margin: 0;
+    font-size: var(--system-14-font-size);
+    line-height: 1.45;
+    color: var(--text-muted);
+    text-wrap: pretty;
+  }
+
+  &__note {
+    margin: 0;
+    font-size: var(--system-12-font-size);
+    color: var(--text-muted);
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.25rem;
+  }
+
+  &__quiet {
+    padding: 0.4rem 0.6rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: var(--system-13-font-size);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+      background: var(--hover);
+    }
+  }
+}

@@ -104,18 +104,19 @@ const nextConfig = {
         destination: '/bazaar',
         permanent: true,
       },
-      // The launch pages became the Trade section. Every token link shared before the rename
-      // points at the old path, and a token page is a thing people paste into group chats — so
-      // these have to keep resolving rather than 404 once the nav stopped naming them.
+      // The launchpad and its token pages left this app entirely, so /trade no longer exists and
+      // these pointed at nothing — which the profile route then answered with a 200 "Profile Not
+      // Found". Sending them to the feed keeps an old shared link resolving without inventing a
+      // destination, and `permanent: false` leaves the door open if the pages ever come back.
       {
         source: '/launches',
-        destination: '/trade',
-        permanent: true,
+        destination: '/',
+        permanent: false,
       },
       {
         source: '/launches/:path*',
-        destination: '/trade/:path*',
-        permanent: true,
+        destination: '/',
+        permanent: false,
       },
     ];
   },

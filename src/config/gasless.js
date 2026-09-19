@@ -28,6 +28,19 @@ export const isGaslessChainId = (networkId) => {
   return Boolean(id) && gaslessChainIds().includes(id)
 }
 
+// A fresh connection must land on a sponsored chain. getActiveChain() treats the wallet's chain
+// as authoritative once connected, and wagmi seeds a connector from config.chains[0] — Ethereum
+// mainnet, the one chain deliberately left out of the list above, where a new account holds
+// nothing and the first post is a real L1 transaction.
+export const ONBOARDING_CHAIN_ID = 42
+
+/** ONBOARDING_CHAIN_ID while it is sponsored, else whatever is — never an unsponsored chain. */
+export const onboardingChainId = () => {
+  const sponsored = gaslessChainIds()
+  if (sponsored.includes(ONBOARDING_CHAIN_ID)) return ONBOARDING_CHAIN_ID
+  return sponsored[0] ?? ONBOARDING_CHAIN_ID
+}
+
 // Per sponsored action:
 //   cooldownMs — minimum gap between two of them from one account
 //   max/windowMs — ceiling over a longer stretch

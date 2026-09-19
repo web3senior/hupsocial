@@ -80,6 +80,13 @@ const EMAIL_WORTHY_TYPES = [
   'community_join_requested',
   'community_vault_needed',
   'followed_user_created_community',
+  // A paid sale is the one notification in this app with a deadline attached: HupSell lets the
+  // buyer reclaim the escrow after GRANT_WINDOW (24h) if the seller never publishes the key, so a
+  // seller who only ever sees this in-app loses a real sale by not opening the tab. The buyer's
+  // side earns a mail for the mirror reason — they paid and are waiting on a file.
+  'sell_received_purchase',
+  'sell_access_released',
+  'sell_purchase_refunded',
 ]
 
 const WORTHY_PLACEHOLDERS = EMAIL_WORTHY_TYPES.map(() => '?').join(', ')

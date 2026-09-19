@@ -18,6 +18,7 @@ import { canSessionPayGas, isSessionActive, isSessionUnusableError, localStorage
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { isSolanaNetworkId } from '@/config/solana'
+import { openConnect } from '@/lib/connectDialog'
 import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import { hupInstruction } from '@/lib/solana/hup'
 import { sendHupAction } from '@/lib/solana/relay'
@@ -379,7 +380,7 @@ export const Like = ({ post, onUpdate }) => {
     e.stopPropagation()
 
     if (!actorConnected) {
-      toast(isSolanaPost ? 'Connect your Solana wallet' : 'Please connect wallet', 'error')
+      if (!openConnect()) toast(isSolanaPost ? 'Connect your Solana wallet' : 'Please connect wallet', 'error')
       return
     }
 

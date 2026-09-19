@@ -1,0 +1,128 @@
+.status {
+  --premium-accent: var(--network-color-primary, var(--premium-500, #0095f6));
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--premium-accent) 35%, var(--border));
+  border-radius: var(--global-border-radius, 16px);
+  background: color-mix(in srgb, var(--premium-accent) 6%, var(--background));
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+  }
+
+  &__mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border-radius: 50%;
+    color: var(--premium-accent);
+    background: color-mix(in srgb, var(--premium-accent) 16%, transparent);
+  }
+
+  &__title {
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  &__expiry {
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-13, 0.8125rem);
+    line-height: 1.5;
+  }
+
+  &__chains {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  &__chain {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: var(--font-size-12, 0.75rem);
+
+    img {
+      border-radius: 50%;
+    }
+  }
+
+  &__history {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  &__entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: var(--font-size-13, 0.8125rem);
+  }
+
+  &__entryLabel {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  /* The gift-giver's name sits inside a sentence, so it must not claim a row of its own */
+  &__giver {
+    display: inline-flex;
+  }
+
+  &__muted {
+    color: var(--text-muted, #888);
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  &__action {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: var(--font-size-13, 0.8125rem);
+    color: var(--text-muted, #888);
+    transition:
+      border-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      border-color: var(--premium-accent);
+      color: var(--text, inherit);
+    }
+  }
+}

@@ -129,7 +129,9 @@ const MentionPicker = forwardRef(function MentionPicker({ query, caretRect, view
                   <Avatar src={suggestion.avatar} size={AVATAR_SIZE} className={styles.mentionPicker__avatar} />
                   <span className={styles.mentionPicker__identity}>
                     <strong className={styles.mentionPicker__name}>{suggestion.name || suggestion.ensName || 'Unnamed wallet'}</strong>
-                    <span className={styles.mentionPicker__address}>{shortAddress(suggestion.address)}</span>
+                    <span className={styles.mentionPicker__address}>
+                      {suggestion.username ? `@${suggestion.username}` : shortAddress(suggestion.address)}
+                    </span>
                   </span>
                 </button>
               </li>

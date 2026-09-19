@@ -61,3 +61,10 @@
     color: var(--text-muted);
   }
 }
+
+/* The mark on a window this account cannot open yet. Same colour as the badge beside a name,
+   so the two read as the same thing. */
+.picker__locked {
+  color: var(--premium-500, #0095f6);
+  flex-shrink: 0;
+}

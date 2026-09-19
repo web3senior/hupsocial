@@ -5,8 +5,14 @@ import { AVATAR_MAX_SIZE, resolveAvatarImageUrl, resolveStorageImageUrl } from '
 import { readUniversalProfile } from '@/lib/lukso'
 import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/badge'
 import { resolveAgentProfile } from '@/lib/agentProfile'
+import { readPremium } from '@/lib/premiumServer'
+import { isAccentColor, parseAccentSelection } from '@/lib/premium'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
+import { readHandleSegment } from '@/lib/username'
+import { normalizeInterests } from '@/config/interestOptions'
 import { hasColumn } from '@/lib/schema'
+import { verifyWalletSignature } from '@/lib/walletSignature'
+import { PROFILE_SIGNATURE_MAX_AGE_MS, profileUpdateMessage } from '@/lib/profileSignature'
 
 /** Stored JSON list columns come back as text; a profile read from the chain already carries arrays. */
 function parseJsonList(value) {
@@ -72,6 +78,23 @@ const resolveCoverUrl = (src) => (src ? resolveStorageImageUrl(src, { width: PRO
 
 /* Both columns land together in cidex/scripts/add-profile-index-cache.sql, so probing one probes both. */
 const CACHE_COLUMN = 'is_universal_profile'
+
+/**
+ * The wallet behind a handle. Every caller of this route may pass `@alice` or `alice` where it
+ * takes an address, so the rest of the read never has to know which one arrived.
+ * @param {string} segment The raw route parameter.
+ * @returns {Promise<string|null>} The wallet address, or null when nothing holds that handle.
+ */
+async function resolveHandle(segment) {
+  const handle = readHandleSegment(segment)
+  if (!handle) return null
+  /* cidex/scripts/add-usernames.sql lands on production days after it lands here, and naming a
+     missing column rejects the statement — until then no path is a handle. */
+  if (!(await hasColumn('users', 'username_key'))) return null
+
+  const [[row]] = await pool.execute('SELECT wallet_address FROM users WHERE username_key = ? LIMIT 1', [handle.key])
+  return row ? normalizeAddress(row.wallet_address) : null
+}
 
 /* How old a row's chain answer may be before it is asked again, behind the response. A wallet
    the chain had no profile for can only become a Universal Profile by being deployed, so it waits longer. */
@@ -168,7 +191,7 @@ function scheduleChainRecheck(address, row) {
  * A Universal Profile as the read serves it, from the onchain document — live, or the row's copy
  * of it. The row can be AHEAD of that document: see cidex/scripts/add-profile-sync-stamp.sql.
  */
-function shapeUniversalProfile(profile, row, address, { badge, origin }) {
+function shapeUniversalProfile(profile, row, address, { badge, origin, premium }) {
   const liveStamp = String(profile.lastMetadataUpdate ?? '')
   const storedStamp = row?.profile_sync_stamp ?? null
   const hupIsAhead = storedStamp !== null && storedStamp === liveStamp
@@ -207,8 +230,17 @@ function shapeUniversalProfile(profile, row, address, { badge, origin }) {
   // Birthday is a Hup-native field with no UP metadata equivalent — always
   // sourced from our own users row, even when the profile itself is a UP.
   profile.birthday = row?.birthday ?? null
+  // And the same for interests: a Hup catalogue, with no LSP3 equivalent to read instead.
+  profile.interests = normalizeInterests(row?.interests)
   // Same for the community badge: a UP describes a person, not their Hup memberships.
   profile.badge = badge
+  // And the same again for premium: a paid subscription is a Hup fact, never an LSP3 one.
+  profile.premium = premium
+  /* Only a colour this build would render is served — a row holding anything else (an old
+     value, a hand-edited one) reads as no accent rather than as CSS. */
+  profile.accent = isAccentColor(row?.accent_color) ? row.accent_color : null
+  // The handle is Hup's own namespace — an LSP3 name is neither unique nor claimed.
+  profile.username = row?.username ?? null
   profile.origin = origin
   /* Read from the profile's OWN tags and description, so the mark travels with the metadata
      rather than with anything Hup remembers about the account — see lib/agentProfile.js. */
@@ -218,7 +250,7 @@ function shapeUniversalProfile(profile, row, address, { badge, origin }) {
 }
 
 /** A profile the chain has nothing for, from the row alone. */
-function shapeDatabaseProfile(row, { badge, origin }) {
+function shapeDatabaseProfile(row, { badge, origin, premium }) {
   const dbProfile = row
 
   // The notification email is private contact data on a public endpoint —
@@ -231,6 +263,11 @@ function shapeDatabaseProfile(row, { badge, origin }) {
   dbProfile.profileImage = resolveAvatarImageUrl(dbProfile.profileImage, AVATAR_MAX_SIZE)
   dbProfile.profileHeader = resolveCoverUrl(readStoredCover(dbProfile.profileHeader).ref)
 
+  /* The folded copy and the cooldown stamp are the claim route's bookkeeping; `username` itself
+     is what anyone renders. */
+  delete dbProfile.username_key
+  delete dbProfile.username_changed_at
+
   /* Only meaningful beside a Universal Profile, which this branch by definition is not. */
   delete dbProfile.profile_sync_stamp
   delete dbProfile.is_universal_profile
@@ -242,11 +279,20 @@ function shapeDatabaseProfile(row, { badge, origin }) {
   delete dbProfile.badge_contract_address
   delete dbProfile.badge_community_id
   dbProfile.badge = badge
+  dbProfile.premium = premium
+  /* Same rule as the badge pointer: the raw column never leaves the server unvalidated. */
+  const accentColor = dbProfile.accent_color
+  delete dbProfile.accent_color
+  dbProfile.accent = isAccentColor(accentColor) ? accentColor : null
 
   /* The raw code says nothing a client can render — no flag, no name — so only the resolved
      form is exposed, exactly as the badge is. */
   delete dbProfile.origin_code
   dbProfile.origin = origin
+
+  /* Slugs, never the raw column: a value this build has no card for is dropped here rather than
+     left for the page to render as a blank tile. */
+  dbProfile.interests = normalizeInterests(dbProfile.interests)
 
   /* Same mark, same rule, off the cached copy of the same two fields — the resolver takes the
      JSON-string form of `tags` this branch carries as readily as the array the branch above has. */
@@ -257,10 +303,17 @@ function shapeDatabaseProfile(row, { badge, origin }) {
 
 export async function GET(request, { params }) {
   try {
-    const { address } = await params
+    const { address: identifier } = await params
 
-    if (!address) {
+    if (!identifier) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
+    }
+
+    /* A handle is 20 characters at most and a Solana address is 32 at least, so the two can never
+       be mistaken for each other — anything that is not an address gets one lookup as a handle. */
+    const address = isWalletAddress(identifier) ? identifier : await resolveHandle(identifier)
+    if (!address) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
     /* Leaderboard rank/score are intentionally NOT part of this response — computing
@@ -274,7 +327,7 @@ export async function GET(request, { params }) {
        and adds no latency running in the same batch. It is re-verified against
        community_members on every call — see lib/badge.js for why it is never stored already
        resolved. */
-    const [[rows], badge] = await Promise.all([
+    const [[rows], badge, premium] = await Promise.all([
       pool.execute(
         `SELECT
           u.*,
@@ -289,6 +342,13 @@ export async function GET(request, { params }) {
          app, taking every avatar with it. Degrade to no badge instead. */
       resolveWornBadge(address).catch((badgeError) => {
         console.error('[BADGE_RESOLVE_ERROR]:', badgeError.message)
+        return null
+      }),
+      /* One indexed seek on premium_subscriptions, guarded for the same reason the badge is:
+         a mark beside a name is decoration, and a database that has not run add-premium.sql
+         must not 500 every profile read in the app. */
+      readPremium(address).catch((premiumError) => {
+        console.error('[PREMIUM_RESOLVE_ERROR]:', premiumError.message)
         return null
       }),
     ])
@@ -311,11 +371,11 @@ export async function GET(request, { params }) {
       if (row.is_universal_profile) {
         return NextResponse.json({
           source: 'universal_profile',
-          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin }),
+          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin, premium }),
         })
       }
 
-      return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin }) })
+      return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium }) })
     }
 
     const { answered, profile: live } = await readUniversalProfile(address)
@@ -334,7 +394,7 @@ export async function GET(request, { params }) {
     if (isUP) {
       return NextResponse.json({
         source: 'universal_profile',
-        data: shapeUniversalProfile(live, row, address, { badge, origin }),
+        data: shapeUniversalProfile(live, row, address, { badge, origin, premium }),
       })
     }
 
@@ -344,7 +404,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin }) })
+    return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium }) })
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
@@ -359,8 +419,10 @@ export async function GET(request, { params }) {
 const OPTIONAL_COLUMNS = {
   badge_network_id: 'cidex/scripts/add-community-badges.sql',
   origin_code: 'the users.origin_code migration',
+  accent_color: 'cidex/scripts/add-premium.sql',
   profile_sync_stamp: 'cidex/scripts/add-profile-sync-stamp.sql',
   profileHeader: 'cidex/scripts/add-profile-header.sql',
+  interests: 'cidex/scripts/add-profile-interests.sql',
 }
 
 /**
@@ -391,10 +453,44 @@ export async function PUT(request, { params }) {
     const profileHeader = formData.get('profileHeader')
     const removeProfileHeader = formData.get('removeProfileHeader') === '1'
     const tags = formData.get('tags')
+    const interests = formData.get('interests')
     const links = formData.get('links')
     const badge = parseBadgeSelection(formData.get('badge'))
     const origin = parseOriginSelection(formData.get('origin'))
+    const accent = parseAccentSelection(formData.get('accent'))
+    /* `username` is deliberately absent: a handle is a global namespace with its own cooldown and
+       release rules. Claims go through POST /api/v1/users/username. */
     const syncStamp = formData.get('syncStamp')
+
+    /* Every field below is displayed to other people as this wallet, and profileImage is fetched
+       server-side by the OG routes — so the write has to prove the caller owns the address in the
+       path. Same challenge-and-burn as the username claim: the nonce dies before the signature is
+       checked, so a captured claim cannot be replayed and a wrong signature costs the nonce. */
+    const nonce = formData.get('nonce')
+    const issuedAt = Number(formData.get('issuedAt'))
+    const signature = formData.get('signature')
+
+    if (!signature || !nonce || !Number.isFinite(issuedAt)) {
+      return NextResponse.json({ error: 'A signed claim is required' }, { status: 400 })
+    }
+    if (Math.abs(Date.now() - issuedAt) > PROFILE_SIGNATURE_MAX_AGE_MS) {
+      return NextResponse.json({ error: 'That signature has expired — try again' }, { status: 400 })
+    }
+
+    const [burn] = await pool.execute(
+      'DELETE FROM nonces WHERE nonce = ? AND wallet_address = ? AND expires_at > NOW()',
+      [nonce, address],
+    )
+    if (burn.affectedRows === 0) {
+      return NextResponse.json({ error: 'That challenge expired — try again' }, { status: 400 })
+    }
+
+    const signed = await verifyWalletSignature(address, profileUpdateMessage({ address, nonce, issuedAt }), signature, {
+      chainId: Number(formData.get('chainId')) || undefined,
+    })
+    if (!signed) {
+      return NextResponse.json({ error: 'That signature does not match the wallet' }, { status: 401 })
+    }
 
     // Verify profile exists before executing update
     const [existing] = await pool.execute('SELECT wallet_address FROM users WHERE wallet_address = ?', [address])
@@ -446,6 +542,14 @@ export async function PUT(request, { params }) {
       queryValues.push(links)
     }
 
+    /* Unlike the free-form tags above, what arrives here is re-checked against the build's own
+       catalogue rather than stored as sent — every entry is drawn as a card, and a slug with no
+       card is nothing a profile can show. Absent leaves it alone; an empty list clears it. */
+    if (interests !== null && (await canWrite('interests'))) {
+      updateFields.push('`interests` = ?')
+      queryValues.push(JSON.stringify(normalizeInterests(interests)))
+    }
+
     /* Which community's tag this wallet wears. Only the pointer is written — the tag itself is
        resolved and re-verified on every read, so a badge set here still vanishes on its own the
        moment the wallet leaves that community or is banned from it. */
@@ -485,6 +589,27 @@ export async function PUT(request, { params }) {
       }
       updateFields.push('`origin_code` = ?')
       queryValues.push(origin.code)
+    }
+
+    /* The profile's own accent colour, which is a premium perk — so unlike the badge and the
+       origin, entitlement is re-checked here rather than trusted from the form. A lapsed
+       subscription is not retroactively stripped of a colour it already set; it simply cannot
+       set a new one, and clearing is always allowed so nobody is stuck with a colour they
+       can no longer change. */
+    if (accent.action === 'invalid') {
+      return NextResponse.json({ error: 'An accent must be a #rrggbb colour' }, { status: 400 })
+    }
+    const accentStorable = accent.action === 'clear' || accent.action === 'set' ? await canWrite('accent_color') : false
+    if (accent.action === 'clear' && accentStorable) {
+      updateFields.push('`accent_color` = NULL')
+    }
+    if (accent.action === 'set' && accentStorable) {
+      const status = await readPremium(address).catch(() => null)
+      if (!status?.premium) {
+        return NextResponse.json({ error: 'A custom accent colour needs Hup Premium' }, { status: 403 })
+      }
+      updateFields.push('`accent_color` = ?')
+      queryValues.push(accent.color)
     }
 
     /* Sent only by the owner's editor, and only for a Universal Profile: it carries the onchain
@@ -530,7 +655,7 @@ export async function POST(request, { params }) {
 
     const walletAddress = normalizeAddress(address)
 
-    await pool.execute(
+    const [insert] = await pool.execute(
       `
       INSERT INTO users (
         wallet_address,
@@ -544,6 +669,11 @@ export async function POST(request, { params }) {
       `,
       [walletAddress],
     )
+
+    /* MariaDB reports 1 affected row for an insert and 2 for the update branch, which is how the
+       client tells a wallet's first ever connect from its thousandth — the one moment it can ask
+       for a username as part of arriving rather than as an interruption. */
+    const isNewAccount = insert.affectedRows === 1
 
     const [rows] = await pool.execute(
       `
@@ -562,6 +692,9 @@ export async function POST(request, { params }) {
     delete created.email
     delete created.email_verified_at
     delete created.email_notifications
+    delete created.username_key
+    delete created.username_changed_at
+    created.is_new_account = isNewAccount
 
     return NextResponse.json(created)
   } catch (error) {

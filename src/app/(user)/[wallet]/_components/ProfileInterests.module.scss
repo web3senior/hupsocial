@@ -1,0 +1,165 @@
+// The one block on the profile header carrying colour of its own. It gets away with that because
+// the colour is the content: a card is read by its gradient and glyph before its word.
+.interests {
+  // Takes the column's width without ever setting it. The profile header is a flex row and this
+  // column sizes to its content, so a plain `width: 100%` let the cards widen the whole header
+  // past the viewport on a phone instead of scrolling inside it — the row is wider than a phone
+  // by construction. A zero size suggestion is what stops the column asking for it.
+  width: 0;
+  min-width: 100%;
+
+  &__title {
+    margin: 0 0 8px;
+    font-size: var(--system-12-font-size);
+    font-weight: 600;
+    color: var(--gray-500);
+  }
+
+  // The arrows hang off this rather than off the block, so they centre on the cards instead of
+  // on the cards plus the heading above them
+  &__rail {
+    position: relative;
+  }
+
+  &__list {
+    // How many cards a full row holds. Everything below is derived from it, so a breakpoint
+    // only ever changes this number.
+    --interest-gap: 8px;
+    --interest-per-view: 6;
+    // Below this a card is narrower than the word on it, so the row overflows into the rail
+    // instead of shrinking any further
+    --interest-min: 76px;
+
+    display: flex;
+    gap: var(--interest-gap);
+    margin: 0;
+    padding: 0;
+    padding-block-end: 4px; // the resting shadow, which the scroller would otherwise clip
+    list-style: none;
+    // Its own scroll region: the page scrolls vertically, this scrolls sideways, and naming the
+    // axis keeps a diagonal swipe from stealing the page's scroll
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    touch-action: pan-x;
+    // Mandatory, not proximity: a row of discrete cards should never settle mid-card
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    // A row's worth of cards divides the row exactly, and fewer than that share the whole width
+    // between them rather than hugging the left edge with dead space beside them. Never shrinks:
+    // past a full row the extra cards overflow into the scroll rather than squeezing the rest.
+    > li {
+      flex: 1 0 max(var(--interest-min), calc((100% - (var(--interest-per-view) - 1) * var(--interest-gap)) / var(--interest-per-view)));
+      min-width: 0;
+      scroll-snap-align: start;
+    }
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    height: 86px;
+    padding: 8px;
+    border-radius: 14px;
+    // Light stop at the top-left, deep one at the bottom-right where the label sits
+    background-image: linear-gradient(135deg, var(--interest-from), var(--interest-to));
+    color: #fff;
+    text-decoration: none;
+    transition: box-shadow 0.18s ease;
+
+    // No lift: the row sits mid-card and a tile jumping out of line pulls the eye off the bio
+    &:hover,
+    &:focus-visible {
+      box-shadow: 0 4px 14px rgb(0 0 0 / 22%);
+    }
+  }
+
+  &__icon {
+    flex-shrink: 0;
+    // The duotone glyph's light half is its own fill at 20%, which on a saturated card reads as
+    // grime rather than as a second tone
+    opacity: 0.95;
+  }
+
+  &__label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--system-12-font-size);
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 35%);
+  }
+
+  &__arrow {
+    position: absolute;
+    inset-block-start: 50%;
+    translate: 0 -50%;
+    display: none;
+    place-items: center;
+    inline-size: 26px;
+    block-size: 26px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+    opacity: 1;
+    transition: opacity 0.15s ease;
+
+    // Touch has the gesture already; only a pointer that hovers needs a button to press
+    @media (hover: hover) and (pointer: fine) {
+      display: grid;
+    }
+
+    // Half the button hangs in the gutter beside the row. The cashtag strip sits it at -6px,
+    // but its cards are four times this wide — over an 86px card that offset buried the label.
+    &--start {
+      inset-inline-start: -12px;
+    }
+
+    &--end {
+      inset-inline-end: -12px;
+    }
+
+    // Kept in the layout but inert at the ends, so the row does not reflow as it scrolls
+    &--hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+  }
+}
+
+// The profile column narrows faster than the viewport does — an avatar sits beside it — so the
+// row holds fewer cards well before a phone.
+@media (max-width: 900px) {
+  .interests__list {
+    --interest-per-view: 5;
+  }
+}
+
+@media (max-width: 700px) {
+  .interests__list {
+    --interest-per-view: 4;
+  }
+}
+
+@media (max-width: 480px) {
+  .interests__list {
+    --interest-per-view: 3;
+  }
+
+  .interests__card {
+    height: 78px;
+  }
+}

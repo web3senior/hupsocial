@@ -591,6 +591,64 @@ const getLocalToken = () => {
 }
 
 /**
+ * Whether a handle can be claimed, for the field that checks as it is typed.
+ * @param {string} username The handle, with or without its `@`.
+ * @param {string} [address] The wallet asking — its own handle reads as available.
+ * @returns {Promise<{available: boolean, error: string|null}>}
+ */
+export const checkUsername = async (username, address) => {
+  const params = new URLSearchParams({ u: username })
+  if (address) params.set('address', address)
+
+  try {
+    const response = await fetch(`/api/v1/users/username?${params}`)
+    const data = await response.json()
+    return { available: Boolean(data.available), error: data.error || null }
+  } catch {
+    return { available: false, error: 'Could not reach the server' }
+  }
+}
+
+/**
+ * Claims a handle for a wallet. The signature is what proves the wallet asked for it — see
+ * api/v1/users/username/route.js.
+ * @param {{address: string, username: string, nonce: string, issuedAt: number, signature: string, chainId?: number}} claim
+ * @returns {Promise<{success: boolean, username?: string, error?: string}>}
+ */
+export const claimUsername = async (claim) => {
+  try {
+    const response = await fetch('/api/v1/users/username', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(claim),
+    })
+    const data = await response.json()
+    return response.ok ? data : { success: false, error: data.error || 'Could not claim that username' }
+  } catch {
+    return { success: false, error: 'Network communication error' }
+  }
+}
+
+/**
+ * A single-use challenge for a wallet to sign.
+ * @param {string} address
+ * @returns {Promise<string|null>} The nonce, or null when the server would not issue one.
+ */
+export const requestAuthNonce = async (address) => {
+  try {
+    const response = await fetch('/api/v1/auth/nonce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet_address: address }),
+    })
+    const data = await response.json()
+    return data?.nonce ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Sends updated profile details to the server backend.
  * @param {FormData} formData - The multi-part form data payload containing profile fields.
  * @param {string} address - The wallet address identifying the account to update.

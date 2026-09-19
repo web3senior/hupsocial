@@ -84,7 +84,7 @@ robinhood.textColor = `#fff`
 robinhood.isNew = true
 
 // Arc
-arc.primaryColor = `#acc6e9`
+arc.primaryColor = `#2775CA`
 arc.textColor = `#fff`
 arc.isNew = true
 

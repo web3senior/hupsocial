@@ -63,11 +63,13 @@ const PRESIGN_THRESHOLD_BYTES = 4 * 1024 * 1024
 
 // Ask the server for somewhere to upload to. Filebase (S3) and Pinata sign uploads
 // differently, so the response says which shape came back.
-async function requestPresign(file, filename, signal) {
+async function requestPresign(file, filename, signal, address) {
   const res = await fetch('/api/ipfs/presign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: filename, mimeType: file.type, size: file.size }),
+    /* The wallet is sent so a premium subscriber gets their larger ceiling. The route treats
+       it as a claim, not proof — see MAX_PREMIUM_UPLOAD_BYTES there. */
+    body: JSON.stringify({ name: filename, mimeType: file.type, size: file.size, address: address ?? null }),
     signal,
   })
   if (!res.ok) throw new Error(await readFailure(res, 'Could not create an upload URL'))
@@ -144,7 +146,7 @@ async function uploadViaPinataPresign(file, filename, { url }, { onProgress, sig
 }
 
 async function uploadViaPresign(file, filename, transfer) {
-  const presigned = await requestPresign(file, filename, transfer.signal)
+  const presigned = await requestPresign(file, filename, transfer.signal, transfer.address)
 
   return presigned.provider === 'filebase'
     ? uploadViaFilebasePresign(file, presigned, transfer)
@@ -154,9 +156,10 @@ async function uploadViaPresign(file, filename, transfer) {
 /**
  * Upload a File/Blob to IPFS. Returns the CID as "ipfs://<hash>".
  * @param {File|Blob} file
- * @param {{ onProgress?: (fraction: number) => void, signal?: AbortSignal }} [transfer]
+ * @param {{ onProgress?: (fraction: number) => void, signal?: AbortSignal, address?: string }} [transfer]
  *   `onProgress` receives the share of the file's bytes sent (0–1); `signal` cancels the transfer,
- *   which then rejects with an AbortError the caller can tell apart from a failure.
+ *   which then rejects with an AbortError the caller can tell apart from a failure. `address` is
+ *   the uploading wallet, which raises the size ceiling for a premium subscriber.
  */
 export async function uploadFileToIPFS(file, transfer = {}) {
   const filename = file.name ?? 'upload'

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useConnection } from 'wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 import Avatar from '@/components/ui/Avatar'
 import { WalletOptions } from '@/components/ConnectWallet'
 import PageTitle from '@/components/PageTitle'
@@ -79,7 +80,7 @@ function Connected({ addr }) {
       </header>
 
       <div className={styles.connected__actions}>
-        <Link href={`/${addr}`} className={styles.connected__primary}>
+        <Link href={profilePath(addr, profile?.username)} className={styles.connected__primary}>
           View profile
         </Link>
         <Link href={`/`} className={styles.connected__secondary}>

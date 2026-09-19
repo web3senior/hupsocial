@@ -33,6 +33,7 @@ import { formatUsdAmount, rateFor } from '@/lib/usdAmount'
 import { PERCENT_FORMAT, readFloorDelta } from '@/lib/nftFloorDelta'
 import { formatStake } from '@/hooks/useStakeToken'
 import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import useNftTokenMarket from '@/hooks/useNftTokenMarket'
 import useTokenOwner from '@/hooks/useTokenOwner'
@@ -122,7 +123,7 @@ function WalletName({ address }) {
   const name = profile?.fullName || (profile?.name && profile.name !== 'new-user' ? profile.name : null)
 
   return (
-    <Link href={`/${address}`} title={address}>
+    <Link href={profilePath(address, profile?.username)} title={address}>
       {name || shortAddress(address)}
     </Link>
   )

@@ -23,6 +23,8 @@ import pool from '@/lib/db'
 import { getServerPublicClient } from '@/lib/serverPublicClient'
 import { resolveAvatarImageUrl } from '@/lib/storageHelper'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
+import { usernameKey } from '@/lib/username'
+import { hasColumn } from '@/lib/schema'
 
 export const runtime = 'nodejs'
 
@@ -68,7 +70,7 @@ const avatarUrl = (src) => resolveAvatarImageUrl(src, RESULT_AVATAR_SIZE)
 
 // A UP name is whatever its owner wrote in its metadata, so it is never proof of identity — the
 // picker always shows the address next to it, which is why every entry carries one.
-const entry = ({ address, name, avatar, source, ensName = null, followerCount = null }) => {
+const entry = ({ address, name, avatar, source, ensName = null, followerCount = null, username = null }) => {
   const checksummed = checksum(address)
   if (!checksummed) return null
 
@@ -77,6 +79,8 @@ const entry = ({ address, name, avatar, source, ensName = null, followerCount = 
   return {
     address: checksummed,
     name: trimmedName || null,
+    // The one name on a result that is unique and was chosen — the picker leads with it.
+    username: username || null,
     avatar: avatar || null,
     source,
     ensName: ensName || null,
@@ -206,24 +210,46 @@ async function fetchLuksoProfile(address) {
 // Hup database
 // ---------------------------------------------------------------------------
 
-const USER_COLUMNS = `u.wallet_address, u.name AS display_name, u.profileImage AS profile_image`
+const BASE_USER_COLUMNS = `u.wallet_address, u.name AS display_name, u.profileImage AS profile_image`
+
+/* Handles land on production days after they land here, and naming a column the database does not
+   have rejects the statement — which here would silently drop the whole Hup source from search. */
+const userColumns = async () =>
+  (await hasColumn('users', 'username_key')) ? `${BASE_USER_COLUMNS}, u.username AS username` : BASE_USER_COLUMNS
 
 /**
- * Wallets Hup knows, matched on display name or address.
+ * Wallets Hup knows, matched on handle, display name or address.
  *
- * Names match as a substring but addresses only as a prefix: a bare hex fragment matches half the
- * table, while the first characters of an address are exactly how someone half-pastes one. An
- * empty `name` is profileHelper's negative cache for "checked, has no profile", not a real name.
+ * The handle leads the ordering: it is the only one of the three that its owner chose and that
+ * nobody else can hold, so an exact one is never buried under a substring match on someone's
+ * display name. Names match as a substring but addresses only as a prefix: a bare hex fragment
+ * matches half the table, while the first characters of an address are exactly how someone
+ * half-pastes one. An empty `name` is profileHelper's negative cache for "checked, has no
+ * profile", not a real name.
  */
 async function searchDbUsers(query, limit) {
+  const handle = usernameKey(query)
+  const byHandle = await hasColumn('users', 'username_key')
+
+  const where = [`(u.name IS NOT NULL AND u.name <> '' AND u.name LIKE ?)`, `u.wallet_address LIKE ?`]
+  const whereParams = [`%${query}%`, `${query.toLowerCase()}%`]
+  const order = [`(u.name = ?) DESC`, `(u.name LIKE ?) DESC`]
+  const orderParams = [query, `${query}%`]
+
+  if (byHandle) {
+    where.unshift(`u.username_key LIKE ?`)
+    whereParams.unshift(`%${handle}%`)
+    order.unshift(`(u.username_key = ?) DESC`, `(u.username_key LIKE ?) DESC`)
+    orderParams.unshift(handle, `${handle}%`)
+  }
+
   const [rows] = await pool.execute(
-    `SELECT ${USER_COLUMNS}
+    `SELECT ${await userColumns()}
        FROM users u
-      WHERE (u.name IS NOT NULL AND u.name <> '' AND u.name LIKE ?)
-         OR u.wallet_address LIKE ?
-      ORDER BY (u.name = ?) DESC, (u.name LIKE ?) DESC, CHAR_LENGTH(COALESCE(u.name, '')) ASC, u.last_seen_at DESC
+      WHERE ${where.join(' OR ')}
+      ORDER BY ${order.join(', ')}, CHAR_LENGTH(COALESCE(u.name, '')) ASC, u.last_seen_at DESC
       LIMIT ?`,
-    [`%${query}%`, `${query.toLowerCase()}%`, query, `${query}%`, limit],
+    [...whereParams, ...orderParams, limit],
   )
 
   return rows
@@ -235,7 +261,7 @@ async function fetchDbUsers(addresses) {
 
   const placeholders = addresses.map(() => '?').join(',')
   const [rows] = await pool.execute(
-    `SELECT ${USER_COLUMNS} FROM users u WHERE u.wallet_address IN (${placeholders})`,
+    `SELECT ${await userColumns()} FROM users u WHERE u.wallet_address IN (${placeholders})`,
     addresses.map((address) => address.toLowerCase()),
   )
 
@@ -297,6 +323,7 @@ function merge(groups) {
         continue
       }
       existing.name = existing.name || item.name
+      existing.username = existing.username || item.username
       existing.avatar = existing.avatar || item.avatar
       existing.ensName = existing.ensName || item.ensName
       existing.followerCount = existing.followerCount ?? item.followerCount
@@ -350,6 +377,7 @@ export async function GET(request) {
       const resolved = entry({
         address,
         name: row?.display_name || upProfile?.name || ensName,
+        username: row?.username ?? null,
         avatar: avatarUrl(row?.profile_image) || upProfile?.avatar,
         source: 'address',
         ensName,
@@ -368,7 +396,7 @@ export async function GET(request) {
       const data = addresses
         .map((address) => {
           const row = rows.get(address.toLowerCase())
-          return entry({ address, name: row?.display_name, avatar: avatarUrl(row?.profile_image), source: 'following' })
+          return entry({ address, name: row?.display_name, username: row?.username ?? null, avatar: avatarUrl(row?.profile_image), source: 'following' })
         })
         .filter(Boolean)
 
@@ -389,6 +417,7 @@ export async function GET(request) {
       ? entry({
           address: ens.address,
           name: ensRow?.display_name || ens.ensName,
+          username: ensRow?.username ?? null,
           avatar: avatarUrl(ensRow?.profile_image),
           source: 'ens',
           ensName: ens.ensName,
@@ -400,6 +429,7 @@ export async function GET(request) {
         entry({
           address: row.wallet_address,
           name: row.display_name,
+          username: row.username ?? null,
           avatar: avatarUrl(row.profile_image),
           source: 'hup',
         }),

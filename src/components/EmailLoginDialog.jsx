@@ -27,6 +27,7 @@ import {
   serializeKdfParams,
   splitKey,
 } from '@/lib/embeddedWallet/crypto'
+import { onboardingChainId } from '@/config/gasless'
 import styles from './EmailLoginDialog.module.scss'
 
 const MIN_PASSWORD_LENGTH = 8
@@ -71,7 +72,9 @@ export default function EmailLoginDialog() {
   const connector = connectors.find((c) => c.id === EMAIL_CONNECTOR_ID)
 
   const finishConnect = async (accountEmail) => {
-    await connect({ connector })
+    // A brand-new wallet has no chain preference, so pin a sponsored one: the connector's own
+    // seed would otherwise make the first post a real L1 transaction against an empty balance.
+    await connect({ connector, chainId: onboardingChainId() })
 
     // One email maps to one live wallet server-side, so any other record under
     // this email is a dead entry (a crash-orphaned or reset-abandoned wallet)
@@ -86,7 +89,7 @@ export default function EmailLoginDialog() {
     }
 
     dialogRef.current?.close()
-    toast(`wallet successfuly connected`, `success`)
+    toast(`wallet successfully connected`, `success`)
   }
 
   const openFlow = async () => {

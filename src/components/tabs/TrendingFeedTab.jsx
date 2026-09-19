@@ -114,7 +114,7 @@ export default function TrendingFeedTab() {
   }
 
   if (isLoaded && posts.list.length === 0) {
-    return <EmptyState message="Nothing is trending right now. Check back soon." />
+    return <EmptyState>Nothing is trending right now. Check back soon.</EmptyState>
   }
 
   return (

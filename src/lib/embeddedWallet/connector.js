@@ -20,6 +20,7 @@ import { createConnector } from 'wagmi'
 import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { hasDeviceShareMarker, joinShares, loadDeviceShare } from './crypto'
+import { onboardingChainId } from '@/config/gasless'
 
 export const EMAIL_CONNECTOR_ID = 'hupEmail'
 
@@ -132,11 +133,25 @@ const confirmOrReject = async (details) => {
 // wagmi storage that only a user-initiated connect clears.
 const DISCONNECTED_KEY = 'hupEmail.disconnected'
 
+// The chain the user last switched to. currentChainId is module memory, so without persisting it
+// a reload would report the seed chain again and move the account off the chain it chose.
+const CHAIN_KEY = 'hupEmail.chainId'
+
 export function emailWallet() {
   return createConnector((config) => {
-    let currentChainId = config.chains[0].id
+    // Not config.chains[0] — that is Ethereum mainnet, which is unsponsored by design.
+    let currentChainId = onboardingChainId()
 
     const chainFor = (chainId) => config.chains.find((chain) => chain.id === chainId)
+
+    const persistChainId = async (chainId) => {
+      await config.storage?.setItem(CHAIN_KEY, chainId)
+    }
+
+    const restoreChainId = async () => {
+      const stored = Number(await config.storage?.getItem(CHAIN_KEY))
+      if (Number.isInteger(stored) && chainFor(stored)) currentChainId = stored
+    }
 
     // The config's transport for a chain (which carries the CORS-pinned RPC
     // overrides from config/wagmi.js) instantiated for direct request() use.
@@ -243,7 +258,15 @@ export function emailWallet() {
         // already answered false.
         await config.storage?.removeItem(DISCONNECTED_KEY)
 
-        if (chainId && chainFor(chainId)) currentChainId = chainId
+        // An explicit chainId (the login dialog pins a sponsored one) wins. A reconnect carries
+        // none, so restore the last switch rather than falling back to the seed.
+        if (chainId && chainFor(chainId)) {
+          currentChainId = chainId
+          await persistChainId(chainId)
+        } else {
+          await restoreChainId()
+        }
+
         const accounts = withCapabilities ? [{ address: account.address, capabilities: {} }] : [account.address]
         return { accounts, chainId: currentChainId }
       },
@@ -277,6 +300,7 @@ export function emailWallet() {
         const chain = chainFor(chainId)
         if (!chain) throw rpcError(4902, `Chain ${chainId} is not supported`)
         currentChainId = chainId
+        await persistChainId(chainId)
         config.emitter.emit('change', { chainId })
         return chain
       },

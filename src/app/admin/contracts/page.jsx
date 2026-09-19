@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useConnection, useWriteContract } from 'wagmi' // Hook added here
 import { waitForTransactionReceipt } from 'wagmi/actions'
-import { createPublicClient, http, isAddress, formatEther, formatUnits, parseEther, parseUnits, zeroAddress } from 'viem'
+import { createPublicClient, erc20Abi, http, isAddress, formatEther, formatUnits, parseEther, parseUnits, zeroAddress } from 'viem'
 import Link from 'next/link'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
@@ -20,7 +20,9 @@ import communityAbi from '@/abis/HupCommunity.json'
 import pollsAbi from '@/abis/HupPolls.json'
 import dropsAbi from '@/abis/HupDrops.json'
 import fundAbi from '@/abis/HupFund.json'
+import premiumAbi from '@/abis/HupPremium.json'
 import { dropStandardLabel, dropStandardRowsFor } from '@/lib/drops'
+import { GRANT_UNITS, grantSeconds, PLAN_IDS as PREMIUM_PLAN_IDS, PLAN_MONTHLY, PLAN_YEARLY, PREMIUM_MAX_BATCH } from '@/lib/premium'
 import { TIP_TOKENS } from '@/lib/tokens'
 import styles from './page.module.scss'
 
@@ -122,6 +124,7 @@ const SECTIONS = [
   { id: 'community', label: 'Community', icon: '👥', contractKey: 'community' },
   { id: 'polls', label: 'Polls', icon: '📊', contractKey: 'polls' },
   { id: 'fund', label: 'Fundraise', icon: '🪙', contractKey: 'fund' },
+  { id: 'premium', label: 'Premium', icon: '⭐', contractKey: 'premium' },
   { id: 'chat', label: 'Chat', icon: '💬', contractKey: 'chat' },
 ]
 
@@ -176,6 +179,18 @@ export default function Page() {
   const [sellFees, setSellFees] = useState({})
   const [sellFeeInputs, setSellFeeInputs] = useState({})
   const [sellFeeTxStates, setSellFeeTxStates] = useState({})
+  const [premiumPlans, setPremiumPlans] = useState({})
+  const [premiumCoinUsd, setPremiumCoinUsd] = useState({})
+  const [premiumTokenInputs, setPremiumTokenInputs] = useState({})
+  const [premiumTokenStates, setPremiumTokenStates] = useState({})
+  const [premiumCompInputs, setPremiumCompInputs] = useState({})
+  const [premiumCompStates, setPremiumCompStates] = useState({})
+  const [premiumManageInputs, setPremiumManageInputs] = useState({})
+  const [premiumManageStates, setPremiumManageStates] = useState({})
+  const [premiumPriceInputs, setPremiumPriceInputs] = useState({})
+  const [premiumTxStates, setPremiumTxStates] = useState({})
+  const [premiumReceiverInputs, setPremiumReceiverInputs] = useState({})
+  const [premiumWithdrawStates, setPremiumWithdrawStates] = useState({})
   const [eventsFees, setEventsFees] = useState({})
   const [eventsFeeInputs, setEventsFeeInputs] = useState({})
   const [eventsFeeTxStates, setEventsFeeTxStates] = useState({})
@@ -633,6 +648,458 @@ export default function Page() {
       setSellFeeTxStates((prev) => ({
         ...prev,
         [chain.id]: { which, loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Read the monthly and yearly plans off a chain's HupPremium. getPlans exists so a client
+  // never needs a round trip per plan, and the admin card uses the same door the page does.
+  const loadPremiumPlans = async (chain, premiumAddress) => {
+    setPremiumPlans((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
+      /* Whether this deployment can price tokens at all is probed by CALLING a function only
+         the token build has, not by reading version() — both builds report "1.0.0" on purpose,
+         so the string cannot tell them apart. An older deployment has no matching selector and
+         no fallback, so the call reverts, which is the answer. */
+      const [plans, takesTokens, complimentaryCount, moderatorRole, paused] = await Promise.all([
+        client.readContract({ address: premiumAddress, abi: premiumAbi, functionName: 'getPlans', args: [PREMIUM_PLAN_IDS] }),
+        client
+          .readContract({ address: premiumAddress, abi: premiumAbi, functionName: 'getTokenPrices', args: [PLAN_MONTHLY, []] })
+          .then(() => true)
+          .catch(() => false),
+        /* Doubles as the probe for the comp surface: a deployment without it has no such
+           selector, so the read reverts and undefined is the answer. */
+        client.readContract({ address: premiumAddress, abi: premiumAbi, functionName: 'complimentaryCount' }).catch(() => undefined),
+        /* The role id is read rather than hardcoded as keccak256("MODERATOR_ROLE"): a constant
+           copied into the client is a constant that can drift from the contract. */
+        client.readContract({ address: premiumAddress, abi: premiumAbi, functionName: 'MODERATOR_ROLE' }).catch(() => null),
+        client.readContract({ address: premiumAddress, abi: premiumAbi, functionName: 'paused' }).catch(() => null),
+      ])
+
+      setPremiumPlans((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, monthly: plans[0], yearly: plans[1], takesTokens, complimentaryCount, moderatorRole, paused },
+      }))
+    } catch (err) {
+      console.error(`Premium plan read error for chain ${chain.id}:`, err)
+      setPremiumPlans((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read plans' },
+      }))
+    }
+  }
+
+  // Load plans for every chain with a HupPremium deployment once the admin is in
+  useEffect(() => {
+    if (!isAdmin) return
+    config.chains.forEach((chain) => {
+      const premiumAddress = CONTRACTS[`chain${chain.id}`]?.premium
+      if (premiumAddress) loadPremiumPlans(chain, premiumAddress)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
+  /* Premium is priced in native wei per chain to hit one dollar target, so the lever is
+     useless without knowing what a coin is worth today. Same keyless upstream the Assets tab
+     reads; a chain it has no price for simply shows none. */
+  useEffect(() => {
+    if (!isAdmin) return
+
+    const chains = config.chains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.premium)
+    if (chains.length === 0) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await fetch('/api/v1/tokens/market', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tokens: chains.map((chain) => ({ chainId: chain.id, address: null })) }),
+        })
+        if (!response.ok) return
+
+        const body = await response.json()
+        if (cancelled) return
+
+        setPremiumCoinUsd(
+          Object.fromEntries(chains.map((chain) => [chain.id, body?.data?.[`${chain.id}:native`]?.usd ?? null])),
+        )
+      } catch (err) {
+        console.error('Premium coin price read failed:', err)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
+
+  // Repoint one plan's price. setPlanPrice keeps the plan's duration, which is the whole point:
+  // the term never changes, only what a coin has to be worth to buy it.
+  const handleSetPremiumPrice = async (chain, premiumAddress, planId) => {
+    const which = planId === PLAN_YEARLY ? 'yearly' : 'monthly'
+    const draft = premiumPriceInputs[chain.id]?.[which]?.trim()
+
+    let value
+    try {
+      value = parseEther(draft || '')
+    } catch {
+      setPremiumTxStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Enter a valid amount in native units' } }))
+      return
+    }
+
+    setPremiumTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: premiumAddress,
+        abi: premiumAbi,
+        functionName: 'setPlanPrice',
+        args: [planId, value],
+        chainId: chain.id,
+      })
+
+      setPremiumTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: false, success: true, hash: txHash } }))
+
+      // Existing subscriptions are untouched by a price move — only the card needs refreshing
+      setTimeout(() => loadPremiumPlans(chain, premiumAddress), 3000)
+    } catch (err) {
+      console.error(`Premium ${which} price update error on chain ${chain.id}:`, err)
+      setPremiumTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { which, loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  /**
+   * Prices one token for one plan. The amount is typed in the token's own units and scaled by
+   * its decimals, read from the token itself — Binance-Peg USDC is 18 decimals where Circle's
+   * is 6, and the same literal on the wrong one is off by a factor of a trillion.
+   */
+  const handleSetPremiumTokenPrice = async (chain, premiumAddress, planId) => {
+    const draft = premiumTokenInputs[chain.id] ?? {}
+    const token = (draft.token ?? '').trim()
+    const which = planId === PLAN_YEARLY ? 'yearly' : 'monthly'
+    const amount = (which === 'yearly' ? draft.yearly : draft.monthly)?.trim()
+
+    if (!isAddress(token)) {
+      setPremiumTokenStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Enter a valid token address' } }))
+      return
+    }
+
+    setPremiumTokenStates((prev) => ({ ...prev, [chain.id]: { which, loading: true, error: null } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
+      const decimals = Number(await client.readContract({ address: token, abi: erc20Abi, functionName: 'decimals' }))
+
+      let value
+      try {
+        value = parseUnits(amount || '', decimals)
+      } catch {
+        setPremiumTokenStates((prev) => ({ ...prev, [chain.id]: { which, error: `Enter a valid amount (${decimals} decimals)` } }))
+        return
+      }
+
+      const txHash = await writeContractAsync({
+        address: premiumAddress,
+        abi: premiumAbi,
+        functionName: 'setTokenPrice',
+        args: [planId, token, value, true],
+        chainId: chain.id,
+      })
+
+      setPremiumTokenStates((prev) => ({
+        ...prev,
+        [chain.id]: { which, loading: false, success: true, hash: txHash, decimals },
+      }))
+    } catch (err) {
+      console.error(`Premium token price error on chain ${chain.id}:`, err)
+      setPremiumTokenStates((prev) => ({
+        ...prev,
+        [chain.id]: { which, loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  /** Takes one token off sale for one plan, leaving its resolved standard in place. */
+  const handleDisablePremiumToken = async (chain, premiumAddress, planId) => {
+    const token = (premiumTokenInputs[chain.id]?.token ?? '').trim()
+    const which = planId === PLAN_YEARLY ? 'yearly' : 'monthly'
+
+    if (!isAddress(token)) {
+      setPremiumTokenStates((prev) => ({ ...prev, [chain.id]: { which, error: 'Enter a valid token address' } }))
+      return
+    }
+
+    setPremiumTokenStates((prev) => ({ ...prev, [chain.id]: { which, loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: premiumAddress,
+        abi: premiumAbi,
+        functionName: 'setTokenPrice',
+        args: [planId, token, 0n, false],
+        chainId: chain.id,
+      })
+
+      setPremiumTokenStates((prev) => ({ ...prev, [chain.id]: { which, loading: false, success: true, hash: txHash } }))
+    } catch (err) {
+      console.error(`Premium token disable error on chain ${chain.id}:`, err)
+      setPremiumTokenStates((prev) => ({
+        ...prev,
+        [chain.id]: { which, loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  /**
+   * Splits the textarea into addresses. Commas, spaces and newlines all separate, because a
+   * list pasted out of a spreadsheet, a chat message or a CSV should all just work.
+   */
+  const parsePremiumAccounts = (raw) => {
+    const parts = String(raw ?? '')
+      .split(/[\s,;]+/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+
+    return { accounts: [...new Set(parts)], invalid: parts.filter((part) => !isAddress(part)) }
+  }
+
+  /**
+   * Adds or removes accounts on the complimentary list — premium with no expiry, revocable.
+   * Batched when there is more than one, so a list of fifty is one signature rather than fifty.
+   */
+  const handleSetPremiumComplimentary = async (chain, premiumAddress, granted) => {
+    const { accounts, invalid } = parsePremiumAccounts(premiumCompInputs[chain.id]?.accounts)
+
+    if (accounts.length === 0) {
+      setPremiumCompStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter at least one wallet address' } }))
+      return
+    }
+    if (invalid.length > 0) {
+      setPremiumCompStates((prev) => ({ ...prev, [chain.id]: { error: `Not a valid address: ${invalid[0]}` } }))
+      return
+    }
+    if (accounts.length > PREMIUM_MAX_BATCH) {
+      setPremiumCompStates((prev) => ({
+        ...prev,
+        [chain.id]: { error: `${accounts.length} addresses — the contract caps a batch at ${PREMIUM_MAX_BATCH}` },
+      }))
+      return
+    }
+
+    setPremiumCompStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: premiumAddress,
+        abi: premiumAbi,
+        functionName: accounts.length === 1 ? 'setComplimentary' : 'setComplimentaryBatch',
+        args: accounts.length === 1 ? [accounts[0], granted] : [accounts, granted],
+        chainId: chain.id,
+      })
+
+      setPremiumCompStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, success: true, hash: txHash, count: accounts.length, granted },
+      }))
+    } catch (err) {
+      console.error(`Premium complimentary error on chain ${chain.id}:`, err)
+      setPremiumCompStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  /**
+   * Credits a fixed term instead — a make-good that expires on its own. Any length: the
+   * contract stopped capping this, so the only bound here is that the number is positive.
+   */
+  const handleGrantPremium = async (chain, premiumAddress) => {
+    const { accounts, invalid } = parsePremiumAccounts(premiumCompInputs[chain.id]?.accounts)
+    const draft = premiumCompInputs[chain.id] ?? {}
+    const seconds = grantSeconds(draft.term, draft.termUnit ?? GRANT_UNITS[0].id)
+
+    if (accounts.length === 0 || invalid.length > 0) {
+      setPremiumCompStates((prev) => ({
+        ...prev,
+        [chain.id]: { error: invalid[0] ? `Not a valid address: ${invalid[0]}` : 'Enter at least one wallet address' },
+      }))
+      return
+    }
+    if (seconds === null) {
+      setPremiumCompStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter how long the term should run' } }))
+      return
+    }
+
+    setPremiumCompStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const duration = BigInt(seconds)
+      const txHash = await writeContractAsync({
+        address: premiumAddress,
+        abi: premiumAbi,
+        functionName: accounts.length === 1 ? 'grantPremium' : 'grantPremiumBatch',
+        args: accounts.length === 1 ? [accounts[0], duration] : [accounts, duration],
+        chainId: chain.id,
+      })
+
+      setPremiumCompStates((prev) => ({
+        ...prev,
+        [chain.id]: {
+          loading: false,
+          success: true,
+          hash: txHash,
+          count: accounts.length,
+          term: `${draft.term} ${draft.termUnit ?? GRANT_UNITS[0].id}`,
+        },
+      }))
+    } catch (err) {
+      console.error(`Premium grant error on chain ${chain.id}:`, err)
+      setPremiumCompStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  /**
+   * Grants or revokes MODERATOR_ROLE. A moderator can give premium away and nothing else —
+   * pricing, the treasury and the pause switch stay with ADMIN_ROLE — so this is the one role
+   * worth handing out, and the only one this card offers.
+   */
+  const handleSetPremiumModerator = async (chain, premiumAddress, role, granted) => {
+    const account = (premiumManageInputs[chain.id]?.moderator ?? '').trim()
+
+    if (!isAddress(account)) {
+      setPremiumManageStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid wallet address' } }))
+      return
+    }
+    if (!role) {
+      setPremiumManageStates((prev) => ({ ...prev, [chain.id]: { error: 'This deployment has no moderator role' } }))
+      return
+    }
+
+    setPremiumManageStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: premiumAddress,
+        abi: premiumAbi,
+        functionName: granted ? 'grantRole' : 'revokeRole',
+        args: [role, account],
+        chainId: chain.id,
+      })
+
+      setPremiumManageStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, success: true, hash: txHash, note: granted ? 'Moderator added' : 'Moderator removed' },
+      }))
+    } catch (err) {
+      console.error(`Premium moderator error on chain ${chain.id}:`, err)
+      setPremiumManageStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  /** Stops every purchase entry point. Existing subscriptions are untouched by it. */
+  const handlePausePremium = async (chain, premiumAddress, paused) => {
+    setPremiumManageStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: premiumAddress,
+        abi: premiumAbi,
+        functionName: paused ? 'unpause' : 'pause',
+        args: [],
+        chainId: chain.id,
+      })
+
+      setPremiumManageStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, success: true, hash: txHash, note: paused ? 'Unpaused' : 'Paused' },
+      }))
+
+      setTimeout(() => loadPremiumPlans(chain, premiumAddress), 3000)
+    } catch (err) {
+      console.error(`Premium pause error on chain ${chain.id}:`, err)
+      setPremiumManageStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  /**
+   * Sweeps one token's balance. Native revenue has its own button — the two cannot move in the
+   * same call, and token revenue is otherwise unreachable from this page.
+   */
+  const handleWithdrawPremiumToken = async (chain, premiumAddress) => {
+    const draft = premiumManageInputs[chain.id] ?? {}
+    const token = (draft.sweepToken ?? '').trim()
+    const receiver = (draft.sweepReceiver ?? '').trim()
+
+    if (!isAddress(token) || !isAddress(receiver)) {
+      setPremiumManageStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid token and receiver address' } }))
+      return
+    }
+
+    setPremiumManageStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: premiumAddress,
+        abi: premiumAbi,
+        functionName: 'withdrawToken',
+        args: [token, receiver],
+        chainId: chain.id,
+      })
+
+      setPremiumManageStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash, note: 'Token swept' } }))
+    } catch (err) {
+      console.error(`Premium token sweep error on chain ${chain.id}:`, err)
+      setPremiumManageStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  // Sweep the contract's full native balance (accumulated subscription revenue)
+  const handleWithdrawPremium = async (chain, premiumAddress) => {
+    const receiver = premiumReceiverInputs[chain.id]?.trim()
+    if (!isAddress(receiver)) {
+      setPremiumWithdrawStates((prev) => ({ ...prev, [chain.id]: { error: 'Enter a valid receiver address' } }))
+      return
+    }
+
+    setPremiumWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: premiumAddress,
+        abi: premiumAbi,
+        functionName: 'withdrawAll',
+        args: [receiver],
+        chainId: chain.id,
+      })
+
+      setPremiumWithdrawStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash } }))
+
+      setTimeout(() => loadChainBalances(chain), 3000)
+    } catch (err) {
+      console.error(`Premium withdrawal error on chain ${chain.id}:`, err)
+      setPremiumWithdrawStates((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
       }))
     }
   }
@@ -4737,6 +5204,599 @@ export default function Page() {
               {visibleChains('fund').length === 0 && (
                 <p className={styles['admin-contracts__empty']}>No HupFund deployments match this filter.</p>
               )}
+            </section>
+          )}
+
+          {activeSection === 'premium' && (
+            <section className={styles['admin-contracts__section']}>
+              <header className={styles['admin-contracts__header']}>
+                <h2 className={styles['admin-contracts__title']}>Premium Pricing</h2>
+                <p className={styles['admin-contracts__subtitle']}>
+                  Each chain prices the monthly and yearly plans in its own native coin, set to hit the same dollar target — so these
+                  move whenever a coin does. Repricing never touches a term already bought. The dollar figure beside each input is what
+                  the amount you typed is worth right now.
+                </p>
+              </header>
+
+              <div className={styles['admin-contracts__grid']}>
+                {visibleChains('premium').map((chain) => {
+                  const deployment = CONTRACTS[`chain${chain.id}`]
+                  const plans = premiumPlans[chain.id]
+                  const priceInputs = premiumPriceInputs[chain.id] ?? {}
+                  const priceTx = premiumTxStates[chain.id]
+                  const receiverDraft = premiumReceiverInputs[chain.id] ?? ''
+                  const withdrawState = premiumWithdrawStates[chain.id]
+                  const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+                  const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+                  const coinUsd = premiumCoinUsd[chain.id] ?? null
+                  const tokenDraft = premiumTokenInputs[chain.id] ?? {}
+                  const tokenTx = premiumTokenStates[chain.id]
+                  const compDraft = premiumCompInputs[chain.id] ?? {}
+                  const compTx = premiumCompStates[chain.id]
+                  const compCount = plans?.complimentaryCount
+                  const takesComplimentary = compCount !== undefined
+                  const manageDraft = premiumManageInputs[chain.id] ?? {}
+                  const manageTx = premiumManageStates[chain.id]
+                  const moderatorRole = plans?.moderatorRole
+                  const isPaused = Boolean(plans?.paused)
+                  const takesTokens = Boolean(plans?.takesTokens)
+                  const nativeBalance = renderBalance(chain.id, deployment.premium, symbol)
+
+                  // What a typed amount would cost a subscriber, so the target is reachable
+                  // without a calculator. Null on a chain with no market price.
+                  const draftUsd = (draft) => {
+                    const amount = Number(draft)
+                    if (!coinUsd || !Number.isFinite(amount) || amount <= 0) return null
+                    return `≈ ${(amount * coinUsd).toFixed(2)}`
+                  }
+
+                  const livePrice = (plan) => {
+                    if (!plan) return '—'
+                    const native = `${formatEther(plan.price)} ${symbol}`
+                    if (!coinUsd) return native
+                    return `${native} (≈ ${(Number(formatEther(plan.price)) * coinUsd).toFixed(2)})`
+                  }
+
+                  return (
+                    <div
+                      key={`premium-${chain.id}`}
+                      className={styles['admin-contracts__card']}
+                      style={{
+                        '--network-color-primary': chain.primaryColor || '#f59e0b',
+                        '--network-color-text': chain.textColor || '#0d0d0d',
+                      }}
+                    >
+                      <div className={styles['admin-contracts__card-header']}>
+                        <div className={styles['admin-contracts__network-info']}>
+                          <div className={styles['admin-contracts__card-icon']}>
+                            <img src={chain.iconUrl} alt="" />
+                          </div>
+                          <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                        </div>
+                        <span className={styles['admin-contracts__badge']}>HUPPREMIUM</span>
+                      </div>
+
+                      <div className={styles['admin-contracts__details']}>
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Premium Address</span>
+                          <span className={styles['admin-contracts__detail-value']}>
+                            {explorerUrl ? (
+                              <a href={`${explorerUrl}/address/${deployment.premium}`} target="_blank" rel="noopener noreferrer">
+                                <code>{deployment.premium}</code> ↗
+                              </a>
+                            ) : (
+                              <code>{deployment.premium}</code>
+                            )}
+                          </span>
+                        </div>
+
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Native Balance</span>
+                          <div className={styles['admin-contracts__detail-value']}>{nativeBalance}</div>
+                        </div>
+
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Current Prices</span>
+                          <div className={styles['admin-contracts__detail-value']}>
+                            {(!plans || plans.loading) && <span>Loading…</span>}
+                            {plans?.error && (
+                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                                {plans.error}
+                              </div>
+                            )}
+                            {plans && !plans.loading && !plans.error && (
+                              <strong>
+                                Monthly {livePrice(plans.monthly)} · Yearly {livePrice(plans.yearly)}
+                              </strong>
+                            )}
+                          </div>
+                        </div>
+
+                        {plans && !plans.loading && !plans.error && !plans.monthly?.enabled && (
+                          <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                            The monthly plan is disabled onchain — nobody can buy it.
+                          </div>
+                        )}
+
+                        {priceTx && (
+                          <div className={styles['admin-contracts__detail-row']}>
+                            <span className={styles['admin-contracts__detail-label']}>Tx Status</span>
+                            <div className={styles['admin-contracts__detail-value']}>
+                              {priceTx.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                              {priceTx.error && <span style={{ color: '#ef4444' }}>❌ {priceTx.error}</span>}
+                              {priceTx.success && (
+                                <span style={{ color: '#10b981' }}>
+                                  🚀 {priceTx.which === 'yearly' ? 'Yearly' : 'Monthly'} price updated.
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSetPremiumPrice(chain, deployment.premium, PLAN_MONTHLY)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>
+                            Monthly Price ({symbol}) {draftUsd(priceInputs.monthly) ?? ''}
+                          </label>
+                          <p className={styles['admin-contracts__hint']}>
+                            What one month costs in this chain&apos;s coin. The coin moves, so this is a peg you re-set — the dollar
+                            figure beside the label is what the amount is worth right now. Repricing never touches a term someone
+                            already bought.
+                          </p>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className={styles['admin-contracts__input']}
+                            value={priceInputs.monthly ?? ''}
+                            onChange={(e) =>
+                              setPremiumPriceInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], monthly: e.target.value } }))
+                            }
+                            placeholder="e.g. 0.002"
+                          />
+                        </div>
+
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={!priceInputs.monthly?.trim() || priceTx?.loading}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {priceTx?.loading && priceTx.which === 'monthly' ? 'Writing...' : 'Set Monthly Price'}
+                          </button>
+                        </div>
+                      </form>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSetPremiumPrice(chain, deployment.premium, PLAN_YEARLY)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>
+                            Yearly Price ({symbol}) {draftUsd(priceInputs.yearly) ?? ''}
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className={styles['admin-contracts__input']}
+                            value={priceInputs.yearly ?? ''}
+                            onChange={(e) =>
+                              setPremiumPriceInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], yearly: e.target.value } }))
+                            }
+                            placeholder="e.g. 0.02"
+                          />
+                        </div>
+
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={!priceInputs.yearly?.trim() || priceTx?.loading}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {priceTx?.loading && priceTx.which === 'yearly' ? 'Writing...' : 'Set Yearly Price'}
+                          </button>
+                        </div>
+                      </form>
+
+                      {!takesTokens && plans && !plans.loading && !plans.error && (
+                        <div className={styles['admin-contracts__validation']}>
+                          This deployment takes the native coin only — it predates token pricing. Redeploy from the current
+                          HupPremium build to accept ERC20 or LSP7.
+                        </div>
+                      )}
+
+                      {/* Token pricing. A token is not on sale until setTokenPrice has been
+                          called for it, per plan — there is no default. Amounts are typed in the
+                          token's own units; the decimals are read off the token, never assumed. */}
+                      {takesTokens && (
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSetPremiumTokenPrice(chain, deployment.premium, PLAN_MONTHLY)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Token Address (ERC20 or LSP7)</label>
+                          <p className={styles['admin-contracts__hint']}>
+                            Let people pay in a token instead of the coin. A stablecoin needs no repricing — 6 USDC is 6 USDC
+                            forever. Amounts below are in the token&apos;s own units, and its decimals are read off the token
+                            itself. A token is not on sale until you set a price for it here, per plan.
+                          </p>
+                          <input
+                            type="text"
+                            className={styles['admin-contracts__input']}
+                            value={tokenDraft.token ?? ''}
+                            onChange={(e) =>
+                              setPremiumTokenInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], token: e.target.value } }))
+                            }
+                            placeholder="0x..."
+                          />
+                        </div>
+
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Monthly Price (token units)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className={styles['admin-contracts__input']}
+                            value={tokenDraft.monthly ?? ''}
+                            onChange={(e) =>
+                              setPremiumTokenInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], monthly: e.target.value } }))
+                            }
+                            placeholder="e.g. 6"
+                          />
+                        </div>
+
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Yearly Price (token units)</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className={styles['admin-contracts__input']}
+                            value={tokenDraft.yearly ?? ''}
+                            onChange={(e) =>
+                              setPremiumTokenInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], yearly: e.target.value } }))
+                            }
+                            placeholder="e.g. 60"
+                          />
+                        </div>
+
+                        {tokenTx && (
+                          <div className={styles['admin-contracts__detail-row']}>
+                            <span className={styles['admin-contracts__detail-label']}>Token Tx</span>
+                            <div className={styles['admin-contracts__detail-value']}>
+                              {tokenTx.loading && <span style={{ color: '#d97706' }}>Signing &amp; broadcasting tx...</span>}
+                              {tokenTx.error && <span style={{ color: '#ef4444' }}>❌ {tokenTx.error}</span>}
+                              {tokenTx.success && (
+                                <span style={{ color: '#10b981' }}>
+                                  🚀 {tokenTx.which === 'yearly' ? 'Yearly' : 'Monthly'} token price set
+                                  {tokenTx.decimals !== undefined ? ` (${tokenTx.decimals} decimals)` : ''}.
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={!tokenDraft.token?.trim() || !tokenDraft.monthly?.trim() || tokenTx?.loading}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {tokenTx?.loading && tokenTx.which === 'monthly' ? 'Writing...' : 'Set Monthly Token Price'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetPremiumTokenPrice(chain, deployment.premium, PLAN_YEARLY)}
+                            disabled={!tokenDraft.token?.trim() || !tokenDraft.yearly?.trim() || tokenTx?.loading}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {tokenTx?.loading && tokenTx.which === 'yearly' ? 'Writing...' : 'Set Yearly Token Price'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDisablePremiumToken(chain, deployment.premium, PLAN_MONTHLY)}
+                            disabled={!tokenDraft.token?.trim() || tokenTx?.loading}
+                            className={styles['admin-contracts__button']}
+                          >
+                            Disable (monthly)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDisablePremiumToken(chain, deployment.premium, PLAN_YEARLY)}
+                            disabled={!tokenDraft.token?.trim() || tokenTx?.loading}
+                            className={styles['admin-contracts__button']}
+                          >
+                            Disable (yearly)
+                          </button>
+                        </div>
+                      </form>
+                      )}
+
+                      {/* Said out loud rather than rendered as nothing: an absent panel reads
+                          as a missing feature, which is exactly the confusion this caused once. */}
+                      {!takesComplimentary && plans && !plans.loading && !plans.error && (
+                        <div className={styles['admin-contracts__validation']}>
+                          This deployment is older than the free-premium features — no free list, no free time, no moderators.
+                          Redeploy from the current HupPremium build to manage them here.
+                        </div>
+                      )}
+
+                      {/* Giving premium away. Two shapes on purpose: a complimentary listing
+                          never expires and can be revoked, a granted term expires on its own and
+                          cannot. Both are open to moderators; nothing else on this card is. */}
+                      {takesComplimentary && (
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSetPremiumComplimentary(chain, deployment.premium, true)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>
+                            Always premium — free, no expiry
+                            {compCount !== undefined && <> ({String(compCount)} listed)</>}
+                          </label>
+                          <p className={styles['admin-contracts__hint']}>
+                            A switch, not a countdown. Anyone listed here has premium for as long as they are on the list, and loses
+                            it the moment you remove them. For your own accounts, the team, partners. One address per line, or
+                            comma separated — up to {PREMIUM_MAX_BATCH} in one transaction.
+                          </p>
+                          <textarea
+                            rows={3}
+                            className={styles['admin-contracts__input']}
+                            value={compDraft.accounts ?? ''}
+                            onChange={(e) =>
+                              setPremiumCompInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], accounts: e.target.value } }))
+                            }
+                            placeholder="0x... one per line, or comma separated"
+                          />
+                        </div>
+
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Or give free time to those addresses</label>
+                          <p className={styles['admin-contracts__hint']}>
+                            A countdown instead. It starts now — or stacks on top of time they already hold — and runs out on its
+                            own. <strong>This cannot be taken back</strong>, so use it for make-goods, prizes and trials, and use
+                            the list above for anything you might want to reverse.
+                          </p>
+                          <div className={styles['admin-contracts__field-row']}>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              className={styles['admin-contracts__input']}
+                              value={compDraft.term ?? ''}
+                              onChange={(e) =>
+                                setPremiumCompInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], term: e.target.value } }))
+                              }
+                              placeholder="e.g. 3"
+                            />
+                            <select
+                              className={styles['admin-contracts__input']}
+                              value={compDraft.termUnit ?? GRANT_UNITS[0].id}
+                              onChange={(e) =>
+                                setPremiumCompInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], termUnit: e.target.value } }))
+                              }
+                            >
+                              {GRANT_UNITS.map((unit) => (
+                                <option key={unit.id} value={unit.id}>
+                                  {unit.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {compTx && (
+                          <div className={styles['admin-contracts__detail-row']}>
+                            <span className={styles['admin-contracts__detail-label']}>Comp Tx</span>
+                            <div className={styles['admin-contracts__detail-value']}>
+                              {compTx.loading && <span style={{ color: '#d97706' }}>Signing &amp; broadcasting tx...</span>}
+                              {compTx.error && <span style={{ color: '#ef4444' }}>❌ {compTx.error}</span>}
+                              {compTx.success && (
+                                <span style={{ color: '#10b981' }}>
+                                  🚀 {compTx.term ? `${compTx.term} granted to` : compTx.granted ? 'Comped' : 'Revoked for'}{' '}
+                                  {compTx.count} {compTx.count === 1 ? 'account' : 'accounts'}.
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={!compDraft.accounts?.trim() || compTx?.loading}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {compTx?.loading ? 'Writing...' : 'Add to free list'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetPremiumComplimentary(chain, deployment.premium, false)}
+                            disabled={!compDraft.accounts?.trim() || compTx?.loading}
+                            className={styles['admin-contracts__button']}
+                          >
+                            Remove from free list
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleGrantPremium(chain, deployment.premium)}
+                            disabled={!compDraft.accounts?.trim() || !compDraft.term?.trim() || compTx?.loading}
+                            className={styles['admin-contracts__button']}
+                          >
+                            Give free time
+                          </button>
+                        </div>
+                      </form>
+                      )}
+
+                      {/* Access and emergency controls, all ADMIN_ROLE only. */}
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSetPremiumModerator(chain, deployment.premium, moderatorRole, true)
+                        }}
+                      >
+                        {moderatorRole && (
+                          <div className={styles['admin-contracts__input-group']}>
+                            <label className={styles['admin-contracts__detail-label']}>Moderator</label>
+                            <p className={styles['admin-contracts__hint']}>
+                              Lets someone else use the two sections above — the free list and free time. They cannot change
+                              prices, move money, or pause sales; those stay with the admin wallet.
+                            </p>
+                            <input
+                              type="text"
+                              className={styles['admin-contracts__input']}
+                              value={manageDraft.moderator ?? ''}
+                              onChange={(e) =>
+                                setPremiumManageInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], moderator: e.target.value } }))
+                              }
+                              placeholder="0x..."
+                            />
+                          </div>
+                        )}
+
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Sweep a token (token, then receiver)</label>
+                          <p className={styles['admin-contracts__hint']}>
+                            Moves a token&apos;s whole balance out of the contract. The coin has its own button below — the two
+                            cannot move in one transaction, so token revenue is only reachable here.
+                          </p>
+                          <div className={styles['admin-contracts__field-row']}>
+                            <input
+                              type="text"
+                              className={styles['admin-contracts__input']}
+                              value={manageDraft.sweepToken ?? ''}
+                              onChange={(e) =>
+                                setPremiumManageInputs((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], sweepToken: e.target.value } }))
+                              }
+                              placeholder="token 0x..."
+                            />
+                            <input
+                              type="text"
+                              className={styles['admin-contracts__input']}
+                              value={manageDraft.sweepReceiver ?? ''}
+                              onChange={(e) =>
+                                setPremiumManageInputs((prev) => ({
+                                  ...prev,
+                                  [chain.id]: { ...prev[chain.id], sweepReceiver: e.target.value },
+                                }))
+                              }
+                              placeholder="receiver 0x..."
+                            />
+                          </div>
+                        </div>
+
+                        {manageTx && (
+                          <div className={styles['admin-contracts__detail-row']}>
+                            <span className={styles['admin-contracts__detail-label']}>Admin Tx</span>
+                            <div className={styles['admin-contracts__detail-value']}>
+                              {manageTx.loading && <span style={{ color: '#d97706' }}>Signing &amp; broadcasting tx...</span>}
+                              {manageTx.error && <span style={{ color: '#ef4444' }}>❌ {manageTx.error}</span>}
+                              {manageTx.success && <span style={{ color: '#10b981' }}>🚀 {manageTx.note}.</span>}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className={styles['admin-contracts__actions']}>
+                          {moderatorRole && (
+                            <>
+                              <button
+                                type="submit"
+                                disabled={!manageDraft.moderator?.trim() || manageTx?.loading}
+                                className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                              >
+                                Add moderator
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSetPremiumModerator(chain, deployment.premium, moderatorRole, false)}
+                                disabled={!manageDraft.moderator?.trim() || manageTx?.loading}
+                                className={styles['admin-contracts__button']}
+                              >
+                                Remove moderator
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleWithdrawPremiumToken(chain, deployment.premium)}
+                            disabled={!manageDraft.sweepToken?.trim() || !manageDraft.sweepReceiver?.trim() || manageTx?.loading}
+                            className={styles['admin-contracts__button']}
+                          >
+                            Sweep token
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handlePausePremium(chain, deployment.premium, isPaused)}
+                            disabled={manageTx?.loading}
+                            className={styles['admin-contracts__button']}
+                          >
+                            {isPaused ? 'Unpause sales' : 'Pause sales'}
+                          </button>
+                        </div>
+                      </form>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleWithdrawPremium(chain, deployment.premium)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Withdraw Receiver</label>
+                          <p className={styles['admin-contracts__hint']}>
+                            Sends the contract&apos;s entire {symbol} balance — everything people have paid in the coin — to this
+                            address, in one go. Tokens go through the sweep above instead.
+                          </p>
+                          <input
+                            type="text"
+                            className={styles['admin-contracts__input']}
+                            value={receiverDraft}
+                            onChange={(e) => setPremiumReceiverInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                            placeholder="0x..."
+                          />
+                        </div>
+
+                        {withdrawState && (
+                          <div className={styles['admin-contracts__detail-row']}>
+                            <span className={styles['admin-contracts__detail-label']}>Withdrawal</span>
+                            <div className={styles['admin-contracts__detail-value']}>
+                              {withdrawState.loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                              {withdrawState.error && <span style={{ color: '#ef4444' }}>❌ {withdrawState.error}</span>}
+                              {withdrawState.success && <span style={{ color: '#10b981' }}>🚀 Withdrawn.</span>}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={!receiverDraft.trim() || withdrawState?.loading}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {withdrawState?.loading ? 'Writing...' : 'Withdraw All'}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )
+                })}
+              </div>
             </section>
           )}
 

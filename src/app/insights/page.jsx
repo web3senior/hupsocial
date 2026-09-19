@@ -3,6 +3,7 @@
 import useSWR from 'swr'
 import { useState } from 'react'
 import { useConnection } from 'wagmi'
+import { usePremium } from '@/hooks/usePremium'
 import { ChartBarIcon, EyeIcon, HeartIcon, UsersIcon, WalletIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
 import { ContentSpinner } from '@/components/Loading'
@@ -64,6 +65,7 @@ export default function InsightsPage() {
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
   const [period, setPeriod] = useState('30d')
+  const { isPremium } = usePremium()
 
   const { data, error, isLoading } = useSWR(
     isConnected && address ? `/api/v1/users/${address}/insights?period=${period}` : null,
@@ -139,7 +141,7 @@ export default function InsightsPage() {
             <>
               <div className={styles.page__header}>
                 <h2 className={styles.page__headerTitle}>Insights</h2>
-                <InsightsPeriodPicker value={period} onChange={setPeriod} />
+                <InsightsPeriodPicker value={period} onChange={setPeriod} isPremium={isPremium} />
               </div>
 
               <div className={styles.page__stats}>

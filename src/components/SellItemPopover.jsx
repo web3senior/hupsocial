@@ -44,7 +44,7 @@ function base64ToFile(base64, filename, mimeType) {
   return new File([new Uint8Array(byteNumbers)], filename, { type: mimeType })
 }
 
-const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
+const SellItemPopover = forwardRef(function SellItemPopover({ item, onPendingCount }, ref) {
   const dialogRef = useRef(null)
   const fileInputRef = useRef(null)
 
@@ -191,15 +191,29 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
     }
   }, [sellAddress, hasListing, publicClient, item.id])
 
-  // Same cadence as the buyer list, and only while the dialog is open
+  const isSellerViewer = Boolean(address && listing?.seller && listing.seller.toLowerCase() === address.toLowerCase())
+
+  // Same cadence as the buyer list while the dialog is open. Closed, the seller still gets ONE
+  // read so the menu can say how many buyers are waiting: the escrow is reclaimable after
+  // GRANT_WINDOW, and a queue only visible inside an open dialog is how a sale silently reverses.
+  // Deliberately not an interval and only for the seller's own listing — this component mounts
+  // once per post in the feed, so anything repeating here would be a read per post per tick.
   useEffect(() => {
-    if (!isOpen) return undefined
+    if (!isOpen) {
+      if (isSellerViewer && hasListing) loadPending()
+      return undefined
+    }
     loadPending()
     const id = setInterval(loadPending, 8000)
     return () => clearInterval(id)
-  }, [isOpen, loadPending])
+  }, [isOpen, isSellerViewer, hasListing, loadPending])
 
   const pendingBuyers = pending.buyers
+
+  // Lets the post's menu say "2 buyers waiting for their key" without opening the dialog
+  useEffect(() => {
+    if (isSellerViewer && hasListing) onPendingCount?.(pendingBuyers.length)
+  }, [isSellerViewer, hasListing, pendingBuyers.length, onPendingCount])
   const pendingPubKeys = pending.pubKeys
   const loadingPending = pending.loading
   const refetchPending = loadPending

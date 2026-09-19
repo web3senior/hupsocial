@@ -17,6 +17,7 @@ import { hupInstruction, readHupConfig } from '@/lib/solana/hup'
 import { sendHupAction } from '@/lib/solana/relay'
 import abi from '@/abi/post.json'
 import NativePopover from './NativePopover'
+import { openConnect } from '@/lib/connectDialog'
 import Counter from './Counter'
 import Tooltip from './Tooltip'
 import postStyles from '../Post.module.scss'
@@ -333,7 +334,7 @@ export const Repost = ({ post, onQuote }) => {
               e.stopPropagation()
               close()
               if (!actorConnected) {
-                toast(isSolanaPost ? `Connect your Solana wallet` : `Please connect wallet`, `error`)
+                if (!openConnect()) toast(isSolanaPost ? `Connect your Solana wallet` : `Please connect wallet`, `error`)
                 return
               }
               isReposted ? removeRepost() : repost(post.id)
@@ -348,7 +349,7 @@ export const Repost = ({ post, onQuote }) => {
               e.stopPropagation()
               close()
               if (!actorConnected) {
-                toast(isSolanaPost ? `Connect your Solana wallet` : `Please connect wallet`, `error`)
+                if (!openConnect()) toast(isSolanaPost ? `Connect your Solana wallet` : `Please connect wallet`, `error`)
                 return
               }
               onQuote?.()

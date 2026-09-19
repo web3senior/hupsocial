@@ -1,0 +1,234 @@
+.premium {
+  /* The accent is the chain being paid on, scoped by networkColorStyle — never :root's,
+     which is whatever chain the wallet happens to sit on. The fallback matters: the
+     variable is undefined until a wallet connects. */
+  --premium-accent: var(--network-color-primary, var(--premium-500, #0095f6));
+  --premium-accent-text: var(--network-color-text, #fff);
+
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+
+  &__hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: center;
+    padding: 1.5rem 0 0.5rem;
+  }
+
+  &__mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    color: var(--premium-accent);
+    background: color-mix(in srgb, var(--premium-accent) 14%, transparent);
+  }
+
+  &__title {
+    font-size: var(--font-size-24, 1.5rem);
+    margin: 0;
+  }
+
+  &__lede {
+    max-width: 34rem;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.55;
+  }
+
+  /* --- Billing period --- */
+
+  &__billing {
+    display: flex;
+    align-self: center;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--background);
+  }
+
+  &__billingOption {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.95rem;
+    border-radius: 999px;
+    font-size: var(--font-size-14, 0.875rem);
+    color: var(--text-muted, #888);
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+
+    &--active {
+      background: var(--premium-accent);
+      color: var(--premium-accent-text);
+    }
+  }
+
+  &__saving {
+    font-size: var(--font-size-11, 0.7rem);
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 18%, transparent);
+  }
+
+  /* --- Chain row --- */
+
+  &__chains {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem;
+  }
+
+  &__chain {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: var(--font-size-12, 0.75rem);
+    color: var(--text-muted, #888);
+    transition:
+      border-color 0.15s ease,
+      color 0.15s ease;
+
+    img {
+      border-radius: 50%;
+    }
+
+    &--active {
+      border-color: var(--premium-accent);
+      color: var(--text, inherit);
+    }
+  }
+
+  /* --- The card --- */
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    padding: 1.35rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius, 16px);
+    background: var(--background);
+  }
+
+  &__price {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  &__priceMain {
+    font-size: var(--font-size-32, 2rem);
+    line-height: 1;
+  }
+
+  &__pricePeriod {
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  &__priceCoin {
+    flex-basis: 100%;
+    text-align: center;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-12, 0.75rem);
+  }
+
+  &__perks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  &__perk {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+
+    svg {
+      flex-shrink: 0;
+      margin-top: 0.2rem;
+      color: var(--premium-accent);
+    }
+
+    div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+    }
+
+    span {
+      color: var(--text-muted, #888);
+      font-size: var(--font-size-13, 0.8125rem);
+      line-height: 1.5;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  &__buy,
+  &__gift {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1.1rem;
+    border-radius: 999px;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    transition: opacity 0.15s ease;
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
+
+  &__buy {
+    flex: 1 1 12rem;
+    background: var(--premium-accent);
+    color: var(--premium-accent-text);
+  }
+
+  &__gift {
+    border: 1px solid var(--border);
+    color: var(--text-muted, #888);
+  }
+
+  &__fineprint {
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-12, 0.75rem);
+    line-height: 1.5;
+  }
+}

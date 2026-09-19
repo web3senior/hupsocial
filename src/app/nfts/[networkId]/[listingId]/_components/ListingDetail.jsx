@@ -11,6 +11,7 @@ import { toRelative } from '@/lib/predict'
 import { formatFeeShare } from '@/lib/tradeFee'
 import { handleBrokenImage } from '@/lib/utils'
 import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import useCollectionInfo from '@/hooks/useCollectionInfo'
@@ -66,7 +67,7 @@ const ReferralName = ({ address }) => {
   const name = profile?.fullName || (profile?.name && profile.name !== 'new-user' ? profile.name : null)
 
   return (
-    <Link href={`/${address}`} title={address}>
+    <Link href={profilePath(address, profile?.username)} title={address}>
       {name || shortAddress(address)}
     </Link>
   )

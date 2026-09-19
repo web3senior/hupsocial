@@ -440,6 +440,33 @@
     gap: 0.75rem;
   }
 
+  // Two controls sharing one line — the grant term's amount beside its unit, or a token
+  // address beside a receiver.
+  //
+  // Both children carry __input, which is width: 100%. In a flex row that makes each one's
+  // basis the whole line, so whichever refuses to shrink takes everything and the other
+  // collapses to a sliver. The widths have to be restated here, not inherited.
+  &__field-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    > input {
+      flex: 1 1 0;
+      width: auto;
+      min-width: 0;
+    }
+
+    > select {
+      flex: 0 0 auto;
+      width: auto;
+      // Wide enough for 'months' plus the native dropdown arrow, so the longest option never
+      // truncates and the control does not resize as the choice changes.
+      min-width: 7.5rem;
+      cursor: pointer;
+    }
+  }
+
   &__button {
     padding: 0.65rem 1.25rem;
     font-size: 0.85rem;

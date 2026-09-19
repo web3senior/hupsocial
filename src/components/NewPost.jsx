@@ -51,6 +51,8 @@ import { captureVideoPoster } from '@/lib/videoPoster'
 import { shortUploadError } from '@/lib/uploadErrors'
 import { canOptimizeVideo, optimizeVideo } from '@/lib/videoOptimizer'
 import { detectAiProvenance } from '@/lib/aiProvenance'
+import { FREE_VIDEO_MB, PREMIUM_VIDEO_MB } from '@/lib/premium'
+import { usePremium } from '@/hooks/usePremium'
 
 const MAX_MEDIA_ITEMS = 8
 const MAX_MEDIA_SIZE_MB = 10
@@ -58,7 +60,7 @@ const MAX_MEDIA_SIZE_MB = 10
 // Uploads above ~4MB bypass the serverless route and go straight to storage, so the cap is a
 // storage-cost decision rather than a platform one. Kept in step with MAX_UPLOAD_BYTES in
 // /api/ipfs/presign, which enforces it server-side.
-const MAX_VIDEO_SIZE_MB = 100
+const MAX_VIDEO_SIZE_MB = FREE_VIDEO_MB
 const MAX_POST_LENGTH = 5000
 const MAX_HISTORY_ENTRIES = 100
 // iOS Safari can hold a video's metadata back indefinitely (Low Power Mode, cellular); the
@@ -185,7 +187,9 @@ const getMediaType = (file) => {
   return null
 }
 
-const getMaxSizeMb = (mediaType) => (mediaType === 'video' ? MAX_VIDEO_SIZE_MB : MAX_MEDIA_SIZE_MB)
+// Premium raises the video ceiling only — an image that large is a mistake, not a perk.
+const getMaxSizeMb = (mediaType, isPremium = false) =>
+  mediaType === 'video' ? (isPremium ? PREMIUM_VIDEO_MB : MAX_VIDEO_SIZE_MB) : MAX_MEDIA_SIZE_MB
 
 const getMediaPreviewSrc = (item) =>
   item.localUrl || (item.type === 'image' ? resolveIPFSImageUrl(item.cid, { width: 800 }) : resolveIPFSUrl(item.cid))
@@ -388,6 +392,8 @@ const restoreCaretState = (editor, caret) => {
 
 export default function NewPost({ text = '', url = '', seedFiles = null, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed, restoreState = null, article: articleSeed = null }) {
   const mounted = useClientMounted()
+  // Raises this composer's video ceiling; the presign route enforces the same number.
+  const { isPremium } = usePremium()
   // The composer mounts open and unmounts closed, so this tracks exactly the sheet's lifetime:
   // the mobile fullscreen sheet sizes itself off these vars to survive the software keyboard
   useVisualViewport()
@@ -930,7 +936,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     chip.className = 'mention'
     chip.contentEditable = 'false'
     chip.dataset.mention = suggestion.address
-    chip.textContent = `@${mentionLabel(suggestion.name || suggestion.ensName, suggestion.address)}`
+    // The handle first: it is the one label that is unique and that its owner chose
+    chip.textContent = `@${mentionLabel(suggestion.username || suggestion.name || suggestion.ensName, suggestion.address)}`
     tail.parentNode.insertBefore(chip, tail)
 
     if (!/^[\s\u00A0]/.test(tail.data)) tail.data = `\u00A0${tail.data}`
@@ -1153,7 +1160,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
           updateMediaItem(uploadId, (item) => ({ ...item, status: 'uploading', progress: 0 }))
         }
 
-        const cid = await uploadToIPFS(upload, { signal: controller.signal, onProgress: reportProgress })
+        const cid = await uploadToIPFS(upload, { signal: controller.signal, onProgress: reportProgress, address })
 
         /* A still, pinned separately, so feed cards render a thumbnail without pulling the video
            through a gateway, plus the inline preview that paints before the still arrives. Best-effort
@@ -1321,7 +1328,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       }
 
       // Classified first: video carries a much larger ceiling than an image does
-      const maxSizeMb = getMaxSizeMb(mediaType)
+      const maxSizeMb = getMaxSizeMb(mediaType, isPremium)
       const sizeInMB = file.size / (1024 * 1024)
       if (sizeInMB > maxSizeMb) {
         toast(`"${file.name}" exceeds the ${maxSizeMb}MB limit`, 'error')

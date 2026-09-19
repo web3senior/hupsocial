@@ -5,6 +5,7 @@ import { useConnection } from 'wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { usePostStats } from '@/hooks/usePostStats'
 import { toast } from '@/components/NextToast'
+import { openConnect } from '@/lib/connectDialog'
 import Counter from './Counter'
 import Tooltip from './Tooltip'
 
@@ -26,7 +27,7 @@ export const CommentAction = ({ post, onComment }) => {
     e.stopPropagation()
 
     if (!isConnected) {
-      toast(`Please connect wallet`, `error`)
+      if (!openConnect()) toast(`Please connect wallet`, `error`)
       return
     }
 
