@@ -53,7 +53,6 @@ const NetworkCard = ({ chain }) => {
     // networkColorStyle, not a bare custom property: the card's accent belongs to the chain it
     // links to, while :root carries the connected wallet's
     <Link href={`/networks/${chain.id}`} className={styles.card} style={networkColorStyle(chain)} title={`View ${chain.name}`}>
-      <span className={styles.card__rail} aria-hidden="true" />
       <div className={styles.card__top}>
         <div className={styles.card__icon}>
           {iconUrl ? <img src={iconUrl} alt="" loading="lazy" /> : <span className={styles['card__icon-fallback']}>{chain.name?.charAt(0)}</span>}
