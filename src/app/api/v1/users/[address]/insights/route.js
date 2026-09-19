@@ -32,14 +32,14 @@ export async function GET(request, { params }) {
 
     // Anchor "today" to the DB's own clock rather than Node's — DATE_FORMAT() below reflects the
     // DB session's timezone, so building the day range off Date.now() (UTC) could disagree with it
-    // at day boundaries and silently drop today's bucket.
-    const [[{ today }]] = await pool.execute(`SELECT DATE_FORMAT(NOW(), '%Y-%m-%d') AS today`)
-    const since = getSinceDate(today, days)
-
-    const [[{ follower_count: followerCount }]] = await pool.execute(
-      `SELECT COUNT(DISTINCT follower_address) AS follower_count FROM follows WHERE followed_address = ? AND is_following = 1`,
+    // at day boundaries and silently drop today's bucket. It rides along with the follower count
+    // because nothing else can be issued until the period's start date is known.
+    const [[{ today, follower_count: followerCount }]] = await pool.execute(
+      `SELECT DATE_FORMAT(NOW(), '%Y-%m-%d') AS today,
+              (SELECT COUNT(DISTINCT follower_address) FROM follows WHERE followed_address = ? AND is_following = 1) AS follower_count`,
       [wallet],
     )
+    const since = getSinceDate(today, days)
 
     const [followerGrowth, profileViews, reach, topPosts, networkBreakdown] = await Promise.all([
       getFollowerGrowth(wallet, since, today, days),
@@ -71,18 +71,19 @@ export async function GET(request, { params }) {
  * row is a +1 on its updated_at day, each is_following=0 row is a -1, so a baseline before the
  * period plus a running cumulative sum through it reproduces the count on every day. */
 async function getFollowerGrowth(wallet, since, today, days) {
-  const [[{ baseline }]] = await pool.execute(
-    `SELECT COALESCE(SUM(CASE WHEN is_following = 1 THEN 1 ELSE -1 END), 0) AS baseline
-     FROM follows WHERE followed_address = ? AND updated_at < ?`,
-    [wallet, since],
-  )
-
-  const [rows] = await pool.execute(
-    `SELECT DATE_FORMAT(updated_at, '%Y-%m-%d') AS day, SUM(CASE WHEN is_following = 1 THEN 1 ELSE -1 END) AS delta
-     FROM follows WHERE followed_address = ? AND updated_at >= ?
-     GROUP BY day`,
-    [wallet, since],
-  )
+  const [[[{ baseline }]], [rows]] = await Promise.all([
+    pool.execute(
+      `SELECT COALESCE(SUM(CASE WHEN is_following = 1 THEN 1 ELSE -1 END), 0) AS baseline
+       FROM follows WHERE followed_address = ? AND updated_at < ?`,
+      [wallet, since],
+    ),
+    pool.execute(
+      `SELECT DATE_FORMAT(updated_at, '%Y-%m-%d') AS day, SUM(CASE WHEN is_following = 1 THEN 1 ELSE -1 END) AS delta
+       FROM follows WHERE followed_address = ? AND updated_at >= ?
+       GROUP BY day`,
+      [wallet, since],
+    ),
+  ])
 
   const deltaByDay = new Map(rows.map((r) => [formatDay(r.day), Number(r.delta)]))
 
