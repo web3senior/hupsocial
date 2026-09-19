@@ -7,7 +7,7 @@
     top: 0rem;
     background-color: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 24px;
+    border-radius: var(--page-border-radius);
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
     overflow: hidden;
     isolation: isolate;
@@ -26,6 +26,18 @@
     }
   }
 
+  &__intro {
+    margin: 0;
+    max-width: 52ch;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-muted);
+
+    @media (max-width: 600px) {
+      padding-inline: 0.25rem;
+    }
+  }
+
   &__section-title {
     display: flex;
     align-items: center;
@@ -33,12 +45,13 @@
     margin: 0 0 1rem;
     font-size: 15px;
     font-weight: 600;
-    color: var(--black-900);
+    color: var(--foreground);
   }
 
   &__section-count {
-    background-color: var(--gray-100);
-    color: var(--text-color-pale);
+    background-color: var(--surface-muted);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
     padding: 2px 8px;
     font-size: 11px;
     font-weight: 500;
@@ -47,17 +60,32 @@
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   padding: 1rem;
-  background-color: var(--background);
-  border: 1px solid transparent;
+  // A step off the container rather than --background: those two are the same white in the
+  // light theme, which left the cards invisible until hover
+  background-color: var(--surface-muted);
+  border: 1px solid var(--border);
   border-radius: 20px;
   cursor: pointer;
-  transition: border-color 0.2s var(--transition-soft), transform 0.1s var(--transition-soft);
+  overflow: hidden;
+  transition: border-color 0.2s var(--transition-soft), box-shadow 0.2s var(--transition-soft), transform 0.1s var(--transition-soft);
   will-change: transform;
   user-select: none;
+
+  // Brand rail along the top edge. color-mix keeps a near-black (#000) or near-white (#acc6e9)
+  // brand colour from disappearing into whichever theme is painting the card.
+  &__rail {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 3px;
+    background-color: color-mix(in srgb, var(--network-color-primary, var(--text-muted)) 70%, transparent);
+    opacity: 0.75;
+    transition: opacity 0.2s var(--transition-soft);
+  }
 
   &__top {
     display: flex;
@@ -69,6 +97,10 @@
 
   &__icon {
     flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background-color: color-mix(in srgb, var(--network-color-primary, transparent) 12%, transparent);
+    border-radius: 10px;
 
     svg,
     img {
@@ -81,25 +113,37 @@
     }
   }
 
+  &__icon-fallback {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    font-size: 15px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
   &__name {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     font-size: 14px;
     font-weight: 600;
-    color: var(--black-900);
+    color: var(--foreground);
   }
 
   &__meta {
     font-size: 12px;
-    color: var(--text-color-pale);
+    color: var(--text-muted);
     white-space: nowrap;
   }
 
   &__count {
     flex-shrink: 0;
-    background-color: var(--gray-100);
-    color: var(--black);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
     padding: 6px 10px;
     font-size: 11px;
     font-weight: 500;
@@ -107,30 +151,35 @@
     white-space: nowrap;
 
     &--empty {
-      color: var(--text-color-pale);
+      background-color: transparent;
+      color: var(--text-muted);
     }
   }
-}
-
-// Shimmer
-.shimmer {
-  padding: 1.2rem;
-  border-radius: 20px;
-  box-shadow: var(--shadow-xs);
 }
 
 /* Enable hover only on non-touch devices */
 @media (hover: hover) and (pointer: fine) {
   .card {
     &:hover {
-      background-color: var(--surface);
-      border-color: var(--network-accent, var(--border));
+      border-color: color-mix(in srgb, var(--network-color-primary, var(--text-muted)) 55%, var(--border));
+      box-shadow: 0 8px 24px color-mix(in srgb, var(--network-color-primary, #000) 16%, transparent);
       -webkit-transform: translateY(-2px);
       transform: translateY(-2px);
+
+      .card__rail {
+        opacity: 1;
+      }
     }
   }
 }
 
-/* Styles for dark color theme. */
-@media (prefers-color-scheme: dark) {
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+
+    &:hover {
+      -webkit-transform: none;
+      transform: none;
+    }
+  }
 }

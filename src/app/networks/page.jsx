@@ -2,6 +2,7 @@ import Link from 'next/link'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import { config } from '@/config/wagmi'
+import { chainIconFor, networkColorStyle } from '@/lib/networkColors'
 import { getDeployment, hupContractCount } from './_components/contractCatalog'
 import styles from './page.module.scss'
 
@@ -15,6 +16,9 @@ export default function Page() {
       <PageTitle name={`Networks`} />
       <div className={styles.page}>
         <div className={clsx('__container', styles.page__container)} data-width={`medium`}>
+          <p className={styles.page__intro}>
+            Every chain {process.env.NEXT_PUBLIC_NAME} runs on. Open one to read its RPC, its explorer and every contract deployed there.
+          </p>
           <NetworkSection title={`Mainnets`} chains={mainnets} />
           <NetworkSection title={`Testnets`} chains={testnets} />
         </div>
@@ -43,12 +47,16 @@ const NetworkSection = ({ title, chains }) => {
 
 const NetworkCard = ({ chain }) => {
   const count = hupContractCount(getDeployment(chain.id))
+  const iconUrl = chainIconFor(chain)
 
   return (
-    <Link href={`/networks/${chain.id}`} className={styles.card} style={{ '--network-accent': chain.primaryColor }} title={`View details`}>
+    // networkColorStyle, not a bare custom property: the card's accent belongs to the chain it
+    // links to, while :root carries the connected wallet's
+    <Link href={`/networks/${chain.id}`} className={styles.card} style={networkColorStyle(chain)} title={`View ${chain.name}`}>
+      <span className={styles.card__rail} aria-hidden="true" />
       <div className={styles.card__top}>
         <div className={styles.card__icon}>
-          <img src={chain.iconUrl} alt="" />
+          {iconUrl ? <img src={iconUrl} alt="" loading="lazy" /> : <span className={styles['card__icon-fallback']}>{chain.name?.charAt(0)}</span>}
         </div>
         <span className={clsx(styles.card__count, count === 0 && styles['card__count--empty'])}>
           {count > 0 ? `${count} contract${count === 1 ? '' : 's'}` : `No contracts`}

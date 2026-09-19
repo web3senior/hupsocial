@@ -21,7 +21,9 @@
   }
 
   a {
-    color: var(--blue-600);
+    // --blue-600 is a fixed palette step; --cashtag-color is declared per theme and clears
+    // contrast on all three surfaces
+    color: var(--cashtag-color);
     overflow-wrap: anywhere;
   }
 }
@@ -31,8 +33,8 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  background-color: var(--background);
-  border: 1px solid transparent;
+  background-color: var(--surface-muted);
+  border: 1px solid var(--border);
   border-radius: 20px;
   padding: 0 2rem 2rem;
   isolation: isolate;
@@ -48,7 +50,8 @@
     gap: 0.5rem;
     padding-top: 3.5rem;
 
-    // Brand-colored band behind the icon
+    // Brand-colored band behind the icon. It fades out downwards so the seam against the card
+    // never reads as a hard stripe, whichever theme is underneath.
     &:before {
       content: '';
       position: absolute;
@@ -56,7 +59,11 @@
       right: 0;
       top: 0;
       height: 90px;
-      background-color: var(--bg-color);
+      background-image: linear-gradient(
+        180deg,
+        var(--network-color-primary, var(--surface-muted)) 0%,
+        color-mix(in srgb, var(--network-color-primary, var(--surface-muted)) 45%, transparent) 100%
+      );
       border-radius: 20px 20px 0 0;
       z-index: -1;
 
@@ -67,8 +74,10 @@
   }
 
   &__icon {
-    background-color: var(--background);
-    border: 3px solid var(--background);
+    display: grid;
+    place-items: center;
+    background-color: var(--surface);
+    border: 3px solid var(--surface);
     border-radius: 14px;
     box-shadow: var(--shadow-10);
     overflow: hidden;
@@ -83,17 +92,30 @@
     }
   }
 
+  &__icon-fallback {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    font-size: 22px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
   &__name {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     margin: 0;
-    color: var(--black-900);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--foreground);
   }
 
   &__meta {
     font-size: 13px;
-    color: var(--text-color-pale);
+    color: var(--text-muted);
   }
 
   &__section-title {
@@ -103,12 +125,13 @@
     margin: 0 0 0.25rem;
     font-size: 14px;
     font-weight: 600;
-    color: var(--black-900);
+    color: var(--foreground);
   }
 
   &__section-count {
-    background-color: var(--gray-100);
-    color: var(--text-color-pale);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
     padding: 2px 8px;
     font-size: 11px;
     font-weight: 500;
@@ -118,11 +141,17 @@
   &__section-description {
     margin: 0 0 0.75rem;
     font-size: 12px;
-    color: var(--text-color-pale);
+    color: var(--text-muted);
   }
 
   &__back {
     align-self: flex-start;
+    padding: 0.4rem 0.8rem;
+    font-size: 13px;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 1000px;
+    transition: border-color 0.2s var(--transition-soft);
   }
 }
 
@@ -167,12 +196,12 @@
   &__label {
     font-size: 13px;
     font-weight: 600;
-    color: var(--black-900);
+    color: var(--foreground);
   }
 
   &__description {
     font-size: 11px;
-    color: var(--text-color-pale);
+    color: var(--text-muted);
   }
 
   &__value {
@@ -181,7 +210,7 @@
     gap: 0.5rem;
     min-width: 0;
     font-size: 13px;
-    color: var(--black-900);
+    color: var(--text);
     text-align: right;
     overflow-wrap: anywhere;
 
@@ -192,6 +221,7 @@
     }
 
     code {
+      font-family: var(--font-mono);
       font-size: 12px;
       overflow-wrap: anywhere;
     }
@@ -208,7 +238,7 @@
   align-items: center;
   gap: 1rem;
   padding: 3rem 1rem;
-  color: var(--text-color-pale);
+  color: var(--text-muted);
 
   p {
     margin: 0;
@@ -217,8 +247,12 @@
 
 /* Enable hover only on non-touch devices */
 @media (hover: hover) and (pointer: fine) {
-}
+  .row:hover {
+    background-color: var(--hover);
+  }
 
-/* Styles for dark color theme. */
-@media (prefers-color-scheme: dark) {
+  // --border-strong is a white alpha in every theme block, so it vanishes on the light surface
+  .network__back:hover {
+    border-color: color-mix(in srgb, var(--text-muted) 45%, transparent);
+  }
 }
