@@ -16,7 +16,6 @@ import {
   TrophyIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
-import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import styles from './page.module.scss'
 import Profile from '@/components/Profile'
@@ -25,12 +24,6 @@ const DEFAULT_AVATAR = '/default-pfp.svg'
 const PAGE_SIZE = 20
 const PODIUM_AVATAR_SIZE = 48
 const ROW_AVATAR_SIZE = 32
-
-const RANK_CROWNS = {
-  1: '/icons/1st.svg',
-  2: '/icons/2nd.svg',
-  3: '/icons/3rd.svg',
-}
 
 const PERIOD_OPTIONS = [
   { value: 'all', label: 'All time' },
@@ -185,11 +178,10 @@ export default function LeaderboardPage() {
                     className={`${styles.podiumItem} ${getRankClass(leader.rank)}`}
                     onClick={() => openProfile(leader.wallet_address)}
                   >
-                    <CrownedProfile
-                      rank={leader.rank}
-                      wallet={leader.wallet_address}
+                    <Profile
+                      creator={leader.wallet_address}
+                      variant="fullWithoutTime"
                       size={PODIUM_AVATAR_SIZE}
-                      className={styles.podiumProfile}
                     />
                     <div className={styles.scoreBlock}>
                       <span>{numberFormatter.format(leader.score)}</span>
@@ -220,10 +212,12 @@ export default function LeaderboardPage() {
                     className={styles.leaderRow}
                     onClick={() => openProfile(leader.wallet_address)}
                   >
-                    <span className={styles.rankNumber}>{leader.rank}</span>
-                    <CrownedProfile
-                      rank={leader.rank}
-                      wallet={leader.wallet_address}
+                    <span className={styles.rankNumber} data-rank={leader.rank}>
+                      {leader.rank}
+                    </span>
+                    <Profile
+                      creator={leader.wallet_address}
+                      variant="fullWithoutTime"
                       size={ROW_AVATAR_SIZE}
                       className={styles.avatar}
                     />
@@ -280,30 +274,6 @@ function Metric({ icon: Icon, label, value, title }) {
    the hover spells out which side of the like each number is. */
 function likesTitle(leader) {
   return `Likes received: ${numberFormatter.format(leader.likes_received)} — Likes given: ${numberFormatter.format(leader.likes_given)}`
-}
-
-/*
- * Profile.jsx stays the one identity renderer; the crown is an overlay anchored off the
- * avatar box it was handed, which is why the size travels as a variable rather than a guess.
- */
-function CrownedProfile({ rank, wallet, size, className }) {
-  const crownSrc = RANK_CROWNS[rank]
-
-  return (
-    <span
-      className={clsx(styles.crowned, className)}
-      style={{ '--crowned-avatar-size': `${size}px` }}
-      data-rank={crownSrc ? rank : undefined}
-    >
-      {crownSrc && (
-        <>
-          <span className={styles.crowned__ring} aria-hidden="true" />
-          <img className={styles.crowned__crown} src={crownSrc} alt="" aria-hidden="true" />
-        </>
-      )}
-      <Profile creator={wallet} variant="fullWithoutTime" size={size} />
-    </span>
-  )
 }
 
 function LeaderboardSkeleton() {
