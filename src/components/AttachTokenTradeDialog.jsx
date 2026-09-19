@@ -9,7 +9,9 @@ import { appChains } from '@/config/contracts'
 import { SOLANA_TRADE_CHAINS, isSolanaNetworkId } from '@/config/solana'
 import { fetchSolanaTokenInfo, isMint } from '@/lib/solanaSwap'
 import { MAX_FEE_BPS } from '@/lib/uniswap'
-import { canSwapOn, probeRoute } from '@/hooks/useTokenSwap'
+import { canSwapOn, fetchLaunchIdentity, probeRoute } from '@/hooks/useTokenSwap'
+import useTokenMarket from '@/hooks/useTokenMarket'
+import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import { XIcon } from '@phosphor-icons/react'
 import NativeDialog from './ui/NativeDialog'
 import TokenIcon from './ui/TokenIcon'
@@ -62,6 +64,16 @@ const AttachTokenTradeDialog = forwardRef(function AttachTokenTradeDialog({ valu
   // meant, so it is added and flagged rather than blocked
   const [warning, setWarning] = useState('')
   const [isChecking, setIsChecking] = useState(false)
+
+  // One batched lookup for every attached EVM token, the same source the post card uses
+  const marketAssets = useMemo(
+    () =>
+      tokens
+        .filter((token) => !isSolanaNetworkId(token.chainId))
+        .map((token) => ({ id: token.chainId + ':' + token.address, chainId: Number(token.chainId), address: token.address })),
+    [tokens],
+  )
+  const { market } = useTokenMarket(marketAssets)
 
   useImperativeHandle(ref, () => ({
     open: () => {
@@ -135,9 +147,21 @@ const AttachTokenTradeDialog = forwardRef(function AttachTokenTradeDialog({ valu
           return
         }
 
+        // A launchpad token's name and artwork exist only in its launch metadata — no logo
+        // service indexes these chains — so they are captured here. Stored as the raw reference
+        // rather than a gateway URL, and only for launches, where nothing else can supply it.
+        const launch = await fetchLaunchIdentity(config, { chainId: Number(chainId), token: trimmed }).catch(() => null)
+
         setTokens((current) => [
           ...current,
-          { chainId: Number(chainId), address: trimmed, symbol: symbol ?? null, decimals: Number(decimals), feeCapable },
+          {
+            chainId: Number(chainId),
+            address: trimmed,
+            symbol: launch?.symbol ?? symbol ?? null,
+            decimals: Number(decimals),
+            feeCapable,
+            ...(launch?.image ? { logo: launch.image } : {}),
+          },
         ])
         // Reached only when the chain answered nothing at all. The token is added rather than
         // refused — an endpoint being down is not evidence about the token — but the author is
@@ -162,7 +186,14 @@ const AttachTokenTradeDialog = forwardRef(function AttachTokenTradeDialog({ valu
 
   const save = () => {
     dialogRef.current?.close()
-    onAttach?.(tokens.length > 0 ? { tokens, feeBps } : null)
+    if (tokens.length === 0) {
+      onAttach?.(null)
+      return
+    }
+    // A rate no attached token can pay is not a rate — storing it would have the composer chip
+    // and the post itself advertising a cut that no route can take
+    const payable = tokens.some((token) => !isSolanaNetworkId(token.chainId) && token.feeCapable !== false)
+    onAttach?.({ tokens, feeBps: payable ? feeBps : 0 })
   }
 
   const chainName = (id) => swappableChains.find((chain) => chain.id === Number(id))?.name ?? `Chain ${id}`
@@ -175,6 +206,17 @@ const AttachTokenTradeDialog = forwardRef(function AttachTokenTradeDialog({ valu
      between a rate an author chose and a rate they will be paid. */
   const unpaid = tokens.filter((token) => isSolanaNetworkId(token.chainId) || token.feeCapable === false)
   const allUnpaid = tokens.length > 0 && unpaid.length === tokens.length
+
+  /* Artwork for the rows. Resolved live rather than stored on the post: a logo URL saved into
+     content would outlive the host serving it, and the card resolves the same way. Solana mints
+     carry theirs from the Jupiter lookup that added them; everything else comes from the market
+     route, since TrustWallet only covers a handful of chains and none of the long tail. */
+  const logoFor = (token) => {
+    const raw = isSolanaNetworkId(token.chainId)
+      ? token.logo
+      : (market[`${Number(token.chainId)}:${String(token.address).toLowerCase()}`]?.logo ?? token.logo)
+    return raw ? (resolveStorageImageUrl(raw, { width: 96 }) ?? raw) : null
+  }
 
   return (
     <NativeDialog
@@ -249,7 +291,7 @@ const AttachTokenTradeDialog = forwardRef(function AttachTokenTradeDialog({ valu
           <ul className={styles.attachTrade__list}>
             {tokens.map((token, index) => (
               <li key={`${token.chainId}:${token.address}`} className={styles.attachTrade__row}>
-                <TokenIcon token={{ logo: null, address: token.address }} chainId={Number(token.chainId)} size="md" />
+                <TokenIcon token={{ logo: logoFor(token), address: token.address }} chainId={Number(token.chainId)} size="md" />
                 <span className={styles.attachTrade__rowIdentity}>
                   <span className={styles.attachTrade__rowSymbol}>{token.symbol ?? 'Token'}</span>
                   <span className={styles.attachTrade__rowChain}>{chainName(token.chainId)}</span>

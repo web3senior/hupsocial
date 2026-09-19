@@ -324,6 +324,9 @@ export async function resolveLaunchMeta(config, { chainId, launchId, createdBloc
       name: created.name || null,
       symbol: created.symbol || null,
       logo: image ? resolveStorageImageUrl(image) : null,
+      // The unresolved reference as well. A caller that stores this keeps a CID rather than one
+      // gateway's URL, so the artwork survives whichever gateway is serving it today.
+      image: image || null,
     }
   } catch {
     return null
@@ -896,3 +899,24 @@ export function useTokenSwap({
 }
 
 export default useTokenSwap
+
+/**
+ * A launchpad token's own name, ticker and artwork, or null when the token did not come from
+ * one. Composes the pool and metadata lookups so a caller that only wants identity does not
+ * have to know about pool keys.
+ *
+ * Worth storing on a post, unlike a logo from a CDN: a launch's artwork exists nowhere else —
+ * no logo service indexes these chains — so a switcher pill showing a token that is not the
+ * active one has no other way to find it.
+ *
+ * @returns {Promise<{name: string|null, symbol: string|null, image: string|null}|null>}
+ */
+export async function fetchLaunchIdentity(config, { chainId, token }) {
+  if (!CONTRACTS[`chain${chainId}`]?.arcoLaunch) return null
+
+  const pool = await resolveLaunchPool(config, { chainId, token })
+  if (!pool) return null
+
+  const meta = await resolveLaunchMeta(config, { chainId, launchId: pool.launchId, createdBlock: pool.createdBlock })
+  return meta ? { name: meta.name, symbol: meta.symbol, image: meta.image } : null
+}
