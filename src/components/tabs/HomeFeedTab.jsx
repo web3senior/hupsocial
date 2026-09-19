@@ -23,6 +23,18 @@ import styles from '@/app/page.module.scss'
 // so mixing page sizes shifts the offset and re-fetches an already-loaded window.
 const POSTS_PAGE_SIZE = 20
 
+// Each tick refetches a full page 1 to diff against, so the interval is the dominant cost of an
+// open feed. Returning to the tab polls immediately, which is what keeps this from feeling slow.
+const POLL_INTERVAL_MS = 90_000
+
+// Floor on that catch-up poll. Without it, switching back and forth between browser tabs fires a
+// full page-1 fetch per return, which costs more than the always-on poll this replaced.
+const CATCH_UP_MIN_GAP_MS = 30_000
+
+// How long a restored feed keeps correcting itself back onto the reader's post. Covers the window
+// where the feed's images are still resolving and reflowing everything below them.
+const RESTORE_SETTLE_MS = 2500
+
 // How far down the author can be and still have their freshly indexed post merged in place of
 // being queued — roughly "hasn't really left the top of the feed yet".
 const AUTHORED_MERGE_MAX_SCROLL_PX = 200
@@ -115,6 +127,8 @@ export default function HomeFeedTab({
   const pendingPageRef = useRef(null)
   // Polls can overtake each other on a slow gateway; only the newest response may speak.
   const pollSeqRef = useRef(0)
+  // When the last poll left, so a tab return can tell "been away a while" from "just glanced off".
+  const lastPollAtRef = useRef(0)
 
   // Params of the feed data currently applied ("address|networkId"); the init
   // effect only fetches when they differ, so a cache hydration skips the mount
@@ -125,8 +139,14 @@ export default function HomeFeedTab({
   // unmount cleanup is too late — Next may have already reset scroll for the
   // incoming route by then.
   const lastScrollYRef = useRef(0)
-  // Cached scroll position to restore; consumed once the posts render.
+  // Cached scroll position to restore; consumed once the posts render. Only the fallback — a
+  // pixel offset says nothing about which post it lands on once media above it reflows.
   const pendingScrollRestoreRef = useRef(initialCache ? initialCache.scrollY ?? 0 : null)
+  // The post the reader was on and where it sat in the viewport, tracked live like the scroll
+  // position. Restoring to a post survives media loading in above it; restoring to a pixel does
+  // not — the feed lands on whatever has drifted into that offset.
+  const lastAnchorRef = useRef(initialCache?.anchor ?? null)
+  const pendingAnchorRestoreRef = useRef(initialCache?.anchor ?? null)
   const cacheSnapshotRef = useRef(null)
   // Feed container height, tracked live like the scroll position (the ref is
   // already null in the unmount cleanup where the snapshot is saved).
@@ -150,6 +170,24 @@ export default function HomeFeedTab({
   }, [isFetching, hasMore])
 
   useEffect(() => {
+    // The first card still showing any part of itself is the one the reader is on. Measured on a
+    // frame rather than per scroll event: this walks the cards, and the events fire far denser
+    // than paints.
+    let anchorFrame = 0
+    const measureAnchor = () => {
+      anchorFrame = 0
+      const cards = containerRef.current?.querySelectorAll('[data-post-key]')
+      if (!cards?.length) return
+
+      for (const card of cards) {
+        const { top, bottom } = card.getBoundingClientRect()
+        if (bottom > 0) {
+          lastAnchorRef.current = { key: card.dataset.postKey, offset: Math.round(top) }
+          return
+        }
+      }
+    }
+
     const handleScroll = () => {
       const scrollElement = document.documentElement
       if (!scrollElement) return
@@ -160,6 +198,7 @@ export default function HomeFeedTab({
       lastScrollYRef.current = scrollTop
       // Media loads change the height without a re-render, so re-measure here too.
       lastFeedHeightRef.current = containerRef.current?.offsetHeight || lastFeedHeightRef.current
+      if (!anchorFrame) anchorFrame = requestAnimationFrame(measureAnchor)
 
       if (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD) {
         if (hasMoreRef.current && !isFetchingRef.current) {
@@ -170,7 +209,10 @@ export default function HomeFeedTab({
 
     if (mounted) {
       window.addEventListener('scroll', handleScroll, { passive: true })
-      return () => window.removeEventListener('scroll', handleScroll)
+      return () => {
+        window.removeEventListener('scroll', handleScroll)
+        if (anchorFrame) cancelAnimationFrame(anchorFrame)
+      }
     }
   }, [mounted])
 
@@ -227,44 +269,89 @@ export default function HomeFeedTab({
     return () => {
       const snapshot = cacheSnapshotRef.current
       if (!snapshot || snapshot.list.length === 0) return
-      saveFeedCache(feedCacheKey, { ...snapshot, scrollY: lastScrollYRef.current, feedHeight: lastFeedHeightRef.current || null })
+      saveFeedCache(feedCacheKey, {
+        ...snapshot,
+        scrollY: lastScrollYRef.current,
+        feedHeight: lastFeedHeightRef.current || null,
+        anchor: lastAnchorRef.current,
+      })
     }
   }, [feedCacheKey, saveFeedCache])
 
-  // Restore the cached scroll position once the hydrated posts have rendered.
-  // Reaching the target once is not enough to stop: Next's layout-router
-  // scrolls the new segment to top AFTER this effect (parent layout effects
-  // run after children's), and media loads can still clamp the position. So
-  // keep re-asserting until the target survives two consecutive frames —
-  // rAF callbacks fire before the pending paint, so a reset that lands
-  // pre-paint gets corrected pre-paint and never shows. The pending ref is
-  // only cleared on success/deadline, so a StrictMode remount restarts the
-  // loop cleanly.
+  // Restore the reader's place once the hydrated posts have rendered.
+  //
+  // Reaching the target once is not enough to stop. Next's layout-router scrolls the new segment
+  // to top AFTER this effect (parent layout effects run after children's), and the feed's media
+  // streams in for seconds afterwards — every image that resolves above the reader moves
+  // everything below it. Settling on the first stable frame is what used to leave the feed a
+  // screenful adrift: the pixel offset was right, the post under it was not.
+  //
+  // So the loop corrects toward the ANCHOR POST for as long as the page is still moving, and only
+  // falls back to the raw offset when that post isn't in the restored list. rAF callbacks fire
+  // before the pending paint, so each correction lands pre-paint and never shows. The pending refs
+  // clear only on settle/deadline/abort, so a StrictMode remount restarts the loop cleanly.
   useLayoutEffect(() => {
+    const anchor = pendingAnchorRestoreRef.current
     const target = pendingScrollRestoreRef.current
-    if (target === null || posts.list.length === 0) return
+    if ((anchor === null && target === null) || posts.list.length === 0) return
 
-    const deadline = performance.now() + 1500
+    const deadline = performance.now() + RESTORE_SETTLE_MS
     let frame = 0
     let stableFrames = 0
+
+    // Detaching is NOT the same as consuming. A re-render re-runs this effect, and if teardown
+    // cleared the pending refs the next run would find nothing to restore — which is how a
+    // StrictMode double-invoke silently leaves the feed at the top. Only settle() consumes them.
+    function teardown() {
+      window.removeEventListener('wheel', settle)
+      window.removeEventListener('touchstart', settle)
+      window.removeEventListener('keydown', settle)
+      cancelAnimationFrame(frame)
+    }
+
+    function settle() {
+      pendingAnchorRestoreRef.current = null
+      pendingScrollRestoreRef.current = null
+      teardown()
+    }
+
+    // How far the page has drifted from where the reader left it, in pixels to scroll by.
+    const drift = () => {
+      if (anchor) {
+        const card = containerRef.current?.querySelector(`[data-post-key="${CSS.escape(anchor.key)}"]`)
+        if (card) return card.getBoundingClientRect().top - anchor.offset
+      }
+      return target === null ? 0 : target - window.scrollY
+    }
+
     const apply = () => {
-      if (Math.abs(window.scrollY - target) < 2) {
+      const delta = drift()
+
+      if (Math.abs(delta) < 2) {
         stableFrames += 1
       } else {
         stableFrames = 0
-        // 'instant' overrides the app's global scroll-behavior: smooth — a plain
-        // scrollTo animates the restore, which IS the visible top-to-position crawl.
-        window.scrollTo({ top: target, behavior: 'instant' })
+        // 'instant' overrides the app's global scroll-behavior: smooth — a plain scrollTo animates
+        // the correction, which IS the visible top-to-position crawl.
+        window.scrollTo({ top: window.scrollY + delta, behavior: 'instant' })
       }
-      if (stableFrames >= 2 || performance.now() > deadline) {
-        pendingScrollRestoreRef.current = null
+
+      // Hold past the first stable frames: media that has not started loading yet will move the
+      // page again. The deadline, not stability, is what ends this.
+      if (performance.now() > deadline && stableFrames >= 2) {
+        settle()
         return
       }
       frame = requestAnimationFrame(apply)
     }
+
+    // The reader touching the page outranks the restore — never fight a deliberate scroll.
+    window.addEventListener('wheel', settle, { passive: true, once: true })
+    window.addEventListener('touchstart', settle, { passive: true, once: true })
+    window.addEventListener('keydown', settle, { once: true })
     apply()
 
-    return () => cancelAnimationFrame(frame)
+    return teardown
   }, [posts])
 
   useEffect(() => {
@@ -290,7 +377,7 @@ export default function HomeFeedTab({
 
     // Skip when data for these params is already applied — either hydrated
     // from the session cache (posts + scroll position restored, so no page-1
-    // refetch behind a shimmer; the 30s polling below surfaces anything new)
+    // refetch behind a shimmer; the background polling below surfaces anything new)
     // or fetched by a previous run of this effect.
     if (mounted && appliedParamsRef.current !== params) {
       initializeData()
@@ -311,7 +398,7 @@ export default function HomeFeedTab({
   }, [])
 
   // Fetches page 1 and parks whatever the feed doesn't hold yet behind the "Show N posts" pill,
-  // leaving the reader's scroll position untouched. Shared by the 30s background poll and the
+  // leaving the reader's scroll position untouched. Shared by the background poll and the
   // nonce below, which needs the same non-intrusive pull on demand.
   //
   // "New" is a set difference against the list as it stands when the response lands — not an
@@ -320,6 +407,7 @@ export default function HomeFeedTab({
   // left the snapshot stale, so the posts just shown were queued a second time.
   const pollNewPosts = useCallback(async () => {
     const seq = ++pollSeqRef.current
+    lastPollAtRef.current = Date.now()
 
     try {
       const response = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType, excludeNft)
@@ -329,20 +417,32 @@ export default function HomeFeedTab({
       const fresh = dedupePosts(response.data).filter((post) => !known.has(postKey(post)))
 
       pendingPageRef.current = { data: response.data, hasMore: Boolean(response.meta?.hasMore) }
-      // Keep the same empty array between quiet polls so the feed doesn't re-render every 30s.
+      // Keep the same empty array between quiet polls so the feed does not re-render on every tick.
       setNewPostsQueue((prev) => (prev.length === 0 && fresh.length === 0 ? prev : fresh))
     } catch (error) {
       console.error('Polling error:', error)
     }
   }, [address, scopedNetworkId, feedType, excludeNft])
 
-  // Background polling for new posts
+  // Background polling for new posts. Skipping the tick while hidden loses nothing: every poll
+  // rebuilds the queue from a fresh page 1, so the catch-up poll on visibilitychange sees
+  // everything the skipped ticks would have.
   useEffect(() => {
     if (!mounted || !hasInitialized) return
 
-    const pollingInterval = setInterval(pollNewPosts, 30000)
+    const pollWhenVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - lastPollAtRef.current < CATCH_UP_MIN_GAP_MS) return
+      pollNewPosts()
+    }
 
-    return () => clearInterval(pollingInterval)
+    const pollingInterval = setInterval(pollWhenVisible, POLL_INTERVAL_MS)
+    document.addEventListener('visibilitychange', pollWhenVisible)
+
+    return () => {
+      clearInterval(pollingInterval)
+      document.removeEventListener('visibilitychange', pollWhenVisible)
+    }
   }, [mounted, hasInitialized, pollNewPosts])
 
   const handlePostPrefetch = (item) => {
@@ -515,6 +615,8 @@ export default function HomeFeedTab({
             {posts?.list?.map((item, i) => (
               <section
                 key={postKey(item)}
+                // What the scroll restore anchors to; see lastAnchorRef.
+                data-post-key={postKey(item)}
                 // Restored feeds must repaint identically in place — no entrance replay.
                 className={clsx(styles.post, !initialCache && ['animate', 'fade'])}
                 onPointerDown={rememberCardPointerDown}
