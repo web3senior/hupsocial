@@ -91,6 +91,10 @@ const sponsoredBucket = (chainId, to, data) => {
 // so the client can pre-check against the same numbers.
 const relayHits = new Map()
 
+/* Ceiling on the gas a caller may ask the relayer to put up. The biggest sponsored call is a full
+   batchLike, sized in lib/relayGasless.js as 150k + 45k per liked post. */
+const MAX_RELAY_GAS = 3_000_000n
+
 const throttleKey = (bucket, chainId, from) => `${bucket}:${chainId}:${from.toLowerCase()}`
 
 // Live hits for a key, pruned to the policy window.
@@ -250,6 +254,17 @@ export async function POST(request) {
       deadline: Number(forwardRequest.deadline),
       data: forwardRequest.data,
       signature: signature,
+    }
+
+    /* `gas` and `value` ride in from the caller and both end up on the relayer's own transaction —
+       gas as its limit, value as coin it would have to front. The sponsored calls are all small
+       writes (lib/relayGasless.js sizes the largest, a full batchLike, well under this ceiling), so
+       anything above it is not a Hup action and anything with value attached is not sponsored. */
+    if (fullRequest.value !== 0n) {
+      return NextResponse.json({ error: 'Sponsored calls cannot carry value.' }, { status: 400 })
+    }
+    if (!(fullRequest.gas > 0n) || fullRequest.gas > MAX_RELAY_GAS) {
+      return NextResponse.json({ error: 'Requested gas is outside the sponsored range.' }, { status: 400 })
     }
 
     // Spend gates — all of them local, and all of them ahead of any RPC work that could cost
