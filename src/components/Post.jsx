@@ -60,6 +60,7 @@ import FundCard from './FundCard'
 import { arcoLaunchHref } from '@/lib/arco'
 import MiniAppEmbed from './MiniAppEmbed'
 import CashtagStrip from './CashtagStrip'
+import TokenTradeCard from './TokenTradeCard'
 import LinkPreview from './LinkPreview'
 import NewPost from './NewPost'
 import { shouldOfferTranslation } from '@/lib/languageHelper'
@@ -401,6 +402,13 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               {/* Nothing loads until the viewer presses launch, so a veiled post never runs
                   third-party code — the inert wrapper blocks the launch button outright */}
               {displayItem?.content?.miniApp && <MiniAppEmbed reference={displayItem.content.miniApp} contextAddress={displayItem?.wallet_address} />}
+
+              {/* The creator fee is paid to the row's signed author, never to anything the
+                  content JSON names — a post is editable, and its own payload is not authority
+                  over where money goes */}
+              {displayItem?.content?.tokenTrade && (
+                <TokenTradeCard trade={displayItem.content.tokenTrade} author={displayItem?.wallet_address} />
+              )}
 
               {/* Live prices for the tokens this post names. The author's kept list wins when
                   the post carries one; otherwise the symbols are read from the text, so posts
@@ -1121,6 +1129,11 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
         <DropCard drop={quotedPost.content.nftDrop} referral={quotedBy} />
       )}
       {quotedPost?.content?.miniApp && <MiniAppEmbed reference={quotedPost.content.miniApp} contextAddress={quotedPost?.wallet_address} />}
+      {/* A quoted widget trades in place, like a quoted poll votes in place — and the fee
+          still follows the original author, not whoever quoted them */}
+      {quotedPost?.content?.tokenTrade && (
+        <TokenTradeCard trade={quotedPost.content.tokenTrade} author={quotedPost?.wallet_address} />
+      )}
     </div>
   )
 }

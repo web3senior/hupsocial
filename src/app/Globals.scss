@@ -17,6 +17,9 @@
   --muted: #83889c;
   --up: #16a34a;
   --down: #dc2626;
+  // Ink for a filled --up/--down surface, so a button can carry the same hue as the figures
+  --on-up: #ffffff;
+  --on-down: #ffffff;
   --lime: #c6e814;
   --lime-deep: #a5c603;
   --on-lime: #12160a;
@@ -118,6 +121,9 @@
   --muted: #696e81;
   --up: #22fe6b;
   --down: #ff3c3f;
+  // Neon on a dark surface: white on --up is 1.4:1 and unreadable, so the label goes near-black
+  --on-up: #06160c;
+  --on-down: #1a0708;
   --lime: #c6e814;
   --lime-deep: #a5c603;
   --on-lime: #12160a;
@@ -180,6 +186,10 @@
   --muted: #3f8a4f;
   --up: #22c55e;
   --down: #ef4444;
+  // Ink for a filled --up/--down surface. This theme's pair are bright enough that white sinks
+  // into them (2.3:1 on --up), so a near-black carries the label instead.
+  --on-up: #06160c;
+  --on-down: #1a0708;
   --lime: #c6e814;
   --lime-deep: #a5c603;
   --on-lime: #12160a;

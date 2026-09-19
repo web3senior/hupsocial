@@ -1,0 +1,265 @@
+/* NativeDialog handles centering, backdrop and modality; everything below is this dialog's own
+   chrome. The open state carries the display, never the closed element — a bare `display` would
+   defeat the dialog's own show/hide. */
+.attachTrade {
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: min(40rem, calc(100vh - 4rem));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+
+  &[open] {
+    display: flex;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 1rem;
+    overflow-y: auto;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+  }
+
+  &__close {
+    display: inline-flex;
+    padding: 0.25rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+  }
+
+  &__lede {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  /* Two rows at every width: the network on its own, then the address with its Add button.
+     Keyed on the layout rather than on a breakpoint because the thing that runs out of room is
+     this dialog, not the viewport — a media query here still overflowed inside a narrow modal
+     on a wide screen. */
+  &__form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  &__select,
+  &__input {
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    /* Explicitly opaque, never transparent: a transparent <select> makes Chrome paint its
+       native option list on white, so the dark theme's light text vanishes into it */
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  &__select {
+    flex: 1 1 100%;
+
+    /* Browsers that ignore the root color-scheme still inherit these for the popup rows */
+    option {
+      background: var(--surface);
+      color: var(--text);
+    }
+  }
+
+  &__input {
+    flex: 1 1 8rem;
+    min-width: 0;
+    font-family: var(--font-mono, monospace);
+  }
+
+  &__add {
+    flex: 0 0 auto;
+    padding: 0.5rem 0.9rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary, #ec4899);
+    color: #fff;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  &__error {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--chart-down);
+  }
+
+  /* Amber rather than red: the token was added, and the author is being asked to look twice.
+     The hue carries the tint and the rule only — the words stay on --text, because a fixed
+     amber that clears contrast on white is unreadable on the dark surface and vice versa. */
+  &__warning {
+    margin: 0;
+    padding: 0.4rem 0.5rem;
+    border-inline-start: 3px solid #f59e0b;
+    border-radius: 8px;
+    background: color-mix(in srgb, #f59e0b 12%, transparent);
+    color: var(--text);
+    font-size: var(--font-size-12);
+    line-height: 1.4;
+  }
+
+  &__feeCaveat {
+    color: var(--text);
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  &__rowIdentity {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__rowSymbol {
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+  }
+
+  &__rowChain {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__remove {
+    display: inline-flex;
+    margin-inline-start: auto;
+    padding: 0.25rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+  }
+
+  &__fees {
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+
+  &__feesLegend {
+    padding: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__feeRow {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+  }
+
+  &__fee {
+    flex: 1 1 auto;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font-size: var(--font-size-14, 0.875rem);
+    cursor: pointer;
+
+    &--active {
+      border-color: var(--primary, #ec4899);
+      background: color-mix(in srgb, var(--primary, #ec4899) 12%, transparent);
+      font-weight: 600;
+    }
+  }
+
+  &__feeNote {
+    margin: 0.35rem 0 0;
+    font-size: var(--font-size-10, 0.65rem);
+    line-height: 1.4;
+    color: var(--text-muted, #888);
+  }
+
+  &__actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  &__detach {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--chart-down);
+    font-size: var(--font-size-14, 0.875rem);
+    cursor: pointer;
+  }
+
+  &__save {
+    flex: 1;
+    padding: 0.6rem 0.75rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary, #ec4899);
+    color: #fff;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+}
+
+@media (max-width: 420px) {
+  .attachTrade {
+    /* The fee ladder is the last row that can hold four across; below this it wraps to two */
+    &__feeRow {
+      flex-wrap: wrap;
+    }
+
+    &__fee {
+      flex-basis: calc(50% - 0.35rem);
+    }
+  }
+}

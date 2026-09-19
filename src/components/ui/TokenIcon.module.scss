@@ -70,3 +70,25 @@
   width: 15px;
   height: 15px;
 }
+
+// Initials stand in for artwork on the chains no logo CDN indexes — Monad, Arc, Base Sepolia
+// and most freshly launched tokens anywhere. Sized off the disc so three characters still fit.
+.tokenIcon__initials {
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text-muted, #888);
+  user-select: none;
+}
+
+.tokenIcon--sm .tokenIcon__initials {
+  font-size: 8px;
+}
+
+.tokenIcon--md .tokenIcon__initials {
+  font-size: 9px;
+}
+
+.tokenIcon--lg .tokenIcon__initials {
+  font-size: 10px;
+}

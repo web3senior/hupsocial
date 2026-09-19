@@ -131,6 +131,25 @@ export const extractIPFSCid = (src) => {
   const proxyAt = src.indexOf(`${PROXY_IMAGE_PATH}?`)
   if (proxyAt !== -1) return new URLSearchParams(src.slice(proxyAt + PROXY_IMAGE_PATH.length + 1)).get('cid') || null
 
+  /* Public gateways, in both shapes they come in. Third-party metadata hands these out
+     constantly — a Solana token icon arrives as `https://<cid>.ipfs.nftstorage.link`, an NFT's
+     as `https://ipfs.io/ipfs/<cid>` — and leaving them alone means loading someone else's
+     gateway, which the browser blocks cross-origin (ORB) and which goes dark when that gateway
+     does. Recovering the CID lets the caller serve the same bytes from this origin.
+
+     Both markers are unambiguous: a `/ipfs/` path segment, and an `.ipfs.` hostname label. */
+  const pathAt = src.indexOf('/ipfs/')
+  if (pathAt !== -1) {
+    const rest = src.slice(pathAt + 6).split(/[?#]/)[0]
+    if (rest) return rest
+  }
+
+  const subdomain = src.match(/^https?:\/\/([^./]+)\.ipfs\.[^/]+(\/[^?#]*)?/i)
+  if (subdomain) {
+    const path = (subdomain[2] ?? '').replace(/^\/+/, '')
+    return path ? `${subdomain[1]}/${path}` : subdomain[1]
+  }
+
   return null
 }
 

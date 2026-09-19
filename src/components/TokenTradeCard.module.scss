@@ -1,0 +1,246 @@
+/* The trade widget a post carries. It sits inside a post card, so it reads as one compact block
+   rather than a second post: five tight rows, no decoration that isn't carrying information.
+   Direction drives the colour — buy is the up hue, sell the down one, the same pair the price
+   change uses — so the button agrees with the number above it instead of competing with it. */
+.tokenTrade {
+  --trade-accent: var(--network-color-primary, var(--primary, #ec4899));
+  --trade-radius: 10px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--trade-radius);
+  background: var(--surface);
+  font-size: var(--font-size-12);
+
+  &__pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  &__pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.4rem 0.1rem 0.15rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    cursor: pointer;
+
+    &--active {
+      border-color: var(--trade-accent);
+      color: var(--text);
+    }
+  }
+
+  /* Artwork, then two stacked lines of identity, then the direction switch hard right. The
+     second line carries the contract address, because on a card that asks for money the address
+     is the only thing that actually identifies the token. */
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  &__identity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  &__titles {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* When a name is present the ticker is the qualifier, so it steps back rather than competing */
+  &__symbol {
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+    white-space: nowrap;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    min-width: 0;
+    font-size: var(--font-size-10, 0.65rem);
+    color: var(--text-muted, #888);
+  }
+
+  &__address {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--font-size-10, 0.65rem);
+  }
+
+  &__price {
+    font-weight: 700;
+    color: var(--text);
+    font-size: var(--font-size-12);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Direction rides the arrow as well as the hue — colour alone fails anyone who cannot
+     separate the two, and this is the one number on the card that carries a judgement */
+  &__change {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+
+    &--up {
+      color: var(--chart-up);
+    }
+
+    &--down {
+      color: var(--chart-down);
+    }
+  }
+
+  /* Pushed to the far edge of the header row, opposite the identity */
+  &__mode {
+    margin-inline-start: auto;
+    flex-shrink: 0;
+  }
+
+  &__presets {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  &__preset {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.3rem 0.2rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text);
+    font-size: var(--font-size-12);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--trade-accent);
+    }
+
+    &--active {
+      border-color: var(--trade-accent);
+      background: color-mix(in srgb, var(--trade-accent) 14%, transparent);
+      font-weight: 700;
+    }
+  }
+
+  /* Same box as a preset so the row reads as one ladder with an open rung on the end */
+  &__custom {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.3rem 0.35rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text);
+    font-size: var(--font-size-12);
+    font-variant-numeric: tabular-nums;
+
+    &:focus-visible {
+      outline: none;
+      border-color: var(--trade-accent);
+    }
+  }
+
+  /* One line, always present, so the card never changes height between "no quote yet" and a
+     quote landing — a feed that reflows under the thumb costs a mis-tap */
+  &__detail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem;
+    min-height: 0.95rem;
+    margin: 0;
+    font-size: var(--font-size-10, 0.65rem);
+    color: var(--text-muted, #888);
+  }
+
+  &__detailSkeleton {
+    width: 10rem;
+    height: 0.7rem;
+    border-radius: 4px;
+  }
+
+  &__receive {
+    color: var(--text);
+    font-weight: 700;
+    font-size: var(--font-size-12);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__spend {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The venue is provenance, not a selling point — last, and quietest thing on the row */
+  &__venue {
+    opacity: 0.75;
+  }
+
+  &__action {
+    padding: 0.45rem 0.6rem;
+    border: none;
+    border-radius: 8px;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 700;
+    cursor: pointer;
+
+    /* The same --up/--down the price change uses, so direction reads as one colour across the
+       card. The label takes the matching --on-* ink rather than a fixed white: these tokens are
+       tuned per theme and swing from a mid green to neon, where white drops to 1.4:1. */
+    &--buy {
+      background: var(--up);
+      color: var(--on-up, #fff);
+    }
+
+    &--sell {
+      background: var(--down);
+      color: var(--on-down, #fff);
+    }
+
+    /* Reporting a state, not offering one — a bordered neutral rather than a dimmed green */
+    &--idle {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted, #888);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+    }
+
+    &--buy:disabled,
+    &--sell:disabled {
+      opacity: 0.5;
+    }
+  }
+}

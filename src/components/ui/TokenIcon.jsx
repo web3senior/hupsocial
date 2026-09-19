@@ -32,10 +32,19 @@ const TokenIcon = ({ token, chainId, size = 'lg', className, badge }) => {
   const [failedSrc, setFailedSrc] = useState(null)
   const hasArt = Boolean(src) && failedSrc !== src
 
+  // A ticker says more than a generic coin does, so a caller that knows one can hand it over
+  // and get initials instead of the glyph. Opt-in: callers that pass no symbol are unchanged.
+  const initials = String(token?.symbol ?? '')
+    .replace(/[^A-Za-z0-9]/g, '')
+    .slice(0, 3)
+    .toUpperCase()
+
   const circle = (
     <span className={clsx(styles.tokenIcon, styles[`tokenIcon--${size}`], !badge && className)} aria-hidden="true">
       {hasArt ? (
         <img key={src} src={src} alt="" loading="lazy" onError={() => setFailedSrc(src)} />
+      ) : initials ? (
+        <span className={styles.tokenIcon__initials}>{initials}</span>
       ) : (
         <CoinIcon size={GLYPH[size] ?? GLYPH.lg} />
       )}

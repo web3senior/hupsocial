@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CheckIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -36,6 +36,7 @@ import AttachMarketModal from '@/components/AttachMarketModal'
 import AttachDropModal from '@/components/AttachDropModal'
 import DropCard from '@/components/DropCard'
 import AttachMiniAppDialog from '@/components/AttachMiniAppDialog'
+import AttachTokenTradeDialog from '@/components/AttachTokenTradeDialog'
 import CreatePollDialog from '@/components/CreatePollDialog'
 import AttachPollDialog from '@/components/AttachPollDialog'
 import CreateFundDialog from '@/components/CreateFundDialog'
@@ -138,7 +139,7 @@ const loadDraftContent = () => {
 // A published payload carries its attachment references alongside the content (see the tail of
 // handleCreatePost), and each of those is restored into its own state. Leaving them on the
 // content object would have getSerializablePostContent spread a second copy into the next one.
-const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'nftDrop', 'miniApp', 'poll', 'hupFund', 'article']
+const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'nftDrop', 'miniApp', 'poll', 'hupFund', 'article', 'tokenTrade']
 
 const stripAttachments = (content) => {
   const bare = { ...content }
@@ -464,6 +465,14 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   )
   const createFundRef = useRef(null)
   const attachFundRef = useRef(null)
+
+  // Tokens to trade are the one attachment with nothing behind them: no contract call, no
+  // onchain object to strand, just { tokens, feeBps } resolved live by the card. Unlike a poll
+  // or a fundraise there is nothing to recover after a refresh, so it keeps no draft.
+  const [tokenTrade, setTokenTrade] = useState(() =>
+    restoredContent?.tokenTrade ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.tokenTrade ?? null) : null)
+  )
+  const attachTokenTradeRef = useRef(null)
   // Every in-flight attachment upload, keyed by uploadId: the File so a failed tile can retry,
   // the AbortController so Remove cancels the transfer, the promise so submit can await it
   const uploadsRef = useRef(new Map())
@@ -683,6 +692,15 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       hint: 'Embed an app inside the post',
       attached: Boolean(miniApp),
     },
+    // Ungated by targetChainId: the widget carries its own chain, so a post on a chain with no
+    // DEX can still offer a token that lives on one
+    canAttachNft && {
+      key: 'tokentrade',
+      icon: CoinsIcon,
+      label: 'Tokens to trade',
+      hint: 'Readers buy in one tap, you take a cut',
+      attached: Boolean(tokenTrade),
+    },
   ].filter(Boolean)
 
   // Dispatch lives here rather than as a closure on each option: the list above is rebuilt
@@ -695,6 +713,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       case 'predict': setShowAttachMarket(true); break
       case 'drop': setShowAttachDrop(true); break
       case 'miniapp': attachMiniAppRef.current?.open(); break
+      case 'tokentrade': attachTokenTradeRef.current?.open(); break
       default: break
     }
   }, [])
@@ -1588,6 +1607,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // that later loses its embeddable grant stops rendering without touching stored posts
       if (miniApp) serializableContent.miniApp = miniApp
 
+      // Tokens to trade carry no onchain object at all — just which tokens and the author's
+      // rate. TokenTradeCard resolves decimals, balances and price live, and pays the fee to
+      // the post's signed author rather than to anything named in here.
+      if (tokenTrade) serializableContent.tokenTrade = tokenTrade
+
       // Articles the same way — the body is already pinned under its own CID by the editor, and
       // only the card travels here. ArticleCard renders from these fields alone; the reader page
       // is the only thing that ever fetches the body.
@@ -1982,6 +2006,19 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 </div>
               )}
 
+              {tokenTrade?.tokens?.length > 0 && (
+                <div className={styles.nftAttachment}>
+                  <CoinsIcon size={16} />
+                  <span>
+                    {tokenTrade.tokens.length} {tokenTrade.tokens.length === 1 ? 'token' : 'tokens'} to trade
+                    {tokenTrade.feeBps > 0 ? ` · ${tokenTrade.feeBps / 100}% to you` : ''}
+                  </span>
+                  <button type="button" onClick={() => setTokenTrade(null)} aria-label="Detach tokens" disabled={isBusy}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
+              )}
+
               {poll && (
                 <div className={styles.nftAttachment}>
                   <ListChecksIcon size={16} />
@@ -2301,6 +2338,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         onCreateNew={() => createFundRef.current?.open()}
       />
       <CreateFundDialog ref={createFundRef} fixedChainId={targetChainId} onCreated={(reference) => reference && setHupFund(reference)} />
+
+      {/* Null is a real answer here — the dialog owns "remove from post" as well as the pick */}
+      <AttachTokenTradeDialog ref={attachTokenTradeRef} value={tokenTrade} onAttach={(payload) => setTokenTrade(payload)} />
     </NativeDialog>
   )
 }

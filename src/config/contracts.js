@@ -89,8 +89,6 @@ export const appChains = [mainnet, lukso, bsc, monad, arc, /* soneium, */ arbitr
 // univ3*/univ4*/sushiV2Router/wnative — swap venues; verify onchain against the DEX registry
 //                 before enabling a chain. A wrong router is where user funds would go.
 // nativeIsErc20 — the native coin is an ERC20: approve, never msg.value.
-// univ4HookedPoolsOnly — every v4 pool on the chain carries a hook, so hookless probing finds
-//                 nothing; the in-post trade widget skips it (hooks/useTokenSwap canSwapOn).
 export const CONTRACTS = {
   chain1: {
     name: 'ethereum',
@@ -293,6 +291,11 @@ export const CONTRACTS = {
     univ4Quoters: ['0x9F75dD27D6664c475B90e105573E550ff69437B0'],
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
     sushiV2Router: '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506',
+    // PancakeSwap is where BNB's long tail actually trades — Uniswap carries almost none of it,
+    // so without this a typical BNB token quotes nowhere. Verified onchain 2026-09-19 against
+    // the canonical V2 factory 0xcA143Ce3…0c73, and it answers getAmountsOut on the shared
+    // UniswapV2 router ABI.
+    pancakeV2Router: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
   },
   chain4663: {
     name: 'robinhood',
@@ -415,16 +418,20 @@ export const CONTRACTS = {
     nativeGate: '',
     univ3Router: '',
     univ3Quoter: '',
-    // The gas coin is USDC; this is its wrapped ERC20 face, a predeploy — verified onchain
-    // 2026-09-18 as symbol USDC, 6 decimals (the native representation is 18, so the two are
-    // NOT interchangeable by value)
+    // The gas coin is USDC, and this predeploy is its ERC20 face — not a wrapper. Verified
+    // onchain 2026-09-18 across four live accounts: balanceOf() returns exactly native / 1e12
+    // (6 decimals against the native 18), the same balance seen through a token interface. So a
+    // trade here spends this address with an allowance, and never wraps: the router has no
+    // WETH9 binding for it and WRAP_ETH reverts.
     wnative: '0x3600000000000000000000000000000000000000',
-    // Every Uniswap v4 pool on Arc carries a hook: neither of the two deepest pools' ids can be
-    // reproduced from any hookless key, at any probed tier, in either currency order. Arc is a
-    // launchpad chain and its pools come from launchpad factories. lib/uniswap-v4.js probes
-    // hookless keys only — a hook is arbitrary code running inside the swap — so the in-post
-    // trade widget finds nothing here and skips the chain (hooks/useTokenSwap canSwapOn).
-    univ4HookedPoolsOnly: true,
+    nativeIsErc20: true,
+    // The Arco launchpad's factory (the app never launches anything — this is read-only, for
+    // resolving a launch's pool key). Its pools carry ArcoOracleHook, which the hookless probe
+    // in lib/uniswap-v4.js will never find, so the key is taken from the factory's own
+    // constants instead: hook(), TICK_SPACING(), LAUNCH_FEE() and the launch's quote asset.
+    // Verified 2026-09-18: rebuilding the key that way reproduces the stored poolId of
+    // launches 1, 2 and 3 exactly.
+    arcoLaunch: '0xE998A15234aF788152254E8F75e04009e945F569',
     // Uniswap's v4 deployment on Arc, every address probed onchain 2026-09-18
     univ4Router: '0x4fcA4a51Ab4F23A7447b3284fBd7D73289A89Fb1',
     // A newer periphery build: its swap params carry minHopPriceX36 (lib/uniswap-v4.js)

@@ -1,0 +1,52 @@
+[
+  {
+    "type": "function",
+    "name": "launchIdOf",
+    "stateMutability": "view",
+    "inputs": [{ "name": "token", "type": "address" }],
+    "outputs": [{ "name": "", "type": "uint256" }]
+  },
+  {
+    "type": "function",
+    "name": "hook",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "address" }]
+  },
+  {
+    "type": "function",
+    "name": "TICK_SPACING",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "int24" }]
+  },
+  {
+    "type": "function",
+    "name": "LAUNCH_FEE",
+    "stateMutability": "view",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint24" }]
+  },
+  {
+    "type": "function",
+    "name": "getLaunch",
+    "stateMutability": "view",
+    "inputs": [{ "name": "launchId", "type": "uint256" }],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          { "name": "creator", "type": "address" },
+          { "name": "token", "type": "address" },
+          { "name": "poolId", "type": "bytes32" },
+          { "name": "quote", "type": "address" },
+          { "name": "positionTokenId", "type": "uint256" },
+          { "name": "createdAt", "type": "uint64" },
+          { "name": "createdBlock", "type": "uint64" },
+          { "name": "creatorShareBps", "type": "uint16" }
+        ]
+      }
+    ]
+  }
+]

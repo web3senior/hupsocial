@@ -11,7 +11,7 @@
 
 import { NextResponse } from 'next/server'
 import { fetchUsdChange24h, fetchUsdPrices, priceKeyFor } from '@/lib/prices'
-import { fetchTokenLogos, logoKeyFor } from '@/lib/tokenLogos'
+import { cachedTokenPrices, fetchTokenChange24h, fetchTokenLogos, logoKeyFor } from '@/lib/tokenLogos'
 
 export const runtime = 'nodejs'
 
@@ -43,11 +43,22 @@ export async function POST(request) {
       fetchTokenLogos(tokens.filter((token) => token.address)),
     ])
 
+    // DefiLlama has no slug for every chain the app trades on — Arc and Robinhood are absent, so
+    // their tokens come back with no price and no movement at all. GeckoTerminal indexes both:
+    // the price rode along in the listing response the logos came from, and the movement is a
+    // second lookup made only for the few rows still missing one, since it is per-pool there.
+    const gecko = cachedTokenPrices(tokens.filter((token) => token.address))
+    const needChange = tokens.filter(
+      (token, index) => token.address && changes.get(priceKeys[index]) === undefined && gecko.has(logoKeyFor(token.chainId, token.address)),
+    )
+    const geckoChanges = await fetchTokenChange24h(needChange)
+
     const data = {}
     tokens.forEach((token, index) => {
       const priceKey = priceKeys[index]
-      const usd = priceKey ? prices.get(priceKey) : undefined
-      const change24h = priceKey ? changes.get(priceKey) : undefined
+      const geckoKey = token.address ? logoKeyFor(token.chainId, token.address) : null
+      const usd = (priceKey ? prices.get(priceKey) : undefined) ?? (geckoKey ? gecko.get(geckoKey) : undefined)
+      const change24h = (priceKey ? changes.get(priceKey) : undefined) ?? (geckoKey ? geckoChanges.get(geckoKey) : undefined)
       const logo = token.address ? logos.get(logoKeyFor(token.chainId, token.address)) : undefined
       if (usd === undefined && change24h === undefined && logo === undefined) return
 

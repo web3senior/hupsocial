@@ -76,6 +76,20 @@ export const SOLANA_NETWORKS = {
 /** Only the clusters Hup is actually deployed on — what the pickers list. */
 export const SOLANA_CHAINS = Object.values(SOLANA_NETWORKS).filter((chain) => chain.hupProgramId)
 
+/**
+ * The clusters a token can be *traded* on, which is a different question from the one above.
+ * Trading routes through Jupiter and the SPL token program — both of which exist whether or not
+ * Hup's own program is deployed — so gating this on `hupProgramId` would switch off swaps for a
+ * reason that has nothing to do with them.
+ *
+ * Devnet is excluded on its own merits: Jupiter indexes no devnet liquidity, so every quote
+ * there comes back empty.
+ */
+export const SOLANA_TRADE_CHAINS = [SOLANA_NETWORKS[SOLANA_MAINNET_ID]]
+
+/** Whether a network id names a cluster the trade widget can quote on. */
+export const canTradeOnSolana = (networkId) => SOLANA_TRADE_CHAINS.some((chain) => chain.id === Number(networkId))
+
 export const isSolanaNetworkId = (networkId) => Object.hasOwn(SOLANA_NETWORKS, Number(networkId))
 
 /** @returns {object|null} The chain-shaped entry for a Solana network id, or null. */
