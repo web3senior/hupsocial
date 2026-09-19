@@ -20,6 +20,7 @@ import NativeDialog from './ui/NativeDialog'
 import RecipientField from './ui/RecipientField'
 import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
 import Profile from './Profile'
+import SplitPayoutCard from '@/components/SplitPayoutCard'
 import styles from './SellItemPopover.module.scss'
 
 const MAX_FILE_SIZE_MB = 10
@@ -721,6 +722,23 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
                 </div>
               )}
 
+              {/* A HupSplits split is just an address to HupSell — it pays the vault with
+                  .call and the splitter's receive() accrues it — so the only thing missing was
+                  somewhere to see who is in it and what they are owed. Renders nothing when the
+                  payout is an ordinary wallet. */}
+              {listing?.vault && listing.vault !== zeroAddress && (
+                <SplitPayoutCard
+                  chainId={chainId}
+                  candidate={listing.vault}
+                  title="Payout split"
+                  tokens={
+                    listing.paymentToken && listing.paymentToken !== zeroAddress
+                      ? [{ address: listing.paymentToken, isLsp7: Boolean(listing.isLsp7) }]
+                      : []
+                  }
+                />
+              )}
+
               <div className={styles.actions}>
                 <button type="button" onClick={handleEdit} disabled={isLoadingContent} className={styles.loadContentButton}>
                   {isLoadingContent ? 'Loading...' : 'Edit'}
@@ -806,7 +824,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item }, ref) {
 
             <RecipientField
               className={styles.payoutField}
-              label="Payout wallet (optional) — sale proceeds go here instead of your wallet"
+              label="Payout wallet (optional) — sale proceeds go here instead of your wallet. A HupSplits split address works too, and divides every sale between its payees."
               value={vaultAddress}
               onChange={setVaultAddress}
               viewer={address ?? null}
