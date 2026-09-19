@@ -73,7 +73,26 @@
     }
   }
 
+  // Any option art — a chain's picture, a glyph — in one fixed box so the labels line up
+  &__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 4px;
+    }
+  }
+
   &__optionText {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 0.15rem;

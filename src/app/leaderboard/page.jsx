@@ -1,45 +1,60 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import useSWRInfinite from 'swr/infinite'
 import {
   ArrowDownIcon,
+  CalendarDotIcon,
+  CalendarDotsIcon,
   ChatCircleIcon,
   EyeIcon,
   FlameIcon,
   HandCoinsIcon,
   HashIcon,
   HeartIcon,
+  InfinityIcon,
   PackageIcon,
   RepeatIcon,
+  SortAscendingIcon,
+  StackIcon,
   TrophyIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
+import { config } from '@/config/wagmi'
+import { SOLANA_CHAINS } from '@/config/solana'
 import PageTitle from '@/components/PageTitle'
+import OptionPicker from '@/components/ui/OptionPicker'
+import SegmentedControl from '@/components/ui/SegmentedControl'
 import styles from './page.module.scss'
 import Profile from '@/components/Profile'
 import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 const DEFAULT_AVATAR = '/default-pfp.svg'
 const PAGE_SIZE = 20
-const PODIUM_AVATAR_SIZE = 48
+// Half of this hangs over the card it sits on — .podium reserves the gutter for it
+const PODIUM_AVATAR_SIZE = 72
 const ROW_AVATAR_SIZE = 32
 
 const PERIOD_OPTIONS = [
-  { value: 'all', label: 'All time' },
-  { value: '30d', label: '30D' },
-  { value: '7d', label: '7D' },
+  { value: 'all', label: 'All time', icon: InfinityIcon },
+  { value: '30d', label: 'Last 30 days', icon: CalendarDotsIcon },
+  { value: '7d', label: 'Last 7 days', icon: CalendarDotIcon },
 ]
 
 const SORT_OPTIONS = [
-  { value: 'score', label: 'Score' },
-  { value: 'engagement', label: 'Engagement' },
-  { value: 'posts', label: 'Posts' },
-  { value: 'views', label: 'Views' },
-  { value: 'transactions', label: 'Transactions' },
-  { value: 'followers', label: 'Followers' },
-  { value: 'tips', label: 'Tips' },
+  { value: 'score', label: 'Score', icon: <TrophyIcon size={16} /> },
+  { value: 'engagement', label: 'Engagement', icon: <HeartIcon size={16} /> },
+  { value: 'posts', label: 'Posts', icon: <FlameIcon size={16} /> },
+  { value: 'views', label: 'Views', icon: <EyeIcon size={16} /> },
+  { value: 'transactions', label: 'Transactions', icon: <PackageIcon size={16} /> },
+  { value: 'followers', label: 'Followers', icon: <UsersIcon size={16} /> },
+  { value: 'tips', label: 'Tips', icon: <HandCoinsIcon size={16} /> },
 ]
+
+// The chain's own picture, the way the header's switcher shows it. Solana's clusters ride in
+// the same config the switcher reads, so a chain added there arrives here with its art.
+const CHAIN_ART = new Map([...config.chains, ...SOLANA_CHAINS].map((chain) => [String(chain.id), chain.iconUrl]))
 
 const numberFormatter = new Intl.NumberFormat('en-US')
 const compactFormatter = new Intl.NumberFormat('en-US', {
@@ -68,7 +83,6 @@ const fetcher = async (url) => {
 }
 
 export default function LeaderboardPage() {
-  const router = useRouter()
   const [period, setPeriod] = useState('all')
   const [sort, setSort] = useState('score')
   const [networkId, setNetworkId] = useState('all')
@@ -100,13 +114,24 @@ export default function LeaderboardPage() {
   const stats = meta?.stats || EMPTY_STATS
   const networks = meta?.networks || []
   const topLeaders = useMemo(() => leaders.slice(0, 3), [leaders])
+  // Ids travel as strings so the 'all' sentinel and a chain id compare the same way
+  const networkOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All networks', icon: <StackIcon size={16} /> },
+      ...networks.map((network) => {
+        const art = CHAIN_ART.get(String(network.id))
+        return {
+          value: String(network.id),
+          label: network.name,
+          // Same fallback the header's switcher uses when a chain ships no art of its own
+          icon: art ? <img src={art} alt="" /> : <span className={styles.chainInitial}>{network.name.charAt(0)}</span>,
+        }
+      }),
+    ],
+    [networks],
+  )
   const hasMore = Boolean(meta?.hasMore)
   const isLoadingMore = isValidating && size > 1
-
-  const openProfile = (walletAddress) => {
-    if (!walletAddress) return
-    router.push(`/${walletAddress}`)
-  }
 
   return (
     <>
@@ -114,42 +139,31 @@ export default function LeaderboardPage() {
       <div className={`${styles.page} animate fade`}>
         <div className={`__container ${styles.page__container}`} data-width="large">
           <header className={styles.header}>
-            <div className={styles.filters} aria-label="Leaderboard filters">
-              <div className={styles.segmented} role="group" aria-label="Time range">
-                {PERIOD_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={period === option.value ? styles.activeSegment : ''}
-                    onClick={() => setPeriod(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+            <div className={styles.filters} role="group" aria-label="Leaderboard filters">
+              <SegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} label="Period" iconOnly />
+
+              <div className={styles.filterGroup}>
+                <OptionPicker
+                  ariaLabel="Network"
+                  value={networkId}
+                  onChange={setNetworkId}
+                  options={networkOptions}
+                  triggerClassName={styles.filterTrigger}
+                  panelClassName={styles.filterPanel}
+                />
               </div>
 
-              <label className={styles.selectLabel}>
-                <span>Network</span>
-                <select value={networkId} onChange={(event) => setNetworkId(event.target.value)}>
-                  <option value="all">All networks</option>
-                  {networks.map((network) => (
-                    <option key={network.id} value={network.id}>
-                      {network.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className={styles.selectLabel}>
-                <span>Sort</span>
-                <select value={sort} onChange={(event) => setSort(event.target.value)}>
-                  {SORT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className={styles.filterGroup}>
+                <OptionPicker
+                  ariaLabel="Sort by"
+                  value={sort}
+                  onChange={setSort}
+                  options={SORT_OPTIONS}
+                  triggerClassName={styles.filterTrigger}
+                  panelClassName={styles.filterPanel}
+                  placement="bottom-end"
+                />
+              </div>
             </div>
           </header>
 
@@ -172,22 +186,24 @@ export default function LeaderboardPage() {
             <>
               <section className={styles.podium} aria-label="Top ranked users">
                 {topLeaders.map((leader) => (
-                  <button
-                    key={leader.wallet_address}
-                    type="button"
-                    className={`${styles.podiumItem} ${getRankClass(leader.rank)}`}
-                    onClick={() => openProfile(leader.wallet_address)}
-                  >
+                  <div key={leader.wallet_address} className={styles.podiumItem} data-rank={leader.rank}>
+                    <Link
+                      href={profilePath(leader.wallet_address, leader.username)}
+                      className={styles.cardLink}
+                      aria-label={`Open the profile ranked #${leader.rank}`}
+                    />
                     <Profile
                       creator={leader.wallet_address}
-                      variant="fullWithoutTime"
+                      variant="stacked"
                       size={PODIUM_AVATAR_SIZE}
+                      className={styles.podiumProfile}
                     />
                     <div className={styles.scoreBlock}>
                       <span>{numberFormatter.format(leader.score)}</span>
                       <small>score</small>
                     </div>
-                  </button>
+                    <span className={styles.podiumRank}>Rank {leader.rank}</span>
+                  </div>
                 ))}
               </section>
 
@@ -206,12 +222,12 @@ export default function LeaderboardPage() {
                   <span>Score</span>
                 </div>
                 {leaders.map((leader) => (
-                  <button
-                    key={`${leader.rank}-${leader.wallet_address}`}
-                    type="button"
-                    className={styles.leaderRow}
-                    onClick={() => openProfile(leader.wallet_address)}
-                  >
+                  <div key={`${leader.rank}-${leader.wallet_address}`} className={styles.leaderRow}>
+                    <Link
+                      href={profilePath(leader.wallet_address, leader.username)}
+                      className={styles.cardLink}
+                      aria-label={`Open the profile ranked #${leader.rank}`}
+                    />
                     <span className={styles.rankNumber} data-rank={leader.rank}>
                       {leader.rank}
                     </span>
@@ -231,7 +247,7 @@ export default function LeaderboardPage() {
                     <Metric icon={PackageIcon} label="Transactions" value={leader.tx_count} />
                     <Metric icon={UsersIcon} label="Followers" value={leader.follower_count} />
                     <span className={styles.rowScore}>{compactFormatter.format(leader.score)}</span>
-                  </button>
+                  </div>
                 ))}
               </section>
 
@@ -288,13 +304,6 @@ function LeaderboardSkeleton() {
       ))}
     </div>
   )
-}
-
-function getRankClass(rank) {
-  if (rank === 1) return styles.rankFirst
-  if (rank === 2) return styles.rankSecond
-  if (rank === 3) return styles.rankThird
-  return ''
 }
 
 function formatWallet(wallet = '') {

@@ -38,6 +38,7 @@ import {
 } from '@/lib/communityVault'
 import { getActiveChain } from '@/lib/communication'
 import { useProfile } from '@/hooks/useProfile'
+import { useProfilePath } from '@/hooks/useProfilePath'
 import { config, CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { chainIconFor, networkColorStyle } from '@/lib/networkColors'
@@ -55,7 +56,7 @@ import ImagePicker from './_components/ImagePicker'
 import CreateCommunityModal from './_components/CreateCommunityModal'
 import { AssetUnitLabel, TokenRequirementTag, TokenUnitHint } from './_components/TokenAmount'
 import TokenAssetInput from './_components/TokenAssetInput'
-import OptionPicker from './_components/OptionPicker'
+import OptionPicker from '@/components/ui/OptionPicker'
 import { DEFAULT_COMMUNITY_CATEGORY, getCommunityCategory, normalizeCommunityCategory } from '@/config/communityCategories'
 import useCommunityCategories from '@/hooks/useCommunityCategories'
 import useRailScroll from '@/hooks/useRailScroll'
@@ -227,6 +228,34 @@ export function CreatorName({ address }) {
   if (!address) return null
   const truncated = `${address.slice(0, 6)}...${address.slice(-4)}`
   return profile ? profile.fullName || profile.name || truncated : truncated
+}
+
+/**
+ * The byline as a link. Not a <Link>: the whole card header is already wrapped in one and anchors
+ * cannot nest, so this routes imperatively — to the creator's handle wherever they have claimed one.
+ */
+function CreatorLink({ address, className }) {
+  const router = useRouter()
+  const path = useProfilePath(address)
+
+  const open = (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    router.push(path)
+  }
+
+  return (
+    <span
+      className={className}
+      role="link"
+      tabIndex={0}
+      title="View creator profile"
+      onClick={open}
+      onKeyDown={(event) => event.key === 'Enter' && open(event)}
+    >
+      By <CreatorName address={address} />
+    </span>
+  )
 }
 
 // Dedicated presentation sub-component to isolate ERC-721 naming hooks safely. NFT minimums are
@@ -2601,28 +2630,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                     <h3 className={styles.card__title} title={metadata.name || undefined}>
                       {metadata.name || `Community #${id}`}
                     </h3>
-                    {/* Not a <Link>: the whole card header is already wrapped in one, and
-                        anchors can't nest — route imperatively instead */}
-                    <span
-                      className={styles.card__creator}
-                      role="link"
-                      tabIndex={0}
-                      title="View creator profile"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        router.push(`/${creator}`)
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          router.push(`/${creator}`)
-                        }
-                      }}
-                    >
-                      By <CreatorName address={creator} />
-                    </span>
+                    <CreatorLink address={creator} className={styles.card__creator} />
                   </div>
                 </div>
 
