@@ -16,7 +16,6 @@ import { isCountryCode } from '@/lib/origin'
 import { usePremium } from '@/hooks/usePremium'
 import { initHupContract, initStatusContract, getStatus, getMaxLength } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
-import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
@@ -41,6 +40,7 @@ import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdenti
 import { useProfile } from '@/hooks/useProfile'
 import { handleBrokenAvatar } from '@/lib/utils'
 import AgentBadge from '@/components/ui/AgentBadge'
+import PremiumBadge from '@/components/ui/PremiumBadge'
 import Avatar from '@/components/ui/Avatar'
 import UsernameField from '@/components/UsernameField'
 import clsx from 'clsx'
@@ -716,6 +716,9 @@ const Profile = ({ addr }) => {
             <div className={styles.profile__header}>
               <b className={styles.profile__name}>{profile.name ? profile.name : 'hup-user'}</b>
 
+              {/* Straight after the name, the same mark every post header shows. */}
+              <PremiumBadge premium={profile.premium} size="lg" />
+
               {/* The worn tag, from the same component every post header uses, so one badge can
                   never look like two things — only its scale changes, so it holds its own beside a
                   display name. Verified server-side on each read — see lib/badge.js. */}
@@ -725,7 +728,6 @@ const Profile = ({ addr }) => {
                   one place a visitor is deciding whether to follow the account is the one place it
                   should not have to be inferred from an icon. */}
               <AgentBadge agent={profile.agent} size="lg" />
-              {/* <img className={styles.profile__checkmark} alt="Checkmark" src={blueCheckMarkIcon.src || blueCheckMarkIcon} /> */}
 
               {profile.source === `universal_profile` && (
                 <div className={styles.badge} onClick={handleUniversalProfile}>
