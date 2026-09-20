@@ -1,0 +1,116 @@
+// Behaviour lives in SearchBox.jsx; the pill chrome (border, background, size, placement) is the
+// caller's, passed through className, so the header and /search each keep their own look.
+.box {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+
+  &__submit {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: var(--foreground);
+    }
+  }
+
+  &__input {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--foreground);
+    // Anything under 16px makes iOS Safari zoom the page on focus
+    font: inherit;
+
+    &::placeholder {
+      color: var(--text-muted);
+    }
+
+    // The UA clear button sits on the pill's edge and fights the rounded corner
+    &::-webkit-search-cancel-button {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+  }
+}
+
+// Descendants are nested under the panel so a page's own bare `li`/`code` rules never win
+.panel {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    max-height: min(420px, calc(100svh - var(--header-height) - 24px));
+    margin: 0;
+    padding: 0.35rem;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  &__status {
+    margin: 0;
+    padding: 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  .option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+
+    &[data-active='true'] {
+      background-color: var(--hover);
+    }
+
+    &--search {
+      justify-content: flex-start;
+      margin-bottom: 0.25rem;
+
+      svg {
+        flex-shrink: 0;
+        color: var(--text-muted);
+      }
+    }
+
+    &__label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &__ens {
+      flex-shrink: 0;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+  }
+}
