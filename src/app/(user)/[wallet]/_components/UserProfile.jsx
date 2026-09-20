@@ -1197,6 +1197,9 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   // State
   const [error, setError] = useState(null)
   const [isPending, setIsPending] = useState(false)
+  /* Saving asks the wallet to sign. An extension prompt can open behind the window and the
+     embedded email wallet signs without prompting at all, so the button says which it is. */
+  const [isSigning, setIsSigning] = useState(false)
   const [tags, setTags] = useState({ list: parseSafeList(profile?.tags) })
   // Picked from a catalogue rather than typed, so the stored value is always a list of slugs
   const [interests, setInterests] = useState(() => normalizeInterests(profile?.interests))
@@ -1477,7 +1480,19 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     try {
       /* The chain id only matters for a smart account: verifyWalletSignature falls back to an
          ERC-1271 call, and a Universal Profile can only answer on its own chain. */
-      saved = await updateProfile(formData, address, (message) => signMessageAsync({ message }), getActiveChain()?.[0]?.id)
+      saved = await updateProfile(
+        formData,
+        address,
+        async (message) => {
+          setIsSigning(true)
+          try {
+            return await signMessageAsync({ message })
+          } finally {
+            setIsSigning(false)
+          }
+        },
+        getActiveChain()?.[0]?.id,
+      )
     } catch (err) {
       console.error(err)
       setError('An unexpected error occurred')
@@ -2050,7 +2065,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
 
           <footer className={styles.profileModal__footer}>
             <button type="submit" className={styles.profileModal__submitBtn} disabled={isPending}>
-              {isPending ? 'Saving…' : 'Save changes'}
+              {isSigning ? 'Sign in your wallet…' : isPending ? 'Saving…' : 'Save changes'}
             </button>
           </footer>
         </form>

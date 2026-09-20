@@ -473,8 +473,11 @@ export async function PUT(request, { params }) {
        normalized address rather than the raw path segment. */
     const claimant = normalizeAddress(address)
 
+    /* A save with no claim at all is a page loaded before this route started asking for one —
+       that page cannot translate the message for itself, so it has to arrive already saying
+       what to do about it. */
     if (!signature || !nonce || !Number.isFinite(issuedAt)) {
-      return NextResponse.json({ error: 'A signed claim is required' }, { status: 400 })
+      return NextResponse.json({ error: 'This save arrived without a signature — reload the page and try again' }, { status: 400 })
     }
     if (Math.abs(Date.now() - issuedAt) > PROFILE_SIGNATURE_MAX_AGE_MS) {
       return NextResponse.json({ error: 'That signature has expired — try again' }, { status: 400 })

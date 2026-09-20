@@ -99,7 +99,7 @@ export async function POST(request) {
     if (!(await isMigrated())) return NextResponse.json(NOT_MIGRATED, { status: 503 })
 
     if (!signature || !nonce || !Number.isFinite(issuedAt)) {
-      return NextResponse.json({ success: false, error: 'A signed claim is required' }, { status: 400 })
+      return NextResponse.json({ success: false, error: 'That claim arrived without a signature — reload the page and try again' }, { status: 400 })
     }
     if (Math.abs(Date.now() - issuedAt) > SIGNATURE_MAX_AGE_MS) {
       return NextResponse.json({ success: false, error: 'That signature has expired — try again' }, { status: 400 })

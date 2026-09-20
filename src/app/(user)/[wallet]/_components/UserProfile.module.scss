@@ -1583,14 +1583,15 @@
     }
   }
 
-  // Error
+  // Error — the status hue rather than the red scale, which has no dark-theme step and whose
+  // --red-50 is shadowed by the Photon palette's saturated red (see abstract/_variables.scss).
   &__error {
     font-size: var(--system-13-font-size);
-    color: var(--red-500);
+    color: var(--status-error);
     padding: 0.5rem 0.75rem;
-    background: var(--red-50);
+    background: color-mix(in srgb, var(--status-error) 12%, transparent);
     border-radius: 0.6rem;
-    border: 1px solid var(--red-200);
+    border: 1px solid color-mix(in srgb, var(--status-error) 35%, transparent);
   }
 
   // Submit

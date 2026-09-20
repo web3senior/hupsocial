@@ -460,9 +460,9 @@ background-color: var(--surface-muted);
 }
 
 .errorState {
-  color: var(--red-500);
-  border-color: var(--red-200);
-  background-color: var(--red-50);
+  color: var(--status-error);
+  border-color: color-mix(in srgb, var(--status-error) 35%, transparent);
+  background-color: color-mix(in srgb, var(--status-error) 12%, transparent);
 }
 
 .skeletonList {

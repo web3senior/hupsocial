@@ -584,6 +584,7 @@ $secondary-color: #9e481d;
   --green-80: #006504;
   --green-90: #003706;
   --orange-50: #ff9400;
+  // Photon's step, not a tint: this shadows the --red-50 wash declared in the scale above.
   --red-50: #ff0039;
   --red-50-a30: rgba(255, 0, 57, 0.3);
   --red-60: #d70022;

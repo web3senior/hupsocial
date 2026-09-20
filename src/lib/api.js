@@ -672,7 +672,17 @@ export const updateProfile = async (formData, address, signMessage, chainId) => 
     if (!nonce) return { success: false, error: 'Could not start a signed save — try again' }
 
     const issuedAt = Date.now()
-    const signature = await signMessage(profileUpdateMessage({ address, nonce, issuedAt }))
+
+    let signature
+    try {
+      signature = await signMessage(profileUpdateMessage({ address, nonce, issuedAt }))
+    } catch (error) {
+      /* Declining the prompt is a decision, not a failure, and it reads as one. */
+      const declined = /rejected|denied|User rejected/i.test(error?.shortMessage || error?.message || '')
+      return { success: false, error: declined ? 'Save cancelled — the signature was declined' : 'Your wallet could not sign this save' }
+    }
+
+    if (!signature) return { success: false, error: 'Your wallet returned no signature — try again' }
 
     formData.set('nonce', nonce)
     formData.set('issuedAt', String(issuedAt))
