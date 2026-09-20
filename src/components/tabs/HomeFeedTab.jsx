@@ -385,7 +385,11 @@ export default function HomeFeedTab({
   // Always a real page-1 fetch. Draining the pill instead used to hand the author a queue that
   // was polled before their post existed, so the post itself surfaced one poll later — behind
   // a second pill.
+  const refreshingRef = useRef(false)
   const handleManualRefresh = useCallback(async () => {
+    // A double-click on the home link bumps the nonce twice; one page-1 fetch is enough.
+    if (refreshingRef.current) return
+    refreshingRef.current = true
     setIsRefreshing(true)
     setIsFetching(true)
     try {
@@ -398,6 +402,7 @@ export default function HomeFeedTab({
     } catch (error) {
       console.error('Refresh error:', error)
     } finally {
+      refreshingRef.current = false
       setIsFetching(false)
       setIsRefreshing(false)
     }

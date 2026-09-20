@@ -169,6 +169,7 @@ export function useFeedScrollRestore({ containerRef, restore = null, ready = fal
     // StrictMode double-invoke restarts the loop instead of silently leaving the feed at the top.
     function teardown() {
       window.removeEventListener('wheel', settle)
+      window.removeEventListener('pointerdown', settle)
       window.removeEventListener('touchstart', settle)
       window.removeEventListener('keydown', settle)
       cancelAnimationFrame(frame)
@@ -210,8 +211,10 @@ export function useFeedScrollRestore({ containerRef, restore = null, ready = fal
       frame = requestAnimationFrame(apply)
     }
 
-    // The reader touching the page outranks the restore: never fight a deliberate scroll.
+    // The reader touching the page outranks the restore: never fight a deliberate scroll. A click
+    // counts too, or the aside's home link scroll-to-top is undone every frame until the deadline.
     window.addEventListener('wheel', settle, { passive: true, once: true })
+    window.addEventListener('pointerdown', settle, { passive: true, once: true })
     window.addEventListener('touchstart', settle, { passive: true, once: true })
     window.addEventListener('keydown', settle, { once: true })
     apply()
