@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/mcp/node_modules
 /src/contracts/node_modules
 /src/contracts/artifacts
 /src/contracts/.states
