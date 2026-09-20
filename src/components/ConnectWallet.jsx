@@ -13,7 +13,6 @@ import { useProfile } from '@/hooks/useProfile'
 import Avatar from '@/components/ui/Avatar'
 import DialogSheet from '@/components/ui/DialogSheet'
 import NativePopover from '@/components/ui/NativePopover'
-import NetworkSelect from '@/components/ui/NetworkSelect'
 import { setActiveChainId, useActiveChain } from '@/hooks/useActiveChain'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useSolanaWallet } from '@/hooks/useSolanaWallet'
@@ -137,12 +136,7 @@ export const ConnectWallet = () => {
 
   return !mounted ? null : (
     <>
-      {isConnected && (
-        <>
-          <NetworkSelect />
-          <Profile addr={address} />
-        </>
-      )}
+      {isConnected && <Profile addr={address} />}
 
       {!isConnected &&
         (isCompact ? (

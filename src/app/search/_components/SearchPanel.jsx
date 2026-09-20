@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useConnection } from 'wagmi'
 import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import Post from '@/components/Post'
@@ -14,6 +15,8 @@ import styles from '../page.module.scss'
 export default function SearchPanel() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  // The route only computes has_liked for a viewer, so results refetch when the wallet arrives
+  const { address } = useConnection()
 
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [results, setResults] = useState([])
@@ -32,7 +35,9 @@ export default function SearchPanel() {
 
     const fetchData = async () => {
       setIsLoading(true)
-      const res = await fetch(`/api/v1/search?q=${encodeURIComponent(query)}`)
+      const params = new URLSearchParams({ q: query })
+      if (address) params.set('viewer_address', address)
+      const res = await fetch(`/api/v1/search?${params}`)
       const json = await res.json()
       if (json.success) setResults(json.data)
       setIsLoading(false)
@@ -40,7 +45,7 @@ export default function SearchPanel() {
 
     const timer = setTimeout(fetchData, 400)
     return () => clearTimeout(timer)
-  }, [query])
+  }, [query, address])
 
   return (
     <div className={`__container ${styles.page__container}`} data-width="small">
@@ -59,7 +64,7 @@ export default function SearchPanel() {
       <div className={styles.results}>
         {results.map((item, i) => (
           <section
-            key={item.id}
+            key={`${item.network_id}:${item.id}`}
             className={`${styles.postWrapper} animate fade`}
             onClick={() => handlePostClick(item.network_id, item.id)}
             onMouseEnter={() => handlePostPrefetch(item.network_id, item.id)}
