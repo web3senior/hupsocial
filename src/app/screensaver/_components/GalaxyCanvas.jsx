@@ -186,9 +186,11 @@ const buildScene = ({ variant, dense = false, chainColor, density = 1 }) => {
  * Variants: 'nebula' (violet-to-emerald ramp), 'chains' (stars keyed to app-chain colours,
  * Hup pink core), 'cinematic' (tighter arms, denser stars, nebula haze), 'robinhood' (cinematic
  * build ramped from the Robinhood chain's brand green). Pass `chainColor` for any other chain's
- * brand colour, and `density` to thin the particles out in small tiles.
+ * brand colour, `density` to thin the particles out in small tiles, and `centered` to keep the
+ * core in the middle of a wide band instead of pushing it right of the copy. `transparent` skips
+ * the pitch-black ground so the scene sits on whatever is behind the canvas.
  */
-export default function GalaxyCanvas({ className, variant = 'nebula', chainColor, density = 1 }) {
+export default function GalaxyCanvas({ className, variant = 'nebula', chainColor, density = 1, centered = false, transparent = false }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
@@ -220,14 +222,19 @@ export default function GalaxyCanvas({ className, variant = 'nebula', chainColor
     const draw = (t) => {
       ctx.globalCompositeOperation = 'source-over'
       ctx.globalAlpha = 1
-      ctx.fillStyle = '#030014'
-      ctx.fillRect(0, 0, width, height)
+      // `transparent` leaves the page's own background as the ground; stars composite `lighter` onto it
+      if (transparent) ctx.clearRect(0, 0, width, height)
+      else {
+        ctx.fillStyle = '#030014'
+        ctx.fillRect(0, 0, width, height)
+      }
 
-      // Wide bands push the galaxy right of the copy; square canvases and fullscreen centre it
+      // Wide bands push the galaxy right of the copy; square canvases, fullscreen and `centered` centre it
       const wide = width > height * 1.5
       const fullscreen = document.fullscreenElement?.contains(canvas) ?? false
-      const cx = width * (wide && !fullscreen ? 0.62 : 0.5)
-      const cy = height * (wide && !fullscreen ? 0.54 : 0.5)
+      const offset = wide && !fullscreen && !centered
+      const cx = width * (offset ? 0.62 : 0.5)
+      const cy = height * (offset ? 0.54 : 0.5)
       const scale = wide ? Math.max(width * 0.34, height * 0.85) : Math.min(width, height) * 0.45
       // Square framing raises the camera so the disk fills the frame instead of a thin band
       const tilt = wide ? TILT : 0.52
@@ -375,7 +382,7 @@ export default function GalaxyCanvas({ className, variant = 'nebula', chainColor
       document.removeEventListener('fullscreenchange', onFullscreen)
       reducedMotion.removeEventListener('change', sync)
     }
-  }, [variant, chainColor, density])
+  }, [variant, chainColor, density, centered, transparent])
 
   return <canvas ref={canvasRef} className={className} aria-hidden="true" />
 }

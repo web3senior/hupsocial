@@ -7,13 +7,33 @@
   }
 }
 
+// The galaxy draws on the page's own background; its stars are lifted toward white, so the copy
+// follows the theme's text colours rather than fixed white
 .hero {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.9rem;
-  padding: 2.5rem 1rem 1rem;
+  min-height: clamp(300px, 42vh, 420px);
+  padding: 3rem 1.25rem 2.5rem;
+  border-radius: var(--global-border-radius);
+  background: transparent;
   text-align: center;
+  overflow: hidden;
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  &__canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+  }
 
   &__eyebrow {
     display: inline-flex;
@@ -36,9 +56,9 @@
     letter-spacing: -0.01em;
   }
 
-  // --accent-primary resolves to the connected network's colour and is empty until a wallet connects
+  // Robinhood's brand green, the same one the galaxy is ramped from
   &__accent {
-    color: var(--text-muted);
+    color: #00c805;
   }
 
   &__lead {

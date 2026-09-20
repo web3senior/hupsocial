@@ -17,6 +17,7 @@ import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
 import EmptyState from '@/components/ui/EmptyState'
+import GalaxyCanvas from '@/app/screensaver/_components/GalaxyCanvas'
 import { profilePath } from '@/lib/username'
 import styles from './page.module.scss'
 
@@ -87,6 +88,8 @@ export default function AgentsPage() {
       <PageTitle name="Agents" />
       <div className={clsx('__container', styles.page__container)} data-width="medium">
         <section className={styles.hero} aria-labelledby="agents-title">
+          {/* The Robinhood-green galaxy from /screensaver, drawn straight onto the page background */}
+          <GalaxyCanvas variant="robinhood" centered transparent className={styles.hero__canvas} />
           <span className={styles.hero__eyebrow}>
             <RobotIcon size={16} aria-hidden="true" />
             Humans and agents welcome
