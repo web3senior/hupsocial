@@ -1,8 +1,9 @@
 import { after, NextResponse } from 'next/server'
 import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
-import { AVATAR_MAX_SIZE, resolveAvatarImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
+import { AVATAR_MAX_SIZE, isSameStoredImage, resolveAvatarImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
 import { readUniversalProfile } from '@/lib/lukso'
+import { moderateImages } from '@/lib/moderation'
 import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/badge'
 import { resolveAgentProfile } from '@/lib/agentProfile'
 import { readPremium } from '@/lib/premiumServer'
@@ -301,6 +302,10 @@ function shapeDatabaseProfile(row, { badge, origin, premium }) {
   return dbProfile
 }
 
+/* A save with a new picture fetches it from a gateway and sends it to OpenAI before writing;
+   the platform default would cut that short and answer with a bare 504. */
+export const maxDuration = 60
+
 export async function GET(request, { params }) {
   try {
     const { address: identifier } = await params
@@ -501,8 +506,10 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'That signature does not match the wallet' }, { status: 401 })
     }
 
-    // Verify profile exists before executing update
-    const [existing] = await pool.execute('SELECT wallet_address FROM users WHERE wallet_address = ?', [address])
+    /* Verify the profile exists before executing the update. The whole row rather than named
+       columns: profileHeader is one of the optional columns above, and naming it on a database
+       that predates it would refuse every save. */
+    const [existing] = await pool.execute('SELECT * FROM users WHERE wallet_address = ?', [address])
 
     if (existing.length === 0) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
@@ -540,6 +547,26 @@ export async function PUT(request, { params }) {
     if ((coverRef || removeProfileHeader) && (await canWrite('profileHeader'))) {
       updateFields.push('`profileHeader` = ?')
       queryValues.push(coverRef ?? COVER_REMOVED)
+    }
+
+    /* The same moderator that checks a post, but as a gate rather than a warning: a picture sits
+       beside every post its owner writes and cannot be blurred, so a flagged one is refused. Only
+       a picture this save changes is checked — the stored one has already been through here, or
+       came off the chain, where it may not be pinned anywhere a gateway can read it. Nothing has
+       been written yet, so a refusal here leaves the row exactly as it was. */
+    const pictures = [
+      [typeof profileImage === 'string' ? profileImage.trim() : '', existing[0].profileImage, 'profile picture'],
+      [coverRef, existing[0].profileHeader ?? null, 'cover'],
+    ]
+    for (const [ref, stored, what] of pictures) {
+      if (!ref || isSameStoredImage(ref, stored)) continue
+      const verdict = await moderateImages([ref])
+      if (verdict?.unreadable.length) {
+        return NextResponse.json({ error: `That ${what} could not be checked — try again in a moment, or pick a PNG, JPEG, GIF or WebP` }, { status: 503 })
+      }
+      if (verdict?.rejected) {
+        return NextResponse.json({ error: `That ${what} can't be used on Hup` }, { status: 422 })
+      }
     }
 
     if (tags !== null) {
