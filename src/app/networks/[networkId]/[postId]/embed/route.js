@@ -11,7 +11,15 @@
  * fallback card, and sealed community content renders the same lock placeholder the feed shows.
  */
 import { getPostById } from '@/lib/api'
-import { renderPostEmbedDocument, renderPostEmbedFallback, normalizeEmbedTheme } from '@/lib/postEmbed'
+import { previewableLink } from '@/lib/linkPreview'
+import { resolveLinkPreview } from '@/lib/linkPreviewServer'
+import {
+  getEmbedBodyText,
+  getEmbedMediaItems,
+  renderPostEmbedDocument,
+  renderPostEmbedFallback,
+  normalizeEmbedTheme,
+} from '@/lib/postEmbed'
 
 export const runtime = 'nodejs'
 
@@ -25,6 +33,35 @@ function isWithheld(row) {
     Number(row?.actioned_reports || 0) >= 3 ||
     Number(row?.moderation_flagged || 0) === 1
   )
+}
+
+// The card the feed shows under the text (LinkPreview.jsx): the first link that earns one,
+// skipped when the post carries its own gallery. Best-effort — a slow or dead X endpoint must
+// never turn the embed into the fallback card.
+async function loadLinkPreview(row) {
+  if (row?.content?.encrypted || getEmbedMediaItems(row).length > 0) return null
+  const link = previewableLink(getEmbedBodyText(row))
+  if (!link) return null
+  try {
+    return await resolveLinkPreview(link.url)
+  } catch (error) {
+    console.warn('[GET_POST_EMBED_PREVIEW]:', link.url, error?.message)
+    return null
+  }
+}
+
+// The quoted original, when the row is a quote post. A missing or withheld original still
+// yields an object so the document can say "unavailable" rather than drop the quote silently.
+async function loadQuoted(networkId, row) {
+  const quoteId = row?.content?.quoteOf
+  if (!quoteId) return null
+  try {
+    const quoted = (await getPostById(networkId, quoteId, null))?.data
+    return { item: quoted && !isWithheld(quoted) ? quoted : null }
+  } catch (error) {
+    console.warn('[GET_POST_EMBED_QUOTE]:', networkId, quoteId, error?.message)
+    return { item: null }
+  }
 }
 
 export async function GET(request, { params }) {
@@ -49,10 +86,14 @@ export async function GET(request, { params }) {
     if (!target) return unavailable('The original post is no longer available on Hup.')
     if (isWithheld(row) || isWithheld(target)) return unavailable('This post is no longer available on Hup.')
 
+    const [linkPreview, quoted] = await Promise.all([loadLinkPreview(target), loadQuoted(networkId, target)])
+
     const document = renderPostEmbedDocument(target, {
       origin,
       theme,
       repostedBy: isRepost ? row.display_name || row.wallet_address : null,
+      linkPreview,
+      quoted,
     })
 
     return new Response(document, {
