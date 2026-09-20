@@ -14,6 +14,7 @@ import UsernameGate from './UsernameGate'
 import EmbeddedTxConfirm from './EmbeddedTxConfirm'
 import VaultUnlockDialog from './VaultUnlockDialog'
 import ComposerRecovery from './ComposerRecovery'
+import ChatDock from './chat/ChatDock'
 import OfflineBanner from './ui/OfflineBanner'
 import { Providers } from '@/app/providers'
 import styles from './ClientLayout.module.scss'
@@ -64,6 +65,8 @@ export default function ClientLayout({ children }) {
         {/* Composers close on the transaction, not the receipt — this is where one comes back
             if the chain rejects it after the author has already returned to the feed */}
         <ComposerRecovery />
+        {/* Offchain messenger docked on the right edge; the onchain /chat page hides it */}
+        <ChatDock />
       </WagmiContext>
 
       {isBooting && <SplashScreen />}

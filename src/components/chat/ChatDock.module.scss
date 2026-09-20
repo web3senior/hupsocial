@@ -1,0 +1,673 @@
+@use '@/styles/components/responsive' as *;
+@use '@/styles/components/shimmer' as *;
+
+// Left of the floating action column in Aside.module.scss (1rem in, one button wide), so the
+// "+" keeps its corner and the chat sits beside it
+$floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
+
+// A messenger card in the bottom-right corner
+.dock {
+  --dock-width: 360px;
+  --dock-height: min(640px, calc(100vh - var(--header-height) - 2rem));
+  --dock-radius: 1.25rem;
+
+  // Every colour the dock paints, all read from the app palette so it follows the theme
+  --dock-surface: var(--surface);
+  --dock-raised: var(--hover);
+  --dock-border: var(--border);
+  --dock-border-strong: var(--border-strong);
+  --dock-text: var(--text);
+  --dock-text-muted: var(--text-muted);
+  --dock-badge: var(--status-error);
+  --dock-jump: var(--text);
+  --dock-jump-text: var(--background);
+  --bubble-theirs: var(--hover);
+  --bubble-mine: #3d5afe;
+  --bubble-mine-text: #fff;
+
+
+  position: fixed;
+  right: $floating-column;
+  bottom: 1rem;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  color: var(--dock-text);
+  background-color: var(--dock-surface);
+  border: 1px solid var(--dock-border);
+  border-radius: var(--dock-radius);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  transition:
+    width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &--minimized {
+    width: auto;
+    height: auto;
+    border-radius: 999px;
+  }
+
+  &--open {
+    width: var(--dock-width);
+    height: var(--dock-height);
+  }
+
+  &--expanded {
+    width: min(520px, calc(100vw - #{$floating-column} - 1rem));
+    height: calc(100vh - var(--header-height) - 2rem);
+  }
+
+  @include md-down() {
+    &--minimized {
+      bottom: calc(var(--bottom-nav-space) + 1rem);
+    }
+
+    &--open,
+    &--expanded {
+      inset: var(--header-height) 0 var(--bottom-nav-space) 0;
+      width: auto;
+      height: auto;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+  }
+
+  // The bar is the drag handle: the card goes wherever it is pulled (ChatDock.jsx)
+  &__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    padding: 0.75rem 0.75rem 0.75rem 1rem;
+    border-bottom: 1px solid var(--dock-border);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+
+    @include md-down() {
+      cursor: default;
+    }
+  }
+
+  &--dragging {
+    transition: none;
+
+    .dock__bar {
+      cursor: grabbing;
+    }
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    font-weight: 700;
+    font-size: var(--font-size-17);
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    flex-shrink: 0;
+  }
+
+  &__iconButton {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    background: none;
+    border: 0;
+    border-radius: 0.5rem;
+    cursor: pointer;
+
+    @media (hover: hover) {
+      &:hover {
+        background-color: var(--dock-raised);
+      }
+    }
+
+    // Phones show the room edge to edge; there is no bigger card to expand into
+    &--expand {
+      @include md-down() {
+        display: none;
+      }
+    }
+  }
+}
+
+// Minimized: icon with its badge, the label, and the reader's own face
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.875rem;
+  color: inherit;
+  font-weight: 700;
+  font-size: var(--font-size-16);
+  background: none;
+  border: 0;
+  cursor: pointer;
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--dock-raised);
+    }
+  }
+
+  &__icon {
+    position: relative;
+    display: inline-flex;
+  }
+
+  &__label {
+    padding-inline-end: 0.5rem;
+  }
+
+  // The last few voices, stacked the way a group chat shows its members
+  &__faces {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding-inline-start: 6px;
+  }
+
+  // A fixed square: the row's negative margins would otherwise let the picture shrink in
+  // width alone and come out squeezed
+  &__face {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    max-width: none;
+    aspect-ratio: 1;
+    box-sizing: border-box;
+    margin-inline-start: -8px;
+    border-radius: 50%;
+    border: 2px solid var(--dock-surface);
+    object-fit: cover;
+    background-color: var(--dock-raised);
+  }
+}
+
+.badge {
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-10);
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background-color: var(--dock-badge);
+  border-radius: 999px;
+
+  .pill__icon & {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+  }
+}
+
+.room {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.75rem 0.875rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  &__notice {
+    padding: 0.5rem 0;
+    text-align: center;
+    color: var(--dock-text-muted);
+    font-size: var(--font-size-12);
+  }
+
+  &__empty {
+    margin: auto;
+  }
+}
+
+// Stands in for the room while a remembered wallet reconnects
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-block: 0.5rem;
+
+  &__bubble {
+    @include shimmer;
+
+    height: 34px;
+    border-radius: 1.25rem;
+    background-color: var(--dock-raised);
+
+    &--theirs {
+      align-self: flex-start;
+      margin-inline-start: calc(28px + 0.5rem);
+    }
+
+    &--mine {
+      align-self: flex-end;
+    }
+  }
+}
+
+.stamp {
+  margin-block: 0.875rem 0.5rem;
+  text-align: center;
+  color: var(--dock-text-muted);
+  font-size: var(--font-size-12);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block: 0.5rem;
+  color: var(--dock-badge);
+  font-size: var(--font-size-10);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background-color: currentColor;
+    opacity: 0.5;
+  }
+}
+
+.jump {
+  position: absolute;
+  right: 1rem;
+  bottom: 4.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  color: var(--dock-jump-text);
+  background-color: var(--dock-jump);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+// One run of the room: a face column on the left for others, bubbles stacked beside it. The
+// face is sticky inside the run, so it rides along the bottom edge of the scroll area while
+// the run is on screen and leaves with the run's last bubble.
+.run {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+
+  &--mine {
+    justify-content: flex-end;
+  }
+
+  &__face {
+    position: sticky;
+    bottom: 0;
+    width: 28px;
+    flex-shrink: 0;
+    align-self: flex-end;
+  }
+
+  &__stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    max-width: 78%;
+    min-width: 0;
+
+    .run--mine & {
+      align-items: flex-end;
+    }
+  }
+
+  &__name {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: 0.25rem 0 0.125rem 0.75rem;
+    font-size: var(--font-size-12);
+    color: var(--dock-text-muted);
+  }
+
+  // The shared identity component, trimmed to its name: the face already sits beside the
+  // bubble and the address is a tap away on the profile
+  &__profile {
+    > a:first-child,
+    code {
+      display: none;
+    }
+  }
+
+  &__mod {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    padding: 0 0.375rem;
+    font-size: var(--font-size-10);
+    font-weight: 700;
+    color: var(--status-success);
+    border: 1px solid currentColor;
+    border-radius: 999px;
+  }
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+
+  .run--mine & {
+    flex-direction: row-reverse;
+  }
+
+  // A line being sent slides up into place, then breathes until the server has it
+  &--pending {
+    animation:
+      chat-line-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+      chat-line-breathe 1.2s ease-in-out 0.22s infinite;
+  }
+
+  @media (hover: hover) {
+    .line__menuButton {
+      opacity: 0;
+    }
+
+    &:hover .line__menuButton,
+    .line__menuButton:focus-visible {
+      opacity: 1;
+    }
+  }
+
+  &__gif {
+    display: block;
+    max-width: 240px;
+    max-height: 200px;
+    border-radius: 1rem;
+    background-color: var(--dock-raised);
+  }
+
+  &__menuButton {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--dock-text-muted);
+    background: none;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--dock-raised);
+      color: var(--dock-text);
+    }
+  }
+}
+
+@keyframes chat-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes chat-line-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line--pending {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+.bubble {
+  margin: 0;
+  padding: 0.5rem 0.875rem;
+  min-width: 0;
+  font-size: var(--font-size-15);
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background-color: var(--bubble-theirs);
+  border-radius: 1.25rem;
+
+  // Inner corners of a run are squared off, the outer ones stay round
+  .run--theirs .line:not(:last-child) & {
+    border-bottom-left-radius: 0.375rem;
+  }
+
+  .run--theirs .line + .line & {
+    border-top-left-radius: 0.375rem;
+  }
+
+  .run--mine & {
+    color: var(--bubble-mine-text);
+    background-color: var(--bubble-mine);
+  }
+
+  .run--mine .line:not(:last-child) & {
+    border-bottom-right-radius: 0.375rem;
+  }
+
+  .run--mine .line + .line & {
+    border-top-right-radius: 0.375rem;
+  }
+
+  &__link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+.menu {
+  padding: 0.25rem;
+  background-color: var(--dock-surface);
+  border: 1px solid var(--dock-border);
+  border-radius: var(--global-border-radius);
+  box-shadow: var(--shadow-md);
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    min-width: 180px;
+  }
+
+  &__item {
+    padding: 0.5rem 0.75rem;
+    font-size: var(--font-size-14);
+    color: var(--dock-text);
+    text-align: left;
+    background: none;
+    border: 0;
+    border-radius: calc(var(--global-border-radius) - 4px);
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--dock-raised);
+    }
+
+    &--admin {
+      margin-top: 0.25rem;
+      border-top: 1px solid var(--dock-border);
+      border-radius: 0;
+    }
+  }
+}
+
+.gate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  padding: 0.75rem 0.875rem;
+  border-top: 1px solid var(--dock-border);
+  background-color: var(--dock-surface);
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-14);
+    color: var(--dock-text-muted);
+  }
+
+  // A small pill in the dock's own ink, not the page's primary button
+  &__button {
+    flex-shrink: 0;
+    padding: 0.375rem 0.875rem;
+    font-size: var(--font-size-14);
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--dock-jump-text);
+    background-color: var(--dock-jump);
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    transition:
+      transform 0.12s ease,
+      opacity 0.12s ease;
+
+    @media (hover: hover) {
+      &:hover {
+        opacity: 0.85;
+      }
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    &[disabled] {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+}
+
+// The composer is one rounded pill: emoji inside on the left, GIF or send on the right
+.composer {
+  flex-shrink: 0;
+  padding: 0.5rem 0.875rem 0.875rem;
+  background-color: var(--dock-surface);
+
+  &__pill {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.25rem;
+    padding: 0.25rem 0.375rem;
+    background-color: var(--dock-raised);
+    border: 1px solid var(--dock-border);
+    border-radius: 1.5rem;
+
+    &:focus-within {
+      border-color: var(--dock-border-strong);
+    }
+  }
+
+  &__tool {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    color: var(--dock-text);
+    background: none;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+
+    // The shared emoji trigger renders its own button; it sits at the same weight as the others
+    button {
+      width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: inherit;
+      background: none;
+      border: 0;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    &--send {
+      color: var(--bubble-mine);
+      transition: transform 0.12s ease;
+
+      &:active {
+        transform: scale(0.85);
+      }
+    }
+
+    &[disabled] {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
+  &__input {
+    flex: 1;
+    min-width: 0;
+    max-height: 120px;
+    padding: 0.5rem 0.25rem;
+    font: inherit;
+    font-size: var(--font-size-15);
+    line-height: 1.35;
+    color: var(--dock-text);
+    background: none;
+    border: 0;
+    resize: none;
+    field-sizing: content;
+
+    &:focus {
+      outline: none;
+    }
+
+    &::placeholder {
+      color: var(--dock-text-muted);
+    }
+  }
+}
