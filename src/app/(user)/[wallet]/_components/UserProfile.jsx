@@ -19,6 +19,8 @@ import { toast } from '@/components/NextToast'
 import blueCheckMarkIcon from '@/../public/icons/blue-checkmark.svg'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
+import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
 import Post from '@/components/Post'
 import { getActiveChain } from '@/lib/communication'
 import { CommunityBadge } from '@/components/Profile'
@@ -78,25 +80,51 @@ const POSTS_PAGE_SIZE = 20
  * Posts and Reposts are the same wallet-scoped feed under a different post_type filter,
  * so both tabs ride this hook. Both fetch on mount — their tab badges carry the totals,
  * so deferring one until its tab opens would leave that count blank until first click.
+ *
+ * Each feed snapshots itself into the session feed cache on unmount and hydrates from it on the
+ * next visit, so coming back to a profile repaints the loaded pages instead of refetching page 1.
  */
 const useProfileFeed = ({ wallet, viewer, postType }) => {
-  const [posts, setPosts] = useState({ list: [] })
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
+  const cacheKey = `profile-${wallet}-${postType}`
+  const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
+  // In-memory store: always empty during hydration, so cache hits only happen on client remounts.
+  const [initialCache] = useState(() => useFeedCacheStore.getState().readFeedCache(cacheKey, viewer ?? null))
+
+  const [posts, setPosts] = useState(() => ({ list: initialCache?.list ?? [] }))
+  const [total, setTotal] = useState(initialCache?.total ?? 0)
+  const [page, setPage] = useState(initialCache?.page ?? 1)
+  const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false)
   const [isFetching, setIsFetching] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(Boolean(initialCache))
 
   // Refs mirror the pagination state so the scroll handler never acts on a stale closure.
   const isFetchingRef = useRef(false)
-  const hasMoreRef = useRef(false)
-  const pageRef = useRef(1)
+  const hasMoreRef = useRef(initialCache?.hasMore ?? false)
+  const pageRef = useRef(initialCache?.page ?? 1)
+  // Params the applied data was fetched for; the mount effect only fetches when they differ, so a
+  // cache hydration skips the page-1 fetch while a viewer change still refetches.
+  const appliedParamsRef = useRef(initialCache ? `${wallet}|${viewer ?? null}|${postType}` : null)
+  const cacheSnapshotRef = useRef(null)
 
   useEffect(() => {
     isFetchingRef.current = isFetching
     hasMoreRef.current = hasMore
     pageRef.current = page
   }, [isFetching, hasMore, page])
+
+  useEffect(() => {
+    cacheSnapshotRef.current = { list: posts.list, total, page, hasMore, loaded: isLoaded, address: viewer ?? null }
+  })
+
+  // An empty feed is cached too once its first page has answered: a profile with no reposts would
+  // otherwise refetch that empty page on every visit.
+  useEffect(() => {
+    return () => {
+      const state = cacheSnapshotRef.current
+      if (!state?.loaded) return
+      saveFeedCache(cacheKey, state)
+    }
+  }, [cacheKey, saveFeedCache])
 
   const loadMore = useCallback(async () => {
     if (isFetchingRef.current || !hasMoreRef.current) return
@@ -126,6 +154,8 @@ const useProfileFeed = ({ wallet, viewer, postType }) => {
 
   // Re-runs when the viewer connects so has_liked/has_bookmarked flags reflect their wallet.
   useEffect(() => {
+    const params = `${wallet}|${viewer ?? null}|${postType}`
+    if (appliedParamsRef.current === params) return
     let cancelled = false
 
     getPosts(1, POSTS_PAGE_SIZE, null, wallet, viewer, null, null, false, postType)
@@ -135,6 +165,7 @@ const useProfileFeed = ({ wallet, viewer, postType }) => {
         setPosts({ list: res.data || [] })
         setPage(1)
         setHasMore(res.meta?.hasMore || false)
+        appliedParamsRef.current = params
       })
       .catch((error) => {
         console.error('Error loading posts:', error)
@@ -148,7 +179,7 @@ const useProfileFeed = ({ wallet, viewer, postType }) => {
     }
   }, [wallet, viewer, postType])
 
-  return { posts, total, hasMore, isFetching, isLoaded, loadMore }
+  return { posts, total, hasMore, isFetching, isLoaded, loadMore, restored: Boolean(initialCache) }
 }
 
 // What an unset colour input shows. Picking it still counts as choosing — the field only
@@ -162,7 +193,6 @@ const DEFAULT_ACCENT = '#0095f6'
  *   was in the URL.
  */
 export default function UserProfile({ address: routeAddress }) {
-  const [activeTab, setActiveTab] = useState('posts') // New state for active tab
   const params = useParams()
   const profileAddress = routeAddress || params.wallet
   const router = useRouter()
@@ -175,8 +205,34 @@ export default function UserProfile({ address: routeAddress }) {
     address: evmAddress,
   })
 
+  // The tab and viewport the reader left this profile on, alongside the feeds' own snapshots.
+  const pageCacheKey = `profile-${profileAddress}`
+  const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
+  const [initialPageCache] = useState(() => useFeedCacheStore.getState().readFeedCache(pageCacheKey, address ?? null))
+  const [activeTab, setActiveTab] = useState(initialPageCache?.activeTab ?? 'posts')
+  const containerRef = useRef(null)
+
   const postsFeed = useProfileFeed({ wallet: profileAddress, viewer: address, postType: 'original' })
   const repostsFeed = useProfileFeed({ wallet: profileAddress, viewer: address, postType: 'repost' })
+
+  const activeFeed = activeTab === 'posts' ? postsFeed : activeTab === 'reposts' ? repostsFeed : null
+  const { snapshot, containerStyle, cardStyle } = useFeedScrollRestore({
+    containerRef,
+    restore: initialPageCache,
+    // A feed tab restores once its cards are in the tree; the other tabs go by offset alone.
+    ready: activeFeed ? activeFeed.posts.list.length > 0 : true,
+  })
+
+  const pageSnapshotRef = useRef(null)
+  useEffect(() => {
+    pageSnapshotRef.current = { activeTab, address: address ?? null }
+  })
+
+  useEffect(() => {
+    return () => {
+      saveFeedCache(pageCacheKey, { ...pageSnapshotRef.current, ...snapshot() })
+    }
+  }, [pageCacheKey, saveFeedCache, snapshot])
 
   const TABS_DATA = [
     { id: 'posts', label: 'Posts', count: postsFeed.total },
@@ -230,7 +286,7 @@ export default function UserProfile({ address: routeAddress }) {
   return (
     <>
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <div className={`__container ${styles.page__container}`} data-width={`small`}>
+        <div className={`__container ${styles.page__container}`} data-width={`small`} ref={containerRef} style={containerStyle}>
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={profileAddress} />
 
@@ -268,7 +324,7 @@ export default function UserProfile({ address: routeAddress }) {
 
           {activeTab === 'posts' && (
             <div className={`${styles.tabContent} ${styles.postTab} relative`}>
-              <PostFeed feed={postsFeed} emptyLabel={`posts`} onPostClick={handlePostClick} onPostPrefetch={handlePostPrefetch} />
+              <PostFeed feed={postsFeed} emptyLabel={`posts`} cardStyle={cardStyle} onPostClick={handlePostClick} onPostPrefetch={handlePostPrefetch} />
             </div>
           )}
 
@@ -286,7 +342,7 @@ export default function UserProfile({ address: routeAddress }) {
 
           {activeTab === 'reposts' && (
             <div className={`${styles.tabContent} ${styles.postTab} ${styles.reposts} relative`}>
-              <PostFeed feed={repostsFeed} emptyLabel={`reposts`} onPostClick={handlePostClick} onPostPrefetch={handlePostPrefetch} />
+              <PostFeed feed={repostsFeed} emptyLabel={`reposts`} cardStyle={cardStyle} onPostClick={handlePostClick} onPostPrefetch={handlePostPrefetch} />
             </div>
           )}
 
@@ -302,7 +358,7 @@ export default function UserProfile({ address: routeAddress }) {
  * @param {*} param0
  * @returns
  */
-const PostFeed = ({ feed, emptyLabel, onPostClick, onPostPrefetch }) => {
+const PostFeed = ({ feed, emptyLabel, cardStyle, onPostClick, onPostPrefetch }) => {
   // Stay blank until the first page settles so the empty state can't flash mid-fetch.
   if (feed.posts.list.length === 0) return feed.isLoaded ? <NoData name={emptyLabel} /> : null
 
@@ -310,10 +366,15 @@ const PostFeed = ({ feed, emptyLabel, onPostClick, onPostPrefetch }) => {
     <>
       <div className={`${styles.grid} flex flex-column`}>
         {feed.posts.list.map((item, i) => {
+          const key = `${item.network_id}:${item.id}`
           return (
             <section
-              key={`${item.network_id}:${item.id}`}
-              className={`${styles.post} animate fade`}
+              key={key}
+              // What the scroll restore anchors to and measures; see useFeedScrollRestore.
+              data-post-key={key}
+              style={cardStyle(key)}
+              // Restored feeds must repaint identically in place — no entrance replay.
+              className={clsx(styles.post, !feed.restored && ['animate', 'fade'])}
               onPointerDown={rememberCardPointerDown}
               onClick={(e) => {
                 if (isTextSelectionDrag(e)) return
@@ -1442,6 +1503,30 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
       } catch (uploadErr) {
         console.error('Profile cover upload error:', uploadErr)
         setError(uploadErr.message || 'Failed to upload the cover to decentralized storage.')
+        setIsPending(false)
+        return
+      }
+    }
+
+    /* The same check the composer runs before a post, here before the signature: the save
+       refuses a picture the moderator flags anyway, and hearing that after signing would cost a
+       second signature for the retry. */
+    for (const [ref, what] of [[imageUri, 'profile picture'], [coverUri, 'cover']]) {
+      if (!ref) continue
+      const verdict = await fetch('/api/moderation/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images: [ref] }),
+      })
+        .then((res) => res.json())
+        .catch(() => ({}))
+      if (verdict?.rejected) {
+        setError(`That ${what} can't be used on Hup.`)
+        setIsPending(false)
+        return
+      }
+      if (verdict?.unreadable?.length) {
+        setError(`That ${what} could not be checked — try again in a moment, or pick a PNG, JPEG, GIF or WebP.`)
         setIsPending(false)
         return
       }
