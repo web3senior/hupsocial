@@ -15,9 +15,11 @@ export const USERNAME_MAX_LENGTH = 20
 const SHAPE = /^[a-z][a-z0-9_]{2,19}$/
 const DOUBLE_UNDERSCORE = /__/
 
-/* Every top-level route in src/app: Next matches those before the [wallet] catch-all, so a
-   handle among them would be unreachable at its bare path — plus the names nobody but Hup
-   should be able to answer to. */
+/* The floor: every top-level route in src/app — Next matches those before the [wallet]
+   catch-all, so a handle among them would be unreachable at its bare path — plus the names nobody
+   but Hup should be able to answer to. Kept in code so the browser refuses them as they are typed
+   and so they hold before any migration lands. The curated long tail (brands, chains, vernacular)
+   lives in the reserved_usernames table, read server-side by lib/reservedUsernames.js. */
 const RESERVED = new Set([
   'activity', 'admin', 'api', 'apps', 'articles', 'bazaar', 'chat', 'communities', 'compose',
   'connect', 'drops', 'events', 'fund', 'gas', 'help', 'insights', 'install', 'leaderboard',
@@ -62,8 +64,6 @@ export const validateUsername = (value) => {
 
   return { ok: true, key, display }
 }
-
-export const isReservedUsername = (value) => RESERVED.has(usernameKey(value))
 
 /** `@alice`, or '' — so a caller can render the result without testing it first. */
 export const formatUsername = (value) => {

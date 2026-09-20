@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { isEvmAddress, normalizeAddress, sameAddress } from '@/lib/address'
 import { hasColumn, hasTable } from '@/lib/schema'
+import { isReservedUsername } from '@/lib/reservedUsernames'
 import { verifyWalletSignature } from '@/lib/walletSignature'
 import {
   USERNAME_CHANGE_COOLDOWN_HOURS,
@@ -29,6 +30,7 @@ const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000
 const DUPLICATE_ENTRY = 'ER_DUP_ENTRY'
 
 const taken = { available: false, error: 'That username is taken' }
+const reserved = { available: false, error: 'That name is reserved' }
 
 /* Production is migrated by hand, so this whole feature can be deployed before its table is
    there. Until it is, the field says so instead of the route 500ing on a missing column. */
@@ -36,8 +38,8 @@ const isMigrated = async () => (await hasColumn('users', 'username_key')) && (aw
 const NOT_MIGRATED = { success: false, error: 'Usernames are not available yet' }
 
 /**
- * Whether `key` is free for `address` to take — shape, the handle's current owner, and the lock a
- * previous owner leaves behind when they move off it.
+ * Whether `key` is free for `address` to take — shape and the floor, the handle's current owner,
+ * the curated reserved list, and the lock a previous owner leaves behind when they move off it.
  * @param {string} key The folded handle.
  * @param {string|null} address The wallet asking, lowercased; its own handle is free to re-claim.
  * @returns {Promise<{available: boolean, error?: string}>}
@@ -50,6 +52,9 @@ async function claimability(key, address) {
   if (owner) {
     return sameAddress(owner.wallet_address, address) ? { available: true, error: null } : taken
   }
+
+  /* After the owner lookup, so a name reserved after someone claimed it stays theirs. */
+  if (await isReservedUsername(key)) return reserved
 
   const [[released]] = await pool.execute(
     `SELECT wallet_address FROM username_history
