@@ -368,6 +368,7 @@ export default function Aside() {
             <Link href="/" className="flex align-items-center gap-025" aria-label="Home">
               <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
               {isExpanded && <span className={styles.logoCap}>{process.env.NEXT_PUBLIC_NAME || 'Hup'}</span>}
+              {isExpanded && <span className={styles.logoBadge}>Beta</span>}
             </Link>
           </div>
 
