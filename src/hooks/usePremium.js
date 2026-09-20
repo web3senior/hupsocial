@@ -49,6 +49,8 @@ export function usePremium(addressOverride) {
     tokens: data?.tokens ?? [],
     prices: data?.prices ?? {},
     purchases: data?.purchases ?? [],
+    /** A current subscriber with a handle, for "get Premium like @…" copy. Null when none. */
+    spotlight: data?.spotlight ?? null,
     /** False when no chain in this build has a HupPremium deployed yet. */
     live: Boolean(data?.live),
     isLoading,

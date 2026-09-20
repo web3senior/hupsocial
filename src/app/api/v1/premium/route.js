@@ -11,7 +11,15 @@
  */
 import { NextResponse } from 'next/server'
 import { nativePricesFor } from '@/lib/fundServer'
-import { premiumDeployments, premiumIsLive, readPlans, readPremium, readPurchases, readTokenPrices } from '@/lib/premiumServer'
+import {
+  premiumDeployments,
+  premiumIsLive,
+  readPlans,
+  readPremium,
+  readPremiumSpotlight,
+  readPurchases,
+  readTokenPrices,
+} from '@/lib/premiumServer'
 
 export const runtime = 'nodejs'
 
@@ -25,15 +33,16 @@ export async function GET(request) {
          so plainly; a 404 would read as a broken route. */
       return NextResponse.json({
         success: true,
-        data: { live: false, plans: [], tokens: [], prices: {}, status: null, purchases: [] },
+        data: { live: false, plans: [], tokens: [], prices: {}, status: null, purchases: [], spotlight: null },
       })
     }
 
-    const [plans, tokens, status, purchases] = await Promise.all([
+    const [plans, tokens, status, purchases, spotlight] = await Promise.all([
       readPlans(),
       readTokenPrices(),
       address ? readPremium(address) : Promise.resolve(null),
       address ? readPurchases(address) : Promise.resolve([]),
+      readPremiumSpotlight(address),
     ])
 
     /* Every chain that sells premium, not just the ones with an indexed plan row — a chain
@@ -50,6 +59,8 @@ export async function GET(request) {
         prices,
         status,
         purchases,
+        /* A current subscriber with a handle, for the profile nudge to name. */
+        spotlight,
         meta: { chains: deployments.map((entry) => entry.networkId) },
       },
     })

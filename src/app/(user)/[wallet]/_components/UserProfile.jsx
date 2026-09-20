@@ -48,6 +48,7 @@ import NativePopover from '@/components/ui/NativePopover'
 import { ProfileQRCode } from './ProfileQRCode'
 import FollowListDialog from './FollowListDialog'
 import ProfileLinks from './ProfileLinks'
+import PremiumNudge from './PremiumNudge'
 import BirthdayConfetti from '@/components/ui/BirthdayConfetti'
 import { CakeIcon, CameraIcon, ImageIcon, MapPinIcon, RobotIcon } from '@phosphor-icons/react'
 import styles from './UserProfile.module.scss'
@@ -865,6 +866,13 @@ const Profile = ({ addr }) => {
                     </button>
                   </div>
                 )}
+              </li>
+            )}
+
+            {/* The "you aren't Premium yet" card, on the viewer's own profile only. */}
+            {isConnected && address.toString().toLowerCase() === targetWallet.toString().toLowerCase() && (
+              <li className="w-100">
+                <PremiumNudge key={address} address={address} profile={profile} />
               </li>
             )}
 

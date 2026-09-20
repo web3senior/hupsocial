@@ -132,6 +132,41 @@ export const readPremiumMany = async (addresses) => {
 }
 
 /**
+ * One current subscriber to name in the "get Premium like @…" nudge — the most recent buyer
+ * who has a handle, so the card can point at a real account. Never the viewer themself.
+ * @param {string|null} exclude The viewer's wallet.
+ * @returns {Promise<{address: string, name: string|null, username: string|null}|null>}
+ */
+export const readPremiumSpotlight = async (exclude) => {
+  const pin = deploymentPin(premiumDeployments())
+  if (!pin) return null
+
+  const excluded = typeof exclude === 'string' ? exclude.toLowerCase() : ''
+  const nowSeconds = Math.floor(Date.now() / 1000)
+
+  try {
+    const [rows] = await pool.execute(
+      `SELECT s.account, u.name, u.username
+         FROM premium_subscriptions s
+         JOIN users u ON LOWER(u.wallet_address) = s.account
+        WHERE ${pin.sql}
+          AND (s.complimentary = 1 OR s.expires_at > ?)
+          AND s.account <> ?
+          AND u.username IS NOT NULL
+        ORDER BY s.last_subscribed_at DESC
+        LIMIT 1`,
+      [...pin.params, nowSeconds, excluded],
+    )
+
+    const row = rows[0]
+    return row ? { address: row.account, name: row.name ?? null, username: row.username ?? null } : null
+  } catch (error) {
+    console.warn('[premium] spotlight read failed:', error.message)
+    return null
+  }
+}
+
+/**
  * The price table across every chain premium is sold on, as cidex indexed it from the
  * contracts' own PlanUpdated logs. One query rather than one RPC call per chain.
  * @returns {Promise<object[]>}
