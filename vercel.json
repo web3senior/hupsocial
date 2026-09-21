@@ -3,6 +3,10 @@
     {
       "path": "/api/v1/cron/notification-emails",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/v1/cron/scheduled-posts",
+      "schedule": "* * * * *"
     }
   ]
 }

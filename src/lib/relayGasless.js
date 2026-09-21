@@ -228,23 +228,41 @@ export const gaslessCooldown = (functionName, networkId, owner, args) => {
   return remainingCooldown(bucket, Number(networkId), owner)
 }
 
+const NONCES_ABI = [
+  {
+    inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
+    name: 'nonces',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+]
+
+/** The forwarder's next nonce for `from`. */
+export const readForwarderNonce = async (publicClient, forwarderAddress, from) =>
+  BigInt(await publicClient.readContract({ address: forwarderAddress, abi: NONCES_ABI, functionName: 'nonces', args: [from] }))
+
 /**
- * Signs `functionName(...args)` against the chain's Hup contract as a ForwardRequest and
- * hands it to the relayer.
+ * Signs `functionName(...args)` against a sponsored contract as a ForwardRequest, without
+ * sending it. relayHupAction hands the result to the relayer straight away; a scheduled post
+ * stores it so the relayer can send it when the time comes (see lib/scheduledPosts.js).
  *
  * @param {Object} params
  * @param {Object} params.chain Viem chain object for the target network (RPC + id).
  * @param {Object} params.publicClient Viem client on that same chain.
  * @param {string} params.owner Connected wallet — the account the action is attributed to.
- * @param {string} params.functionName Hup function to relay (create / update / deleteContent / batchLike / unlike).
+ * @param {string} params.functionName Function to relay (create / update / deleteContent / batchLike / unlike / vote).
  * @param {Array} params.args Arguments for that function, owner-first as Hup expects.
  * @param {Function} [params.signTypedDataAsync] wagmi signer, used when no session exists.
  * @param {boolean} [params.useSessionKey] Sign with the burner instead of the wallet.
  * @param {'hup'|'polls'} [params.contract] Which sponsored contract to target. Extensions ride
  *   the same forwarder and the same relay route; only the address and ABI differ.
- * @returns {Promise<string>} Relayed transaction hash.
+ * @param {number} [params.deadline] Unix seconds the request stays valid until; a few minutes by default.
+ * @param {(from: string, forwarderAddress: string) => Promise<bigint>} [params.nonceFor] Picks the
+ *   nonce to sign with once the signer is known; the signer's current forwarder nonce by default.
+ * @returns {Promise<{request: Object, signature: string, forwarderAddress: string, forwarderName: string, chainId: number, from: string, bucket: string}>}
  */
-export const relayHupAction = async ({
+export const signHupForwardRequest = async ({
   chain,
   publicClient,
   owner,
@@ -253,26 +271,24 @@ export const relayHupAction = async ({
   signTypedDataAsync,
   useSessionKey = false,
   contract = 'hup',
+  deadline = null,
+  nonceFor = null,
 }) => {
   const chainId = Number(chain?.id)
   const contracts = CONTRACTS[`chain${chainId}`]
   const candidates = forwarderCandidatesFor(contracts, contract)
   const targetAbi = contract === 'polls' ? pollsAbi : hupAbi
   const targetAddress = contracts?.[contract]
-  const rpcUrl = chain?.rpcUrls?.default?.http?.[0]
   const gasEntry = RELAY_GAS[functionName]
   const gas = typeof gasEntry === 'function' ? gasEntry(args) : gasEntry
   const bucket = gaslessBucketFor(functionName, args)
 
-  if (!chainId || candidates.length === 0 || !targetAddress || !rpcUrl) throw unsupported('Relay is not configured for this network')
+  if (!chainId || candidates.length === 0 || !targetAddress) throw unsupported('Relay is not configured for this network')
   if (!publicClient || !owner) throw unsupported('Relay needs a connected wallet')
   if (!gas || !bucket) throw unsupported(`${functionName} is not a sponsored action`)
 
-  // Both checked before the signature prompt: a too-early tap should not open the wallet,
-  // and neither should a chain whose contract has not been pointed at a forwarder yet
-  const waiting = remainingCooldown(bucket, chainId, owner)
-  if (waiting > 0) throw throttled(waiting)
-
+  // Checked before the signature prompt: a chain whose contract has not been pointed at a
+  // forwarder yet should not open the wallet
   const forwarder = await trustedForwarderFor(publicClient, chainId, targetAddress, candidates)
   if (!forwarder) throw unsupported('This network does not trust the relayer forwarder yet')
   const { address: forwarderAddress, name: forwarderName } = forwarder
@@ -313,20 +329,7 @@ export const relayHupAction = async ({
       })
   }
 
-  const nonce = await publicClient.readContract({
-    address: forwarderAddress,
-    abi: [
-      {
-        inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
-        name: 'nonces',
-        outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-        stateMutability: 'view',
-        type: 'function',
-      },
-    ],
-    functionName: 'nonces',
-    args: [from],
-  })
+  const nonce = nonceFor ? await nonceFor(from, forwarderAddress) : await readForwarderNonce(publicClient, forwarderAddress, from)
 
   const domain = {
     name: forwarderName,
@@ -341,16 +344,68 @@ export const relayHupAction = async ({
     value: 0n,
     gas,
     nonce: BigInt(nonce),
-    deadline: Math.floor(Date.now() / 1000) + RELAY_DEADLINE_SECONDS,
+    deadline: deadline ?? Math.floor(Date.now() / 1000) + RELAY_DEADLINE_SECONDS,
     data,
   }
 
   const signature = await sign(domain, message)
 
+  return { request: message, signature, forwarderAddress, forwarderName, chainId, from, bucket }
+}
+
+/**
+ * Signs `functionName(...args)` against the chain's Hup contract as a ForwardRequest and
+ * hands it to the relayer.
+ *
+ * @param {Object} params
+ * @param {Object} params.chain Viem chain object for the target network (RPC + id).
+ * @param {Object} params.publicClient Viem client on that same chain.
+ * @param {string} params.owner Connected wallet — the account the action is attributed to.
+ * @param {string} params.functionName Hup function to relay (create / update / deleteContent / batchLike / unlike).
+ * @param {Array} params.args Arguments for that function, owner-first as Hup expects.
+ * @param {Function} [params.signTypedDataAsync] wagmi signer, used when no session exists.
+ * @param {boolean} [params.useSessionKey] Sign with the burner instead of the wallet.
+ * @param {'hup'|'polls'} [params.contract] Which sponsored contract to target. Extensions ride
+ *   the same forwarder and the same relay route; only the address and ABI differ.
+ * @returns {Promise<string>} Relayed transaction hash.
+ */
+export const relayHupAction = async ({
+  chain,
+  publicClient,
+  owner,
+  functionName,
+  args,
+  signTypedDataAsync,
+  useSessionKey = false,
+  contract = 'hup',
+}) => {
+  const chainId = Number(chain?.id)
+  const rpcUrl = chain?.rpcUrls?.default?.http?.[0]
+  const bucket = gaslessBucketFor(functionName, args)
+
+  if (!chainId || !rpcUrl) throw unsupported('Relay is not configured for this network')
+  if (!owner) throw unsupported('Relay needs a connected wallet')
+  if (!bucket) throw unsupported(`${functionName} is not a sponsored action`)
+
+  // Checked before the signature prompt: a too-early tap should not open the wallet
+  const waiting = remainingCooldown(bucket, chainId, owner)
+  if (waiting > 0) throw throttled(waiting)
+
+  const { request: message, signature, forwarderAddress, forwarderName } = await signHupForwardRequest({
+    chain,
+    publicClient,
+    owner,
+    functionName,
+    args,
+    signTypedDataAsync,
+    useSessionKey,
+    contract,
+  })
+
   const res = await fetch('/api/v1/relay', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ request: message, signature, rpcUrl, forwarderAddress, chainId, forwarderName: domain.name }, (_, value) =>
+    body: JSON.stringify({ request: message, signature, rpcUrl, forwarderAddress, chainId, forwarderName }, (_, value) =>
       typeof value === 'bigint' ? value.toString() : value,
     ),
   })

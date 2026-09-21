@@ -1,0 +1,222 @@
+/* Chrome for the NativeDialog root — the primitive only supplies centering + animation */
+.schedule {
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--background);
+  color: var(--text);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  /* Only style the open state's display — a bare `display` would override the UA's
+     `display: none` on the closed dialog and flash it before showModal() runs */
+  &[open] {
+    display: flex;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    /* The native dialog caps itself at calc(100% - 6px - 2em); stay inside that plus the
+       border so small screens never scroll sideways */
+    width: min(600px, calc(100vw - 6px - 2em - 2px));
+    max-height: 82svh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 1rem 1rem;
+    cursor: default;
+  }
+
+  &__header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-height: 52px;
+    padding: 6px 0;
+    background: var(--background);
+
+    h3 {
+      flex: 1;
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+  }
+
+  &__close {
+    all: unset;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+
+  &__confirm {
+    height: 36px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 999px;
+    /* --foreground, not --text: the dark theme's --text is 65% white, which turns a solid
+       pill into a washed-out grey one */
+    background: var(--foreground);
+    color: var(--background);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+
+    &:hover:not(:disabled) {
+      opacity: 0.85;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+
+    svg {
+      flex-shrink: 0;
+    }
+
+    &--invalid {
+      color: #cb2e2e;
+    }
+  }
+
+  &__label {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  &__glyph {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--text);
+  }
+
+  &__zone {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+
+    a {
+      color: var(--network-color-primary, var(--color-primary));
+      font-weight: 700;
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  &__clear {
+    all: unset;
+    color: #cb2e2e;
+    font-weight: 700;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+/* A select dressed as a labelled box: the small label sits above the big value, and the
+   native control underneath keeps keyboard and screen-reader behaviour for free */
+.field {
+  position: relative;
+  display: flex;
+  flex: 1 1 120px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 100px;
+  padding: 8px 40px 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+
+  &:focus-within {
+    border-color: var(--network-color-primary, var(--color-primary));
+  }
+
+  &--wide {
+    flex-basis: 200px;
+  }
+
+  &__label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  &__select {
+    all: unset;
+    appearance: none;
+    width: 100%;
+    font-size: 1.25rem;
+    line-height: 1.3;
+    /* Explicitly opaque, never transparent: a transparent <select> makes Chrome paint its
+       native option list on white, so the dark theme's light text vanishes into it */
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+
+    /* Browsers that ignore the root color-scheme still inherit these for the popup rows */
+    option {
+      background: var(--surface);
+      color: var(--text);
+    }
+  }
+
+  &__caret {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .schedule__row .field {
+    flex-basis: calc(50% - 0.75rem);
+  }
+}

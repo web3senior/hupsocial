@@ -1,0 +1,23 @@
+.page {
+  height: 100%;
+  min-height: 80svh;
+
+  &__container {
+    position: relative;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    isolation: isolate;
+    padding: 2rem;
+
+    @media (max-width: 600px) {
+      padding: 0;
+      background-color: transparent;
+      box-shadow: none;
+      border: none;
+      border-radius: unset;
+    }
+  }
+}

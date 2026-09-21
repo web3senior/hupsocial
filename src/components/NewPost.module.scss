@@ -808,3 +808,36 @@ dialog.newPost {
     margin-top: 0;
   }
 }
+
+/* ■■■ [Schedule] ■■■ */
+
+/* "Will send on …" under the header, where X puts it: the one line that says the button at
+   the bottom will not post yet. A button, so tapping it reopens the picker. */
+.scheduleLine {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin: 0 16px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text);
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+/* The calendar tool lights up while a time is set, so the row itself says the post is scheduled */
+.toolbar > button[aria-pressed='true'] {
+  color: var(--network-color-primary, var(--color-primary));
+}

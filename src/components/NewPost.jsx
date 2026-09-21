@@ -1,13 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useConnection, usePublicClient, useSignTypedData, useSwitchChain, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useSignMessage, useSignTypedData, useSwitchChain, useWriteContract } from 'wagmi'
 import { isSessionActive } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, CalendarDotsIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -41,6 +41,16 @@ import CreatePollDialog from '@/components/CreatePollDialog'
 import AttachPollDialog from '@/components/AttachPollDialog'
 import CreateFundDialog from '@/components/CreateFundDialog'
 import AttachFundDialog from '@/components/AttachFundDialog'
+import SchedulePostDialog from '@/components/SchedulePostDialog'
+import {
+  canPreSign,
+  createScheduledPost,
+  ensureScheduleSession,
+  formatWillSend,
+  listScheduledPosts,
+  pokeScheduledRunner,
+  preSignScheduledPost,
+} from '@/lib/scheduledPosts'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
 import MentionPicker from './MentionPicker'
@@ -419,6 +429,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
   const [postContent, setPostContent] = useState(() => initialPostContent)
   const [allowComments, setAllowComments] = useState(() => restoreState?.allowComments ?? true)
+  // When the post goes out, as unix seconds, or null for right now (see SchedulePostDialog)
+  const [scheduledAt, setScheduledAt] = useState(null)
+  const [scheduleTimeZone, setScheduleTimeZone] = useState(null)
+  const scheduleDialogRef = useRef(null)
   // Edits re-upload the whole content JSON, so the existing attachment must be carried
   // into state or saving the edit would silently drop the listing from the post
   const [nftListing, setNftListing] = useState(() =>
@@ -628,9 +642,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // post all inherit theirs, so the switcher would lie about where the submission lands
   const isChainPinned = actionType !== 'post' || Boolean(communityTarget)
 
+  // Only a plain post or a quote can wait for a later time: a reply belongs to a live thread, a
+  // community post is sealed for one room's key, and Solana has no relayer path to hold it in
+  const canSchedule = (actionType === 'post' || isQuote) && !communityTarget && !isSolanaTarget
+  const isScheduled = canSchedule && Boolean(scheduledAt)
+
   // Relay reads (forwarder nonce, account code) must hit the chain the submission lands on
   const targetPublicClient = usePublicClient({ chainId: targetChainId || undefined })
   const { signTypedDataAsync } = useSignTypedData()
+  // The one-time sign-in that unlocks the scheduled-posts API (lib/scheduledPosts.js)
+  const { signMessageAsync } = useSignMessage()
 
   // The wallet only ever signs on the chain it is connected to — editing a Celo post from a
   // LUKSO connection would otherwise fire `update` at Celo's contract address on LUKSO, so the
@@ -1543,6 +1564,62 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     return signature
   }
 
+  /**
+   * The Schedule path. The metadata is pinned exactly as it would be for a live post, the row
+   * is recorded, and — where the relayer can act for this author — the forward request it will
+   * send at that time is signed now (silently with a session key, one prompt for a plain
+   * wallet). A declined or impossible pre-sign is not a failure: the row still exists, and the
+   * author's own browser publishes it when the time comes (components/ScheduledPostsRunner).
+   */
+  const scheduleForLater = async ({ metadata, content }) => {
+    const token = await ensureScheduleSession(address, signMessageAsync, targetChainId)
+    const row = await createScheduledPost(token, {
+      networkId: targetChainId,
+      metadata,
+      content,
+      allowComments,
+      quoteOf: isQuote ? String(quoteTarget.id) : null,
+      scheduledAt,
+      timeZone: scheduleTimeZone,
+    })
+
+    // The post is out of the draft slot the moment it is recorded — same rule as finishSubmission
+    if (actionType === 'post' && !restoreState) {
+      localStorage.removeItem(getDraftStorageKey())
+      localStorage.removeItem(getAttachmentDraftKey())
+    }
+
+    let relayerWillSend = false
+    try {
+      const ability = await canPreSign({ row, owner: address, publicClient: targetPublicClient })
+      if (ability.ok) {
+        const pending = await listScheduledPosts(token, 'pending')
+        await preSignScheduledPost({
+          row,
+          pendingRows: pending,
+          chain: targetChain,
+          publicClient: targetPublicClient,
+          owner: address,
+          signTypedDataAsync,
+          useSessionKey: ability.useSessionKey,
+          token,
+        })
+        relayerWillSend = true
+      }
+    } catch (error) {
+      console.warn('Scheduled post will publish from this browser:', error.message)
+    }
+
+    toast(
+      relayerWillSend
+        ? `Scheduled for ${formatWillSend(scheduledAt)}`
+        : `Scheduled for ${formatWillSend(scheduledAt)} — it needs your signature to go out, so have Hup open around then`,
+      'success',
+    )
+    pokeScheduledRunner()
+    handleClose()
+  }
+
   const handleCreatePost = async (event) => {
     event.preventDefault()
 
@@ -1675,6 +1752,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       const resultIPFS = await uploadObjectToIPFS(contentForUpload)
       const metadata = resultIPFS.cid
       if (!metadata) throw new Error('CID not found')
+
+      // Same pin, later transaction: the row is what the runner and the cron publish from
+      if (isScheduled) {
+        await scheduleForLater({ metadata, content: serializableContent })
+        return
+      }
 
       // The metadata URI is the one handle on this submission that works everywhere: it exists
       // before the transaction is sent (so the relayed path has it too), it is what the indexer
@@ -1871,6 +1954,13 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
           </span>
         )}
       </header>
+
+      {isScheduled && (
+        <button type="button" className={styles.scheduleLine} onClick={() => scheduleDialogRef.current?.open()} disabled={isBusy}>
+          <CalendarDotsIcon size={18} />
+          <span>Will send on {formatWillSend(scheduledAt)}</span>
+        </button>
+      )}
 
       {isSolanaTarget && !solanaWallet.address && (
         <div className={styles.chainWarning} role="alert">
@@ -2184,6 +2274,19 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
               <TextItalicIcon size={20} />
             </button>
             <EmojiPicker onSelect={insertTextAtCaret} disabled={isBusy} />
+            {canSchedule && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => scheduleDialogRef.current?.open()}
+                title="Schedule"
+                aria-label="Schedule post"
+                aria-pressed={isScheduled}
+                disabled={isBusy}
+              >
+                <CalendarDotsIcon size={20} />
+              </button>
+            )}
             {attachOptions.length > 0 && (
               <NativePopover
                 placement="top-start"
@@ -2246,9 +2349,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                   the only wait left in here is the author's own signature */}
               {isSubmitting && hasPendingUploads
                 ? 'Uploading...'
-                : isSigning
-                  ? 'Signing...'
-                  : actionType === 'edit' ? 'Update' : isComment ? 'Reply' : 'Post'}
+                : isSubmitting && isScheduled
+                  ? 'Scheduling...'
+                  : isSigning
+                    ? 'Signing...'
+                    : actionType === 'edit' ? 'Update' : isComment ? 'Reply' : isScheduled ? 'Schedule' : 'Post'}
             </button>
           </div>
         </footer>
@@ -2256,6 +2361,18 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
       {/* Outside the <form>: the picker's search input must never submit the post */}
       <GifPicker ref={gifPickerRef} onSelect={handleGifSelect} />
+
+      {canSchedule && (
+        <SchedulePostDialog
+          ref={scheduleDialogRef}
+          value={scheduledAt}
+          onConfirm={(unixSeconds, zone) => {
+            setScheduledAt(unixSeconds)
+            setScheduleTimeZone(zone)
+          }}
+          onClear={() => setScheduledAt(null)}
+        />
+      )}
 
       {showSellNftModal && (
         <SellNftModal
