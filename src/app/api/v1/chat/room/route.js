@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { isEvmAddress, normalizeAddress } from '@/lib/address'
 import { chatActorFromRequest, isBanned } from '@/lib/chatSession'
-import { BODY_MAX_CHARS, LIVE_LINES, isGifUrl, serializeLine } from '@/lib/chatRows'
+import { BODY_MAX_CHARS, LIVE_LINES, attachReactions, isGifUrl, pruneOldLines, serializeLine } from '@/lib/chatRows'
 
 export const runtime = 'nodejs'
 
@@ -37,6 +37,8 @@ export async function GET(request) {
     const headers = { 'Cache-Control': 'no-store' }
     const countAfter = Number(searchParams.get('countAfter'))
     if (Number.isFinite(countAfter) && searchParams.has('countAfter')) {
+      // The minimized poll is the one call that keeps coming while nobody writes
+      await pruneOldLines(pool)
       const [[row]] = await pool.execute(
         `SELECT COUNT(*) AS n FROM (SELECT id FROM chat_messages WHERE room = ? AND deleted_at IS NULL AND id > ? LIMIT ${UNREAD_CAP + 1}) c`,
         [room, Math.max(0, countAfter)]
@@ -93,16 +95,25 @@ export async function GET(request) {
       if (!Number.isNaN(since.getTime())) {
         const [gone] = await pool.execute('SELECT id FROM chat_messages WHERE room = ? AND deleted_at > ? LIMIT 200', [room, since])
         removed = gone.map((row) => Number(row.id))
-        const [changed] = await pool.execute(`${LIVE} AND m.edited_at > ? ORDER BY m.id ASC LIMIT 200`, [room, since])
+        const [changed] = await pool.execute(`${LIVE} AND (m.edited_at > ? OR m.reacted_at > ?) ORDER BY m.id ASC LIMIT 200`, [
+          room,
+          since,
+          since,
+        ])
         edited = changed.map(serialize)
       }
     }
+
+    // Reading is public, but a token on the request lets the chips say which reactions are the reader's
+    const viewer = await chatActorFromRequest(pool, request).catch(() => null)
+    const messages = await attachReactions(pool, rows.map(serialize), viewer?.id ?? null)
+    await attachReactions(pool, edited, viewer?.id ?? null)
 
     return NextResponse.json(
       {
         success: true,
         room,
-        messages: rows.map(serialize),
+        messages,
         hasMore: rows.length === PAGE_LIMIT,
         removed,
         edited,
@@ -166,8 +177,10 @@ export async function POST(request) {
       [room, me.id, kind, text, gif, replyTo]
     )
     const [[row]] = await pool.execute(`${LIVE} AND m.id = ?`, [room, result.insertId])
+    await pruneOldLines(pool)
+    const [message] = await attachReactions(pool, [serialize(row)], me.id)
 
-    return NextResponse.json({ success: true, message: serialize(row) }, { status: 201 })
+    return NextResponse.json({ success: true, message }, { status: 201 })
   } catch (error) {
     console.error('[CHAT_ROOM_POST_ERROR]:', error)
     return NextResponse.json({ success: false, error: 'Failed to send the message' }, { status: 500 })

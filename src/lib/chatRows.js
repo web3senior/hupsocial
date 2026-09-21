@@ -9,6 +9,24 @@ import { isEvmAddress, normalizeAddress } from '@/lib/address'
 
 export const BODY_MAX_CHARS = 1000
 
+// The room keeps four weeks. Older lines are dropped for good, at most once an hour per server
+// instance, from the write and poll paths, so no scheduler has to exist for it to happen.
+export const RETENTION_DAYS = 28
+const PRUNE_EVERY_MS = 60 * 60 * 1000
+let lastPruneAt = 0
+
+/** Drops lines past retention when an hour has gone by since the last look. Never throws. */
+export const pruneOldLines = async (pool) => {
+  const now = Date.now()
+  if (now - lastPruneAt < PRUNE_EVERY_MS) return
+  lastPruneAt = now
+  try {
+    await pool.execute('DELETE FROM chat_messages WHERE created_at < NOW(3) - INTERVAL ? DAY LIMIT 5000', [RETENTION_DAYS])
+  } catch (error) {
+    console.error('[CHAT_PRUNE_ERROR]:', error)
+  }
+}
+
 const GIF_HOSTS = new Set([
   'media.giphy.com',
   'media0.giphy.com',
@@ -43,6 +61,36 @@ export const LIVE_LINES = `SELECT m.id, m.kind, m.body, m.gif_url, m.reply_to, m
                         LEFT JOIN chat_messages r ON r.id = m.reply_to
                         LEFT JOIN chat_users ru ON ru.id = r.sender_id
                             WHERE m.room = ? AND m.deleted_at IS NULL`
+
+// The reactions a line can take: a short fixed set, so a chip row never turns into a zoo
+export const REACTIONS = ['👍', '❤️', '😂', '🔥', '😮', '😢', '🙏', '👀']
+
+/**
+ * Adds `reactions` to each serialized line: one entry per emoji with its count and whether the
+ * viewer is among them. One grouped query for the whole page.
+ * @param {import('mysql2/promise').Pool} pool
+ * @param {object[]} lines serialized lines, mutated in place
+ * @param {number|null} viewerId chat_users.id of the reader, when signed in
+ */
+export const attachReactions = async (pool, lines, viewerId = null) => {
+  for (const line of lines) line.reactions = []
+  const ids = lines.map((line) => line.id).filter((id) => Number.isInteger(id) && id > 0)
+  if (!ids.length) return lines
+  const [rows] = await pool.query(
+    `SELECT message_id, emoji, COUNT(*) AS n, MAX(user_id = ?) AS mine
+       FROM chat_reactions WHERE message_id IN (?) GROUP BY message_id, emoji`,
+    [viewerId ?? 0, ids]
+  )
+  const byId = new Map(lines.map((line) => [line.id, line]))
+  for (const row of rows) {
+    const line = byId.get(Number(row.message_id))
+    if (!line) continue
+    line.reactions.push({ emoji: row.emoji, count: Number(row.n), mine: Boolean(Number(row.mine)) })
+  }
+  // Chips in the order of the fixed set, so the same reactions read the same on every line
+  for (const line of lines) line.reactions.sort((a, b) => REACTIONS.indexOf(a.emoji) - REACTIONS.indexOf(b.emoji))
+  return lines
+}
 
 /** @returns the browser shape of one line */
 export const serializeLine = (row) => ({

@@ -45,7 +45,9 @@ import {
   readChatToken,
   sendRoomMessage,
   subscribeChatToken,
+  toggleReaction,
 } from '@/lib/chatApi'
+import { REACTIONS } from '@/lib/chatRows'
 import { useChatDockStore } from '@/stores/useChatDockStore'
 import styles from './ChatDock.module.scss'
 
@@ -476,6 +478,13 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
   const [openedAtId] = useState(lastSeenId)
   const dividerRef = useRef(null)
   const [initialScrollDone, setInitialScrollDone] = useState(false)
+  // Whether the last load was refused: an outage must not read as an empty room
+  const [loadFailed, setLoadFailed] = useState(false)
+  // Reads carry the token for the reader-owned reaction flags without re-running on sign-in
+  const tokenRef = useRef(token)
+  useEffect(() => {
+    tokenRef.current = token
+  }, [token])
   const contentRef = useRef(null)
   // Where the reader was, tracked on every scroll: a hidden element reads 0, so it cannot be
   // asked at the moment the card closes
@@ -504,8 +513,8 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
       try {
         if (openedAtId > 0) {
           const [olderPage, newerPage] = await Promise.all([
-            fetchRoomMessages({ before: openedAtId + 1 }),
-            fetchRoomMessages({ after: openedAtId }),
+            fetchRoomMessages({ token: tokenRef.current, before: openedAtId + 1 }),
+            fetchRoomMessages({ token: tokenRef.current, after: openedAtId }),
           ])
           if (cancelled) return
           serverTimeRef.current = newerPage.serverTime
@@ -513,7 +522,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
           setHasOlder(olderPage.hasMore)
           setHasNewer(newerPage.hasMore)
         } else {
-          const page = await fetchRoomMessages()
+          const page = await fetchRoomMessages({ token: tokenRef.current })
           if (cancelled) return
           serverTimeRef.current = page.serverTime
           setMessages(page.messages)
@@ -521,7 +530,11 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
           setHasNewer(false)
         }
       } catch {
-        if (!cancelled) setMessages([])
+        // The live-edge poll keeps asking, so the room recovers on its own once the server does
+        if (!cancelled) {
+          setLoadFailed(true)
+          setMessages([])
+        }
       }
     }
     load()
@@ -549,9 +562,10 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
     let cancelled = false
     const tick = async () => {
       try {
-        const data = await fetchRoomMessages({ after: maxId, deletedSince: serverTimeRef.current })
+        const data = await fetchRoomMessages({ token: tokenRef.current, after: maxId, deletedSince: serverTimeRef.current })
         if (cancelled) return
         serverTimeRef.current = data.serverTime
+        setLoadFailed(false)
         applyRemoved(data.removed)
         applyEdited(data.edited)
         if (data.messages.length) setMessages((current) => mergeSorted(current ?? [], data.messages))
@@ -621,7 +635,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
     const list = listRef.current
     const heightBefore = list?.scrollHeight ?? 0
     try {
-      const page = await fetchRoomMessages({ before: minId })
+      const page = await fetchRoomMessages({ token: tokenRef.current, before: minId })
       setMessages((current) => mergeSorted(current ?? [], page.messages))
       setHasOlder(page.hasMore)
       // Keep the line the reader was on where it was while the older page lands above it
@@ -641,7 +655,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
     pagingRef.current = true
     setIsPaging(true)
     try {
-      const page = await fetchRoomMessages({ after: maxId, deletedSince: serverTimeRef.current })
+      const page = await fetchRoomMessages({ token: tokenRef.current, after: maxId, deletedSince: serverTimeRef.current })
       serverTimeRef.current = page.serverTime
       applyRemoved(page.removed)
       applyEdited(page.edited)
@@ -670,7 +684,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
 
   const jumpToLatest = async () => {
     try {
-      const page = await fetchRoomMessages()
+      const page = await fetchRoomMessages({ token: tokenRef.current })
       serverTimeRef.current = page.serverTime
       setMessages(page.messages)
       setHasOlder(page.hasMore)
@@ -725,6 +739,37 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
       else toast(error?.message || 'Could not send the message', 'error')
       if (error?.status === 403) onModerated()
       return false
+    }
+  }
+
+  // One emoji on one line, flipped at once and settled by what the server sends back
+  const reactLine = async (id, emoji) => {
+    let previous = null
+    setMessages((current) =>
+      (current ?? []).map((message) => {
+        if (message.id !== id) return message
+        previous = message.reactions ?? []
+        const existing = previous.find((reaction) => reaction.emoji === emoji)
+        let next
+        if (existing?.mine) {
+          next = previous
+            .map((reaction) => (reaction.emoji === emoji ? { ...reaction, count: reaction.count - 1, mine: false } : reaction))
+            .filter((reaction) => reaction.count > 0)
+        } else if (existing) {
+          next = previous.map((reaction) => (reaction.emoji === emoji ? { ...reaction, count: reaction.count + 1, mine: true } : reaction))
+        } else {
+          next = [...previous, { emoji, count: 1, mine: true }].sort((a, b) => REACTIONS.indexOf(a.emoji) - REACTIONS.indexOf(b.emoji))
+        }
+        return { ...message, reactions: next }
+      })
+    )
+    try {
+      const data = await toggleReaction(token, id, emoji)
+      setMessages((current) => (current ?? []).map((message) => (message.id === id ? { ...message, reactions: data.reactions } : message)))
+    } catch (error) {
+      setMessages((current) => (current ?? []).map((message) => (message.id === id ? { ...message, reactions: previous ?? [] } : message)))
+      if (isChatUnauthorized(error)) clearChatToken(me)
+      else toast(error?.message || 'Could not react', 'error')
     }
   }
 
@@ -787,7 +832,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
               )}
               {messages.length === 0 && (
                 <EmptyState icon={ChatCircleIcon} align="center" size="sm" className={styles.room__empty}>
-                  Nobody has said anything yet
+                  {loadFailed ? 'The chat could not be loaded. Trying again…' : 'Nobody has said anything yet'}
                 </EmptyState>
               )}
               {groupRuns(messages, openedAtId).map((run) => (
@@ -805,6 +850,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
                   onCancelEdit={() => setEditingId(null)}
                   onDeleteOwn={deleteOwn}
                   onReply={token ? setReplyTarget : null}
+                  onReact={token ? reactLine : null}
                   onJump={jumpToLine}
                 />
               ))}
@@ -864,6 +910,7 @@ function ChatRun({
   onCancelEdit,
   onDeleteOwn,
   onReply,
+  onReact,
   onJump,
 }) {
   const mine = sameAddress(run.sender, me)
@@ -921,6 +968,7 @@ function ChatRun({
               onCancelEdit={onCancelEdit}
               onDeleteOwn={onDeleteOwn}
               onReply={onReply}
+              onReact={onReact}
               onJump={onJump}
             />
           ))}
@@ -942,6 +990,7 @@ function ChatLine({
   onCancelEdit,
   onDeleteOwn,
   onReply,
+  onReact,
   onJump,
   onModerate,
   onRemoved,
@@ -978,7 +1027,10 @@ function ChatLine({
   }
 
   return (
-    <div className={clsx(styles.line, message.pending && styles['line--pending'])} data-line-id={message.id}>
+    <div
+      className={clsx(styles.line, message.gif && styles['line--media'], message.pending && styles['line--pending'])}
+      data-line-id={message.id}
+    >
       {editing ? (
         <LineEditor body={message.body} onSave={(text) => onSaveEdit(message.id, text)} onCancel={onCancelEdit} />
       ) : (
@@ -1011,9 +1063,27 @@ function ChatLine({
               {message.editedAt && <span className={styles.bubble__edited}>(edited)</span>}
             </p>
           )}
+          {message.reactions?.length > 0 && (
+            <div className={styles.reactions}>
+              {message.reactions.map((reaction) => (
+                <button
+                  key={reaction.emoji}
+                  type="button"
+                  className={clsx(styles.reaction, reaction.mine && styles['reaction--mine'])}
+                  onClick={() => onReact?.(message.id, reaction.emoji)}
+                  disabled={!onReact || !settled}
+                  aria-pressed={reaction.mine}
+                  aria-label={`${reaction.emoji} ${reaction.count}`}
+                >
+                  {reaction.emoji}
+                  <span className={styles.reaction__count}>{reaction.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
-      {items.length > 0 && !editing && (
+      {(items.length > 0 || (onReact && settled)) && !editing && (
         <NativePopover
           placement="bottom-end"
           className={styles.menu}
@@ -1025,6 +1095,27 @@ function ChatLine({
         >
           {({ close }) => (
             <div className={styles.menu__list}>
+              {onReact && settled && (
+                <div className={styles.menu__emojis}>
+                  {REACTIONS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className={clsx(
+                        styles.menu__emoji,
+                        message.reactions?.some((reaction) => reaction.emoji === emoji && reaction.mine) && styles['menu__emoji--mine']
+                      )}
+                      onClick={() => {
+                        close()
+                        onReact(message.id, emoji)
+                      }}
+                      aria-label={`React ${emoji}`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
               {items.map((item) => (
                 <button
                   key={item.label}

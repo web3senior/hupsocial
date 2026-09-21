@@ -107,13 +107,18 @@ const call = async (token, path, init = {}) => {
   return data
 }
 
-export const fetchRoomMessages = ({ room = 'global', after, before, deletedSince } = {}) => {
+/** Reading needs no token; with one, the reactions say which are the reader's own. */
+export const fetchRoomMessages = ({ room = 'global', after, before, deletedSince, token = null } = {}) => {
   const params = new URLSearchParams({ room })
   if (after) params.set('after', String(after))
   if (before) params.set('before', String(before))
   if (deletedSince) params.set('deletedSince', deletedSince)
-  return call(null, `/api/v1/chat/room?${params}`)
+  return call(token, `/api/v1/chat/room?${params}`)
 }
+
+/** Toggles one emoji on a line; the reply carries the line's reactions as they now stand. */
+export const toggleReaction = (token, messageId, emoji) =>
+  call(token, '/api/v1/chat/reaction', { method: 'POST', body: JSON.stringify({ messageId, emoji }) })
 
 /**
  * How many live messages are newer than `sinceId`, capped, plus the newest id, the last few

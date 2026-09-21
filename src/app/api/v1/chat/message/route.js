@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { chatActorFromRequest, isBanned } from '@/lib/chatSession'
-import { BODY_MAX_CHARS, LIVE_LINES, serializeLine } from '@/lib/chatRows'
+import { BODY_MAX_CHARS, LIVE_LINES, attachReactions, serializeLine } from '@/lib/chatRows'
 
 export const runtime = 'nodejs'
 
@@ -49,7 +49,8 @@ export async function PATCH(request) {
     // For a GIF line the body is its caption
     await pool.execute('UPDATE chat_messages SET body = ?, edited_at = NOW(3) WHERE id = ?', [text, found.row.id])
     const [[row]] = await pool.execute(`${LIVE_LINES} AND m.id = ?`, [found.row.room, found.row.id])
-    return NextResponse.json({ success: true, message: serializeLine(row) })
+    const [message] = await attachReactions(pool, [serializeLine(row)], me.id)
+    return NextResponse.json({ success: true, message })
   } catch (error) {
     console.error('[CHAT_MESSAGE_PATCH_ERROR]:', error)
     return NextResponse.json({ success: false, error: 'Failed to edit the message' }, { status: 500 })
