@@ -751,14 +751,28 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
         previous = message.reactions ?? []
         const existing = previous.find((reaction) => reaction.emoji === emoji)
         let next
+        // The names travel with the count, so the hover list is right before the server answers
         if (existing?.mine) {
           next = previous
-            .map((reaction) => (reaction.emoji === emoji ? { ...reaction, count: reaction.count - 1, mine: false } : reaction))
+            .map((reaction) =>
+              reaction.emoji === emoji
+                ? {
+                    ...reaction,
+                    count: reaction.count - 1,
+                    mine: false,
+                    by: (reaction.by ?? []).filter((wallet) => !sameAddress(wallet, me)),
+                  }
+                : reaction
+            )
             .filter((reaction) => reaction.count > 0)
         } else if (existing) {
-          next = previous.map((reaction) => (reaction.emoji === emoji ? { ...reaction, count: reaction.count + 1, mine: true } : reaction))
+          next = previous.map((reaction) =>
+            reaction.emoji === emoji ? { ...reaction, count: reaction.count + 1, mine: true, by: [...(reaction.by ?? []), me] } : reaction
+          )
         } else {
-          next = [...previous, { emoji, count: 1, mine: true }].sort((a, b) => REACTIONS.indexOf(a.emoji) - REACTIONS.indexOf(b.emoji))
+          next = [...previous, { emoji, count: 1, mine: true, by: [me] }].sort(
+            (a, b) => REACTIONS.indexOf(a.emoji) - REACTIONS.indexOf(b.emoji)
+          )
         }
         return { ...message, reactions: next }
       })
@@ -1066,18 +1080,11 @@ function ChatLine({
           {message.reactions?.length > 0 && (
             <div className={styles.reactions}>
               {message.reactions.map((reaction) => (
-                <button
+                <ReactionChip
                   key={reaction.emoji}
-                  type="button"
-                  className={clsx(styles.reaction, reaction.mine && styles['reaction--mine'])}
-                  onClick={() => onReact?.(message.id, reaction.emoji)}
-                  disabled={!onReact || !settled}
-                  aria-pressed={reaction.mine}
-                  aria-label={`${reaction.emoji} ${reaction.count}`}
-                >
-                  {reaction.emoji}
-                  <span className={styles.reaction__count}>{reaction.count}</span>
-                </button>
+                  reaction={reaction}
+                  onReact={onReact && settled ? () => onReact(message.id, reaction.emoji) : null}
+                />
               ))}
             </div>
           )}
@@ -1198,6 +1205,62 @@ function LineEditor({ body, onSave, onCancel }) {
         </button>
       </div>
     </div>
+  )
+}
+
+/**
+ * One reaction chip, with the people behind it on hover. The trigger is a span rather than a
+ * button on purpose: `popovertarget` only activates on buttons, so the chip inside keeps its
+ * own click for the reaction and the panel is left to the hover.
+ */
+function ReactionChip({ reaction, onReact }) {
+  const [opened, setOpened] = useState(false)
+  const shown = reaction.by ?? []
+  const extra = reaction.count - shown.length
+
+  return (
+    <NativePopover
+      openOnHover
+      placement="top-start"
+      className={styles.who}
+      onToggle={(event) => {
+        if (event.newState === 'open') setOpened(true)
+      }}
+      trigger={
+        <span className={styles.reaction__wrap}>
+          <button
+            type="button"
+            className={clsx(styles.reaction, reaction.mine && styles['reaction--mine'])}
+            onClick={() => onReact?.()}
+            disabled={!onReact}
+            aria-pressed={reaction.mine}
+            aria-label={`${reaction.emoji} ${reaction.count}`}
+          >
+            {reaction.emoji}
+            <span className={styles.reaction__count}>{reaction.count}</span>
+          </button>
+        </span>
+      }
+    >
+      {() =>
+        opened ? (
+          <>
+            <div className={styles.who__head}>
+              <span aria-hidden="true">{reaction.emoji}</span>
+              <span>
+                {reaction.count} {reaction.count === 1 ? 'reaction' : 'reactions'}
+              </span>
+            </div>
+            <div className={styles.who__list}>
+              {shown.map((wallet) => (
+                <Profile key={wallet} creator={wallet} variant="fullWithoutTime" size={20} hoverCard={false} fingerprint={false} />
+              ))}
+              {extra > 0 && <span className={styles.who__more}>and {extra} more</span>}
+            </div>
+          </>
+        ) : null
+      }
+    </NativePopover>
   )
 }
 

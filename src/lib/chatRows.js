@@ -65,9 +65,13 @@ export const LIVE_LINES = `SELECT m.id, m.kind, m.body, m.gif_url, m.reply_to, m
 // The reactions a line can take: a short fixed set, so a chip row never turns into a zoo
 export const REACTIONS = ['👍', '❤️', '😂', '🔥', '😮', '😢', '🙏', '👀']
 
+// How many of the people behind one chip travel with it, for the list shown on hover
+const REACTORS_SHOWN = 8
+
 /**
- * Adds `reactions` to each serialized line: one entry per emoji with its count and whether the
- * viewer is among them. One grouped query for the whole page.
+ * Adds `reactions` to each serialized line: one entry per emoji with its count, whether the
+ * viewer is among them, and the first few wallets behind it. Two queries for the whole page:
+ * the counts are grouped, and the names come capped, so a wildly reacted line stays cheap.
  * @param {import('mysql2/promise').Pool} pool
  * @param {object[]} lines serialized lines, mutated in place
  * @param {number|null} viewerId chat_users.id of the reader, when signed in
@@ -76,6 +80,7 @@ export const attachReactions = async (pool, lines, viewerId = null) => {
   for (const line of lines) line.reactions = []
   const ids = lines.map((line) => line.id).filter((id) => Number.isInteger(id) && id > 0)
   if (!ids.length) return lines
+
   const [rows] = await pool.query(
     `SELECT message_id, emoji, COUNT(*) AS n, MAX(user_id = ?) AS mine
        FROM chat_reactions WHERE message_id IN (?) GROUP BY message_id, emoji`,
@@ -85,8 +90,22 @@ export const attachReactions = async (pool, lines, viewerId = null) => {
   for (const row of rows) {
     const line = byId.get(Number(row.message_id))
     if (!line) continue
-    line.reactions.push({ emoji: row.emoji, count: Number(row.n), mine: Boolean(Number(row.mine)) })
+    line.reactions.push({ emoji: row.emoji, count: Number(row.n), mine: Boolean(Number(row.mine)), by: [] })
   }
+
+  // Oldest first, so the list reads as the order people arrived; the cap is per page, and each
+  // chip then keeps its own first few, so one busy line cannot crowd the others out
+  const [people] = await pool.query(
+    `SELECT r.message_id, r.emoji, u.wallet
+       FROM chat_reactions r JOIN chat_users u ON u.id = r.user_id
+      WHERE r.message_id IN (?) ORDER BY r.created_at ASC LIMIT ${ids.length * REACTORS_SHOWN * 4}`,
+    [ids]
+  )
+  for (const row of people) {
+    const reaction = byId.get(Number(row.message_id))?.reactions.find((entry) => entry.emoji === row.emoji)
+    if (reaction && reaction.by.length < REACTORS_SHOWN) reaction.by.push(row.wallet)
+  }
+
   // Chips in the order of the fixed set, so the same reactions read the same on every line
   for (const line of lines) line.reactions.sort((a, b) => REACTIONS.indexOf(a.emoji) - REACTIONS.indexOf(b.emoji))
   return lines
