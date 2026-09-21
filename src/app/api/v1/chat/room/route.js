@@ -9,52 +9,23 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { isEvmAddress, normalizeAddress } from '@/lib/address'
 import { chatActorFromRequest, isBanned } from '@/lib/chatSession'
+import { BODY_MAX_CHARS, LIVE_LINES, isGifUrl, serializeLine } from '@/lib/chatRows'
 
 export const runtime = 'nodejs'
 
 const PAGE_LIMIT = 40
-const BODY_MAX_CHARS = 1000
 const RATE_WINDOW_S = 60
 const RATE_LIMIT = 20
 const UNREAD_CAP = 99
 const RECENT_FACES = 3
 const ROOMS = new Set(['global'])
-const GIF_HOSTS = new Set([
-  'media.giphy.com',
-  'media0.giphy.com',
-  'media1.giphy.com',
-  'media2.giphy.com',
-  'media3.giphy.com',
-  'media4.giphy.com',
-  'i.giphy.com',
-])
 
-const serialize = (row) => ({
-  id: Number(row.id),
-  sender: row.sender,
-  senderRole: row.sender_role,
-  kind: row.kind,
-  body: row.body,
-  createdAt: row.created_at,
-  editedAt: row.edited_at,
-})
+const serialize = serializeLine
+const LIVE = LIVE_LINES
 
 const roomFrom = (raw) => {
   const room = typeof raw === 'string' && raw ? raw : 'global'
   return ROOMS.has(room) ? room : null
-}
-
-const LIVE = `SELECT m.id, m.kind, m.body, m.created_at, m.edited_at, u.wallet AS sender, u.role AS sender_role
-                FROM chat_messages m JOIN chat_users u ON u.id = m.sender_id
-               WHERE m.room = ? AND m.deleted_at IS NULL`
-
-const isGifUrl = (value) => {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'https:' && GIF_HOSTS.has(url.hostname)
-  } catch {
-    return false
-  }
 }
 
 export async function GET(request) {
@@ -160,14 +131,26 @@ export async function POST(request) {
     const room = roomFrom(body?.room)
     if (!room) return NextResponse.json({ success: false, error: 'Unknown room' }, { status: 404 })
 
-    const kind = body?.kind === 'gif' ? 'gif' : 'text'
+    // A line is text, a GIF, or a GIF with a caption; a reply points at a live line of the room
     const text = typeof body?.body === 'string' ? body.body.trim() : ''
-    if (!text) return NextResponse.json({ success: false, error: 'Write something first' }, { status: 400 })
+    const gif = typeof body?.gif === 'string' && body.gif ? body.gif.trim() : null
+    const kind = gif ? 'gif' : 'text'
+    if (!text && !gif) return NextResponse.json({ success: false, error: 'Write something first' }, { status: 400 })
     if (text.length > BODY_MAX_CHARS) {
       return NextResponse.json({ success: false, error: `Messages are capped at ${BODY_MAX_CHARS} characters` }, { status: 400 })
     }
-    if (kind === 'gif' && !isGifUrl(text)) {
+    if (gif && (gif.length > 500 || !isGifUrl(gif))) {
       return NextResponse.json({ success: false, error: 'Only Giphy GIFs can be sent' }, { status: 400 })
+    }
+    let replyTo = null
+    if (body?.replyTo != null) {
+      const target = Number(body.replyTo)
+      const [[quoted]] =
+        Number.isInteger(target) && target > 0
+          ? await pool.execute('SELECT id FROM chat_messages WHERE id = ? AND room = ? AND deleted_at IS NULL LIMIT 1', [target, room])
+          : [[null]]
+      if (!quoted) return NextResponse.json({ success: false, error: 'That message is gone' }, { status: 400 })
+      replyTo = target
     }
 
     const [[recent]] = await pool.execute(
@@ -178,12 +161,10 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Slow down a little' }, { status: 429 })
     }
 
-    const [result] = await pool.execute('INSERT INTO chat_messages (room, sender_id, kind, body) VALUES (?, ?, ?, ?)', [
-      room,
-      me.id,
-      kind,
-      text,
-    ])
+    const [result] = await pool.execute(
+      'INSERT INTO chat_messages (room, sender_id, kind, body, gif_url, reply_to) VALUES (?, ?, ?, ?, ?, ?)',
+      [room, me.id, kind, text, gif, replyTo]
+    )
     const [[row]] = await pool.execute(`${LIVE} AND m.id = ?`, [room, result.insertId])
 
     return NextResponse.json({ success: true, message: serialize(row) }, { status: 201 })

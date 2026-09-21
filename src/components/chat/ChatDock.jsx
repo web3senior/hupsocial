@@ -685,14 +685,31 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
     }
   }
 
-  const send = async (text, kind = 'text') => {
-    if (!text || !token) return false
+  // The line the next send answers, picked from a line's menu
+  const [replyTarget, setReplyTarget] = useState(null)
+
+  const send = async ({ body = '', gif = null }) => {
+    if ((!body && !gif) || !token) return false
     const tempId = `pending-${Date.now()}`
-    const pending = { id: tempId, sender: me, kind, body: text, createdAt: new Date().toISOString(), pending: true }
+    const previousTarget = replyTarget
+    const quoted = replyTarget
+      ? { id: replyTarget.id, sender: replyTarget.sender, body: replyTarget.body, gif: replyTarget.gif ?? null, deleted: false }
+      : null
+    const pending = {
+      id: tempId,
+      sender: me,
+      kind: gif ? 'gif' : 'text',
+      body,
+      gif,
+      replyTo: quoted,
+      createdAt: new Date().toISOString(),
+      pending: true,
+    }
     stickRef.current = true
     setMessages((current) => [...(current ?? []), pending])
+    setReplyTarget(null)
     try {
-      const data = await sendRoomMessage(token, text, { kind })
+      const data = await sendRoomMessage(token, { body, gif, replyTo: quoted?.id ?? null })
       setMessages((current) =>
         mergeSorted(
           (current ?? []).filter((message) => message.id !== tempId),
@@ -702,12 +719,25 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
       return true
     } catch (error) {
       setMessages((current) => (current ?? []).filter((message) => message.id !== tempId))
+      setReplyTarget(previousTarget)
       // A token the server no longer honours is dropped, and the sign-in button comes back
       if (isChatUnauthorized(error)) clearChatToken(me)
       else toast(error?.message || 'Could not send the message', 'error')
       if (error?.status === 403) onModerated()
       return false
     }
+  }
+
+  // A quote is a link back to its line, when that line is in the loaded window
+  const jumpToLine = (id) => {
+    const list = listRef.current
+    const target = list?.querySelector(`[data-line-id="${id}"]`)
+    if (!list || !target) {
+      toast('That message is further up than what is loaded')
+      return
+    }
+    stickRef.current = false
+    list.scrollTop = Math.max(0, target.offsetTop - list.offsetTop - 48)
   }
 
   // A line of the reader's own: rewritten in place, or taken back
@@ -774,6 +804,8 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
                   onSaveEdit={saveEdit}
                   onCancelEdit={() => setEditingId(null)}
                   onDeleteOwn={deleteOwn}
+                  onReply={token ? setReplyTarget : null}
+                  onJump={jumpToLine}
                 />
               ))}
               {hasNewer && (
@@ -813,13 +845,27 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
           </span>
         </div>
       ) : (
-        <Composer onSend={send} viewer={me} />
+        <Composer onSend={send} viewer={me} replyTo={replyTarget} onCancelReply={() => setReplyTarget(null)} />
       )}
     </>
   )
 }
 
-function ChatRun({ run, me, chatMe, dividerRef, onModerate, onRemoved, editingId, onEdit, onSaveEdit, onCancelEdit, onDeleteOwn }) {
+function ChatRun({
+  run,
+  me,
+  chatMe,
+  dividerRef,
+  onModerate,
+  onRemoved,
+  editingId,
+  onEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onDeleteOwn,
+  onReply,
+  onJump,
+}) {
   const mine = sameAddress(run.sender, me)
   const first = run.messages[0]
   const isModerator = first.senderRole === 'moderator'
@@ -874,6 +920,8 @@ function ChatRun({ run, me, chatMe, dividerRef, onModerate, onRemoved, editingId
               onSaveEdit={onSaveEdit}
               onCancelEdit={onCancelEdit}
               onDeleteOwn={onDeleteOwn}
+              onReply={onReply}
+              onJump={onJump}
             />
           ))}
         </div>
@@ -893,6 +941,8 @@ function ChatLine({
   onSaveEdit,
   onCancelEdit,
   onDeleteOwn,
+  onReply,
+  onJump,
   onModerate,
   onRemoved,
 }) {
@@ -902,7 +952,8 @@ function ChatLine({
   const when = message.pending ? 'Sending…' : toRelativeTime(message.createdAt)
 
   const items = []
-  if (canOwn && message.kind === 'text') items.push({ label: 'Edit', run: () => onEdit(message.id) })
+  if (onReply && settled) items.push({ label: 'Reply', run: () => onReply(message) })
+  if (canOwn) items.push({ label: 'Edit', run: () => onEdit(message.id) })
   if (canOwn) items.push({ label: 'Delete', run: () => onDeleteOwn(message.id) })
   if (canModerateLine) {
     items.push({ label: 'Remove message', run: () => onModerate({ action: 'delete', messageId: message.id }, () => onRemoved(message.id)) })
@@ -930,31 +981,37 @@ function ChatLine({
     <div className={clsx(styles.line, message.pending && styles['line--pending'])} data-line-id={message.id}>
       {editing ? (
         <LineEditor body={message.body} onSave={(text) => onSaveEdit(message.id, text)} onCancel={onCancelEdit} />
-      ) : message.kind === 'gif' ? (
-        // A Giphy CDN URL straight from the picker: the optimizer would only re-fetch it
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className={styles.line__gif} src={message.body} alt="GIF" loading="lazy" title={when} />
       ) : (
-        <p className={styles.bubble} title={when}>
-          {splitChatText(message.body).map((part, index) =>
-            part.type === 'link' ? (
-              <a key={index} href={part.value} target="_blank" rel="nofollow noopener noreferrer" className={styles.bubble__link}>
-                {part.value}
-              </a>
-            ) : part.type === 'mention' ? (
-              <Link
-                key={index}
-                href={`/${part.address}`}
-                className={clsx(styles.bubble__mention, sameAddress(part.address, me) && styles['bubble__mention--me'])}
-              >
-                @{part.label}
-              </Link>
-            ) : (
-              <span key={index}>{part.value}</span>
-            )
+        <div className={styles.stack}>
+          {message.replyTo && <Quote reply={message.replyTo} onJump={onJump} />}
+          {message.gif && (
+            // A Giphy CDN URL straight from the picker: the optimizer would only re-fetch it
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className={styles.line__gif} src={message.gif} alt="GIF" loading="lazy" title={when} />
           )}
-          {message.editedAt && <span className={styles.bubble__edited}>(edited)</span>}
-        </p>
+          {message.body && (
+            <p className={clsx(styles.bubble, message.gif && styles['bubble--caption'])} title={when}>
+              {splitChatText(message.body).map((part, index) =>
+                part.type === 'link' ? (
+                  <a key={index} href={part.value} target="_blank" rel="nofollow noopener noreferrer" className={styles.bubble__link}>
+                    {part.value}
+                  </a>
+                ) : part.type === 'mention' ? (
+                  <Link
+                    key={index}
+                    href={`/${part.address}`}
+                    className={clsx(styles.bubble__mention, sameAddress(part.address, me) && styles['bubble__mention--me'])}
+                  >
+                    @{part.label}
+                  </Link>
+                ) : (
+                  <span key={index}>{part.value}</span>
+                )
+              )}
+              {message.editedAt && <span className={styles.bubble__edited}>(edited)</span>}
+            </p>
+          )}
+        </div>
       )}
       {items.length > 0 && !editing && (
         <NativePopover
@@ -1053,7 +1110,49 @@ function LineEditor({ body, onSave, onCancel }) {
   )
 }
 
-function Composer({ onSend, viewer }) {
+/** The first words of a quoted line, mentions collapsed to their handle. */
+const quoteText = (reply) => {
+  const { text } = toEditable(reply?.body || '')
+  return text || (reply?.gif ? 'GIF' : '')
+}
+
+// The line being answered, above the bubble. A div, not a button: the name inside is a link
+function Quote({ reply, onJump }) {
+  if (reply.deleted) {
+    return (
+      <div className={clsx(styles.quote, styles['quote--gone'])}>
+        <span className={styles.quote__text}>Message deleted</span>
+      </div>
+    )
+  }
+  const jump = () => onJump?.(reply.id)
+  return (
+    <div
+      className={styles.quote}
+      role="button"
+      tabIndex={0}
+      onClick={jump}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          jump()
+        }
+      }}
+    >
+      <Profile
+        creator={reply.sender}
+        variant="fullWithoutTime"
+        size={16}
+        hoverCard={false}
+        fingerprint={false}
+        className={clsx(styles.run__profile, styles.quote__name)}
+      />
+      <span className={styles.quote__text}>{quoteText(reply)}</span>
+    </div>
+  )
+}
+
+function Composer({ onSend, viewer, replyTo, onCancelReply }) {
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
   const inputRef = useRef(null)
@@ -1064,6 +1163,12 @@ function Composer({ onSend, viewer }) {
   // Picked people, by the label they show as, so the draft stays readable and the wire format
   // is only written at send time
   const mentionsRef = useRef(new Map())
+  // A picked GIF waits here for its caption; Send carries both
+  const [gif, setGif] = useState(null)
+
+  useEffect(() => {
+    if (replyTo) inputRef.current?.focus()
+  }, [replyTo])
 
   const syncMention = (value, caret) => {
     const found = MENTION_QUERY_PATTERN.exec(value.slice(0, caret))
@@ -1097,13 +1202,17 @@ function Composer({ onSend, viewer }) {
 
   const submit = async () => {
     const text = draft.trim()
-    if (!text || isSending) return
+    if ((!text && !gif) || isSending) return
     setIsSending(true)
     setDraft('')
     setMention(null)
-    const sent = await onSend(toWire(text), 'text')
-    if (sent) mentionsRef.current.clear()
-    else setDraft(text)
+    const sent = await onSend({ body: toWire(text), gif: gif?.full?.url ?? null })
+    if (sent) {
+      mentionsRef.current.clear()
+      setGif(null)
+    } else {
+      setDraft(text)
+    }
     setIsSending(false)
     inputRef.current?.focus()
   }
@@ -1121,7 +1230,7 @@ function Composer({ onSend, viewer }) {
     })
   }
 
-  const hasDraft = draft.trim().length > 0
+  const canSend = draft.trim().length > 0 || Boolean(gif)
 
   return (
     <form
@@ -1131,6 +1240,35 @@ function Composer({ onSend, viewer }) {
         submit()
       }}
     >
+      {replyTo && (
+        <div className={styles.staged}>
+          <div className={styles.staged__quote}>
+            <Profile
+              creator={replyTo.sender}
+              variant="fullWithoutTime"
+              size={16}
+              hoverCard={false}
+              fingerprint={false}
+              className={clsx(styles.run__profile, styles.staged__name)}
+            />
+            <span className={styles.staged__text}>{quoteText(replyTo)}</span>
+          </div>
+          <button type="button" className={styles.staged__close} onClick={onCancelReply} aria-label="Cancel reply">
+            <XIcon size={16} weight="bold" />
+          </button>
+        </div>
+      )}
+      {gif && (
+        <div className={styles.staged}>
+          {/* The picker's own preview rendition, as it already showed it */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className={styles.staged__gif} src={gif.preview?.url || gif.full?.url} alt="" />
+          <span className={styles.staged__hint}>Add a caption, or send it as it is</span>
+          <button type="button" className={styles.staged__close} onClick={() => setGif(null)} aria-label="Remove GIF">
+            <XIcon size={16} weight="bold" />
+          </button>
+        </div>
+      )}
       <div className={styles.composer__pill}>
         <div className={styles.composer__tool}>
           <EmojiPicker onSelect={insertEmoji} />
@@ -1161,7 +1299,7 @@ function Composer({ onSend, viewer }) {
           maxLength={BODY_MAX_CHARS}
           aria-label="Message"
         />
-        {hasDraft ? (
+        {canSend ? (
           <button
             type="submit"
             className={clsx(styles.composer__tool, styles['composer__tool--send'])}
@@ -1190,7 +1328,13 @@ function Composer({ onSend, viewer }) {
         onPick={insertMention}
         onDismiss={() => setMention(null)}
       />
-      <GifPicker ref={gifPickerRef} onSelect={(gif) => onSend(gif.full.url, 'gif')} />
+      <GifPicker
+        ref={gifPickerRef}
+        onSelect={(picked) => {
+          setGif(picked)
+          requestAnimationFrame(() => inputRef.current?.focus())
+        }}
+      />
     </form>
   )
 }
