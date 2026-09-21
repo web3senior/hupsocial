@@ -141,6 +141,18 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
       }
     }
   }
+
+  // The room lives here across close/open; the hidden attribute must win over the flex display
+  &__room {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+
+    &[hidden] {
+      display: none;
+    }
+  }
 }
 
 // Minimized: icon with its badge, the label, and the reader's own face
@@ -219,12 +231,17 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
 .room {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   padding: 0.75rem 0.875rem;
   overflow-y: auto;
   overscroll-behavior: contain;
+
+  // The observed box: its height is what a landing image changes
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 100%;
+  }
 
   &__notice {
     padding: 0.5rem 0;

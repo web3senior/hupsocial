@@ -247,22 +247,7 @@ export default function ChatDock() {
               </button>
             </div>
           </header>
-          {isSettling ? (
-            <RoomSkeleton />
-          ) : (
-            <Room
-              me={me}
-              token={token}
-              chatMe={chatMe}
-              lastSeenId={lastSeenId}
-              markSeen={markSeen}
-              onSeen={onSeen}
-              onSignIn={signIn}
-              isSigningIn={isSigningIn}
-              onConnect={() => openConnect() || minimize()}
-              onModerated={() => mutateChatMe()}
-            />
-          )}
+          {isSettling && <RoomSkeleton />}
         </>
       ) : (
         <button type="button" className={styles.pill} onClick={open} aria-label="Maximize chat" title="Open chat">
@@ -279,6 +264,26 @@ export default function ChatDock() {
             </span>
           )}
         </button>
+      )}
+
+      {/* Mounted once and kept across close/open, so reopening lands exactly where the reader
+          left instead of refetching and re-scrolling; hidden, it neither polls nor marks seen */}
+      {!isSettling && (
+        <div className={styles.dock__room} hidden={!isOpen}>
+          <Room
+            active={isOpen}
+            me={me}
+            token={token}
+            chatMe={chatMe}
+            lastSeenId={lastSeenId}
+            markSeen={markSeen}
+            onSeen={onSeen}
+            onSignIn={signIn}
+            isSigningIn={isSigningIn}
+            onConnect={() => openConnect() || minimize()}
+            onModerated={() => mutateChatMe()}
+          />
+        </div>
       )}
     </section>
   )
@@ -404,7 +409,7 @@ function PillFace({ wallet }) {
   return <Avatar src={profile?.profileImage} size={28} alt="" title={profile?.name} className={styles.pill__face} />
 }
 
-function Room({ me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSigningIn, onConnect, onModerated }) {
+function Room({ active, me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSigningIn, onConnect, onModerated }) {
   const [messages, setMessages] = useState(null)
   const [hasOlder, setHasOlder] = useState(false)
   const [hasNewer, setHasNewer] = useState(false)
@@ -417,6 +422,10 @@ function Room({ me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSig
   const [openedAtId] = useState(lastSeenId)
   const dividerRef = useRef(null)
   const [initialScrollDone, setInitialScrollDone] = useState(false)
+  const contentRef = useRef(null)
+  // Where the reader was, tracked on every scroll: a hidden element reads 0, so it cannot be
+  // asked at the moment the card closes
+  const savedScrollRef = useRef(0)
 
   const isLoaded = messages !== null
   const minId = messages?.length ? numericId(messages[0]) : 0
@@ -463,7 +472,7 @@ function Room({ me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSig
 
   // First paint of the window: rest on the divider when there is one, else on the newest line
   useEffect(() => {
-    if (!isLoaded || initialScrollDone) return
+    if (!isLoaded || !active || initialScrollDone) return
     const list = listRef.current
     if (!list) return
     if (dividerRef.current) {
@@ -472,11 +481,11 @@ function Room({ me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSig
       list.scrollTop = list.scrollHeight
     }
     setInitialScrollDone(true)
-  }, [isLoaded, initialScrollDone])
+  }, [isLoaded, active, initialScrollDone])
 
   // Polling only at the live edge; a reader still catching up loads forward by scrolling
   useEffect(() => {
-    if (!isLoaded || hasNewer) return undefined
+    if (!isLoaded || hasNewer || !active) return undefined
     let cancelled = false
     const tick = async () => {
       try {
@@ -490,27 +499,52 @@ function Room({ me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSig
         /* The next tick tries again */
       }
     }
+    if (maxId > 0) tick()
     const timer = setInterval(tick, POLL_LIVE_MS)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
-  }, [isLoaded, hasNewer, maxId, applyRemoved])
+  }, [isLoaded, hasNewer, maxId, active, applyRemoved])
 
   // Following the newest line while the reader sits at the bottom
   const stickRef = useRef(true)
   useEffect(() => {
     const list = listRef.current
-    if (list && stickRef.current && initialScrollDone) list.scrollTop = list.scrollHeight
-  }, [maxId, initialScrollDone])
+    if (list && active && stickRef.current && initialScrollDone) list.scrollTop = list.scrollHeight
+  }, [maxId, active, initialScrollDone])
+
+  // A GIF or a face that finishes loading grows the content under the reader; while they sit
+  // at the bottom the view stays pinned there, so nothing ever jumps
+  useEffect(() => {
+    const list = listRef.current
+    const content = contentRef.current
+    if (!list || !content || !active) return undefined
+    const observer = new ResizeObserver(() => {
+      if (stickRef.current) list.scrollTop = list.scrollHeight
+    })
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [active, isLoaded])
+
+  // Reopening puts the reader back where they were, or at the bottom if that is where they sat
+  useEffect(() => {
+    if (!active || !initialScrollDone) return undefined
+    const frame = requestAnimationFrame(() => {
+      const list = listRef.current
+      if (!list) return
+      list.scrollTop = stickRef.current ? list.scrollHeight : savedScrollRef.current
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [active, initialScrollDone])
 
   // What the reader has scrolled to the bottom of has been seen
   useEffect(() => {
-    if (atBottom && !hasNewer && maxId > 0) {
+    if (active && atBottom && !hasNewer && maxId > 0) {
       markSeen(maxId)
       onSeen()
     }
-  }, [atBottom, hasNewer, maxId, markSeen, onSeen])
+  }, [active, atBottom, hasNewer, maxId, markSeen, onSeen])
 
   const loadOlder = useCallback(async () => {
     if (pagingRef.current || !hasOlder || !minId) return
@@ -555,6 +589,8 @@ function Room({ me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSig
   const onScroll = () => {
     const list = listRef.current
     if (!list) return
+    if (!active) return
+    savedScrollRef.current = list.scrollTop
     const fromBottom = list.scrollHeight - list.scrollTop - list.clientHeight
     const bottom = fromBottom < 40
     stickRef.current = bottom && !hasNewer
@@ -620,6 +656,7 @@ function Room({ me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSig
   return (
     <>
       <div className={styles.room} ref={listRef} onScroll={onScroll}>
+        <div className={styles.room__content} ref={contentRef}>
         {messages === null ? (
           <div className={styles.room__notice}>Loading…</div>
         ) : (
@@ -648,6 +685,7 @@ function Room({ me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSig
             )}
           </>
         )}
+        </div>
       </div>
 
       {showJump && messages?.length > 0 && (
