@@ -128,6 +128,12 @@ export const fetchRoomUnread = (sinceId, viewer = null, room = 'global') => {
 export const sendRoomMessage = (token, body, { kind = 'text', room = 'global' } = {}) =>
   call(token, '/api/v1/chat/room', { method: 'POST', body: JSON.stringify({ room, body, kind }) })
 
+export const editRoomMessage = (token, messageId, body) =>
+  call(token, '/api/v1/chat/message', { method: 'PATCH', body: JSON.stringify({ messageId, body }) })
+
+export const deleteRoomMessage = (token, messageId) =>
+  call(token, '/api/v1/chat/message', { method: 'DELETE', body: JSON.stringify({ messageId }) })
+
 export const fetchChatMe = (token) => call(token, '/api/v1/chat/me')
 
 export const moderateChat = (token, payload) => call(token, '/api/v1/chat/moderation', { method: 'POST', body: JSON.stringify(payload) })

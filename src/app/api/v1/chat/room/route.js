@@ -36,6 +36,7 @@ const serialize = (row) => ({
   kind: row.kind,
   body: row.body,
   createdAt: row.created_at,
+  editedAt: row.edited_at,
 })
 
 const roomFrom = (raw) => {
@@ -43,7 +44,7 @@ const roomFrom = (raw) => {
   return ROOMS.has(room) ? room : null
 }
 
-const LIVE = `SELECT m.id, m.kind, m.body, m.created_at, u.wallet AS sender, u.role AS sender_role
+const LIVE = `SELECT m.id, m.kind, m.body, m.created_at, m.edited_at, u.wallet AS sender, u.role AS sender_role
                 FROM chat_messages m JOIN chat_users u ON u.id = m.sender_id
                WHERE m.room = ? AND m.deleted_at IS NULL`
 
@@ -113,13 +114,16 @@ export async function GET(request) {
       rows.reverse()
     }
 
-    // Ids removed by a moderator since the client last asked, so open rooms drop them too
+    // Lines removed or rewritten since the client last asked, so open rooms follow along
     let removed = []
+    let edited = []
     if (deletedSince) {
       const since = new Date(deletedSince)
       if (!Number.isNaN(since.getTime())) {
         const [gone] = await pool.execute('SELECT id FROM chat_messages WHERE room = ? AND deleted_at > ? LIMIT 200', [room, since])
         removed = gone.map((row) => Number(row.id))
+        const [changed] = await pool.execute(`${LIVE} AND m.edited_at > ? ORDER BY m.id ASC LIMIT 200`, [room, since])
+        edited = changed.map(serialize)
       }
     }
 
@@ -130,6 +134,7 @@ export async function GET(request) {
         messages: rows.map(serialize),
         hasMore: rows.length === PAGE_LIMIT,
         removed,
+        edited,
         serverTime: new Date().toISOString(),
       },
       { headers }

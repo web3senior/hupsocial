@@ -34,6 +34,8 @@ import { splitChatText } from '@/lib/chatText'
 import { mentionLabel, mentionMarkdown } from '@/lib/mentions'
 import {
   clearChatToken,
+  deleteRoomMessage,
+  editRoomMessage,
   ensureChatSession,
   fetchChatMe,
   fetchRoomMessages,
@@ -94,6 +96,35 @@ const groupRuns = (messages, openedAtId) => {
     runs.push({ key: String(message.id), sender: message.sender, stamped, divider, messages: [message] })
   })
   return runs
+}
+
+/**
+ * Every @label in the text that names a picked person becomes the same link a post carries.
+ * @param {string} text
+ * @param {Map<string, string>} mentions label → address
+ */
+const mentionsToWire = (text, mentions) => {
+  let out = text
+  for (const [label, address] of mentions) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    out = out.replace(new RegExp(`(^|[^\\w])@${escaped}(?![\\w])`, 'g'), (_, lead) => `${lead}${mentionMarkdown(label, address)}`)
+  }
+  return out
+}
+
+/** The stored body as it reads in a box: mention links collapse to @label, remembered for the trip back. */
+const toEditable = (body) => {
+  const mentions = new Map()
+  let text = ''
+  for (const part of splitChatText(body)) {
+    if (part.type === 'mention') {
+      mentions.set(part.label, part.address)
+      text += `@${part.label}`
+    } else {
+      text += part.value
+    }
+  }
+  return { text, mentions }
 }
 
 const mergeSorted = (current, incoming) => {
@@ -460,6 +491,12 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
     setMessages((current) => (current ?? []).filter((message) => !gone.has(message.id)))
   }, [])
 
+  const applyEdited = useCallback((edited) => {
+    if (!edited?.length) return
+    const byId = new Map(edited.map((message) => [message.id, message]))
+    setMessages((current) => (current ?? []).map((message) => byId.get(message.id) ?? message))
+  }, [])
+
   // Initial window: the page around the last seen line when there is one, else the newest page
   useEffect(() => {
     let cancelled = false
@@ -516,6 +553,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
         if (cancelled) return
         serverTimeRef.current = data.serverTime
         applyRemoved(data.removed)
+        applyEdited(data.edited)
         if (data.messages.length) setMessages((current) => mergeSorted(current ?? [], data.messages))
         if (data.hasMore) setHasNewer(true)
       } catch {
@@ -528,7 +566,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
       cancelled = true
       clearInterval(timer)
     }
-  }, [isLoaded, hasNewer, maxId, active, applyRemoved])
+  }, [isLoaded, hasNewer, maxId, active, applyRemoved, applyEdited])
 
   // Following the newest line while the reader sits at the bottom
   const stickRef = useRef(true)
@@ -606,6 +644,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
       const page = await fetchRoomMessages({ after: maxId, deletedSince: serverTimeRef.current })
       serverTimeRef.current = page.serverTime
       applyRemoved(page.removed)
+      applyEdited(page.edited)
       setMessages((current) => mergeSorted(current ?? [], page.messages))
       setHasNewer(page.hasMore)
     } catch {
@@ -614,7 +653,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
       pagingRef.current = false
       setIsPaging(false)
     }
-  }, [hasNewer, maxId, applyRemoved])
+  }, [hasNewer, maxId, applyRemoved, applyEdited])
 
   const onScroll = () => {
     const list = listRef.current
@@ -671,6 +710,28 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
     }
   }
 
+  // A line of the reader's own: rewritten in place, or taken back
+  const [editingId, setEditingId] = useState(null)
+  const saveEdit = async (id, text) => {
+    try {
+      const data = await editRoomMessage(token, id, text)
+      applyEdited([data.message])
+      setEditingId(null)
+    } catch (error) {
+      if (isChatUnauthorized(error)) clearChatToken(me)
+      else toast(error?.message || 'Could not edit the message', 'error')
+    }
+  }
+  const deleteOwn = async (id) => {
+    try {
+      await deleteRoomMessage(token, id)
+      applyRemoved([id])
+    } catch (error) {
+      if (isChatUnauthorized(error)) clearChatToken(me)
+      else toast(error?.message || 'Could not delete the message', 'error')
+    }
+  }
+
   const moderate = async (payload, done) => {
     try {
       const result = await moderateChat(token, payload)
@@ -708,6 +769,11 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
                   dividerRef={run.divider ? dividerRef : null}
                   onModerate={moderate}
                   onRemoved={(id) => applyRemoved([id])}
+                  editingId={editingId}
+                  onEdit={setEditingId}
+                  onSaveEdit={saveEdit}
+                  onCancelEdit={() => setEditingId(null)}
+                  onDeleteOwn={deleteOwn}
                 />
               ))}
               {hasNewer && (
@@ -753,7 +819,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
   )
 }
 
-function ChatRun({ run, me, chatMe, dividerRef, onModerate, onRemoved }) {
+function ChatRun({ run, me, chatMe, dividerRef, onModerate, onRemoved, editingId, onEdit, onSaveEdit, onCancelEdit, onDeleteOwn }) {
   const mine = sameAddress(run.sender, me)
   const first = run.messages[0]
   const isModerator = first.senderRole === 'moderator'
@@ -803,6 +869,11 @@ function ChatRun({ run, me, chatMe, dividerRef, onModerate, onRemoved }) {
               isModerator={isModerator}
               onModerate={onModerate}
               onRemoved={onRemoved}
+              editing={editingId === message.id}
+              onEdit={onEdit}
+              onSaveEdit={onSaveEdit}
+              onCancelEdit={onCancelEdit}
+              onDeleteOwn={onDeleteOwn}
             />
           ))}
         </div>
@@ -811,13 +882,55 @@ function ChatRun({ run, me, chatMe, dividerRef, onModerate, onRemoved }) {
   )
 }
 
-function ChatLine({ message, mine, me, chatMe, isModerator, onModerate, onRemoved }) {
-  const canAct = Boolean(chatMe?.canModerate) && !mine && !message.pending
+function ChatLine({
+  message,
+  mine,
+  me,
+  chatMe,
+  isModerator,
+  editing,
+  onEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onDeleteOwn,
+  onModerate,
+  onRemoved,
+}) {
+  const settled = !message.pending && typeof message.id === 'number'
+  const canOwn = mine && settled
+  const canModerateLine = Boolean(chatMe?.canModerate) && !mine && settled
   const when = message.pending ? 'Sending…' : toRelativeTime(message.createdAt)
+
+  const items = []
+  if (canOwn && message.kind === 'text') items.push({ label: 'Edit', run: () => onEdit(message.id) })
+  if (canOwn) items.push({ label: 'Delete', run: () => onDeleteOwn(message.id) })
+  if (canModerateLine) {
+    items.push({ label: 'Remove message', run: () => onModerate({ action: 'delete', messageId: message.id }, () => onRemoved(message.id)) })
+    for (const days of BAN_CHOICES) {
+      const plural = days > 1 ? 's' : ''
+      items.push({
+        label: `Ban for ${days} day${plural}`,
+        run: () => onModerate({ action: 'ban', wallet: message.sender, days }, () => toast(`Banned for ${days} day${plural}`)),
+      })
+    }
+    items.push({ label: 'Lift ban', run: () => onModerate({ action: 'unban', wallet: message.sender }, () => toast('Ban lifted')) })
+    if (chatMe?.isAdmin) {
+      items.push({
+        label: isModerator ? 'Remove moderator' : 'Make moderator',
+        admin: true,
+        run: () =>
+          onModerate({ action: isModerator ? 'demote' : 'promote', wallet: message.sender }, () =>
+            toast(isModerator ? 'Moderator role removed' : 'Made a moderator')
+          ),
+      })
+    }
+  }
 
   return (
     <div className={clsx(styles.line, message.pending && styles['line--pending'])} data-line-id={message.id}>
-      {message.kind === 'gif' ? (
+      {editing ? (
+        <LineEditor body={message.body} onSave={(text) => onSaveEdit(message.id, text)} onCancel={onCancelEdit} />
+      ) : message.kind === 'gif' ? (
         // A Giphy CDN URL straight from the picker: the optimizer would only re-fetch it
         // eslint-disable-next-line @next/next/no-img-element
         <img className={styles.line__gif} src={message.body} alt="GIF" loading="lazy" title={when} />
@@ -840,71 +953,102 @@ function ChatLine({ message, mine, me, chatMe, isModerator, onModerate, onRemove
               <span key={index}>{part.value}</span>
             )
           )}
+          {message.editedAt && <span className={styles.bubble__edited}>(edited)</span>}
         </p>
       )}
-      {canAct && (
+      {items.length > 0 && !editing && (
         <NativePopover
           placement="bottom-end"
           className={styles.menu}
           trigger={
-            <button type="button" className={styles.line__menuButton} aria-label="Moderate this message">
+            <button type="button" className={styles.line__menuButton} aria-label="Message options">
               <DotsThreeIcon size={18} weight="bold" />
             </button>
           }
         >
           {({ close }) => (
             <div className={styles.menu__list}>
-              <button
-                type="button"
-                className={styles.menu__item}
-                onClick={() => {
-                  close()
-                  onModerate({ action: 'delete', messageId: message.id }, () => onRemoved(message.id))
-                }}
-              >
-                Remove message
-              </button>
-              {BAN_CHOICES.map((days) => (
+              {items.map((item) => (
                 <button
-                  key={days}
+                  key={item.label}
                   type="button"
-                  className={styles.menu__item}
+                  className={clsx(styles.menu__item, item.admin && styles['menu__item--admin'])}
                   onClick={() => {
                     close()
-                    onModerate({ action: 'ban', wallet: message.sender, days }, () => toast(`Banned for ${days} day${days > 1 ? 's' : ''}`))
+                    item.run()
                   }}
                 >
-                  Ban for {days} day{days > 1 ? 's' : ''}
+                  {item.label}
                 </button>
               ))}
-              <button
-                type="button"
-                className={styles.menu__item}
-                onClick={() => {
-                  close()
-                  onModerate({ action: 'unban', wallet: message.sender }, () => toast('Ban lifted'))
-                }}
-              >
-                Lift ban
-              </button>
-              {chatMe?.isAdmin && (
-                <button
-                  type="button"
-                  className={clsx(styles.menu__item, styles['menu__item--admin'])}
-                  onClick={() => {
-                    close()
-                    onModerate({ action: isModerator ? 'demote' : 'promote', wallet: message.sender }, () =>
-                      toast(isModerator ? 'Moderator role removed' : 'Made a moderator')
-                    )
-                  }}
-                >
-                  {isModerator ? 'Remove moderator' : 'Make moderator'}
-                </button>
-              )}
             </div>
           )}
         </NativePopover>
       )}
+    </div>
+  )
+}
+
+// Rewrites one line in place. Enter saves, Escape or Cancel leaves it as it was.
+function LineEditor({ body, onSave, onCancel }) {
+  const [initial] = useState(() => toEditable(body))
+  const [text, setText] = useState(initial.text)
+  const [isSaving, setIsSaving] = useState(false)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input) return
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }, [])
+
+  const save = async () => {
+    const trimmed = text.trim()
+    if (!trimmed || isSaving) return
+    if (trimmed === initial.text.trim()) {
+      onCancel()
+      return
+    }
+    setIsSaving(true)
+    await onSave(mentionsToWire(trimmed, initial.mentions))
+    setIsSaving(false)
+  }
+
+  return (
+    <div className={styles.editor}>
+      <textarea
+        ref={inputRef}
+        className={styles.editor__input}
+        value={text}
+        rows={1}
+        maxLength={BODY_MAX_CHARS}
+        aria-label="Edit message"
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            onCancel()
+          }
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault()
+            save()
+          }
+        }}
+      />
+      <div className={styles.editor__actions}>
+        <button type="button" className={styles.editor__button} onClick={onCancel}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className={clsx(styles.editor__button, styles['editor__button--save'])}
+          onClick={save}
+          disabled={!text.trim() || isSaving}
+        >
+          Save
+        </button>
+      </div>
     </div>
   )
 }
@@ -949,15 +1093,7 @@ function Composer({ onSend, viewer }) {
     })
   }
 
-  // Every @label still in the text becomes the same link a post would carry
-  const toWire = (text) => {
-    let out = text
-    for (const [label, address] of mentionsRef.current) {
-      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      out = out.replace(new RegExp(`(^|[^\\w])@${escaped}(?![\\w])`, 'g'), (_, lead) => `${lead}${mentionMarkdown(label, address)}`)
-    }
-    return out
-  }
+  const toWire = (text) => mentionsToWire(text, mentionsRef.current)
 
   const submit = async () => {
     const text = draft.trim()
