@@ -15,6 +15,7 @@ import NewPost from '@/components/NewPost'
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useFaviconBadge } from '@/hooks/useFaviconBadge'
+import { useTitleBadge } from '@/hooks/useTitleBadge'
 import { useProfile } from '@/hooks/useProfile'
 import { profilePath } from '@/lib/username'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -218,6 +219,7 @@ export default function Aside() {
   const unreadCount = notifData?.success ? (notifData.meta?.unread_count ?? 0) : 0
 
   useFaviconBadge(unreadCount)
+  useTitleBadge(unreadCount)
 
   // Client-side navigation fires no focus event and never remounts the layout, so without this the
   // badge only moves on the poll tick.
