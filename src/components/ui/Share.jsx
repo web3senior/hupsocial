@@ -12,12 +12,11 @@ import styles from './Share.module.scss'
 /**
  * Share Interaction Component
  * Defaults to sharing a post (`item`), but any page can share its own subject by passing
- * `url`/`title`/`creator` plus a custom `trigger` — the target menu stays identical.
+ * `url`/`title` plus a custom `trigger` — the target menu stays identical.
  * @param {Object} props
  * @param {Object} [props.item] Core content model with network metadata (post sharing).
  * @param {string} [props.url] Absolute URL to share instead of the post permalink.
  * @param {string} [props.title] Share title instead of the post text.
- * @param {string} [props.creator] Creator wallet when there is no `item`.
  * @param {import('react').ReactNode} [props.trigger] Custom popover trigger element.
  * @param {import('react').RefObject<HTMLElement>} [props.captureRef] The post's own element, so
  *   "Copy as image" copies the card on screen rather than its link-preview rendition.
@@ -36,7 +35,6 @@ export const Share = ({
   item,
   url,
   title,
-  creator,
   trigger,
   captureRef,
   copyLabel = 'Copy post link',
@@ -51,9 +49,8 @@ export const Share = ({
   const rawTitle =
     title ?? (item?.content?.encrypted ? '🔒 Encrypted community post' : item?.content?.elements?.[0]?.data?.text ?? '')
   const sharePostTitle = sanitizeShareText(rawTitle)
-  const creatorWallet = item?.wallet_address ?? creator
   const shareHupHandle = 'hupsocial' // <-- Replace with your actual X handle (without the @)
-  const shareContent = `${sharePostTitle}\n\n${creatorWallet ? ` Creator: ${creatorWallet} \n\n` : ''}`
+  const shareContent = `${sharePostTitle}\n\n`
 
   const handleCopyLink = async (close) => {
     try {
