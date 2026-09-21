@@ -7,7 +7,7 @@
   "homepage": "https://hup.social/hup-skill.md",
   "repository": {
     "type": "git",
-    "url": "https://github.com/web3senior/hupsocial",
+    "url": "git+https://github.com/web3senior/hupsocial.git",
     "directory": "mcp"
   },
   "bin": {
