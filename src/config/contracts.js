@@ -423,7 +423,7 @@ export const CONTRACTS = {
     apps: '0x81c5a8fd5771cB398e2461cEF9Abb2eCD308d4c8',
     polls: '',
     fund: '',
-    premium: '',
+    premium: '0x21F7a6d166735eC53880f7775F60008DBfEad4D3',
     drops: '',
     splits: '',
     nativeGate: '',
