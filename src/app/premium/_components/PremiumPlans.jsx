@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { CheckIcon, GiftIcon, SealCheckIcon, SparkleIcon } from '@phosphor-icons/react'
 import { useActiveChain } from '@/hooks/useActiveChain'
-import { usePremium, plansForChain } from '@/hooks/usePremium'
+import { usePremium, plansForChain, paymentOptionsFor } from '@/hooks/usePremium'
 import { resolveChain } from '@/lib/chains'
 import { chainIconFor, networkColorStyle } from '@/lib/networkColors'
 import { formatCoin, formatUsd, planUsd, PLAN_LABELS, PLAN_MONTHLY, PLAN_YEARLY, PREMIUM_PERKS, yearlySavingPercent } from '@/lib/premium'
@@ -33,7 +33,16 @@ export default function PremiumPlans() {
   const selected = planId === PLAN_YEARLY ? yearly : monthly
 
   const usdPerCoin = prices?.[chainId] ?? null
-  const saving = yearlySavingPercent(monthly?.priceWei, yearly?.priceWei)
+
+  /* What the page quotes. The coin when the chain offers it; otherwise the first token priced
+     for the plan — on a USDC-only chain that is the dollar figure itself, no rate needed. */
+  const quote = (plan, id) => paymentOptionsFor(tokens, chainId, id, plan, chainInfo)[0] ?? null
+  const monthlyQuote = quote(monthly, PLAN_MONTHLY)
+  const yearlyQuote = quote(yearly, PLAN_YEARLY)
+  const selectedQuote = planId === PLAN_YEARLY ? yearlyQuote : monthlyQuote
+
+  // The saving compares like with like: both quotes are in the same unit on one chain.
+  const saving = yearlySavingPercent(monthlyQuote?.price, yearlyQuote?.price)
 
   const openCheckout = (recipient = null) => {
     setGiftTo(recipient)
@@ -111,16 +120,22 @@ export default function PremiumPlans() {
 
       <div className={styles.premium__card}>
         <div className={styles.premium__price}>
-          {selected ? (
+          {selectedQuote ? (
             <>
-              {/* The dollar figure leads because it is the one people compare; the coin
-                  amount below it is what the wallet will actually be asked for. */}
+              {/* The dollar figure leads because it is the one people compare; the amount
+                  below it is what the wallet will actually be asked for. A stablecoin quote
+                  is already dollars, so it needs no rate and no second line. */}
               <strong className={styles.premium__priceMain}>
-                {formatUsd(planUsd(selected.priceWei, usdPerCoin)) ?? formatCoin(selected.priceWei, chainInfo?.nativeCurrency?.symbol)}
+                {selectedQuote.isNative
+                  ? (formatUsd(planUsd(selectedQuote.price, usdPerCoin, selectedQuote.decimals)) ??
+                    formatCoin(selectedQuote.price, selectedQuote.symbol, selectedQuote.decimals))
+                  : formatCoin(selectedQuote.price, selectedQuote.symbol, selectedQuote.decimals)}
               </strong>
               <span className={styles.premium__pricePeriod}>{PLAN_LABELS[planId].short}</span>
-              {usdPerCoin && (
-                <span className={styles.premium__priceCoin}>{formatCoin(selected.priceWei, chainInfo?.nativeCurrency?.symbol)}</span>
+              {selectedQuote.isNative && usdPerCoin && (
+                <span className={styles.premium__priceCoin}>
+                  {formatCoin(selectedQuote.price, selectedQuote.symbol, selectedQuote.decimals)}
+                </span>
               )}
             </>
           ) : (
@@ -141,11 +156,11 @@ export default function PremiumPlans() {
         </ul>
 
         <div className={styles.premium__actions}>
-          <button type="button" className={styles.premium__buy} onClick={() => openCheckout()} disabled={!selected}>
+          <button type="button" className={styles.premium__buy} onClick={() => openCheckout()} disabled={!selectedQuote}>
             <SparkleIcon size={16} weight="fill" aria-hidden="true" />
             {isPremium ? 'Extend premium' : 'Get Premium'}
           </button>
-          <button type="button" className={styles.premium__gift} onClick={() => openCheckout('')} disabled={!selected}>
+          <button type="button" className={styles.premium__gift} onClick={() => openCheckout('')} disabled={!selectedQuote}>
             <GiftIcon size={16} aria-hidden="true" />
             Gift it
           </button>

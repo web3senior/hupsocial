@@ -102,6 +102,14 @@ export const grantSeconds = (amount, unitId) => {
   return Math.round(value * unit.seconds)
 }
 
+/* The native price that means "not for sale". No coin amount can satisfy it, so subscribe()
+   reverts with InsufficientPayment — which is how native sales are closed on a live deployment
+   that has no on/off switch for them. Reopening is setting a real price again. */
+export const NATIVE_CLOSED_PRICE = (1n << 256n) - 1n
+
+/** Whether a native price is the sentinel rather than a price. */
+export const isNativeClosed = (priceWei) => toWei(priceWei) === NATIVE_CLOSED_PRICE
+
 // Mirrors MAX_BATCH in HupPremium.sol — a longer list reverts with InvalidBatch, so the admin
 // card refuses it before it costs a signature.
 export const PREMIUM_MAX_BATCH = 200

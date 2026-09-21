@@ -22,7 +22,16 @@ import dropsAbi from '@/abis/HupDrops.json'
 import fundAbi from '@/abis/HupFund.json'
 import premiumAbi from '@/abis/HupPremium.json'
 import { dropStandardLabel, dropStandardRowsFor } from '@/lib/drops'
-import { GRANT_UNITS, grantSeconds, PLAN_IDS as PREMIUM_PLAN_IDS, PLAN_MONTHLY, PLAN_YEARLY, PREMIUM_MAX_BATCH } from '@/lib/premium'
+import {
+  GRANT_UNITS,
+  grantSeconds,
+  isNativeClosed,
+  NATIVE_CLOSED_PRICE,
+  PLAN_IDS as PREMIUM_PLAN_IDS,
+  PLAN_MONTHLY,
+  PLAN_YEARLY,
+  PREMIUM_MAX_BATCH,
+} from '@/lib/premium'
 import { TIP_TOKENS } from '@/lib/tokens'
 import styles from './page.module.scss'
 
@@ -1069,6 +1078,35 @@ export default function Page() {
       setPremiumManageStates((prev) => ({
         ...prev,
         [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
+      }))
+    }
+  }
+
+  /**
+   * Closes native sales for one plan by pricing it at the sentinel no coin amount can meet.
+   * The deployed contract has no on/off switch for the coin alone — `enabled` would take the
+   * tokens down with it — so this is the lever. Reopen by setting a real price.
+   */
+  const handleClosePremiumNative = async (chain, premiumAddress, planId) => {
+    const which = planId === PLAN_YEARLY ? 'yearly' : 'monthly'
+    setPremiumTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: true, error: null } }))
+
+    try {
+      const txHash = await writeContractAsync({
+        address: premiumAddress,
+        abi: premiumAbi,
+        functionName: 'setPlanPrice',
+        args: [planId, NATIVE_CLOSED_PRICE],
+        chainId: chain.id,
+      })
+
+      setPremiumTxStates((prev) => ({ ...prev, [chain.id]: { which, loading: false, success: true, hash: txHash, closed: true } }))
+      setTimeout(() => loadPremiumPlans(chain, premiumAddress), 3000)
+    } catch (err) {
+      console.error(`Premium native close error on chain ${chain.id}:`, err)
+      setPremiumTxStates((prev) => ({
+        ...prev,
+        [chain.id]: { which, loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
       }))
     }
   }
@@ -5241,6 +5279,7 @@ export default function Page() {
                   const isPaused = Boolean(plans?.paused)
                   const takesTokens = Boolean(plans?.takesTokens)
                   const nativeBalance = renderBalance(chain.id, deployment.premium, symbol)
+                  const nativeHidden = Boolean(deployment.premiumNativeDisabled)
 
                   // What a typed amount would cost a subscriber, so the target is reachable
                   // without a calculator. Null on a chain with no market price.
@@ -5252,6 +5291,8 @@ export default function Page() {
 
                   const livePrice = (plan) => {
                     if (!plan) return '—'
+                    // The sentinel is not a price; showing it as one is a 78-digit number
+                    if (isNativeClosed(plan.price)) return 'closed'
                     const native = `${formatEther(plan.price)} ${symbol}`
                     if (!coinUsd) return native
                     return `${native} (≈ ${(Number(formatEther(plan.price)) * coinUsd).toFixed(2)})`
@@ -5312,6 +5353,14 @@ export default function Page() {
                           </div>
                         </div>
 
+                        {nativeHidden && (
+                          <div className={styles['admin-contracts__validation']}>
+                            The app does not offer {symbol} on this chain (premiumNativeDisabled in contracts.js) — only
+                            tokens. That hides it; it does not close it. Use <strong>Close {symbol} sales</strong> below so
+                            a transaction sent outside the app cannot pay in {symbol} either.
+                          </div>
+                        )}
+
                         {plans && !plans.loading && !plans.error && !plans.monthly?.enabled && (
                           <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                             The monthly plan is disabled onchain — nobody can buy it.
@@ -5326,7 +5375,7 @@ export default function Page() {
                               {priceTx.error && <span style={{ color: '#ef4444' }}>❌ {priceTx.error}</span>}
                               {priceTx.success && (
                                 <span style={{ color: '#10b981' }}>
-                                  🚀 {priceTx.which === 'yearly' ? 'Yearly' : 'Monthly'} price updated.
+                                  🚀 {priceTx.which === 'yearly' ? 'Yearly' : 'Monthly'} {priceTx.closed ? 'native sales closed.' : 'price updated.'}
                                 </span>
                               )}
                             </div>
@@ -5370,6 +5419,14 @@ export default function Page() {
                           >
                             {priceTx?.loading && priceTx.which === 'monthly' ? 'Writing...' : 'Set Monthly Price'}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => handleClosePremiumNative(chain, deployment.premium, PLAN_MONTHLY)}
+                            disabled={priceTx?.loading || isNativeClosed(plans?.monthly?.price)}
+                            className={styles['admin-contracts__button']}
+                          >
+                            {isNativeClosed(plans?.monthly?.price) ? `${symbol} closed (monthly)` : `Close ${symbol} sales (monthly)`}
+                          </button>
                         </div>
                       </form>
 
@@ -5403,6 +5460,14 @@ export default function Page() {
                             className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
                           >
                             {priceTx?.loading && priceTx.which === 'yearly' ? 'Writing...' : 'Set Yearly Price'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleClosePremiumNative(chain, deployment.premium, PLAN_YEARLY)}
+                            disabled={priceTx?.loading || isNativeClosed(plans?.yearly?.price)}
+                            className={styles['admin-contracts__button']}
+                          >
+                            {isNativeClosed(plans?.yearly?.price) ? `${symbol} closed (yearly)` : `Close ${symbol} sales (yearly)`}
                           </button>
                         </div>
                       </form>

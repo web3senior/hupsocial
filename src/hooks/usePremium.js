@@ -69,8 +69,10 @@ export function usePremium(addressOverride) {
  * @param {object|null} chain The resolved chain, for the native symbol.
  */
 export const paymentOptionsFor = (tokens, networkId, planId, plan, chain) => {
-  const native = plan
-    ? [
+  // A chain can sell in tokens only; the coin then never reaches the picker.
+  const native =
+    plan && plan.nativeOffered !== false
+      ? [
         {
           token: NATIVE_TOKEN,
           price: plan.priceWei,

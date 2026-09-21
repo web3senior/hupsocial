@@ -15,7 +15,7 @@
 
 import pool from '@/lib/db'
 import { CONTRACTS, appChains } from '@/config/contracts'
-import { PLAN_IDS } from '@/lib/premium'
+import { PLAN_IDS, isNativeClosed } from '@/lib/premium'
 
 /** The (networkId, address) pairs this build sells premium on, lowercased to match the rows. */
 export const premiumDeployments = () =>
@@ -191,6 +191,9 @@ export const readPlans = async () => {
       duration: Number(row.duration),
       priceWei: String(row.price_wei),
       enabled: Boolean(row.enabled),
+      /* Whether the coin is a way to pay on this chain. Off by config
+         (premiumNativeDisabled) or by the onchain sentinel — either alone is enough. */
+      nativeOffered: !CONTRACTS[`chain${row.network_id}`]?.premiumNativeDisabled && !isNativeClosed(row.price_wei),
     }))
   } catch (error) {
     console.warn('[premium] plan read failed:', error.message)
