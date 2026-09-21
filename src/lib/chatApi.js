@@ -115,9 +115,15 @@ export const fetchRoomMessages = ({ room = 'global', after, before, deletedSince
   return call(null, `/api/v1/chat/room?${params}`)
 }
 
-/** How many live messages are newer than `sinceId`, capped, plus the newest id. */
-export const fetchRoomUnread = (sinceId, room = 'global') =>
-  call(null, `/api/v1/chat/room?${new URLSearchParams({ room, countAfter: String(sinceId || 0) })}`)
+/**
+ * How many live messages are newer than `sinceId`, capped, plus the newest id, the last few
+ * faces, and (with a viewer) how many of those lines mention them and which comes first.
+ */
+export const fetchRoomUnread = (sinceId, viewer = null, room = 'global') => {
+  const params = new URLSearchParams({ room, countAfter: String(sinceId || 0) })
+  if (viewer) params.set('viewer', viewer)
+  return call(null, `/api/v1/chat/room?${params}`)
+}
 
 export const sendRoomMessage = (token, body, { kind = 'text', room = 'global' } = {}) =>
   call(token, '/api/v1/chat/room', { method: 'POST', body: JSON.stringify({ room, body, kind }) })

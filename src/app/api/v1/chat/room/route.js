@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { isEvmAddress, normalizeAddress } from '@/lib/address'
 import { chatActorFromRequest, isBanned } from '@/lib/chatSession'
 
 export const runtime = 'nodejs'
@@ -18,7 +19,15 @@ const RATE_LIMIT = 20
 const UNREAD_CAP = 99
 const RECENT_FACES = 3
 const ROOMS = new Set(['global'])
-const GIF_HOSTS = new Set(['media.giphy.com', 'media0.giphy.com', 'media1.giphy.com', 'media2.giphy.com', 'media3.giphy.com', 'media4.giphy.com', 'i.giphy.com'])
+const GIF_HOSTS = new Set([
+  'media.giphy.com',
+  'media0.giphy.com',
+  'media1.giphy.com',
+  'media2.giphy.com',
+  'media3.giphy.com',
+  'media4.giphy.com',
+  'i.giphy.com',
+])
 
 const serialize = (row) => ({
   id: Number(row.id),
@@ -58,17 +67,35 @@ export async function GET(request) {
     if (Number.isFinite(countAfter) && searchParams.has('countAfter')) {
       const [[row]] = await pool.execute(
         `SELECT COUNT(*) AS n FROM (SELECT id FROM chat_messages WHERE room = ? AND deleted_at IS NULL AND id > ? LIMIT ${UNREAD_CAP + 1}) c`,
-        [room, Math.max(0, countAfter)],
+        [room, Math.max(0, countAfter)]
       )
       const [[latest]] = await pool.execute('SELECT MAX(id) AS id FROM chat_messages WHERE room = ? AND deleted_at IS NULL', [room])
       // The last few distinct voices, for the faces on the minimized pill
       const [recent] = await pool.execute(
         `SELECT u.wallet FROM chat_messages m JOIN chat_users u ON u.id = m.sender_id
           WHERE m.room = ? AND m.deleted_at IS NULL ORDER BY m.id DESC LIMIT 30`,
-        [room],
+        [room]
       )
       const recentSenders = [...new Set(recent.map((r) => r.wallet))].slice(0, RECENT_FACES)
-      return NextResponse.json({ success: true, count: Number(row.n), latestId: Number(latest.id) || 0, recentSenders }, { headers })
+
+      // Unread lines that mention the viewer, by the mention link's address; the collation is
+      // case-insensitive so the checksummed form in the body matches the lowercase wallet
+      let mentions = 0
+      let firstMentionId = 0
+      const viewer = normalizeAddress(searchParams.get('viewer'))
+      if (isEvmAddress(viewer)) {
+        const [hits] = await pool.execute(
+          `SELECT id FROM chat_messages WHERE room = ? AND deleted_at IS NULL AND id > ? AND body LIKE ? ORDER BY id ASC LIMIT ${UNREAD_CAP + 1}`,
+          [room, Math.max(0, countAfter), `%](/${viewer})%`]
+        )
+        mentions = hits.length
+        firstMentionId = Number(hits[0]?.id) || 0
+      }
+
+      return NextResponse.json(
+        { success: true, count: Number(row.n), latestId: Number(latest.id) || 0, recentSenders, mentions, firstMentionId },
+        { headers }
+      )
     }
 
     const after = Number(searchParams.get('after')) || 0
@@ -97,8 +124,15 @@ export async function GET(request) {
     }
 
     return NextResponse.json(
-      { success: true, room, messages: rows.map(serialize), hasMore: rows.length === PAGE_LIMIT, removed, serverTime: new Date().toISOString() },
-      { headers },
+      {
+        success: true,
+        room,
+        messages: rows.map(serialize),
+        hasMore: rows.length === PAGE_LIMIT,
+        removed,
+        serverTime: new Date().toISOString(),
+      },
+      { headers }
     )
   } catch (error) {
     console.error('[CHAT_ROOM_GET_ERROR]:', error)
@@ -113,7 +147,7 @@ export async function POST(request) {
     if (isBanned(me)) {
       return NextResponse.json(
         { success: false, error: 'You are banned from chat', bannedUntil: me.banned_until, reason: me.ban_reason },
-        { status: 403 },
+        { status: 403 }
       )
     }
 
@@ -133,7 +167,7 @@ export async function POST(request) {
 
     const [[recent]] = await pool.execute(
       'SELECT COUNT(*) AS n FROM chat_messages WHERE sender_id = ? AND created_at > NOW(3) - INTERVAL ? SECOND',
-      [me.id, RATE_WINDOW_S],
+      [me.id, RATE_WINDOW_S]
     )
     if (Number(recent.n) >= RATE_LIMIT) {
       return NextResponse.json({ success: false, error: 'Slow down a little' }, { status: 429 })

@@ -17,8 +17,10 @@ import {
   ShieldCheckIcon,
   XIcon,
 } from '@phosphor-icons/react'
+import Link from 'next/link'
 import Profile from '@/components/Profile'
 import Avatar from '@/components/ui/Avatar'
+import MentionPicker from '@/components/MentionPicker'
 import { useProfile } from '@/hooks/useProfile'
 import EmojiPicker from '@/components/EmojiPicker'
 import GifPicker from '@/components/GifPicker'
@@ -29,6 +31,7 @@ import { openConnect } from '@/lib/connectDialog'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { sameAddress } from '@/lib/address'
 import { splitChatText } from '@/lib/chatText'
+import { mentionLabel, mentionMarkdown } from '@/lib/mentions'
 import {
   clearChatToken,
   ensureChatSession,
@@ -59,6 +62,8 @@ const MOBILE_QUERY = '(max-width: 767px)'
 const DRAG_MARGIN = 8
 // How long the room waits for a remembered wallet to come back before rendering without it
 const WALLET_GRACE_MS = 4_000
+// An `@` and what follows it, up to the caret, when nothing but a space or the start sits before
+const MENTION_QUERY_PATTERN = /(^|\s)@([^\s@]{0,48})$/
 
 const compactCount = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 0 })
 const stampDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
@@ -189,15 +194,18 @@ export default function ChatDock() {
   // last few people who spoke
   const [unread, setUnread] = useState(0)
   const [recentSenders, setRecentSenders] = useState([])
+  // Unread lines that mention the reader: the badge turns into an @ and opening lands on the first
+  const [mentionAlert, setMentionAlert] = useState({ count: 0, firstId: 0 })
   useEffect(() => {
     if (hidden || isOpen) return undefined
     let cancelled = false
     const check = async () => {
       try {
-        const data = await fetchRoomUnread(lastSeenId)
+        const data = await fetchRoomUnread(lastSeenId, me)
         if (cancelled) return
         setUnread(data.count)
         setRecentSenders(data.recentSenders ?? [])
+        setMentionAlert({ count: data.mentions ?? 0, firstId: data.firstMentionId ?? 0 })
       } catch {
         /* The next tick tries again */
       }
@@ -208,15 +216,29 @@ export default function ChatDock() {
       cancelled = true
       clearInterval(timer)
     }
-  }, [hidden, isOpen, lastSeenId])
+  }, [hidden, isOpen, lastSeenId, me])
 
-  const onSeen = useCallback(() => setUnread(0), [])
+  const onSeen = useCallback(() => {
+    setUnread(0)
+    setMentionAlert({ count: 0, firstId: 0 })
+  }, [])
 
   const { dockRef, dragProps, isDragging, dragStyle } = useDraggableCard({ enabled: isOpen, offset, setOffset })
 
   if (hidden) return null
 
-  const badge = unread > 0 && <span className={styles.badge}>{compactCount.format(unread)}</span>
+  // An @ badge when the reader was mentioned, the way Telegram flags a chat; the count otherwise
+  const badge =
+    mentionAlert.count > 0 ? (
+      <span
+        className={clsx(styles.badge, styles['badge--mention'])}
+        title={`${mentionAlert.count} mention${mentionAlert.count > 1 ? 's' : ''}`}
+      >
+        @
+      </span>
+    ) : (
+      unread > 0 && <span className={styles.badge}>{compactCount.format(unread)}</span>
+    )
 
   return (
     <section
@@ -272,6 +294,7 @@ export default function ChatDock() {
         <div className={styles.dock__room} hidden={!isOpen}>
           <Room
             active={isOpen}
+            focusId={mentionAlert.firstId}
             me={me}
             token={token}
             chatMe={chatMe}
@@ -409,7 +432,7 @@ function PillFace({ wallet }) {
   return <Avatar src={profile?.profileImage} size={28} alt="" title={profile?.name} className={styles.pill__face} />
 }
 
-function Room({ active, me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSigningIn, onConnect, onModerated }) {
+function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSigningIn, onConnect, onModerated }) {
   const [messages, setMessages] = useState(null)
   const [hasOlder, setHasOlder] = useState(false)
   const [hasNewer, setHasNewer] = useState(false)
@@ -527,16 +550,23 @@ function Room({ active, me, token, chatMe, lastSeenId, markSeen, onSeen, onSignI
     return () => observer.disconnect()
   }, [active, isLoaded])
 
-  // Reopening puts the reader back where they were, or at the bottom if that is where they sat
+  // Reopening puts the reader back where they were, or at the bottom if that is where they sat;
+  // an unread mention wins over both, so the card opens on the line that called them
   useEffect(() => {
     if (!active || !initialScrollDone) return undefined
     const frame = requestAnimationFrame(() => {
       const list = listRef.current
       if (!list) return
+      const mentioned = focusId > 0 ? list.querySelector(`[data-line-id="${focusId}"]`) : null
+      if (mentioned) {
+        stickRef.current = false
+        list.scrollTop = Math.max(0, mentioned.offsetTop - list.offsetTop - 48)
+        return
+      }
       list.scrollTop = stickRef.current ? list.scrollHeight : savedScrollRef.current
     })
     return () => cancelAnimationFrame(frame)
-  }, [active, initialScrollDone])
+  }, [active, initialScrollDone, focusId])
 
   // What the reader has scrolled to the bottom of has been seen
   useEffect(() => {
@@ -657,34 +687,34 @@ function Room({ active, me, token, chatMe, lastSeenId, markSeen, onSeen, onSignI
     <>
       <div className={styles.room} ref={listRef} onScroll={onScroll}>
         <div className={styles.room__content} ref={contentRef}>
-        {messages === null ? (
-          <div className={styles.room__notice}>Loading…</div>
-        ) : (
-          <>
-            {hasOlder && (
-              <div className={styles.room__notice}>{isPaging ? 'Loading earlier messages…' : 'Scroll up for earlier messages'}</div>
-            )}
-            {messages.length === 0 && (
-              <EmptyState icon={ChatCircleIcon} align="center" size="sm" className={styles.room__empty}>
-                Nobody has said anything yet
-              </EmptyState>
-            )}
-            {groupRuns(messages, openedAtId).map((run) => (
-              <ChatRun
-                key={run.key}
-                run={run}
-                me={me}
-                chatMe={chatMe}
-                dividerRef={run.divider ? dividerRef : null}
-                onModerate={moderate}
-                onRemoved={(id) => applyRemoved([id])}
-              />
-            ))}
-            {hasNewer && (
-              <div className={styles.room__notice}>{isPaging ? 'Loading newer messages…' : 'Scroll down for newer messages'}</div>
-            )}
-          </>
-        )}
+          {messages === null ? (
+            <div className={styles.room__notice}>Loading…</div>
+          ) : (
+            <>
+              {hasOlder && (
+                <div className={styles.room__notice}>{isPaging ? 'Loading earlier messages…' : 'Scroll up for earlier messages'}</div>
+              )}
+              {messages.length === 0 && (
+                <EmptyState icon={ChatCircleIcon} align="center" size="sm" className={styles.room__empty}>
+                  Nobody has said anything yet
+                </EmptyState>
+              )}
+              {groupRuns(messages, openedAtId).map((run) => (
+                <ChatRun
+                  key={run.key}
+                  run={run}
+                  me={me}
+                  chatMe={chatMe}
+                  dividerRef={run.divider ? dividerRef : null}
+                  onModerate={moderate}
+                  onRemoved={(id) => applyRemoved([id])}
+                />
+              ))}
+              {hasNewer && (
+                <div className={styles.room__notice}>{isPaging ? 'Loading newer messages…' : 'Scroll down for newer messages'}</div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -717,7 +747,7 @@ function Room({ active, me, token, chatMe, lastSeenId, markSeen, onSeen, onSignI
           </span>
         </div>
       ) : (
-        <Composer onSend={send} />
+        <Composer onSend={send} viewer={me} />
       )}
     </>
   )
@@ -768,6 +798,7 @@ function ChatRun({ run, me, chatMe, dividerRef, onModerate, onRemoved }) {
               key={message.id}
               message={message}
               mine={mine}
+              me={me}
               chatMe={chatMe}
               isModerator={isModerator}
               onModerate={onModerate}
@@ -780,12 +811,12 @@ function ChatRun({ run, me, chatMe, dividerRef, onModerate, onRemoved }) {
   )
 }
 
-function ChatLine({ message, mine, chatMe, isModerator, onModerate, onRemoved }) {
+function ChatLine({ message, mine, me, chatMe, isModerator, onModerate, onRemoved }) {
   const canAct = Boolean(chatMe?.canModerate) && !mine && !message.pending
   const when = message.pending ? 'Sending…' : toRelativeTime(message.createdAt)
 
   return (
-    <div className={clsx(styles.line, message.pending && styles['line--pending'])}>
+    <div className={clsx(styles.line, message.pending && styles['line--pending'])} data-line-id={message.id}>
       {message.kind === 'gif' ? (
         // A Giphy CDN URL straight from the picker: the optimizer would only re-fetch it
         // eslint-disable-next-line @next/next/no-img-element
@@ -797,6 +828,14 @@ function ChatLine({ message, mine, chatMe, isModerator, onModerate, onRemoved })
               <a key={index} href={part.value} target="_blank" rel="nofollow noopener noreferrer" className={styles.bubble__link}>
                 {part.value}
               </a>
+            ) : part.type === 'mention' ? (
+              <Link
+                key={index}
+                href={`/${part.address}`}
+                className={clsx(styles.bubble__mention, sameAddress(part.address, me) && styles['bubble__mention--me'])}
+              >
+                @{part.label}
+              </Link>
             ) : (
               <span key={index}>{part.value}</span>
             )
@@ -870,19 +909,65 @@ function ChatLine({ message, mine, chatMe, isModerator, onModerate, onRemoved })
   )
 }
 
-function Composer({ onSend }) {
+function Composer({ onSend, viewer }) {
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
   const inputRef = useRef(null)
   const gifPickerRef = useRef(null)
+  const mentionPickerRef = useRef(null)
+  // The `@query` under the caret, when there is one; the picker is open exactly then
+  const [mention, setMention] = useState(null)
+  // Picked people, by the label they show as, so the draft stays readable and the wire format
+  // is only written at send time
+  const mentionsRef = useRef(new Map())
+
+  const syncMention = (value, caret) => {
+    const found = MENTION_QUERY_PATTERN.exec(value.slice(0, caret))
+    if (!found) {
+      setMention(null)
+      return
+    }
+    const rect = inputRef.current?.getBoundingClientRect()
+    setMention((current) => (current?.query === found[2] ? current : { query: found[2], caretRect: rect ?? null }))
+  }
+
+  const insertMention = (suggestion) => {
+    const input = inputRef.current
+    const caret = input?.selectionStart ?? draft.length
+    const found = MENTION_QUERY_PATTERN.exec(draft.slice(0, caret))
+    setMention(null)
+    if (!found) return
+    const label = mentionLabel(suggestion.username || suggestion.name || suggestion.ensName, suggestion.address)
+    mentionsRef.current.set(label, suggestion.address)
+    const start = caret - found[2].length - 1
+    setDraft(`${draft.slice(0, start)}@${label} ${draft.slice(caret)}`)
+    requestAnimationFrame(() => {
+      if (!input) return
+      input.focus()
+      const at = start + label.length + 2
+      input.setSelectionRange(at, at)
+    })
+  }
+
+  // Every @label still in the text becomes the same link a post would carry
+  const toWire = (text) => {
+    let out = text
+    for (const [label, address] of mentionsRef.current) {
+      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      out = out.replace(new RegExp(`(^|[^\\w])@${escaped}(?![\\w])`, 'g'), (_, lead) => `${lead}${mentionMarkdown(label, address)}`)
+    }
+    return out
+  }
 
   const submit = async () => {
     const text = draft.trim()
     if (!text || isSending) return
     setIsSending(true)
     setDraft('')
-    const sent = await onSend(text, 'text')
-    if (!sent) setDraft(text)
+    setMention(null)
+    const sent = await onSend(toWire(text), 'text')
+    if (sent) mentionsRef.current.clear()
+    else setDraft(text)
     setIsSending(false)
     inputRef.current?.focus()
   }
@@ -918,8 +1003,18 @@ function Composer({ onSend }) {
           ref={inputRef}
           className={styles.composer__input}
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            setDraft(event.target.value)
+            syncMention(event.target.value, event.target.selectionStart ?? event.target.value.length)
+          }}
+          onKeyUp={(event) => {
+            if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') {
+              syncMention(event.target.value, event.target.selectionStart ?? event.target.value.length)
+            }
+          }}
+          onBlur={() => setMention(null)}
           onKeyDown={(event) => {
+            if (mentionPickerRef.current?.handleKeyDown(event)) return
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault()
               submit()
@@ -951,6 +1046,14 @@ function Composer({ onSend }) {
           </button>
         )}
       </div>
+      <MentionPicker
+        ref={mentionPickerRef}
+        query={mention?.query ?? ''}
+        caretRect={mention?.caretRect ?? null}
+        viewer={viewer ?? null}
+        onPick={insertMention}
+        onDismiss={() => setMention(null)}
+      />
       <GifPicker ref={gifPickerRef} onSelect={(gif) => onSend(gif.full.url, 'gif')} />
     </form>
   )
