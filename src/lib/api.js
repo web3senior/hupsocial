@@ -5,7 +5,9 @@ import { profileUpdateMessage } from './profileSignature'
 export const getProfile= async (address) => {
   // Determine the base URL based on the environment
   const isServer = typeof window === 'undefined'
-  const baseUrl = isServer ? process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' : ''
+  // The env value may carry a trailing slash; joined as-is that made every server-side self-fetch
+  // a `//api/…` URL and a 308 round trip before the real one
+  const baseUrl = isServer ? (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '') : ''
   const url = `${baseUrl}/api/v1/users/profile/${normalizeAddress(address)}`
 
   // Server-side (generateMetadata) hits the Next data cache so repeat navigations
@@ -523,7 +525,7 @@ export const getStatuses = async (page = 1, limit = 20, networkId = null) => {
 export const getPostById = async (networkId, postId, viewerAddress = null) => {
   // Determine the base URL based on the environment
   const isServer = typeof window === 'undefined'
-  const baseUrl = isServer ? process.env.NEXT_PUBLIC_BASE_URL || 'https://localhost:3000' : ''
+  const baseUrl = isServer ? (process.env.NEXT_PUBLIC_BASE_URL || 'https://localhost:3000').replace(/\/+$/, '') : ''
 
   const path = viewerAddress
     ? `/api/v1/networks/${networkId}/${postId}?viewer_address=${viewerAddress}`

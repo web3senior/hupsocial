@@ -1,10 +1,10 @@
 /**
- * @file api/v1/networks/[networkId]/posts/[postId]/route.js
+ * @file api/v1/networks/[networkId]/[postId]/route.js
  * @description Fetches a single post by its unique database ID and network context directly from the route layout parameters.
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
-import { communityJoin } from '@/lib/communityJoin'
+import { readPostRow, shapePostRow } from '@/lib/postRows'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 import { attachTipUsdTotals } from '@/lib/tipTotals'
 import { attachSalesUsdTotals } from '@/lib/salesTotals'
@@ -18,96 +18,27 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url)
     const viewerAddress = searchParams.get('viewer_address')
 
-    let queryParams = [postId, networkId]
-    if (viewerAddress) {
-      // Prepend the viewer address for each dynamic has_liked/has_bookmarked/folder_id/has_reposted/viewer_repost_id subquery position
-      queryParams.unshift(viewerAddress, viewerAddress, viewerAddress, viewerAddress, viewerAddress)
-    }
+    const post = await readPostRow(networkId, postId, viewerAddress)
 
-    // Select unified row structures using indexed relational bindings and direct aggregations.
-    // total_reposts merges true reposts and quotes (X-style); quotes are matched via the quoteOf
-    // key in their content JSON, so quotes sealed inside encrypted communities cannot be counted.
-    const query = `
-      SELECT
-        p.*,
-        n.name as network_name,
-        n.id as network_id,
-        u.name as display_name,
-        u.profileImage as profile_image,
-        comm.name as community_name,
-        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND is_active = 1) as total_likes,
-        (
-          (SELECT COUNT(*) FROM posts child WHERE child.is_comment = p.id AND child.network_id = p.network_id
-            AND child.contract_address <=> p.contract_address AND child.is_deleted = 0)
-          + (SELECT COUNT(*) FROM posts child WHERE child.network_id = p.network_id
-            AND child.contract_address <=> p.contract_address AND child.parent_id = p.id
-            AND child.parent_id <> 0 AND child.is_deleted = 0
-            AND NOT (child.is_comment <=> p.id)
-            AND (child.content_type = 1 OR child.is_comment IS NOT NULL))
-        ) as total_comments,
-        (SELECT COUNT(*) FROM posts WHERE is_repost = p.id AND network_id = p.network_id AND is_deleted = 0)
-        + (SELECT COUNT(*) FROM posts q WHERE q.network_id = p.network_id AND q.is_deleted = 0
-           AND CASE WHEN JSON_VALID(q.content) THEN JSON_UNQUOTE(JSON_EXTRACT(q.content, '$.quoteOf')) = CAST(p.id AS CHAR) ELSE 0 END) as total_reposts,
-        (SELECT COUNT(*) FROM post_views WHERE post_id = p.id AND network_id = p.network_id) as total_views,
-        (SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id) as total_bookmarks,
-        (SELECT COUNT(*) FROM tips WHERE post_id = p.id AND network_id = p.network_id) as total_tips,
-        (SELECT COUNT(*) FROM user_reports WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned') as actioned_reports,
-        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address = ? AND is_active = 1))` : '0'} as has_liked,
-        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id AND wallet_address = ?))` : '0'} as has_bookmarked,
-        ${viewerAddress ? `(SELECT folder_id FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id AND wallet_address = ?)` : 'NULL'} as folder_id,
-        ${viewerAddress ? `(SELECT EXISTS(SELECT 1 FROM posts WHERE is_repost = p.id AND network_id = p.network_id AND wallet_address = ? AND is_deleted = 0))` : '0'} as has_reposted,
-        ${viewerAddress ? `(SELECT id FROM posts WHERE is_repost = p.id AND network_id = p.network_id AND wallet_address = ? AND is_deleted = 0 LIMIT 1)` : 'NULL'} as viewer_repost_id
-      FROM posts p
-      JOIN networks n ON p.network_id = n.id
-      LEFT JOIN users u ON p.wallet_address = u.wallet_address
-      ${communityJoin()}
-      WHERE p.id = ? AND n.id = ?
-      LIMIT 1
-    `
-
-    const [rows] = await pool.execute(query, queryParams)
-
-    if (rows.length === 0) {
+    if (!post) {
       return NextResponse.json({ success: false, error: 'Post not found' }, { status: 404 })
     }
 
-    const post = rows[0]
+    // The Universal Profile fill (a chain read for an author the users table has not seen) runs
+    // beside the dollar totals rather than ahead of them; the two write different fields. The
+    // totals stay in turn so they share one warm price cache. The tip badge and the post-tip
+    // revalidation read this row.
+    await Promise.all([
+      fulfillUniversalProfiles([post], pool),
+      (async () => {
+        await attachTipUsdTotals([post])
+        await attachSalesUsdTotals([post])
+      })(),
+    ])
 
-    // Fulfill any missing Universal Profile fields
-    await fulfillUniversalProfiles([post], pool)
-
-    // Dollars for the tip badge — the post-tip revalidation reads this row
-    await attachTipUsdTotals([post])
-    await attachSalesUsdTotals([post])
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...post,
-        content: parseContent(post.content),
-        has_liked: !!post.has_liked,
-        // Feed rows expose the viewer flag as is_liked; consumers (e.g. the Like
-        // button's initial state) read that name, so the detail row must match.
-        is_liked: !!post.has_liked,
-        is_bookmarked: !!post.has_bookmarked,
-        folder_id: post.folder_id ?? null,
-        has_reposted: !!post.has_reposted,
-        viewer_repost_id: post.viewer_repost_id ?? null
-      }
-    })
+    return NextResponse.json({ success: true, data: shapePostRow(post) })
   } catch (error) {
     console.error('[GET_POST_BY_ID_ERROR]:', error.message)
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
-  }
-}
-
-/**
- * Helper to safely handle IPFS JSON data stored in the DB
- */
-function parseContent(content) {
-  try { 
-    return JSON.parse(content) 
-  } catch (e) { 
-    return content 
   }
 }

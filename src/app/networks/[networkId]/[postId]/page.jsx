@@ -1,12 +1,17 @@
 import { cache } from 'react'
-import { getPostById } from '@/lib/api'
+import { readPostForPage } from '@/lib/postRows'
+import { commentsPageUrl } from '@/lib/commentsRequest'
 import { summarizePost } from '@/lib/postSummary'
 import PageTitle from '@/components/PageTitle'
+import PreloadFetch from '@/components/PreloadFetch'
 import PostDetails from './_components/PostDetails'
 import styles from './page.module.scss'
 
-// Deduplicate the fetch so generateMetadata and Page share one request per render
-const fetchPost = cache((networkId, postId) => getPostById(networkId, postId, null))
+// Deduplicate the read so generateMetadata and Page share one query per render. Straight from
+// the database rather than over HTTP to our own API: the post is what this page is, so it is
+// rendered here and shipped in the HTML instead of fetched again once the client wakes up. A
+// failed read renders the page without a row and the client fetches as it always could.
+const fetchPost = cache((networkId, postId) => readPostForPage(networkId, postId).catch(() => null))
 
 /* Long enough to read as a sentence, short enough that no crawler truncates it mid-card */
 const TITLE_MAX = 70
@@ -19,10 +24,14 @@ export async function generateMetadata({ params }, parent) {
   // Extract required parameters for fetching the dynamic post
   const { networkId, postId } = await params
 
+  const notFound = {
+    title: 'Post Not Found',
+    description: parentMetadata.description || 'The requested post was not found.',
+  }
+
   try {
-    // Attempt to fetch post data from the external source
-    const post = await fetchPost(networkId, postId)
-    const item = post?.data
+    const item = await fetchPost(networkId, postId)
+    if (!item) return notFound
 
     /* summarizePost reads the text element by type rather than by index — an NFT listing or a
        media-only post does not necessarily lead with words — and describes the post when it
@@ -63,22 +72,31 @@ export async function generateMetadata({ params }, parent) {
     return metadata
   } catch (error) {
     // Provide safe layout fallbacks if runtime processing encounters failures
-    return {
-      title: 'Post Not Found',
-      description: parentMetadata.description || 'The requested post was not found.',
-    }
+    return notFound
   }
 }
 
 export default async function Page({ params }) {
-  const resolvedParams = await params
-  const { networkId, postId } = resolvedParams
+  const { networkId, postId } = await params
+  const post = await fetchPost(networkId, postId)
+
+  // The thread and the supporters strip are the first things the client asks for once it
+  // hydrates. Naming them in the document lets the browser start both while it is still parsing
+  // the HTML, which lands them about a hydration earlier. PreloadFetch itself keeps this to
+  // document loads; a client navigation has the thread cached or already in flight.
+  const preloads = []
+  if (post) {
+    const threadId = Number(post.is_repost) > 0 ? post.is_repost : postId
+    preloads.push(commentsPageUrl(networkId, threadId))
+    if (Number(post.total_tips) > 0) preloads.push(`/api/v1/networks/${networkId}/${threadId}/tips`)
+  }
 
   return (
     <>
+      {preloads.length > 0 && <PreloadFetch hrefs={preloads} />}
       <PageTitle name={`Post`} changeDocumentTitle={false} />
       <div className={`${styles.page}`}>
-        <PostDetails networkId={networkId} postId={postId} />
+        <PostDetails networkId={networkId} postId={postId} initialPost={post} />
       </div>
     </>
   )

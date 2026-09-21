@@ -62,64 +62,48 @@ function isInternalHref(href) {
   return hosts.some((candidate) => host === candidate || hostname === candidate || hostname.endsWith(`.${candidate}`))
 }
 
+/**
+ * Render a post body. One renderer on both sides, so the post page (rendered on the server,
+ * where DOMPurify cannot run) and the feed (rendered in the browser) show a post identically;
+ * the browser pass keeps DOMPurify as a second line of defence over output that is already safe
+ * by construction.
+ * @param {string} markdown
+ * @returns {string} Sanitized HTML.
+ */
 export function renderMarkdown(markdown) {
-  const content = typeof markdown === 'string' ? markdown.trim() : ''
+  const html = renderSafeMarkdown(markdown, { breaks: true })
+  if (typeof window === 'undefined') return html
 
-  const renderer = new marked.Renderer()
-
-  // A list item or heading hands over a container whose .text is raw source; its formatting lives in .tokens
-  renderer.text = function (token) {
-    if (token?.tokens?.length) return this.parser.parseInline(token.tokens)
-
-    const rawText = typeof token === 'string' ? token : token?.text || ''
-
-    return rawText.replace(CASHTAG_PATTERN, (match, prefix, symbol) => {
-      return `${prefix}<span class="ticker-trigger" data-symbol="${symbol.toUpperCase()}">$${symbol}</span>`
-    })
-  }
-
-  renderer.link = (token) => {
-    const href = escapeAttr(token?.href)
-    const title = token?.title ? ` title="${escapeAttr(token.title)}"` : ''
-    const text = token?.text || ''
-    const target = isInternalHref(token?.href) ? '' : ' rel="noopener noreferrer" target="_blank"'
-
-    return `<a href="${href}"${mentionAttrs(token)}${title}${target}>${text}</a>`
-  }
-
-  const dirtyHtml = marked.parse(content, {
-    renderer,
-    gfm: true,
-    breaks: true,
-  })
-
-  return DOMPurify.sanitize(dirtyHtml, {
+  return DOMPurify.sanitize(html, {
     ADD_TAGS: ['span'],
     ADD_ATTR: ['target', 'rel', 'data-symbol', 'data-chain', 'data-address', 'data-mention'],
   }).trim()
 }
-/* ─── Articles ─────────────────────────────────────────────────────────────────────────────
-   renderMarkdown above leans on DOMPurify, which is a browser library: without a window its
-   default export has no `sanitize` at all, so calling it during a server render throws. Article
-   bodies have to render on the server — an article a crawler cannot read is the one thing a
-   long-form feature cannot afford — so they take a renderer that is safe by construction rather
-   than safe by post-processing.
+
+/* ─── Safe renderer ────────────────────────────────────────────────────────────────────────
+   DOMPurify is a browser library: without a window its default export has no `sanitize` at all,
+   so nothing rendered on the server can lean on it. Post bodies (the post page renders them on
+   the server) and article bodies (a crawler must be able to read one) take a renderer that is
+   safe by construction rather than safe by post-processing.
 
    Three rules make it safe without a DOM, each covering a hole the others leave:
      1. Raw HTML never reaches the output — marked routes both block and inline html through
         renderer.html, so returning '' there drops `<script>` and `<img onerror=…>` alike.
      2. Text is escaped on the way out, so a `<` an author typed in prose stays prose.
      3. Every URL passes a protocol allowlist. Escaping an href stops attribute-breakout but not
-        `javascript:` — marked emits that href untouched, and DOMPurify was the only thing
-        catching it on the client path.                                                         */
+        `javascript:`, which marked emits untouched.                                            */
 
 /* Anything not on this list is dropped rather than rendered. Relative paths, fragments and
    query-only links are handled separately (they carry no protocol at all). */
 const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'ipfs:'])
 
+// An `&` that already begins an entity is left alone, as marked's own escape does: `&amp;` typed
+// by a client that pre-encodes must render as `&`, not as the literal entity
+const BARE_AMPERSAND = /&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/g
+
 function escapeHtml(value) {
   return String(value ?? '')
-    .replaceAll('&', '&amp;')
+    .replace(BARE_AMPERSAND, '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
@@ -158,7 +142,17 @@ function safeUrl(href) {
  * @param {string} markdown
  * @returns {string} Sanitized HTML.
  */
-export function renderArticleMarkdown(markdown) {
+export const renderArticleMarkdown = (markdown) => renderSafeMarkdown(markdown, { breaks: false })
+
+/**
+ * The DOM-free renderer behind both article bodies and the server pass of post bodies.
+ * @param {string} markdown
+ * @param {Object} [options]
+ * @param {boolean} [options.breaks] Whether a single newline becomes a <br>: true for a post,
+ *   where every newline is deliberate; false for an article, where it is a wrapped editor line.
+ * @returns {string} Sanitized HTML.
+ */
+function renderSafeMarkdown(markdown, { breaks = false } = {}) {
   const source = typeof markdown === 'string' ? markdown.trim() : ''
   if (!source) return ''
 
@@ -215,8 +209,5 @@ export function renderArticleMarkdown(markdown) {
      someone's markup is an article that can run their script, and no author needs it here. */
   renderer.html = () => ''
 
-  /* breaks:false, unlike the post renderer above — in a post a single newline is a deliberate
-     line break, but in an article it is just a wrapped line in the author's editor, and turning
-     each one into a <br> would shred every paragraph. */
-  return marked.parse(source, { renderer, gfm: true, breaks: false }).trim()
+  return marked.parse(source, { renderer, gfm: true, breaks }).trim()
 }

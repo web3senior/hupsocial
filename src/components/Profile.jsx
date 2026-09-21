@@ -25,9 +25,11 @@ import UPlogo from '@/../public/up.png'
 import { openConnect } from '@/lib/connectDialog'
 import styles from './Profile.module.scss'
 
-export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, fingerprint = true, className }) {
+export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, fingerprint = true, className, fallback }) {
   const router = useRouter()
-  const { profile, isLoading } = useProfile(creator)
+  // `fallback` is the name and picture a post row already carries (profileFallbackFromRow):
+  // the byline paints with it at once and the fetched profile replaces it
+  const { profile } = useProfile(creator, fallback)
   const [popoverOpened, setPopoverOpened] = useState(false)
 
   // Derived check for layout variations sharing the full metadata sub-row
@@ -80,8 +82,9 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  // Render placeholder skeletal visual states during active metadata fetches
-  if (isLoading || !profile) {
+  // Placeholder until there is something to show: with no fallback that is the whole fetch,
+  // with one it is never (isLoading stays true through a fetch even when fallback data paints)
+  if (!profile) {
     return (
       <div className={clsx(styles.profileShimmer, 'flex align-items-center gap-050', className)} style={avatarBox}>
         <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: size, height: size, flexShrink: 0 }} />
@@ -192,8 +195,11 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             {profile.username && !handleUnderName && <span className={styles.handle}>{`@${profile.username}`}</span>}
             {/* Timestamp remains completely exclusive to the standard 'full' layout variant.
                 The separator only appears between two words — after a handle, never after a mark. */}
+            {/* Relative time is read off two clocks when the byline is server-rendered — a post
+                seconds old can say "12s" in the HTML and "14s" at hydration — so React must not
+                treat that text as a mismatch and re-render the whole boundary over it */}
             {variant === 'full' && createdAt && (
-              <small className={styles.createdAt}>
+              <small className={styles.createdAt} suppressHydrationWarning>
                 {profile.username && !handleUnderName ? `· ${toRelativeTime(createdAt)}` : toRelativeTime(createdAt)}
               </small>
             )}

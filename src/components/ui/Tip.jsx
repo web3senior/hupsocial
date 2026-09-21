@@ -48,6 +48,10 @@ export const Tip = ({ post, onTip }) => {
   const tipCount = Number(stats?.total_tips) || 0
   const earnedUsd = Number(stats?.tips_usd) || 0
   const hasEarned = earnedUsd > 0
+  // A server-rendered post row carries the count but has not been priced yet (the page skips
+  // the price lookup; the client's refresh brings it). Hold the counter until then rather than
+  // paint a count that turns into money a beat later — every other row arrives priced.
+  const unpriced = tipCount > 0 && stats?.tips_usd === undefined
 
   const handleTip = (e) => {
     e.stopPropagation()
@@ -82,7 +86,7 @@ export const Tip = ({ post, onTip }) => {
             </span>
           </Counter>
         ) : (
-          tipCount > 0 && <Counter value={tipCount}>{compactCount.format(tipCount)}</Counter>
+          tipCount > 0 && !unpriced && <Counter value={tipCount}>{compactCount.format(tipCount)}</Counter>
         )}
       </button>
     </Tooltip>

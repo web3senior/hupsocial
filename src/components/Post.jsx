@@ -10,7 +10,7 @@ import { getPublicClient } from 'wagmi/actions'
 import { initHupContract } from '@/lib/communication'
 import { getPostById, recordPostView } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
-import { useProfile } from '@/hooks/useProfile'
+import { useProfile, profileFallbackFromRow } from '@/hooks/useProfile'
 import { profilePath } from '@/lib/username'
 import abi from '@/abi/post.json'
 import { getActiveChain } from '@/lib/communication'
@@ -122,7 +122,10 @@ function useDecryptedCommunityItem(item) {
   }, [item, decryptedContent])
 }
 
-export default function Post({ item, showContent, actions, chainId, hasCommentBelow = false }) {
+// `authorFallback`: paint the byline from the row's own name and picture before the profile
+// fetch answers. Only the post page's own post opts in — its row is read with the handle, so the
+// name line will not change when the profile lands; feed rows are not, and would flip.
+export default function Post({ item, showContent, actions, chainId, hasCommentBelow = false, authorFallback = false }) {
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
   const [showQuoteModal, setShowQuoteModal] = useState(null)
@@ -280,7 +283,12 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
           </Link>
         )}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
-          <Profile creator={displayItem?.wallet_address} createdAt={displayItem?.created_at} networkId={displayItem?.network_id} />
+          <Profile
+            creator={displayItem?.wallet_address}
+            createdAt={displayItem?.created_at}
+            networkId={displayItem?.network_id}
+            fallback={authorFallback ? profileFallbackFromRow(displayItem) : undefined}
+          />
 
           <div
             className={clsx(styles.post__header__actions, 'flex align-items-center justify-content-start gap-050')}

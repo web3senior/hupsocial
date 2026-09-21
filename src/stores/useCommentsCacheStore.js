@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { commentsPageUrl } from '@/lib/commentsRequest'
 
 // Keep restored threads reasonably fresh; older snapshots still paint instantly
 // but revalidate in the background.
@@ -7,7 +8,6 @@ const COMMENTS_CACHE_TTL_MS = 10 * 60 * 1000
 // no request at all. Replies only appear once their transaction is indexed, so a
 // thread cannot meaningfully change faster than this.
 const COMMENTS_FRESH_MS = 30 * 1000
-const COMMENTS_PAGE_SIZE = 30
 
 export const commentsCacheKey = (networkId, postId) => `${networkId}:${postId}`
 
@@ -65,8 +65,9 @@ export const useCommentsCacheStore = create((set, get) => ({
     const pending = inflight.get(requestKey)
     if (pending) return pending
 
-    let url = `/api/v1/networks/${networkId}/${postId}/comments?page=1&limit=${COMMENTS_PAGE_SIZE}`
-    if (address) url += `&viewer_address=${encodeURIComponent(address)}`
+    // The same URL the post page preloads for a document load, so the browser can hand this
+    // fetch the response it already started on
+    const url = commentsPageUrl(networkId, postId, address)
 
     const request = fetch(url)
       .then((res) => res.json())

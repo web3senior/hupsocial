@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ArrowSquareOutIcon, EnvelopeSimpleIcon, ImageIcon, LinkSimpleIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
 import CopyPostImageDialog from '@/components/CopyPostImageDialog'
 import { SAVED, copyPostImage, hasPostImage, supportsImageClipboard } from '@/lib/postImage'
@@ -43,7 +44,13 @@ export const Share = ({
   // The card being copied, held from the click that asked for it: the popover unmounts on close,
   // so the node cannot be read again when the sheet renders.
   const [imageNode, setImageNode] = useState(null)
-  const shareUrl = url ?? `${location.protocol}//${window.location.host}/networks/${item.network_id}/${item.id}`
+  // The menu's links are in the markup from the first render, and the post page renders that on
+  // the server where there is no location. The origin arrives on mount so the first client render
+  // matches the served attributes and the re-render is what writes the full URLs into the DOM —
+  // React never patches an attribute that merely mismatched at hydration.
+  const mounted = useClientMounted()
+  const origin = mounted ? window.location.origin : ''
+  const shareUrl = url ?? `${origin}/networks/${item.network_id}/${item.id}`
   // Encrypted posts carry an envelope object as content — share the lock placeholder, never
   // the object (or its ciphertext)
   const rawTitle =
