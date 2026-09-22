@@ -19,6 +19,7 @@ export const CHILD_KEY_LABELS = {
   communityVault: 'hup:community-vault:v1',
   inAppWallet: 'hup:in-app-wallet:v1',
   sellVault: 'hup:sell-vault:v1',
+  taskVault: 'hup:task-vault:v1',
 }
 
 export const masterSecretSessionKey = `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''}security_vault_master`

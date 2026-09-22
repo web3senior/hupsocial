@@ -14,6 +14,7 @@ import UsernameGate from './UsernameGate'
 import EmbeddedTxConfirm from './EmbeddedTxConfirm'
 import VaultUnlockDialog from './VaultUnlockDialog'
 import ComposerRecovery from './ComposerRecovery'
+import TaskFundingHost from './TaskFundingHost'
 import ScheduledPostsRunner from './ScheduledPostsRunner'
 import ChatDock from './chat/ChatDock'
 import OfflineBanner from './ui/OfflineBanner'
@@ -66,6 +67,8 @@ export default function ClientLayout({ children }) {
         {/* Composers close on the transaction, not the receipt — this is where one comes back
             if the chain rejects it after the author has already returned to the feed */}
         <ComposerRecovery />
+        {/* A task post publishes first and is funded once indexed; the composer is gone by then */}
+        <TaskFundingHost />
         {/* Publishes scheduled posts the relayer cannot, and asks for the one signature a due
             post still needs — the author's side of lib/scheduledDelivery.js */}
         <ScheduledPostsRunner />

@@ -1,0 +1,111 @@
+.taskCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface, var(--background));
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  &__kind {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    min-width: 0;
+    font-size: var(--font-size-13, 0.8125rem);
+    font-weight: 700;
+    color: var(--network-color-primary, var(--primary, #ec4899));
+  }
+
+  &__sealed {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.05rem 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+  }
+
+  &__amounts {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  &__reward {
+    font-size: 1.35rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  &__per,
+  &__meta {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__bar {
+    gap: 0.3rem;
+  }
+
+  &__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  &__action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: auto;
+    border: none;
+    border-radius: 999px;
+    padding: 0.45rem 1rem;
+    background: var(--network-color-primary, var(--primary, #ec4899));
+    color: var(--network-color-text, #fff);
+    font-size: var(--font-size-12);
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  &__yours {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: #15803d;
+  }
+
+  &__hidden {
+    margin-top: 0.5rem;
+    padding: 0.6rem 0.85rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+}

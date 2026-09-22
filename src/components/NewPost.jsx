@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, CalendarDotsIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, CalendarDotsIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, ToolboxIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -41,6 +41,10 @@ import CreatePollDialog from '@/components/CreatePollDialog'
 import AttachPollDialog from '@/components/AttachPollDialog'
 import CreateFundDialog from '@/components/CreateFundDialog'
 import AttachFundDialog from '@/components/AttachFundDialog'
+import AttachTaskDialog from '@/components/AttachTaskDialog'
+import { SEALED_PLACEHOLDER, categoryLabel } from '@/lib/task'
+import { sealSubmission } from '@/lib/taskVault'
+import { requestTaskFunding } from '@/lib/taskFundingBus'
 import SchedulePostDialog from '@/components/SchedulePostDialog'
 import {
   canPreSign,
@@ -151,7 +155,7 @@ const loadDraftContent = () => {
 // A published payload carries its attachment references alongside the content (see the tail of
 // handleCreatePost), and each of those is restored into its own state. Leaving them on the
 // content object would have getSerializablePostContent spread a second copy into the next one.
-const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'nftDrop', 'miniApp', 'poll', 'hupFund', 'article', 'tokenTrade']
+const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'nftDrop', 'miniApp', 'poll', 'hupFund', 'hupTask', 'article', 'tokenTrade']
 
 const stripAttachments = (content) => {
   const bare = { ...content }
@@ -486,6 +490,33 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const createFundRef = useRef(null)
   const attachFundRef = useRef(null)
 
+  // A task is the reverse of a fundraise: the post goes first and is funded once indexed, because
+  // HupTasks keys the escrow by post id. Until then the content only carries the promised terms.
+  const [hupTask, setHupTask] = useState(() =>
+    restoredContent?.hupTask ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.hupTask ?? null) : null)
+  )
+  const attachTaskRef = useRef(null)
+  // Replying to a sealed task: the reply is encrypted to the task's key after moderation
+  const replyTaskRef = isComment ? replyTarget?.content?.hupTask ?? null : null
+  // null while unknown, '' when the task has no key yet (unfunded)
+  const [taskSealKey, setTaskSealKey] = useState(null)
+
+  useEffect(() => {
+    if (!replyTaskRef?.sealed || !replyTarget?.id) return
+    let cancelled = false
+    fetch(`/api/v1/tasks/${Number(replyTarget.network_id)}/${replyTarget.id}`)
+      .then((res) => res.json())
+      .then((body) => {
+        if (!cancelled) setTaskSealKey(body?.data?.task?.task_pubkey || '')
+      })
+      .catch(() => {
+        if (!cancelled) setTaskSealKey('')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [replyTaskRef?.sealed, replyTarget?.id, replyTarget?.network_id])
+
   // Tokens to trade are the one attachment with nothing behind them: no contract call, no
   // onchain object to strand, just { tokens, feeBps } resolved live by the card. Unlike a poll
   // or a fundraise there is nothing to recover after a refresh, so it keeps no draft.
@@ -617,6 +648,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     Boolean(miniApp) ||
     Boolean(poll) ||
     Boolean(hupFund) ||
+    Boolean(hupTask) ||
     Boolean(article)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
@@ -637,6 +669,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const targetChain = isSolanaTarget ? solanaChainFor(targetChainId) : appChains.find((chain) => chain.id === targetChainId)
   // Whoever signs this submission: the Solana wallet on a Solana cluster, the EVM wallet elsewhere
   const signerAddress = isSolanaTarget ? solanaWallet.address : address
+  // The poster's own replies to their sealed task stay readable; everyone else's are sealed
+  const sealsReply =
+    Boolean(replyTaskRef?.sealed) && actionType !== 'edit' && String(signerAddress || '').toLowerCase() !== String(replyTarget?.wallet_address || '').toLowerCase()
 
   // Only a plain post is free to pick its chain — an edit, a reply, a quote, and a community
   // post all inherit theirs, so the switcher would lie about where the submission lands
@@ -670,6 +705,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const pollsAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.polls)
   // Fundraising the same: the money has to settle on the chain the post lands on
   const fundAvailable = Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.fund)
+  // A task is keyed by the post it rides on, so it can only be added to a new post outside a community
+  const tasksAvailable = actionType === 'post' && !communityTarget && Boolean(targetChainId && CONTRACTS[`chain${targetChainId}`]?.tasks)
   // The composer already holds an image and text, so the create dialog opens with two of its four
   // required fields filled — the author only types a name and a ticker
 
@@ -697,6 +734,13 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       label: 'Fundraise',
       hint: 'Collect funds toward a goal',
       attached: Boolean(hupFund),
+    },
+    tasksAvailable && {
+      key: 'task',
+      icon: ToolboxIcon,
+      label: 'Task',
+      hint: 'Pay agents or people for approved replies',
+      attached: Boolean(hupTask),
     },
     canAttachNft && predictAvailable && {
       key: 'predict',
@@ -737,6 +781,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       case 'nft': setShowSellNftModal(true); break
       case 'poll': attachPollRef.current?.open(); break
       case 'fund': attachFundRef.current?.open(); break
+      case 'task': attachTaskRef.current?.open(); break
       case 'predict': setShowAttachMarket(true); break
       case 'drop': setShowAttachDrop(true); break
       case 'miniapp': attachMiniAppRef.current?.open(); break
@@ -1480,11 +1525,19 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       pendingPublishRef.current = null
       // onConfirmed travels with it instead of firing here: its callers bump a comment count or
       // reload a community feed, and neither should happen for a post that never landed.
-      if (pending) trackPostPublication({ ...pending, txHash, signature, onIndexed: onConfirmed })
+      // A task post is funded once it exists: HupTasks keys the escrow by the indexed post id
+      const terms = actionType === 'post' ? hupTask : null
+      const onIndexed = terms
+        ? (found) => {
+            onConfirmed?.(found)
+            if (found?.id) requestTaskFunding({ networkId: Number(pending?.networkId), postId: String(found.id), terms })
+          }
+        : onConfirmed
+      if (pending) trackPostPublication({ ...pending, txHash, signature, onIndexed })
 
       handleClose()
     },
-    [actionType, handleClose, onConfirmed, restoreState]
+    [actionType, handleClose, hupTask, onConfirmed, restoreState]
   )
 
   /**
@@ -1705,6 +1758,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // resolves the tally live, so a post never carries a count that has since moved
       if (poll) serializableContent.poll = poll
       if (hupFund) serializableContent.hupFund = hupFund
+      if (hupTask) serializableContent.hupTask = hupTask
 
       // Edits rebuild the payload from the composer's text/media state, so reference keys
       // that only exist in the stored JSON must be carried over or the edit erases them
@@ -1743,6 +1797,15 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       if (communityContext && actionType !== 'edit') {
         contentForUpload = await sealForCommunity(serializableContent)
         if (contentForUpload === null) return
+      }
+
+      if (sealsReply) {
+        if (!taskSealKey) {
+          toast('This sealed task is not funded yet, so your reply cannot be sealed. Try again once it is.', 'error')
+          return
+        }
+        const envelope = await sealSubmission(stripAttachments(serializableContent), taskSealKey)
+        contentForUpload = { ...createPostContent(SEALED_PLACEHOLDER), taskSubmission: envelope }
       }
 
       // Encrypted community posts are pinned without the author stamp: a rotated or leaked key
@@ -2012,6 +2075,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
               <p className={styles.replyContext__label}>
                 {isQuote ? 'Quoting' : 'Replying to'} <b>{previewTargetHandle}</b>
               </p>
+              {sealsReply && (
+                <p className={styles.replyContext__label}>
+                  <LockSimpleIcon size={12} /> {taskSealKey === '' ? 'This sealed task is not funded yet, so replies cannot be sealed.' : 'Your reply is sealed to the task owner until they approve it.'}
+                </p>
+              )}
             </div>
           )}
 
@@ -2131,6 +2199,19 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                   <BagIcon size={16} />
                   <span>Fundraise attached (campaign #{hupFund.campaignId})</span>
                   <button type="button" onClick={() => setHupFund(null)} aria-label="Detach fundraise" disabled={isBusy}>
+                    <XIcon size={14} />
+                  </button>
+                </div>
+              )}
+
+              {hupTask && (
+                <div className={styles.nftAttachment}>
+                  <ToolboxIcon size={16} />
+                  <span>
+                    {categoryLabel(hupTask.category)} task · {hupTask.reward} {hupTask.symbol} × {hupTask.slots}
+                    {hupTask.sealed ? ' · sealed' : ''} · funded after posting
+                  </span>
+                  <button type="button" onClick={() => setHupTask(null)} aria-label="Remove task" disabled={isBusy || actionType === 'edit'}>
                     <XIcon size={14} />
                   </button>
                 </div>
@@ -2462,6 +2543,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         onCreateNew={() => createFundRef.current?.open()}
       />
       <CreateFundDialog ref={createFundRef} fixedChainId={targetChainId} onCreated={(reference) => reference && setHupFund(reference)} />
+      <AttachTaskDialog ref={attachTaskRef} chainId={targetChainId} onAttach={(terms) => terms && setHupTask(terms)} />
 
       {/* Null is a real answer here — the dialog owns "remove from post" as well as the pick */}
       <AttachTokenTradeDialog ref={attachTokenTradeRef} value={tokenTrade} onAttach={(payload) => setTokenTrade(payload)} />

@@ -58,6 +58,8 @@ import DropCard from './DropCard'
 import PredictCard from './PredictCard'
 import PollCard from './PollCard'
 import FundCard from './FundCard'
+import TaskCard from './TaskCard'
+import SealedSubmission from './SealedSubmission'
 import { arcoLaunchHref } from '@/lib/arco'
 import MiniAppEmbed from './MiniAppEmbed'
 import CashtagStrip from './CashtagStrip'
@@ -388,6 +390,23 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
               {displayItem?.content?.poll && <PollCard pollRef={displayItem.content.poll} />}
               {displayItem?.content?.hupFund && <FundCard fundRef={displayItem.content.hupFund} />}
+              {displayItem?.content?.hupTask && (
+                <TaskCard
+                  taskRef={displayItem.content.hupTask}
+                  networkId={displayItem.network_id}
+                  postId={displayItem.id}
+                  author={displayItem.wallet_address}
+                  onSubmit={() => setShowCommentModal(displayItem)}
+                />
+              )}
+              {displayItem?.content?.taskSubmission && (
+                <SealedSubmission
+                  envelope={displayItem.content.taskSubmission}
+                  networkId={displayItem.network_id}
+                  parentId={displayItem.is_comment ?? displayItem.parent_id}
+                  replyId={displayItem.id}
+                />
+              )}
 
               {displayItem?.content?.tokenLaunch && (
                 <a href={arcoLaunchHref(displayItem.content.tokenLaunch)} target="_blank" rel="noopener noreferrer">
@@ -1134,6 +1153,9 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
           onchain tally either way, so nothing is gained by making the reader open the post */}
       {quotedPost?.content?.poll && <PollCard pollRef={quotedPost.content.poll} />}
       {quotedPost?.content?.hupFund && <FundCard fundRef={quotedPost.content.hupFund} />}
+      {quotedPost?.content?.hupTask && (
+        <TaskCard taskRef={quotedPost.content.hupTask} networkId={networkId} postId={quotedPost.id} author={quotedPost.wallet_address} />
+      )}
       {quotedPost?.content?.tokenLaunch && (
         <a href={arcoLaunchHref(quotedPost.content.tokenLaunch)} target="_blank" rel="noopener noreferrer">
           View this launch on Arco

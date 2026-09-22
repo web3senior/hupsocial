@@ -345,6 +345,7 @@
       { id: "HupOffers", label: "HupOffers (escrowed offers / OTC)", file: "HupOffers.json" },
       { id: "HupCommunity", label: "HupCommunity", file: "HupCommunity.json" },
       { id: "HupFund", label: "HupFund (fundraising campaigns, escrowed — admin only)", file: "HupFund.json" },
+      { id: "HupTasks", label: "HupTasks (micro bounties on posts, escrowed — salt hup-tasks)", file: "HupTasks.json" },
       { id: "HupTestToken", label: "Test token · ERC20 (faucet, any EVM)", file: "HupTestToken.json", signerArgs: ["owner_"] },
       { id: "HupTestERC721", label: "Test NFT · ERC721 (faucet, any EVM)", file: "HupTestERC721.json", signerArgs: ["owner_"] },
       { id: "HupTestLSP7", label: "Test token · LSP7 (faucet, LUKSO-style)", file: "HupTestLSP7.json", signerArgs: ["owner_"] },
@@ -471,6 +472,19 @@
       // credits msg.sender and nothing else, so there is no address to point it at but the admin.
       HupOffers: {
         42: ["0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // admin
+      },
+      // Hup core, the ERC-8004 Reputation Registry, admin. Testnets use the 8004 testnet pair.
+      HupTasks: {
+        1: ["0xd1aEc7Bb7679FA30E74Ab30877FbdF96d51333D4", "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        42: ["0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8", "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        56: ["0xA5e73b15c1C3eE477AED682741f0324C6787bbb8", "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        143: ["0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A", "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        4663: ["0x4E6Bab4961Ab53D70745E791FA727993A4221d1F", "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        5042: ["0xA5e73b15c1C3eE477AED682741f0324C6787bbb8", "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        8453: ["0xE401aF10CAa79F9Bb6945C87Ee196503E5DE6BEA", "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        42161: ["0x1EC0B3b802aFE596929a038f40F832EA01eCc281", "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        42220: ["0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73", "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        84532: ["0xf6b33ecab0fa561300453c1bb1B520Ce544544ae", "0x8004B663056A597Dffe9eCcC1965A193B7388713", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
       },
       // Forwarder = the chain's HupChatForwarder (`forwarder` in contracts.js) — the one every
       // Hup extension trusts (HupApps on 42 confirmed onchain), NOT `hupForwarder`, which only

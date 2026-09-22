@@ -79,6 +79,7 @@ export const ACTION_META = {
   sell_access_released: { icon: LockKeyOpenIcon, tone: 'money', weight: 'fill', group: 'none', verb: 'released your key', previewFrom: 'entity' },
   sell_sent_purchase: { icon: ShoppingBagOpenIcon, tone: 'money', weight: 'fill', group: 'none', previewFrom: 'entity' },
   sell_purchase_refunded: { icon: ArrowsCounterClockwiseIcon, tone: 'money', weight: 'fill', group: 'none', previewFrom: 'entity' },
+  task_paid: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', group: 'none', verb: 'paid you for your task reply', previewFrom: 'entity' },
   nft_purchased: { icon: StorefrontIcon, tone: 'money', weight: 'fill', group: 'none' },
   nft_offer_made: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', group: 'none' },
   nft_offer_accepted: { icon: HandshakeIcon, tone: 'money', weight: 'fill', group: 'none' },

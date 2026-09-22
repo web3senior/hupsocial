@@ -25,7 +25,7 @@ const RESERVED = new Set([
   'connect', 'drops', 'events', 'fund', 'gas', 'help', 'insights', 'install', 'leaderboard',
   'liked', 'networks', 'nfts', 'notifications', 'offline', 'p2p', 'polls', 'predict', 'premium',
   'privacy_policy', 'profiles', 'register', 'revenue', 'saved', 'screensaver', 'search',
-  'secure_account', 'settings', 'share', 'shorts', 'unlock',
+  'secure_account', 'settings', 'share', 'shorts', 'tasks', 'unlock',
   'about', 'auth', 'billing', 'blog', 'contact', 'developer', 'developers', 'docs', 'download',
   'explore', 'faq', 'feed', 'home', 'hup', 'hupsocial', 'legal', 'login', 'logout', 'me',
   'messages', 'moderator', 'official', 'privacy', 'root', 'security', 'signin', 'signup',

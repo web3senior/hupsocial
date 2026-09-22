@@ -1,0 +1,206 @@
+.attachTask {
+  padding: var(--native-popover-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: min(440px, calc(100vw - 6px - 2em - 2px - 2 * var(--native-popover-padding, 1rem)));
+    max-height: 82svh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+  }
+
+  &__close {
+    all: unset;
+    display: flex;
+    padding: 0.25rem;
+    border-radius: 50%;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__lead,
+  &__summary,
+  &__notice {
+    margin: 0;
+    font-size: var(--font-size-13, 0.8125rem);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+  }
+
+  &__notice {
+    padding: 0.5rem 0.75rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+
+    legend,
+    label {
+      padding: 0;
+      margin-bottom: 0.45rem;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    label {
+      margin-bottom: 0;
+    }
+  }
+
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  &__chip {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    padding: 0.3rem 0.8rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+
+    &--active {
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+      color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+  }
+
+  &__slots {
+    width: 5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.3rem 0.7rem;
+    background: var(--background);
+    color: inherit;
+    font: inherit;
+    font-size: var(--font-size-12);
+  }
+
+  &__amount {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--background);
+
+    &:focus-within {
+      border-color: var(--network-color-primary, var(--primary, #ec4899));
+    }
+
+    input {
+      all: unset;
+      flex: 1;
+      min-width: 0;
+      font-size: 1.4rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      appearance: textfield;
+
+      &::-webkit-outer-spin-button,
+      &::-webkit-inner-spin-button {
+        appearance: none;
+        margin: 0;
+      }
+    }
+
+    select {
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.3rem 0.6rem;
+      background: var(--surface);
+      color: inherit;
+      font: inherit;
+      font-weight: 600;
+    }
+  }
+
+  &__toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    cursor: pointer;
+
+    input {
+      margin-top: 0.2rem;
+    }
+
+    span {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    strong {
+      font-size: var(--font-size-13, 0.8125rem);
+    }
+
+    small {
+      font-size: var(--font-size-12);
+      line-height: 1.45;
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__submit {
+    border: none;
+    border-radius: 999px;
+    padding: 0.65rem 1rem;
+    background: var(--network-color-primary, var(--primary, #ec4899));
+    color: var(--network-color-text, #fff);
+    font-weight: 700;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}

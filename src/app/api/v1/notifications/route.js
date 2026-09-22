@@ -45,6 +45,7 @@ const MONEY_TYPES = [
   'sell_access_released',
   'sell_sent_purchase',
   'sell_purchase_refunded',
+  'task_paid',
 ]
 
 // Every row the indexer writes for something you did yourself carries actor = recipient

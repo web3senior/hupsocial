@@ -22,6 +22,7 @@ import {
   SealCheckIcon,
   SquaresFourIcon,
   StorefrontIcon,
+  ToolboxIcon,
   TrophyIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
@@ -65,6 +66,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
   // Beside polls for the same reason: asking people for something, in public, on the record.
   { id: 'fund', name: 'Fundraise', path: '/fund', icon: CurrencyCircleDollarIcon },
+  { id: 'tasks', name: 'Tasks', path: '/tasks', icon: ToolboxIcon },
   // With the social rows for the same reason polls are: an article is something someone wrote,
   // not something they listed for sale. The directory is public and the only reading surface
   // for long-form, so it earns a row rather than living behind the More menu.

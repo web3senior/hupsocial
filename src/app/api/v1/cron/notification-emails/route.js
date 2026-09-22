@@ -87,6 +87,7 @@ const EMAIL_WORTHY_TYPES = [
   'sell_received_purchase',
   'sell_access_released',
   'sell_purchase_refunded',
+  'task_paid',
 ]
 
 const WORTHY_PLACEHOLDERS = EMAIL_WORTHY_TYPES.map(() => '?').join(', ')

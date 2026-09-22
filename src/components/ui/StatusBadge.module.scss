@@ -1,0 +1,112 @@
+/* Fills from the design; text darkened per tone until it clears WCAG AA on that fill. */
+.badge {
+  --status-pending-bg: #fff0de;
+  --status-pending-fg: #a75900;
+  --status-pending-icon: #f58300;
+  --status-review-bg: #dcf3fd;
+  --status-review-fg: #0970b1;
+  --status-review-icon: #0b8fe3;
+  --status-progress-bg: #efdcfe;
+  --status-progress-fg: #9b0ee5;
+  --status-progress-icon: #a10fef;
+  --status-idle-bg: #ebebeb;
+  --status-idle-fg: #3d3d3d;
+  --status-idle-icon: #3d3d3d;
+  --status-cancelled-bg: #ffdddc;
+  --status-cancelled-fg: #b83817;
+  --status-cancelled-icon: #f24a1e;
+  --status-approved-bg: #ddfbe0;
+  --status-approved-fg: #177f0b;
+  --status-approved-icon: #1ea70e;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--status-bg);
+  color: var(--status-fg);
+  font-family: var(--font-geist-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+
+  svg {
+    flex-shrink: 0;
+    color: var(--status-icon);
+  }
+
+  &--sm {
+    padding: 0.3em 0.7em 0.3em 0.55em;
+    font-size: var(--font-size-12, 0.75rem);
+
+    svg {
+      width: 1.1em;
+      height: 1.1em;
+    }
+  }
+
+  &--md {
+    padding: 0.5em 1em 0.5em 0.8em;
+    font-size: var(--font-size-14, 0.875rem);
+
+    svg {
+      width: 1.25em;
+      height: 1.25em;
+    }
+  }
+
+  &--pending {
+    --status-bg: var(--status-pending-bg);
+    --status-fg: var(--status-pending-fg);
+    --status-icon: var(--status-pending-icon);
+  }
+
+  &--review {
+    --status-bg: var(--status-review-bg);
+    --status-fg: var(--status-review-fg);
+    --status-icon: var(--status-review-icon);
+  }
+
+  &--progress {
+    --status-bg: var(--status-progress-bg);
+    --status-fg: var(--status-progress-fg);
+    --status-icon: var(--status-progress-icon);
+  }
+
+  &--idle {
+    --status-bg: var(--status-idle-bg);
+    --status-fg: var(--status-idle-fg);
+    --status-icon: var(--status-idle-icon);
+  }
+
+  &--cancelled {
+    --status-bg: var(--status-cancelled-bg);
+    --status-fg: var(--status-cancelled-fg);
+    --status-icon: var(--status-cancelled-icon);
+  }
+
+  &--approved {
+    --status-bg: var(--status-approved-bg);
+    --status-fg: var(--status-approved-fg);
+    --status-icon: var(--status-approved-icon);
+  }
+}
+
+:global([data-theme='dark']) .badge,
+:global([data-theme='terminal']) .badge {
+  --status-pending-bg: #422d16;
+  --status-pending-fg: #f58300;
+  --status-review-bg: #132f44;
+  --status-review-fg: #239ae6;
+  --status-progress-bg: #311546;
+  --status-progress-fg: #bf5cf4;
+  --status-progress-icon: #bf5cf4;
+  --status-idle-bg: #1d1f23;
+  --status-idle-fg: #878787;
+  --status-idle-icon: #878787;
+  --status-cancelled-bg: #41211c;
+  --status-cancelled-fg: #f46039;
+  --status-approved-bg: #173419;
+  --status-approved-fg: #2cac1c;
+}

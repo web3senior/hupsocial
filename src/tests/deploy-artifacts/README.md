@@ -169,3 +169,21 @@ cidex via the template at the bottom of `cidex/scripts/add-hupfund.sql` (name mu
 restart cidex, and set the fee and sweep the ledger from the Fundraise tab on `/admin/contracts`.
 
 Deployed: Base Sepolia `0xEB6c36fE71aC893Dca06fCAbc78C0C6690eA6D4b` (2026-09-08).
+
+## HupTasks
+
+Micro bounties escrowed against a post (`src/contracts/v2/Extensions/HupTasks.sol`). Same build as
+HupFund: **foundry, solc 0.8.36, optimizer 200, viaIR, cancun**. Suite:
+`forge test --match-contract HupTasksTest` from `src/contracts`.
+
+**Salt: `hup-tasks`**:
+
+    0xb8f2da53e9c7f43a147feed07eee10cf71c66a5b5bbafd2c1bb434d9544d5449
+
+Constructor: Hup core, the chain's ERC-8004 Reputation Registry, admin. `CTOR_DEFAULTS.HupTasks`
+carries all three per chain. Mainnets share the 8004 pair `0x8004A169…a432` / `0x8004BAa1…9b63`;
+Base Sepolia uses the testnet pair `0x8004A818…D9e` / `0x8004B663…8713`. The Hup core differs per
+chain, so the address does too. Like HupFund there is no forwarder and no session key.
+
+After deploying: fill `chain<id>.tasks` in `src/config/contracts.js`, run the matching section of
+`cidex/scripts/add-huptasks-contracts.sql` with the real deploy block, and restart cidex.
