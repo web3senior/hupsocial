@@ -14,7 +14,7 @@
     min-height: 100svh;
     background-color: var(--surface);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--card-elevation, var(--shadow-md));
     border-radius: 24px;
     overflow: hidden;
 

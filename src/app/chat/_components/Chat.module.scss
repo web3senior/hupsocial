@@ -21,7 +21,7 @@
     position: relative;
     top: 0rem;
     background-color: var(--background);
-    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--card-elevation, 0px 0px 8px rgba(0, 0, 0, 0.04));
     border: 1px solid var(--border);
     border-radius: var(--global-border-radius);
     overflow: hidden;

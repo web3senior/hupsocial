@@ -168,7 +168,7 @@
 
     ul {
       li {
-        box-shadow: var(--shadow-xs, 0 0 #0000);
+        box-shadow: var(--card-elevation, var(--shadow-xs, 0 0 #0000));
         border: 1px solid var(--border);
         border-radius: var(--global-border-radius);
         margin-bottom: 0.5rem;

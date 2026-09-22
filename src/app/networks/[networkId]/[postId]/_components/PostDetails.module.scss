@@ -20,7 +20,7 @@
     background-color: var(--page-bg);
     color: var(--page-text);
     border: 1px solid var(--page-border);
-    box-shadow: var(--page-shadow);
+    box-shadow: var(--card-elevation, var(--page-shadow));
     border-radius: var(--page-border-radius);
     overflow: hidden;
 

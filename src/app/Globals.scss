@@ -142,6 +142,8 @@
 
   --hover: #20232a;
   --tag: var(--black-800);
+  // Cards sit flat here; each card reads box-shadow: var(--card-elevation, <its light shadow>)
+  --card-elevation: none;
   --shimmer-glint: rgba(255, 255, 255, 0.12);
   --shimmer-bg: #23262c;
   --cashtag-color: #1d9bf0;

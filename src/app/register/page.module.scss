@@ -14,7 +14,7 @@
     padding: 2.5rem;
     max-width: 500px;
     width: 100%;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--card-elevation, 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06));
   }
 
   &__header {

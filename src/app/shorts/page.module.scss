@@ -90,7 +90,7 @@
 .shimmer {
   padding: 1.2rem;
   border-radius: 20px;
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--card-elevation, var(--shadow-xs));
 }
 
 /* Enable hover only on non-touch devices */

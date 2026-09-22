@@ -18,7 +18,7 @@
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: 24px;
-    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--card-elevation, 0px 0px 8px rgba(0, 0, 0, 0.04));
     overflow: clip;
     isolation: isolate;
     // Rows carry their own padding and run edge to edge, so the shell adds none.
@@ -90,7 +90,7 @@
 .shimmer {
   padding: 1.2rem;
   border-radius: 20px;
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--card-elevation, var(--shadow-xs));
 }
 
 /* Enable hover only on non-touch devices */

@@ -8,7 +8,7 @@
 
   &:not([data-shadow="none"]) {
     --shadow: 0px 9px 4px rgba(63, 93, 116, 0.01), 0px 5px 3px rgba(63, 93, 116, 0.04), 0px 2px 2px rgba(63, 93, 116, 0.07), 0px 1px 1px rgba(63, 93, 116, 0.08), 0px 0px 0px rgba(63, 93, 116, 0.08);
-    box-shadow: var(--shadow, 0 0 #0000);
+    box-shadow: var(--card-elevation, var(--shadow, 0 0 #0000));
   }
   
   &:not([data-margin="none"]) {
@@ -17,7 +17,7 @@
 
   &:hover:not([data-hover="none"]) {
     --tw-shadow: 0px 18px 7px rgba(63, 93, 116, 0.02), 0px 10px 6px rgba(63, 93, 116, 0.08), 0px 4px 4px rgba(63, 93, 116, 0.13), 0px 1px 2px rgba(63, 93, 116, 0.15), 0px 0px 0px rgba(63, 93, 116, 0.16);
-    box-shadow: var(--tw-shadow, 0 0 #0000);
+    box-shadow: var(--card-elevation, var(--tw-shadow, 0 0 #0000));
   }
 
   &__header {

@@ -26,7 +26,7 @@
   border-radius: 20px;
   background-color: var(--surface, var(--background));
   color: var(--foreground, inherit);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-elevation, 0 12px 40px rgba(0, 0, 0, 0.08));
 
   @media (max-width: 600px) {
     border: none;
