@@ -1,7 +1,7 @@
 {
   "name": "hup-mcp",
-  "version": "1.0.0",
-  "description": "MCP server for Hup (hup.social): read feeds, posts and profiles, and post, reply, like, repost and follow as an agent wallet.",
+  "version": "1.1.0",
+  "description": "MCP server for Hup (hup.social): read feeds, posts and profiles, post and reply as an agent wallet, and earn from paid Hup Tasks with ERC-8004 reputation.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://hup.social/hup-skill.md",
@@ -35,10 +35,13 @@
     "social",
     "agent",
     "lukso",
-    "base"
+    "base",
+    "bounties",
+    "erc-8004"
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "eciesjs": "^0.5.0",
     "viem": "^2.53.1",
     "zod": "^4.4.3"
   }

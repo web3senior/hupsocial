@@ -12,6 +12,9 @@ import { createPublicClient, createWalletClient, encodeFunctionData, fallback, f
 import { privateKeyToAccount } from 'viem/accounts'
 import { CONTENT_TYPE, FORWARD_REQUEST_TYPES, FORWARDER_ABI, HUP_ABI, LSP26_ABI } from './abi.js'
 import { chainEntry, txUrl } from './config.js'
+import { sealSubmission, taskIdentityFromKey } from './taskCrypto.js'
+
+export const SEALED_PLACEHOLDER = '🔒 Sealed task submission'
 
 const MAX_POST_LENGTH = 5000
 const MAX_MEDIA_ITEMS = 8
@@ -263,11 +266,21 @@ export function createSigner({ privateKey, http }) {
     return confirm(entry, sent)
   }
 
-  async function publish({ chain, type, text, media = [], parentId = 0, allowComments = true, quoteOf, mode }) {
+  /**
+   * @param {object} [params.extra] Keys merged into the document (e.g. hupTask).
+   * @param {string} [params.sealTo] Task public key: moderation reads the plaintext, then the
+   *   document is replaced by a sealed envelope only that key can open.
+   */
+  async function publish({ chain, type, text, media = [], parentId = 0, allowComments = true, quoteOf, mode, extra, sealTo }) {
     const items = []
     for (const item of media) items.push(await pinMedia(item))
-    const doc = buildDocument({ text, media: items, quoteOf })
+    let doc = { ...buildDocument({ text, media: items, quoteOf }), ...(extra ?? {}) }
     const moderation = await moderate(doc)
+    if (sealTo) {
+      const { author, ...plain } = doc
+      const envelope = await sealSubmission(plain, sealTo)
+      doc = { ...buildDocument({ text: SEALED_PLACEHOLDER }), taskSubmission: envelope }
+    }
     const uri = await pinObject(doc)
     const entry = chainEntry(chain)
     await assertMetadataFits(entry, uri)
@@ -366,5 +379,28 @@ export function createSigner({ privateKey, http }) {
     return rows
   }
 
-  return { address: account.address, buildDocument, publish, repost, edit, remove, like, unlike, follow, updateProfile, balances, write }
+  /** A direct transaction to any contract, paid by the agent wallet, confirmed like a Hup write. */
+  async function send({ chain, address, abi, functionName, args, value = 0n }) {
+    const entry = chainEntry(chain)
+    const { publicClient, walletClient } = clientsFor(entry)
+    const balance = await publicClient.getBalance({ address: account.address })
+    if (balance === 0n) throw new Error(`${account.address} holds no ${entry.chain.nativeCurrency.symbol} on ${entry.slug} to pay gas`)
+    const txHash = await walletClient.writeContract({ address, abi, functionName, args, value })
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: RECEIPT_TIMEOUT_MS })
+    return {
+      tx_hash: txHash,
+      status: receipt.status === 'success' ? 'confirmed' : 'reverted',
+      block: Number(receipt.blockNumber),
+      chain: entry.slug,
+      network_id: entry.id,
+      explorer: txUrl(entry, txHash),
+      logs: receipt.logs,
+    }
+  }
+
+  const read = ({ chain, address, abi, functionName, args }) => clientsFor(chainEntry(chain)).publicClient.readContract({ address, abi, functionName, args })
+
+  const taskIdentity = () => taskIdentityFromKey(key)
+
+  return { address: account.address, buildDocument, publish, repost, edit, remove, like, unlike, follow, updateProfile, balances, write, send, read, taskIdentity }
 }

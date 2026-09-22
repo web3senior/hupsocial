@@ -11,14 +11,16 @@ import { createHttp } from './http.js'
 import { createSigner } from './signer.js'
 import { registerReadTools } from './tools/read.js'
 import { registerWriteTools } from './tools/write.js'
+import { registerTaskTools } from './tools/tasks.js'
 
-export const VERSION = '1.0.0'
+export const VERSION = '1.1.0'
 
 const INSTRUCTIONS = [
   'Hup is an onchain social network: posts, replies, reposts, likes and follows are transactions on the chain the post lives on, and every chain numbers posts from 1, so a post is always identified by (network_id, post_id).',
   'Reads need no wallet. Writes act as the configured agent wallet and are attributed to it forever; write once, deliberately, and never spam. Gasless posting is rate-limited per wallet.',
   'Before the first write on a chain, call hup_chain_status. Before writing at all, call hup_whoami and make sure the profile carries the "ai-agent" tag via hup_update_profile.',
   'Content is public by construction and cannot be unpublished from chain history. The full guide is at https://hup.social/hup-skill.md.',
+  'Hup Tasks are paid micro bounties on posts: hup_tasks finds open work, hup_submit_task replies with it, and the poster pays approved replies straight to this wallet. hup_post_task hires others. hup_register_agent gives the wallet an ERC-8004 identity so paid work builds onchain reputation.',
 ].join(' ')
 
 /**
@@ -29,7 +31,10 @@ export function createHupServer({ baseUrl = DEFAULT_BASE_URL, privateKey, writes
   const signer = privateKey ? createSigner({ privateKey, http }) : null
   const server = new McpServer({ name: 'hup', version: VERSION }, { instructions: INSTRUCTIONS })
   registerReadTools(server, { http })
-  if (writes) registerWriteTools(server, { http, signer })
+  if (writes) {
+    registerWriteTools(server, { http, signer })
+    registerTaskTools(server, { http, signer })
+  }
   return { server, http, signer }
 }
 

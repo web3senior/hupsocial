@@ -7,6 +7,7 @@
 import { z } from 'zod'
 import { CHAINS, chainEntry, chainSummary } from '../config.js'
 import { compactActivity, compactCommunity, compactPost, compactProfile } from '../shape.js'
+import { compactSubmission, compactTask } from '../taskShape.js'
 
 const MAX_LIMIT = 50
 
@@ -394,6 +395,61 @@ export function registerReadTools(server, { http }) {
           at: row.created_at,
         })),
         next_page: body.nextPage ?? null,
+      })
+    }),
+  )
+
+  server.registerTool(
+    'hup_tasks',
+    {
+      title: 'Find paid tasks',
+      description:
+        'Micro bounties on Hup posts. Each task escrows a reward per slot onchain; anyone submits by replying to the post, and the poster pays each reply they approve. status: open (default, taking replies), review (deadline passed, poster still paying), done, all. Use poster or worker to see one wallet’s tasks.',
+      inputSchema: {
+        status: z.enum(['open', 'review', 'done', 'all']).optional(),
+        category: z.string().optional().describe('translate, summarize, write, design, research, code, data, review, other'),
+        network_id: chainField,
+        sort: z.enum(['recent', 'deadline', 'reward']).optional(),
+        poster: z.string().optional(),
+        worker: z.string().optional(),
+        limit: z.number().int().min(1).max(MAX_LIMIT).optional(),
+        offset: z.number().int().min(0).optional(),
+      },
+    },
+    guard(async ({ status = 'open', category, network_id, sort, poster, worker, limit, offset = 0 }) => {
+      const body = await http.get('/api/v1/tasks', {
+        status,
+        category,
+        networkId: chainIdOf(network_id),
+        sort,
+        poster: poster ? (await resolveUser(http, poster)).address : undefined,
+        worker: worker ? (await resolveUser(http, worker)).address : undefined,
+        limit: clampLimit(limit),
+        offset,
+      })
+      return ok({ tasks: (body.data ?? []).map((row) => compactTask(row, base)), has_more: Boolean(body.hasMore) })
+    }),
+  )
+
+  server.registerTool(
+    'hup_task',
+    {
+      title: 'Read one task',
+      description:
+        'One task with its submissions (the post’s replies) and payouts. Sealed submissions show no text: only the poster can open them, with hup_review_task. A task that is null here is a post that promised a task but was never funded.',
+      inputSchema: {
+        network_id: z.union([z.number().int(), z.string()]),
+        post_id: z.union([z.number().int(), z.string()]),
+      },
+    },
+    guard(async ({ network_id, post_id }) => {
+      const chainId = chainEntry(network_id).id
+      const body = await http.get(`/api/v1/tasks/${chainId}/${post_id}`)
+      const data = body.data ?? {}
+      return ok({
+        task: data.task ? compactTask(data.task, base) : null,
+        promised_terms: data.post?.hupTask ?? null,
+        submissions: (data.submissions ?? []).map(compactSubmission),
       })
     }),
   )

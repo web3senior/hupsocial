@@ -31,6 +31,10 @@ const arc = defineChain({
 // viem's defaults refuse keyless server callers on several chains; pin ones that answer.
 const pin = (chain, http) => ({ ...chain, rpcUrls: { ...chain.rpcUrls, default: { http } } })
 
+/** ERC-8004 registries: one CREATE2 pair on every mainnet, another on testnets. */
+const ERC8004_MAINNET = { identity: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432', reputation: '0x8004BAa17C55a88189AE136b182e5fdA19dE9b63' }
+const ERC8004_TESTNET = { identity: '0x8004A818BFB912233c491871b3d84c89A494BD9e', reputation: '0x8004B663056A597Dffe9eCcC1965A193B7388713' }
+
 const entry = (chain, slug, hup, forwarder, forwarderName, followerSystem, extra = {}) => ({
   chain,
   id: chain.id,
@@ -40,7 +44,9 @@ const entry = (chain, slug, hup, forwarder, forwarderName, followerSystem, extra
   forwarderName,
   followerSystem,
   testnet: false,
+  tasks: '',
   ...extra,
+  erc8004: extra.testnet ? ERC8004_TESTNET : ERC8004_MAINNET,
 })
 
 export const CHAINS = [
@@ -123,7 +129,7 @@ export const CHAINS = [
     '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
     'HupChatForwarder',
     '',
-    { testnet: true },
+    { testnet: true, tasks: '0x0bbac84D3b302d349C88Fc89BFF731745F915852' },
   ),
 ]
 
@@ -152,6 +158,8 @@ export const chainSummary = (c) => ({
   hup: c.hup,
   forwarder: c.forwarder,
   follow_supported: Boolean(c.followerSystem),
+  tasks: c.tasks || null,
+  erc8004_identity: c.erc8004.identity,
   explorer: c.chain.blockExplorers?.default?.url ?? null,
 })
 
