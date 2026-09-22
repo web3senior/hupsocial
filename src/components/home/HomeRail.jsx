@@ -4,10 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
 import { useConnection, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
-import { XIcon, UsersThreeIcon } from '@phosphor-icons/react'
+import { XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import Profile from '@/components/Profile'
-import EmptyState from '@/components/ui/EmptyState'
 import { toast } from '@/components/NextToast'
 import { usePremium } from '@/hooks/usePremium'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
@@ -97,14 +96,14 @@ const PremiumUpsell = () => {
 
 const WhoToFollow = () => {
   const { address: viewer } = useActiveWallet()
-  const { data, error, isLoading, mutate } = useSWR(['suggested-users', viewer ?? 'anon'], () => fetchSuggestions(viewer), {
+  const { data, isLoading, mutate } = useSWR(['suggested-users', viewer ?? 'anon'], () => fetchSuggestions(viewer), {
     revalidateOnFocus: false,
     keepPreviousData: true,
   })
 
   const users = data?.users ?? []
-  // No chain in this build sells Premium: there is nothing to suggest from, so no card at all.
-  if (data && !data.live) return null
+  // No one left to suggest (or no Premium on this build, or the read failed): no card at all.
+  if (!isLoading && users.length === 0) return null
 
   return (
     <section className={clsx(styles.card, styles.follow)} aria-label="Who to follow">
@@ -122,12 +121,6 @@ const WhoToFollow = () => {
             </li>
           ))}
         </ul>
-      )}
-
-      {!isLoading && (error || users.length === 0) && (
-        <EmptyState icon={UsersThreeIcon} size="sm" className={styles.follow__empty}>
-          {error ? 'Suggestions are taking a break.' : 'No one new to suggest right now.'}
-        </EmptyState>
       )}
 
       {users.length > 0 && (
