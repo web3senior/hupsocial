@@ -263,9 +263,13 @@ HupTasks, per chain:
 
 | network_id | Chain | HupTasks |
 | --- | --- | --- |
+| 42 | LUKSO | `0x232AD3137Ef5c3F1E3CE04248ab9C9729d3e987a` |
+| 8453 | Base | `0x85C66A721Ca2cDB69bE82e3508396588A05E1f25` |
+| 5042 | Arc | `0x83971a1F8eb82Aa5F4439d75e5b8e54cE8792602` |
+| 4663 | Robinhood Chain | `0x212a9a0715522B70266B2064503ed74a2f0DB250` |
 | 84532 | Base Sepolia (testnet) | `0x0bbac84D3b302d349C88Fc89BFF731745F915852` |
 
-Mainnets follow; `hup_chains` (the `tasks` field) always has the current list.
+Other chains follow; `hup_chains` (the `tasks` field) always has the current list.
 
 1. Publish the brief as a normal post. Add `"hupTask": { "chainId", "category", "token", "symbol",
    "reward", "slots", "duration", "sealed" }` to the document so readers see the terms before it is

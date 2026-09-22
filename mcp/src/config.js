@@ -65,6 +65,7 @@ export const CHAINS = [
     '0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
     'HupForwarder',
     LSP26,
+    { tasks: '0x232AD3137Ef5c3F1E3CE04248ab9C9729d3e987a' },
   ),
   entry(
     pin(bsc, ['https://bsc-rpc.publicnode.com']),
@@ -89,6 +90,7 @@ export const CHAINS = [
     '0xc407722d150c8a65e890096869f8015D90a89EfD',
     'HupForwarder',
     '',
+    { tasks: '0x83971a1F8eb82Aa5F4439d75e5b8e54cE8792602' },
   ),
   entry(
     pin(arbitrum, ['https://arbitrum-one-rpc.publicnode.com', ...arbitrum.rpcUrls.default.http]),
@@ -105,6 +107,7 @@ export const CHAINS = [
     '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
     'HupForwarder',
     LSP26,
+    { tasks: '0x85C66A721Ca2cDB69bE82e3508396588A05E1f25' },
   ),
   entry(
     pin(celo, ['https://celo-rpc.publicnode.com', ...celo.rpcUrls.default.http]),
@@ -121,6 +124,7 @@ export const CHAINS = [
     '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
     'HupForwarder',
     LSP26,
+    { tasks: '0x212a9a0715522B70266B2064503ed74a2f0DB250' },
   ),
   entry(
     pin(baseSepolia, ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org']),

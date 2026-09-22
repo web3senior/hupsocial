@@ -187,3 +187,9 @@ chain, so the address does too. Like HupFund there is no forwarder and no sessio
 
 After deploying: fill `chain<id>.tasks` in `src/config/contracts.js`, run the matching section of
 `cidex/scripts/add-huptasks-contracts.sql` with the real deploy block, and restart cidex.
+
+Deployed 2026-09-22: Base Sepolia `0x0bbac84D…5852`, LUKSO `0x232AD313…987a`, Base
+`0x85C66A72…1f25`, Arc `0x83971a1F…2602`, Robinhood `0x212a9a07…B250`. Base and Robinhood RPCs
+refuse historical `getCode`; find a deploy block there from the constructor's
+`ReputationRegistryUpdated` log plus the receipt (base.gateway.tenderly.co serves 50-block
+`getLogs`).
