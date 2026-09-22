@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useConnection } from 'wagmi'
 import { isSolanaNetworkId } from '@/config/solana'
 import { useSolanaWallet } from '@/hooks/useSolanaWallet'
@@ -12,6 +12,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
 import { PostCard } from '@/components/Post'
 import PendingPost from '@/components/PendingPost'
+import WhoToFollow from '@/components/home/WhoToFollow'
 import { usePostStore } from '@/stores/usePostStore'
 import { usePendingPostStore } from '@/stores/usePendingPostStore'
 import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
@@ -35,6 +36,9 @@ const CATCH_UP_MIN_GAP_MS = 30_000
 // How far down the author can be and still have their freshly indexed post merged in place of
 // being queued — roughly "hasn't really left the top of the feed yet".
 const AUTHORED_MERGE_MAX_SCROLL_PX = 200
+
+// "Who to follow" sits after this post, once, and only when another post follows it.
+const SUGGESTIONS_AFTER_INDEX = 4
 
 // Post ids are per network — every chain's HupCommunity numbers its own posts from 1 — so a
 // cross-network feed routinely holds two different posts with the same id. Identity is the pair.
@@ -86,6 +90,8 @@ export default function HomeFeedTab({
   const feedType = feedMode === 'premium' ? 'premium' : feedMode === 'nft' ? 'nft' : null
   // Home-style feeds hide NFT-sale posts — those live in the dedicated NFTs tab.
   const excludeNft = feedMode === 'foryou' || feedMode === 'network'
+  // Follows are LSP26 on an EVM chain, so a Solana feed has no one to suggest.
+  const showSuggestions = feedMode === 'foryou' || (feedMode === 'network' && !isSolanaNetworkId(networkId))
   const feedCacheKey =
     feedMode === 'network' ? `network-${networkId}` : feedMode === 'premium' ? 'premium' : feedMode === 'nft' ? 'nft' : 'foryou'
   const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
@@ -496,25 +502,27 @@ export default function HomeFeedTab({
             {postsLoaded === 0 && (loadError ? <FeedError onRetry={handleRetry} /> : <PostSkeletonGrid count={14} />)}
 
             {posts?.list?.map((item, i) => (
-              <section
-                key={postKey(item)}
-                // What the scroll restore anchors to and measures; see useFeedScrollRestore.
-                data-post-key={postKey(item)}
-                style={cardStyle(postKey(item))}
-                // Restored feeds must repaint identically in place — no entrance replay.
-                className={clsx(styles.post, !initialCache && ['animate', 'fade'])}
-                onPointerDown={rememberCardPointerDown}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (isTextSelectionDrag(e)) return
-                  handlePostClick(item)
-                }}
-                onMouseEnter={() => handlePostPrefetch(item)}
-                onTouchStart={() => handlePostPrefetch(item)}
-              >
-                <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} />
-                {i < posts.list.length - 1 && <hr />}
-              </section>
+              <Fragment key={postKey(item)}>
+                <section
+                  // What the scroll restore anchors to and measures; see useFeedScrollRestore.
+                  data-post-key={postKey(item)}
+                  style={cardStyle(postKey(item))}
+                  // Restored feeds must repaint identically in place — no entrance replay.
+                  className={clsx(styles.post, !initialCache && ['animate', 'fade'])}
+                  onPointerDown={rememberCardPointerDown}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (isTextSelectionDrag(e)) return
+                    handlePostClick(item)
+                  }}
+                  onMouseEnter={() => handlePostPrefetch(item)}
+                  onTouchStart={() => handlePostPrefetch(item)}
+                >
+                  <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} />
+                  {i < posts.list.length - 1 && <hr />}
+                </section>
+                {showSuggestions && i === SUGGESTIONS_AFTER_INDEX && i < posts.list.length - 1 && <WhoToFollow />}
+              </Fragment>
             ))}
           </div>
 

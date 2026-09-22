@@ -1,15 +1,23 @@
 /**
  * @file api/v1/users/suggested/route.js
- * @description A random handful of accounts for the home rail's "Who to follow": anyone with a
- * name and a picture, never the viewer, never someone they already follow on any chain.
+ * @description A random handful of accounts for the home feed's "Who to follow", drawn from the
+ * leaderboard's top 20: anyone with a name and a picture, never the viewer, never someone they
+ * already follow on any chain.
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { normalizeAddress } from '@/lib/address'
+import { getLeaderboardSnapshot } from '@/lib/leaderboard'
 
 export const runtime = 'nodejs'
 
 const MAX_LIMIT = 10
+
+// The pool to suggest from: the leaderboard's own opening view (all time, by score, every
+// network), cut at the rank the page's first screen ends on.
+const TOP_RANK = 20
+
+const isEvmAddress = (value) => /^0x[0-9a-fA-F]{40}$/.test(value ?? '')
 
 export async function GET(request) {
   try {
@@ -17,35 +25,41 @@ export async function GET(request) {
     const limit = Math.min(Math.max(Number(request.nextUrl.searchParams.get('limit')) || 3, 1), MAX_LIMIT)
 
     // Read as literals rather than joined: users and follows can differ in collation on production.
-    const excluded = viewer ? [viewer] : []
+    const excluded = new Set(viewer ? [viewer] : [])
     if (viewer) {
       const [followed] = await pool.execute(
         `SELECT DISTINCT followed_address FROM follows WHERE follower_address = ? AND is_following = 1`,
         [viewer],
       )
-      excluded.push(...followed.map((row) => row.followed_address))
+      for (const row of followed) excluded.add(String(row.followed_address).toLowerCase())
     }
 
-    const [rows] = await pool.query(
-      `SELECT wallet_address, name, username, profileImage
-         FROM users
-        WHERE wallet_address LIKE '0x%' AND CHAR_LENGTH(wallet_address) = 42
-          AND name IS NOT NULL AND name <> ''
-          AND profileImage IS NOT NULL AND profileImage <> ''
-          ${excluded.length > 0 ? 'AND LOWER(wallet_address) NOT IN (?)' : ''}
-        ORDER BY RAND()
-        LIMIT ?`,
-      excluded.length > 0 ? [excluded, limit] : [limit],
-    )
+    // Shared with /api/v1/leaderboard, cache and all, so the feed never pays for its own ranking.
+    const snapshot = await getLeaderboardSnapshot({ period: 'all', sort: 'score', networkId: null, since: null })
 
-    const users = rows.map((row) => ({
+    const candidates = snapshot.rows
+      .slice(0, TOP_RANK)
+      .filter(
+        (row) =>
+          isEvmAddress(row.wallet_address) &&
+          row.display_name &&
+          row.profile_image &&
+          !excluded.has(String(row.wallet_address).toLowerCase()),
+      )
+
+    // Every call is a fresh shuffle; a fixed slice would pin the same faces to the feed.
+    for (let i = candidates.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[candidates[i], candidates[j]] = [candidates[j], candidates[i]]
+    }
+
+    const users = candidates.slice(0, limit).map((row) => ({
       address: row.wallet_address.toLowerCase(),
-      name: row.name,
+      name: row.display_name,
       username: row.username ?? null,
-      profileImage: row.profileImage,
+      profileImage: row.profile_image,
     }))
 
-    // Every call is a fresh shuffle; a cached copy would pin the same faces to the rail.
     return NextResponse.json({ success: true, data: { users } }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     console.error('[GET_SUGGESTED_USERS_ERROR]:', error.message)
