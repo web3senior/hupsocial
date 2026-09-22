@@ -167,6 +167,52 @@ export const readPremiumSpotlight = async (exclude) => {
 }
 
 /**
+ * A random handful of current subscribers for the home rail's "Who to follow" — never the viewer,
+ * never someone they already follow anywhere (the cross-network `follows` aggregate), so every
+ * row is an account they can act on.
+ * @param {{exclude?: string|null, limit?: number}} options
+ * @returns {Promise<{address: string, name: string|null, username: string|null, profileImage: string|null}[]>}
+ */
+export const readPremiumSuggestions = async ({ exclude = null, limit = 3 } = {}) => {
+  const pin = deploymentPin(premiumDeployments())
+  if (!pin) return []
+
+  const excluded = typeof exclude === 'string' ? exclude.toLowerCase() : ''
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  const rowLimit = Math.min(Math.max(Number(limit) || 3, 1), 10)
+
+  try {
+    // The subscriber table is small, so a RAND() sort is a cheap shuffle here.
+    const [rows] = await pool.execute(
+      `SELECT s.account, u.name, u.username, u.profileImage
+         FROM premium_subscriptions s
+         LEFT JOIN users u ON LOWER(u.wallet_address) = s.account
+        WHERE ${pin.sql}
+          AND (s.complimentary = 1 OR s.expires_at > ?)
+          AND s.account <> ?
+          AND NOT EXISTS (
+            SELECT 1 FROM follows f
+             WHERE f.follower_address = ? AND f.followed_address = s.account AND f.is_following = 1
+          )
+        GROUP BY s.account, u.name, u.username, u.profileImage
+        ORDER BY RAND()
+        LIMIT ${rowLimit}`,
+      [...pin.params, nowSeconds, excluded, excluded],
+    )
+
+    return rows.map((row) => ({
+      address: row.account,
+      name: row.name ?? null,
+      username: row.username ?? null,
+      profileImage: row.profileImage ?? null,
+    }))
+  } catch (error) {
+    console.warn('[premium] suggestions read failed:', error.message)
+    return []
+  }
+}
+
+/**
  * The price table across every chain premium is sold on, as cidex indexed it from the
  * contracts' own PlanUpdated logs. One query rather than one RPC call per chain.
  * @returns {Promise<object[]>}

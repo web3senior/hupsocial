@@ -26,6 +26,29 @@
     transition: none;
   }
 
+  // The home shell. The rail hangs off the feed column in an absolute slot rather than sharing a
+  // flex row with it, so the feed stays exactly where it is on every viewport and the rail simply
+  // appears once there is room for it to the right: 640px feed + 1.5rem gap + 320px rail, doubled
+  // around the centre, is ~1330px, and at that width the feed's left edge already clears the aside.
+  &.home {
+    position: relative;
+  }
+
+  .home__rail {
+    display: none;
+
+    @media (min-width: 1340px) {
+      display: block;
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: calc(50% + 320px + 1.5rem);
+      width: 320px;
+      // Over the tab bar's full-width background (2), under the aside (3).
+      z-index: 2;
+    }
+  }
+
   &__tab-bar {
     // Keeps the tab strip visible while the feed scrolls. Sticky lives on this
     // full-width wrapper: the strip's own __container parent is exactly the

@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic'
 import { useHomeTabsStore, resolveTabs } from '@/stores/useHomeTabsStore'
 import HomeTabStrip from '@/components/HomeTabStrip'
 import HomeFeedTab from '@/components/tabs/HomeFeedTab'
+import HomeRail from '@/components/home/HomeRail'
+import clsx from 'clsx'
 import styles from './page.module.scss'
 
 // Only the default "For you" tab is bundled with the route; the other tab
@@ -22,7 +24,7 @@ export default function Page() {
   const activeTab = resolvedTabs.find((tab) => tab.id === activeTabId) ?? resolvedTabs[0]
 
   return (
-    <div className={styles.page}>
+    <div className={clsx(styles.page, styles.home)}>
       <div className={styles['page__tab-bar']}>
         <div className={`__container`} data-width={`small`}>
           <HomeTabStrip />
@@ -39,6 +41,12 @@ export default function Page() {
       {activeTab?.type === 'trending' && <TrendingFeedTab />}
       {activeTab?.type === 'status' && <StatusFeedTab />}
       {activeTab?.type === 'polls' && <PollsTab />}
+
+      {/* Beside the feed on wide screens only; the feed column itself keeps its viewport centring.
+          Last in the DOM so it stacks over the tab bar's full-width sticky background. */}
+      <aside className={styles.home__rail} aria-label="Suggestions">
+        <HomeRail />
+      </aside>
     </div>
   )
 }
