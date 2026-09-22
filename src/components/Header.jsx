@@ -1,6 +1,8 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeftIcon } from '@phosphor-icons/react'
 import { ConnectWallet } from '@/components/ConnectWallet'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePageTitleStore } from '@/stores/usePageTitleStore'
@@ -13,6 +15,9 @@ export default function Header() {
   const pathname = usePathname()
   const { isMenuOpen, openMobileMenu } = useSidebarStore()
   const title = usePageTitleStore((state) => state.title)
+  const subtitle = usePageTitleStore((state) => state.subtitle)
+  const back = usePageTitleStore((state) => state.back)
+  const width = usePageTitleStore((state) => state.width)
 
   // The feed labels itself with its tab strip, so home is the one route that leaves the
   // centre slot empty - search takes it there, the page title everywhere else.
@@ -35,10 +40,26 @@ export default function Header() {
       {isHome ? (
         <HeaderSearch />
       ) : (
-        title && (
-          <h1 className={styles['header__title']}>
-            <span>{title}</span>
-          </h1>
+        (title || back) && (
+          // Full-width layer so the container inside centres against the same box as the page's
+          // own containers, clearing the aside the same way
+          <div className={styles.header__bar}>
+            <div className={clsx('__container', styles.header__inner)} data-width={width || undefined}>
+              {back && (
+                <Link href={back.href} className={styles.back} aria-label={back.label} title={back.label}>
+                  <ArrowLeftIcon size={20} aria-hidden="true" />
+                </Link>
+              )}
+              {title && (
+                <div className={clsx(styles.header__heading, back && styles['header__heading--start'])}>
+                  <h1 className={styles.header__title}>
+                    <span>{title}</span>
+                  </h1>
+                  {subtitle && <p className={styles.header__subtitle}>{subtitle}</p>}
+                </div>
+              )}
+            </div>
+          </div>
         )
       )}
 

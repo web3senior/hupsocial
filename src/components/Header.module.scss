@@ -12,18 +12,49 @@
   background-color: var(--background);
   z-index: 2;
 
-  &__title {
+  // Spans the whole header so percentages inside resolve against the viewport, like <main>'s
+  &__bar {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  &__inner {
+    display: flex;
+    align-items: center;
+    height: 100%;
+  }
+
+  &__heading {
     position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     max-width: min(50vw, 420px);
+    text-align: center;
+
+    // Beside a back arrow the heading reads from the left, X-style, instead of centring
+    &--start {
+      position: static;
+      transform: none;
+      flex: 1;
+      min-width: 0;
+      max-width: none;
+      align-items: flex-start;
+      text-align: start;
+    }
+  }
+
+  &__title {
+    max-width: 100%;
     margin: 0;
     color: var(--foreground);
     font-weight: var(--font-weight-bold);
     font-size: var(--font-size-17);
-    text-align: center;
-    user-select: none;
+    line-height: 1.25;
 
     span {
       display: block;
@@ -31,6 +62,13 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+  }
+
+  &__subtitle {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-13);
+    line-height: 1.25;
   }
 }
 
@@ -47,6 +85,25 @@
   svg {
     color: var(--text-muted);
   }
+  &:hover {
+    background-color: var(--hover);
+  }
+}
+
+// Round back arrow at the container's left edge, the heading following it
+.back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-inline-end: 1.25rem;
+  border-radius: 1000px;
+  pointer-events: auto;
+  color: var(--foreground);
+  transition: background-color 0.15s ease;
+
   &:hover {
     background-color: var(--hover);
   }
@@ -69,6 +126,11 @@
 @include md-down() {
   .menuButton {
     display: inline-flex;
+  }
+
+  // Below md the container runs edge to edge, so step past the menu button (1rem pad + 38px)
+  .header__inner {
+    padding-inline-start: calc(1rem + 38px + 0.25rem);
   }
 
   .nav {

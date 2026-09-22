@@ -10,6 +10,7 @@ import CommentSkeletonList from '@/components/ui/CommentSkeleton'
 import { usePostStore } from '@/stores/usePostStore'
 import pageStyles from './page.module.scss'
 import detailStyles from './_components/PostDetails.module.scss'
+import { postHeaderProps } from './_components/postHeader'
 
 // Every navigation into this dynamic route pays a server roundtrip, and this
 // boundary is what the user sees during it. The click handlers put the tapped
@@ -27,7 +28,12 @@ export default function Loading() {
 
   return (
     <>
-      <PageTitle name={`Post`} changeDocumentTitle={false} />
+      <PageTitle
+        name={`Post`}
+        changeDocumentTitle={false}
+        containerWidth={`small`}
+        {...postHeaderProps(cachedMatchesTarget ? currentPost : null, params?.networkId)}
+      />
       <div className={pageStyles.page}>
         {cachedMatchesTarget ? (
           <div className={detailStyles.post}>

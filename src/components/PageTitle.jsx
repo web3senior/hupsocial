@@ -11,9 +11,23 @@ import styles from './PageTitle.module.scss'
  * it centered, and optionally syncs document.title. Kept as a component (not
  * a hook) so server-component pages can still declare their title. Renders a
  * spacer so page content clears the fixed header; pass spacer={false} to
- * render nothing, or paddingTop={false} for the shorter spacer.
+ * render nothing, or paddingTop={false} for the shorter spacer. backHref puts
+ * a back arrow before a left-aligned title, so it paints with the header instead
+ * of arriving with the page body and shifting it; subtitle adds a muted second
+ * line. containerWidth takes the page's data-width step so the header lines up
+ * with its content.
  */
-const PageTitle = ({ name = '', changeDocumentTitle = true, paddingTop = true, spacer = true, showInHeader = true }) => {
+const PageTitle = ({
+  name = '',
+  changeDocumentTitle = true,
+  paddingTop = true,
+  spacer = true,
+  showInHeader = true,
+  backHref = '',
+  backLabel = 'Back',
+  subtitle = '',
+  containerWidth = '',
+}) => {
   const setTitle = usePageTitleStore((state) => state.setTitle)
   const clearTitle = usePageTitleStore((state) => state.clearTitle)
 
@@ -22,11 +36,15 @@ const PageTitle = ({ name = '', changeDocumentTitle = true, paddingTop = true, s
     // header's center empty - for views that already label themselves (home tabs)
     if (!name || !showInHeader) return
 
-    setTitle(name)
+    setTitle(name, {
+      subtitle,
+      back: backHref ? { href: backHref, label: backLabel } : null,
+      width: containerWidth,
+    })
 
     // Clear on unmount so a route without a PageTitle shows an empty center
     return () => clearTitle()
-  }, [name, showInHeader, setTitle, clearTitle])
+  }, [name, showInHeader, subtitle, backHref, backLabel, containerWidth, setTitle, clearTitle])
 
   useEffect(() => {
     if (!name || !changeDocumentTitle) return
