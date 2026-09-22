@@ -47,14 +47,15 @@ import { sealSubmission } from '@/lib/taskVault'
 import { requestTaskFunding } from '@/lib/taskFundingBus'
 import SchedulePostDialog from '@/components/SchedulePostDialog'
 import {
-  canPreSign,
+  canScheduleOn,
   createScheduledPost,
-  ensureScheduleSession,
   formatWillSend,
-  listScheduledPosts,
+  isSchedulingLive,
   pokeScheduledRunner,
-  preSignScheduledPost,
+  randomNonce,
+  signScheduledPost,
 } from '@/lib/scheduledPosts'
+import { SCHEDULE_MIN_LEAD_S } from '@/lib/scheduleSignature'
 import Profile from './Profile'
 import MediaGallery from './Gallery'
 import MentionPicker from './MentionPicker'
@@ -679,7 +680,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
   // Only a plain post or a quote can wait for a later time: a reply belongs to a live thread, a
   // community post is sealed for one room's key, and Solana has no relayer path to hold it in
-  const canSchedule = (actionType === 'post' || isQuote) && !communityTarget && !isSolanaTarget
+  // A task post is funded once it is indexed, so it has to go out now
+  const canSchedule = (actionType === 'post' || isQuote) && !communityTarget && !isSolanaTarget && !hupTask && canScheduleOn(targetChainId)
   const isScheduled = canSchedule && Boolean(scheduledAt)
 
   // Relay reads (forwarder nonce, account code) must hit the chain the submission lands on
@@ -1618,15 +1620,32 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   }
 
   /**
-   * The Schedule path. The metadata is pinned exactly as it would be for a live post, the row
-   * is recorded, and — where the relayer can act for this author — the forward request it will
-   * send at that time is signed now (silently with a session key, one prompt for a plain
-   * wallet). A declined or impossible pre-sign is not a failure: the row still exists, and the
-   * author's own browser publishes it when the time comes (components/ScheduledPostsRunner).
+   * The Schedule path. The metadata is pinned exactly as for a live post, then the author signs,
+   * with their own wallet, the one request that publishes it at the chosen time. The relayer holds
+   * that signature and sends it when due, so nobody has to be online (lib/scheduledPosts.js).
+   * Declining the signature schedules nothing and leaves the composer as it was.
    */
   const scheduleForLater = async ({ metadata, content }) => {
-    const token = await ensureScheduleSession(address, signMessageAsync, targetChainId)
-    const row = await createScheduledPost(token, {
+    let signed
+    try {
+      signed = await signScheduledPost({
+        chainId: targetChainId,
+        publicClient: targetPublicClient,
+        owner: address,
+        metadata,
+        allowComments,
+        scheduledAt,
+        nonce: randomNonce(),
+        signTypedDataAsync,
+        signMessageAsync,
+      })
+    } catch (error) {
+      const declined = /rejected|denied|cancel/i.test(error?.shortMessage || error?.message || '') || error?.code === 4001
+      toast(declined ? 'Not scheduled: the signature was declined' : error.shortMessage || error.message || 'Could not sign the scheduled post', 'error')
+      return
+    }
+
+    await createScheduledPost({
       networkId: targetChainId,
       metadata,
       content,
@@ -1634,6 +1653,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       quoteOf: isQuote ? String(quoteTarget.id) : null,
       scheduledAt,
       timeZone: scheduleTimeZone,
+      ...signed,
     })
 
     // The post is out of the draft slot the moment it is recorded — same rule as finishSubmission
@@ -1642,33 +1662,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       localStorage.removeItem(getAttachmentDraftKey())
     }
 
-    let relayerWillSend = false
-    try {
-      const ability = await canPreSign({ row, owner: address, publicClient: targetPublicClient })
-      if (ability.ok) {
-        const pending = await listScheduledPosts(token, 'pending')
-        await preSignScheduledPost({
-          row,
-          pendingRows: pending,
-          chain: targetChain,
-          publicClient: targetPublicClient,
-          owner: address,
-          signTypedDataAsync,
-          useSessionKey: ability.useSessionKey,
-          token,
-        })
-        relayerWillSend = true
-      }
-    } catch (error) {
-      console.warn('Scheduled post will publish from this browser:', error.message)
-    }
-
-    toast(
-      relayerWillSend
-        ? `Scheduled for ${formatWillSend(scheduledAt)}`
-        : `Scheduled for ${formatWillSend(scheduledAt)} — it needs your signature to go out, so have Hup open around then`,
-      'success',
-    )
+    toast(`Scheduled for ${formatWillSend(scheduledAt)}. It goes onchain then, even if you're offline.`, 'success')
     pokeScheduledRunner()
     handleClose()
   }
@@ -1687,8 +1681,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       return
     }
 
-    // Same reason: a sponsored post or edit still cooling down should not pin its media first
-    const cooldown = gaslessCooldown(actionType === 'edit' ? 'update' : 'create', targetChainId, signerAddress)
+    // Same reason: a sponsored post or edit still cooling down should not pin its media first.
+    // A scheduled post never goes through the live relay, so its throttle does not apply.
+    const cooldown = isScheduled ? 0 : gaslessCooldown(actionType === 'edit' ? 'update' : 'create', targetChainId, signerAddress)
     if (cooldown > 0) {
       toast(`Slow down — you can ${actionType === 'edit' ? 'edit' : 'post'} again in ${formatWait(cooldown)}.`, 'error')
       return
@@ -1706,6 +1701,19 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
     setIsSubmitting(true)
     try {
+      // Checked before anything is pinned: a schedule that cannot be taken should cost nothing
+      if (isScheduled) {
+        if (scheduledAt < Math.floor(Date.now() / 1000) + SCHEDULE_MIN_LEAD_S) {
+          toast('That time has passed, pick a new one', 'error')
+          scheduleDialogRef.current?.open()
+          return
+        }
+        if (!(await isSchedulingLive({ networkId: targetChainId, publicClient: targetPublicClient }))) {
+          toast(`Scheduling isn't live on ${targetChain?.name || 'this network'} yet`, 'error')
+          return
+        }
+      }
+
       // Tiles still uploading are collected here rather than gating the button: the author
       // finished writing while the bytes moved, and Post simply waits for the last of them
       const pendingIds = mediaItems.filter(isTransferring).map((item) => item.uploadId)

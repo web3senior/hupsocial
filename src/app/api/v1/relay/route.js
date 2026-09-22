@@ -7,8 +7,7 @@ import pollsAbi from '../../../../abis/HupPolls.json'
 import { CONTRACTS } from '../../../../config/contracts'
 import { GASLESS_BUCKETS, GASLESS_POLL_BUCKETS, formatWait, gaslessBucketFor, gaslessPolicyFor, isGaslessChainId } from '../../../../config/gasless'
 import { forgetServerRpc, getServerProvider, isTransportError } from '../../../../lib/serverRpc'
-
-const RELAYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY
+import { enqueueRelayerSend, relayerFees, relayerWallet } from '../../../../lib/relayerSend'
 
 // --- Relay policy ---
 // The relayer's key pays for everything that lands here, so a request may only target one of
@@ -139,23 +138,6 @@ const peekThrottle = (bucket, chainId, from) => {
 // simulation never starts someone's cooldown — the clock tracks what we spend, not what we saw.
 const recordThrottleHit = (bucket, chainId, from) => {
   recentHits(bucket, chainId, from).push(Date.now())
-}
-
-// --- Send queue ---
-// Two concurrent sends from the relayer race on its account nonce, which surfaces as
-// "nonce too low" / "replacement underpriced". Each chain's sends run one after another.
-const sendQueues = new Map()
-
-const enqueueSend = (chainId, task) => {
-  const previous = sendQueues.get(chainId) ?? Promise.resolve()
-  const next = previous.then(task, task)
-
-  sendQueues.set(
-    chainId,
-    next.catch(() => {}),
-  )
-
-  return next
 }
 
 // The EIP-712 name a forwarder was actually deployed with, read from the contract itself.
@@ -311,7 +293,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Could not reach this network right now. Please try again shortly.' }, { status: 503 })
     }
 
-    const relayer = new ethers.Wallet(RELAYER_PRIVATE_KEY, provider)
+    const relayer = relayerWallet(provider)
     const forwarder = new ethers.Contract(forwarderAddress, forwarderAbi, relayer)
 
     const message = {
@@ -452,15 +434,10 @@ export async function POST(request) {
 
     // eth_estimateGas on LUKSO returns no revert data and is unreliable.
     // Skip auto-estimation by providing an explicit gasLimit (inner gas + forwarder overhead).
-    // EIP-1559: maxFeePerGas must be >= maxPriorityFeePerGas; clamp to whichever is larger
-    // so low-base-fee chains (e.g. LUKSO) don't reject the tx with "priorityFee > maxFee".
-    const maxPriorityFeePerGas = ethers.parseUnits('2', 'gwei')
-    const feeData = await provider.getFeeData()
-    const networkMax = feeData.maxFeePerGas ?? 0n
-    const maxFeePerGas = networkMax >= maxPriorityFeePerGas ? networkMax : maxPriorityFeePerGas
+    const { maxPriorityFeePerGas, maxFeePerGas } = await relayerFees(provider)
     recordThrottleHit(bucket, chainId, fullRequest.from)
 
-    const tx = await enqueueSend(chainId, () =>
+    const tx = await enqueueRelayerSend(chainId, () =>
       forwarder.execute(fullRequest, {
         gasLimit: BigInt(fullRequest.gas) + 100000n,
         maxPriorityFeePerGas,

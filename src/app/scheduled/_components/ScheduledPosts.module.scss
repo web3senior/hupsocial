@@ -126,12 +126,12 @@
     font-size: 0.85rem;
     color: var(--text-muted);
 
-    &--relayer,
+    &--queued,
     &--sent {
       color: var(--success-500, #16a34a);
     }
 
-    &--stale,
+    &--retrying,
     &--failed {
       color: var(--warning-500, #f59e0b);
     }
@@ -175,12 +175,6 @@
 
   &__action--danger {
     color: #cb2e2e;
-  }
-
-  &__error {
-    margin: 0;
-    font-size: 0.8rem;
-    color: var(--text-muted);
   }
 }
 

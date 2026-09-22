@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
-import { useConnection, useSignMessage } from 'wagmi'
+import { useConnection, useSignMessage, useSignTypedData, useSwitchChain } from 'wagmi'
+import { getPublicClient } from 'wagmi/actions'
 import {
   ArrowSquareOutIcon,
   CalendarDotsIcon,
@@ -14,20 +15,24 @@ import {
 } from '@phosphor-icons/react'
 import { useActiveChain } from '@/hooks/useActiveChain'
 import { appChains } from '@/config/contracts'
+import { config } from '@/config/wagmi'
 import EmptyState from '@/components/ui/EmptyState'
 import MediaGallery from '@/components/Gallery'
 import { toast } from '@/components/NextToast'
 import { renderMarkdown } from '@/lib/markdown'
+import { trackPostPublication } from '@/lib/postPublication'
 import {
   cancelScheduledPost,
   clearScheduleToken,
+  deliverDueScheduledPosts,
   ensureScheduleSession,
   formatWillSend,
   listScheduledPosts,
-  pokeScheduledRunner,
+  localTimeZone,
   readScheduleToken,
+  rescheduleScheduledPost,
+  signScheduledPost,
   subscribeScheduleToken,
-  updateScheduledPost,
 } from '@/lib/scheduledPosts'
 import styles from './ScheduledPosts.module.scss'
 
@@ -38,24 +43,28 @@ const TABS = [
 
 // While a post is mid-publish the row flips on its own; poll it rather than make the author reload
 const SENDING_POLL_MS = 5000
+// "Post now" is signed a little in the past, so a wallet clock running ahead of the chain is not "too early"
+const POST_NOW_BACKDATE_S = 30
 
 const stateOf = (row) => {
   if (row.status === 'sending') return { key: 'sending', label: 'Publishing…', Icon: SpinnerIcon }
   if (row.status === 'sent') return { key: 'sent', label: 'Sent', Icon: CheckCircleIcon }
-  if (row.status === 'failed') return { key: 'failed', label: 'Failed', Icon: WarningCircleIcon }
+  if (row.status === 'failed') return { key: 'failed', label: row.lastError ? `Failed: ${row.lastError}` : 'Failed', Icon: WarningCircleIcon }
   if (row.status === 'cancelled') return { key: 'cancelled', label: 'Cancelled', Icon: XCircleIcon }
-  if (row.signed && !row.signatureStale) return { key: 'relayer', label: 'Sends on time, even while you are away', Icon: PaperPlaneTiltIcon }
-  if (row.signatureStale) return { key: 'stale', label: 'Needs your signature — it goes out when you are next on Hup', Icon: WarningCircleIcon }
-  return { key: 'author', label: 'Goes out when you are on Hup at that time', Icon: CalendarDotsIcon }
+  if (row.attempts > 0 && row.lastError) return { key: 'retrying', label: `Retrying: ${row.lastError}`, Icon: WarningCircleIcon }
+  return { key: 'queued', label: 'Goes onchain at this time, even while you are offline', Icon: PaperPlaneTiltIcon }
 }
 
 const textOf = (row) => row?.content?.elements?.[0]?.data?.text ?? ''
 const mediaOf = (row) => row?.content?.elements?.[1]?.data?.items ?? []
+const isDeclined = (error) => /rejected|denied|cancel/i.test(error?.shortMessage || error?.message || '') || error?.code === 4001
 
 export default function ScheduledPosts() {
-  const { address, isConnected } = useConnection()
+  const { address, isConnected, chain: walletChain } = useConnection()
   const { chainId } = useActiveChain()
   const { signMessageAsync } = useSignMessage()
+  const { signTypedDataAsync } = useSignTypedData()
+  const { switchChainAsync } = useSwitchChain()
   const token = useSyncExternalStore(
     subscribeScheduleToken,
     () => readScheduleToken(address),
@@ -100,12 +109,45 @@ export default function ScheduledPosts() {
     }
   }
 
-  const act = async (row, run, after) => {
+  /* The time is inside the signature, so publishing early means signing again. The same nonce goes
+     into the new signature, so the old one can never publish the post a second time. */
+  const postNow = async (row) => {
+    setBusyId(row.id)
+    try {
+      if (walletChain?.id !== row.networkId) await switchChainAsync({ chainId: row.networkId })
+
+      const scheduledAt = Math.floor(Date.now() / 1000) - POST_NOW_BACKDATE_S
+      const signed = await signScheduledPost({
+        chainId: row.networkId,
+        publicClient: getPublicClient(config, { chainId: row.networkId }),
+        owner: address,
+        metadata: row.metadata,
+        allowComments: row.allowComments,
+        scheduledAt,
+        nonce: BigInt(row.forwardNonce),
+        signTypedDataAsync,
+        signMessageAsync,
+      })
+      await rescheduleScheduledPost(token, row.id, { scheduledAt, now: true, timeZone: localTimeZone(), ...signed })
+
+      const result = await deliverDueScheduledPosts(token)
+      const sent = result?.sent?.find((item) => item.id === row.id)
+      if (sent) trackPostPublication({ networkId: row.networkId, author: address, metadata: row.metadata, kind: 'post', txHash: sent.txHash })
+      else toast('Publishing it within a minute', 'info')
+
+      await load()
+    } catch (err) {
+      toast(isDeclined(err) ? 'Not sent: the signature was declined' : err.shortMessage || err.message || 'Could not publish it now', 'error')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const act = async (row, run) => {
     setBusyId(row.id)
     try {
       await run()
       await load()
-      after?.()
     } catch (err) {
       toast(err.message || 'That did not work', 'error')
     } finally {
@@ -113,15 +155,6 @@ export default function ScheduledPosts() {
     }
   }
 
-  const postNow = (row) =>
-    act(
-      row,
-      () => updateScheduledPost(token, row.id, { action: 'now' }),
-      () => {
-        pokeScheduledRunner()
-        toast('Publishing it now…', 'info')
-      },
-    )
   const cancel = (row) => act(row, () => cancelScheduledPost(token, row.id))
   const remove = (row) => act(row, () => cancelScheduledPost(token, row.id, { purge: true }))
 
@@ -182,6 +215,7 @@ export default function ScheduledPosts() {
           const state = stateOf(row)
           const Icon = state.Icon
           const pending = row.status === 'scheduled'
+          const canPostNow = (pending || row.status === 'failed') && Boolean(row.forwardNonce)
           const text = textOf(row)
           const media = mediaOf(row)
           const explorer = chain?.blockExplorers?.default?.url
@@ -210,9 +244,9 @@ export default function ScheduledPosts() {
                 </span>
 
                 <div className={styles.row__actions}>
-                  {pending && (
+                  {canPostNow && (
                     <button type="button" onClick={() => postNow(row)} disabled={busy}>
-                      Post now
+                      {busy ? 'Signing…' : 'Post now'}
                     </button>
                   )}
                   {pending && (
@@ -232,8 +266,6 @@ export default function ScheduledPosts() {
                   )}
                 </div>
               </footer>
-
-              {row.signatureStale && row.lastError && <p className={styles.row__error}>{row.lastError}</p>}
             </article>
           )
         })}

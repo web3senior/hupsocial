@@ -1,10 +1,10 @@
 /**
  * @file app/api/v1/cron/scheduled-posts/route.js
- * @description Publishes due scheduled posts for authors who are not around to do it themselves.
+ * @description Publishes every due scheduled post through the relayer, whether or not its author
+ * is online.
  *
  * Vercel cron GETs this path every minute with `Authorization: Bearer ${CRON_SECRET}`
- * (vercel.json); locally the same curl works. Only pre-signed rows are touched — a post the
- * author never signed a forward request for can only leave their own browser.
+ * (vercel.json); locally the same curl works.
  */
 
 import { NextResponse } from 'next/server'
@@ -24,7 +24,7 @@ export async function GET(request) {
 
     const result = await deliverDueScheduledPosts({ limit: 50 })
     const counts = Object.fromEntries(Object.entries(result).map(([key, list]) => [key, list.length]))
-    if (counts.sent || counts.stale || counts.retry) console.log('SCHEDULED_POSTS_SWEEP:', counts)
+    if (counts.sent || counts.failed || counts.retry) console.log('SCHEDULED_POSTS_SWEEP:', counts)
 
     return NextResponse.json({ success: true, ...counts })
   } catch (error) {

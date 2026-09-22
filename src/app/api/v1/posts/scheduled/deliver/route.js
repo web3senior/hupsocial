@@ -1,9 +1,8 @@
 /**
  * @file app/api/v1/posts/scheduled/deliver/route.js
- * @description The author's own trigger for the relayer sweep: publishes whichever of their
- * pre-signed posts are due right now. The shell runner calls it the minute a post comes due while
- * the author has Hup open, so a live author never waits on the cron, and a dev box without any
- * cron still delivers.
+ * @description The author's own trigger for the relayer sweep: publishes whichever of their posts
+ * are due right now. The shell runner and "Post now" call it, so an author who is online never waits
+ * for the next cron tick, and a dev box without a cron still delivers.
  */
 
 import { NextResponse } from 'next/server'

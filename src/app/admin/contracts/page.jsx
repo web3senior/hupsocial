@@ -35,6 +35,7 @@ import {
 } from '@/lib/premium'
 import { TIP_TOKENS, USDC } from '@/lib/tokens'
 import styles from './page.module.scss'
+import ScheduleForwarderSection from './_components/ScheduleForwarderSection'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
 
@@ -124,6 +125,7 @@ const formatNative = (wei) => formatToken(wei, 18)
 const SECTIONS = [
   { id: 'balances', label: 'Balances', icon: '💰', contractKey: null },
   { id: 'forwarders', label: 'Forwarders', icon: '✍️', contractKey: 'forwarder' },
+  { id: 'scheduling', label: 'Scheduling', icon: '⏰', contractKey: 'scheduleForwarder' },
   { id: 'sell-fees', label: 'Sell Fees', icon: '💸', contractKey: 'sell' },
   { id: 'sell-treasury', label: 'Sell Treasury', icon: '🏦', contractKey: 'sell' },
   { id: 'events', label: 'Events', icon: '🎟️', contractKey: 'events' },
@@ -2871,6 +2873,8 @@ export default function Page() {
               {visibleChains(null).length === 0 && <p className={styles['admin-contracts__empty']}>No chains configured.</p>}
             </section>
           )}
+
+          {activeSection === 'scheduling' && <ScheduleForwarderSection chains={visibleChains('scheduleForwarder')} />}
 
           {activeSection === 'forwarders' && (
             <section className={styles['admin-contracts__section']}>

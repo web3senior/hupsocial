@@ -1,35 +1,34 @@
 /**
  * @file lib/scheduledPosts.js
- * @description Browser side of scheduled posts: the one-time signed sign-in that unlocks the
- * scheduled-posts API, the token it leaves in localStorage, the fetchers, the pre-signing that
- * lets the relayer publish a post while its author is away, and the wording the composer and the
- * list share.
+ * @description Browser side of scheduled posts: signing the request that lets the relayer publish a
+ * post at its time, the fetchers, the one-time sign-in the list page needs, and the wording the
+ * composer and the list share.
  *
- * Two hands can publish a scheduled post (see lib/scheduledDelivery.js for the server's). This
- * file is the author's: it signs the forward request at schedule time, keeps that signature
- * fresh while the author is around, and — through components/ScheduledPostsRunner — publishes
- * directly when the relayer cannot.
+ * A scheduled post is a HupScheduleForwarder request the author signs with their own wallet when
+ * they press Schedule: a plain key signs the typed data, a Universal Profile answers for its
+ * controller's signature through ERC-1271. The chosen time is inside the signature, so the relayer
+ * can deliver it with nobody online and cannot deliver it early (lib/scheduledDelivery.js).
  */
 
+import { encodeFunctionData, hashTypedData } from 'viem'
+import hupAbi from '@/abi/post.json'
+import { CONTRACTS } from '@/config/contracts'
 import { requestAuthNonce } from '@/lib/api'
 import { normalizeAddress } from '@/lib/address'
 import { ContentType } from '@/lib/content'
-import { isSessionActive } from '@/lib/burnerSession'
-import { isGaslessEnabled, readForwarderNonce, signHupForwardRequest } from '@/lib/relayGasless'
 import { scheduleSessionMessage, SCHEDULE_DELIVERY_WINDOW_S } from '@/lib/scheduleSignature'
 
 const prefix = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
 const tokenKey = (address) => `${prefix}schedule-session:${normalizeAddress(address)}`
 
-// Fired whenever something changed that the runner should look at right away — a post was just
-// scheduled, moved, or asked to go out now
+// Fired whenever something changed that the runner should look at right away
 export const SCHEDULE_POKE_EVENT = 'hup:scheduled-posts'
 
 export const pokeScheduledRunner = () => {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(SCHEDULE_POKE_EVENT))
 }
 
-// --- Token ---
+// --- Token (list page only) ---
 
 const listeners = new Set()
 const announce = () => listeners.forEach((listener) => listener())
@@ -73,7 +72,7 @@ export const clearScheduleToken = (address) => {
 }
 
 /**
- * One wallet signature buys a month of scheduling. Reuses a stored token when it has one.
+ * One wallet signature buys a month of access to the list. Reuses a stored token when it has one.
  * @param {string} address
  * @param {(args: {message: string}) => Promise<string>} signMessageAsync
  * @param {number} [chainId]
@@ -125,14 +124,24 @@ export const listScheduledPosts = async (token, scope = 'pending') => {
   return (await readJson(response, 'Could not load scheduled posts')).data
 }
 
-export const createScheduledPost = async (token, payload) => {
-  const response = await fetch('/api/v1/posts/scheduled', { method: 'POST', headers: authed(token), body: JSON.stringify(payload) })
+/** Records a signed post. No token: the signature is the proof of who scheduled it. */
+export const createScheduledPost = async (payload) => {
+  const response = await fetch('/api/v1/posts/scheduled', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
   return (await readJson(response, 'Could not schedule the post')).data
 }
 
-export const updateScheduledPost = async (token, id, body) => {
-  const response = await fetch(`/api/v1/posts/scheduled/${id}`, { method: 'PATCH', headers: authed(token), body: JSON.stringify(body) })
-  return (await readJson(response, 'Could not update the scheduled post')).data
+/** Moves a pending or failed post to a new signed time, "now" included. */
+export const rescheduleScheduledPost = async (token, id, body) => {
+  const response = await fetch(`/api/v1/posts/scheduled/${id}`, {
+    method: 'PATCH',
+    headers: authed(token),
+    body: JSON.stringify({ action: 'reschedule', ...body }),
+  })
+  return (await readJson(response, 'Could not move the scheduled post')).data
 }
 
 export const cancelScheduledPost = async (token, id, { purge = false } = {}) => {
@@ -140,7 +149,7 @@ export const cancelScheduledPost = async (token, id, { purge = false } = {}) => 
   return (await readJson(response, 'Could not cancel the scheduled post')).data
 }
 
-/** Asks the server to relay whichever of the author's pre-signed posts are due. */
+/** Asks the server to publish whichever of the author's posts are due. */
 export const deliverDueScheduledPosts = async (token) => {
   const response = await fetch('/api/v1/posts/scheduled/deliver', { method: 'POST', headers: authed(token) })
   return (await readJson(response, 'Could not publish scheduled posts')).data
@@ -165,7 +174,7 @@ export const localTimeZone = () => {
   }
 }
 
-/** "Iran Standard Time" for "Asia/Tehran" — the zone's long name, or the id when there is none. */
+/** "Iran Standard Time" for "Asia/Tehran": the zone's long name, or the id when there is none. */
 export const timeZoneLongName = (zone) => {
   try {
     return (
@@ -180,87 +189,128 @@ export const timeZoneLongName = (zone) => {
 
 // --- Signing ---
 
-/** The `create` call a scheduled row stands for. */
-export const createArgsFor = (row, owner) => [owner, ContentType.Post, row.metadata, 0, row.allowComments !== false]
-
-const serializeRequest = (request) => ({
-  from: request.from,
-  to: request.to,
-  value: request.value.toString(),
-  gas: request.gas.toString(),
-  nonce: request.nonce.toString(),
-  deadline: Number(request.deadline),
-  data: request.data,
-})
-
-/**
- * Whether this author can pre-sign a forward request for the relayer at all: the chain is in
- * the gasless trial (and the author has not turned it off) and the account can sign one — a
- * plain wallet, or a smart account with a live session key.
- */
-export const canPreSign = async ({ row, owner, publicClient }) => {
-  if (!isGaslessEnabled(row.networkId) || !owner || !publicClient) return { ok: false, useSessionKey: false }
-
-  const session = await isSessionActive({ userAddress: owner, publicClient }).catch(() => ({ active: false }))
-  if (session.active) return { ok: true, useSessionKey: true }
-
-  const code = await publicClient.getCode({ address: owner }).catch(() => null)
-  return { ok: !(code && code !== '0x'), useSessionKey: false }
+const SCHEDULED_REQUEST_TYPES = {
+  ScheduledRequest: [
+    { name: 'from', type: 'address' },
+    { name: 'to', type: 'address' },
+    { name: 'gas', type: 'uint256' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'notBefore', type: 'uint48' },
+    { name: 'deadline', type: 'uint48' },
+    { name: 'data', type: 'bytes' },
+  ],
 }
 
-/**
- * The nonce a new pre-signed request should carry: the signer's current forwarder nonce plus one
- * for every already-signed post of theirs that goes out first. Requests from one signer execute
- * in nonce order, so a post due earlier has to be signed earlier in the sequence.
- */
-const nonceForRow = ({ row, pendingRows, publicClient }) => async (from, forwarderAddress) => {
-  const base = await readForwarderNonce(publicClient, forwarderAddress, from)
-  const ahead = (pendingRows ?? []).filter(
-    (other) =>
-      other.id !== row.id &&
-      other.status === 'scheduled' &&
-      other.signed &&
-      !other.signatureStale &&
-      Number(other.networkId) === Number(row.networkId) &&
-      normalizeAddress(other.forwardFrom) === normalizeAddress(from) &&
-      (other.scheduledAt < row.scheduledAt || (other.scheduledAt === row.scheduledAt && other.id < row.id)),
-  ).length
-  return base + BigInt(ahead)
+// Headroom for Hup.create storing a struct and a CID string; unused gas is never charged
+const SCHEDULED_POST_GAS = 600_000n
+
+const TRUSTED_FORWARDER_ABI = [
+  {
+    inputs: [{ name: 'forwarder', type: 'address' }],
+    name: 'isTrustedForwarder',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+]
+
+// Only a yes is cached: a chain switched on mid-session should not need a reload
+const liveChains = new Set()
+
+/** Whether this chain has a schedule forwarder configured at all. */
+export const canScheduleOn = (networkId) => Boolean(CONTRACTS[`chain${Number(networkId)}`]?.scheduleForwarder)
+
+/** Whether this chain's Hup trusts the schedule forwarder yet, which is what makes scheduling live there. */
+export const isSchedulingLive = async ({ networkId, publicClient }) => {
+  const contracts = CONTRACTS[`chain${Number(networkId)}`]
+  if (!contracts?.hup || !contracts?.scheduleForwarder || !publicClient) return false
+  if (liveChains.has(Number(networkId))) return true
+
+  try {
+    const live = Boolean(
+      await publicClient.readContract({
+        address: contracts.hup,
+        abi: TRUSTED_FORWARDER_ABI,
+        functionName: 'isTrustedForwarder',
+        args: [contracts.scheduleForwarder],
+      }),
+    )
+    if (live) liveChains.add(Number(networkId))
+    return live
+  } catch {
+    return false
+  }
 }
 
+/** A fresh 256-bit nonce. Random rather than sequential, so it never collides with the author's other requests. */
+export const randomNonce = () => {
+  const bytes = crypto.getRandomValues(new Uint8Array(32))
+  return BigInt(`0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`)
+}
+
+const isDeclined = (error) => /rejected|denied|cancel/i.test(error?.shortMessage || error?.message || '') || error?.code === 4001
+
 /**
- * Signs the forward request that lets the relayer publish `row` at its time and stores it on
- * the row. Silent with an active session key; one typed-data prompt for a plain wallet.
+ * Signs the request that publishes `metadata` as a post by `owner` at `scheduledAt`.
+ *
+ * Typed data first, which both plain wallets and the Universal Profile extension sign. If a contract
+ * account's wallet cannot sign typed data, its controller signs the same digest as a message, which
+ * the forwarder accepts from contract accounts only.
  *
  * @param {Object} params
- * @param {object} params.row A scheduled row from the API.
- * @param {object[]} [params.pendingRows] The author's other pending rows, for nonce ordering.
- * @param {object} params.chain Viem chain of the row's network.
- * @param {object} params.publicClient Viem client on that chain.
- * @param {string} params.owner The author.
- * @param {Function} [params.signTypedDataAsync] wagmi signer for the wallet path.
- * @param {boolean} params.useSessionKey From canPreSign.
- * @param {string} params.token Scheduled-posts bearer token.
- * @returns {Promise<object>} The updated row.
+ * @param {number} params.chainId The post's chain; the wallet must be on it.
+ * @param {Object} params.publicClient Viem client on that chain.
+ * @param {string} params.owner The author, who signs.
+ * @param {string} params.metadata The pinned ipfs:// URI.
+ * @param {boolean} params.allowComments
+ * @param {number} params.scheduledAt Unix seconds.
+ * @param {bigint} params.nonce From randomNonce(), or the row's own when re-signing a new time.
+ * @param {Function} params.signTypedDataAsync wagmi signer.
+ * @param {Function} params.signMessageAsync wagmi signer, for the contract-account fallback.
+ * @returns {Promise<{forwardRequest: Object, signature: string}>}
  */
-export const preSignScheduledPost = async ({ row, pendingRows, chain, publicClient, owner, signTypedDataAsync, useSessionKey, token }) => {
-  const signed = await signHupForwardRequest({
-    chain,
-    publicClient,
-    owner,
-    functionName: 'create',
-    args: createArgsFor(row, owner),
-    signTypedDataAsync,
-    useSessionKey,
-    deadline: Number(row.scheduledAt) + SCHEDULE_DELIVERY_WINDOW_S,
-    nonceFor: nonceForRow({ row, pendingRows, publicClient }),
-  })
+export const signScheduledPost = async ({ chainId, publicClient, owner, metadata, allowComments, scheduledAt, nonce, signTypedDataAsync, signMessageAsync }) => {
+  const contracts = CONTRACTS[`chain${Number(chainId)}`]
+  if (!contracts?.hup || !contracts?.scheduleForwarder) throw new Error('Scheduling is not supported on this network')
 
-  return updateScheduledPost(token, row.id, {
-    action: 'sign',
-    forwardRequest: serializeRequest(signed.request),
-    signature: signed.signature,
-    forwarderAddress: signed.forwarderAddress,
-    forwarderName: signed.forwarderName,
-  })
+  const message = {
+    from: owner,
+    to: contracts.hup,
+    gas: SCHEDULED_POST_GAS,
+    nonce: BigInt(nonce),
+    notBefore: Number(scheduledAt),
+    deadline: Number(scheduledAt) + SCHEDULE_DELIVERY_WINDOW_S,
+    data: encodeFunctionData({
+      abi: hupAbi,
+      functionName: 'create',
+      args: [owner, ContentType.Post, metadata, 0n, Boolean(allowComments)],
+    }),
+  }
+  const typedData = {
+    domain: { name: 'HupScheduleForwarder', version: '1', chainId: Number(chainId), verifyingContract: contracts.scheduleForwarder },
+    types: SCHEDULED_REQUEST_TYPES,
+    primaryType: 'ScheduledRequest',
+    message,
+  }
+
+  let signature
+  try {
+    signature = await signTypedDataAsync(typedData)
+  } catch (error) {
+    if (isDeclined(error) || typeof signMessageAsync !== 'function') throw error
+
+    const code = await publicClient?.getCode({ address: owner }).catch(() => null)
+    if (!code || code === '0x') throw error
+
+    signature = await signMessageAsync({ message: { raw: hashTypedData(typedData) } })
+  }
+
+  return {
+    forwardRequest: {
+      ...message,
+      gas: message.gas.toString(),
+      nonce: message.nonce.toString(),
+    },
+    signature,
+  }
 }

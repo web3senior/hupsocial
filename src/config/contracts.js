@@ -89,6 +89,10 @@ export const appChains = [mainnet, lukso, bsc, monad, arc, /* soneium, */ arbitr
 // univ3*/univ4*/sushiV2Router/wnative — swap venues; verify onchain against the DEX registry
 //                 before enabling a chain. A wrong router is where user funds would go.
 // nativeIsErc20 — the native coin is an ERC20: approve, never msg.value.
+// HupScheduleForwarder: one CREATE2 address on every chain (salt hup-schedule-forwarder). Usable on a
+// chain only once that chain's Hup trusts it, which the app reads onchain before offering Schedule.
+const SCHEDULE_FORWARDER = '0xcCD906822d2D89CE6587759BE6777a843E64048C'
+
 export const CONTRACTS = {
   chain1: {
     name: 'ethereum',
@@ -129,6 +133,7 @@ export const CONTRACTS = {
     hupForwarder: '0xd21EEb8df33D47e80dcf6d3776e6bE702982B112',
     hupForwarderName: 'HupForwarder',
     hup: '0xf6eeC4e32a532b23ACC56b72865e79c79877CEc8',
+    scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0xeCF2c230df65F50482c687040b272A808F753849',
     community: '0xB7Af957f4157aeAdA5Cab17D3B55fB1f1315F41A',
     chat: '',
@@ -160,6 +165,7 @@ export const CONTRACTS = {
     forwarder: '0x18B86518709a6C0942F3adCD0CD528D1716e0A80',
     forwarderName: 'HupChatForwarder',
     hup: '0xf6b33ecab0fa561300453c1bb1B520Ce544544ae',
+    scheduleForwarder: SCHEDULE_FORWARDER,
     status: '',
     community: '0x09E50a68f63dFFF83924c149268923eeDBCF1B7e',
     polls: '0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73',
@@ -193,6 +199,7 @@ export const CONTRACTS = {
     hupForwarder: '0x8466799e31a86a4d51B76154e57B14DcAF9A8756',
     hupForwarderName: 'HupForwarder',
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
+    scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
     chat: '',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
@@ -222,6 +229,7 @@ export const CONTRACTS = {
     name: 'celo',
     forwarder: '0x46a3dfcb1f4ec29db7f96c0d3962df20e6edb259',
     hup: '0xdda507afa7be1e70b9dceeb3b34c9b886c98ff73',
+    scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0xe7A1F3601b6dCA2F0D5176cd9d8FFA10479D3Ed0',
     chat: '',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
@@ -254,6 +262,7 @@ export const CONTRACTS = {
     name: 'base',
     forwarder: '0xae95e44D2642F568D0e0Fc0d60202B55c8764567',
     hup: '0xE401aF10CAa79F9Bb6945C87Ee196503E5DE6BEA',
+    scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
     community: '0x77986dE55d0C746351F3A0797b745306c5Fc072C',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
@@ -284,6 +293,7 @@ export const CONTRACTS = {
     name: 'bnb',
     forwarder: '0xc407722d150c8a65e890096869f8015D90a89EfD',
     hup: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
+    scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0x81c5a8fd5771cB398e2461cEF9Abb2eCD308d4c8',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     sell: '',
@@ -318,6 +328,7 @@ export const CONTRACTS = {
     name: 'robinhood',
     forwarder: '0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76',
     hup: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
+    scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     chat: '',
@@ -363,6 +374,7 @@ export const CONTRACTS = {
     name: 'arbitrum',
     forwarder: '0x41e6D71623FD02633C568342852154D2Cd7DBD0e',
     hup: '0x1EC0B3b802aFE596929a038f40F832EA01eCc281',
+    scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0x2269Fb436d594902e3c38085CBB3f350532531B3',
     followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
     community: '',
@@ -424,6 +436,7 @@ export const CONTRACTS = {
     name: 'arc',
     forwarder: '0xc407722d150c8a65e890096869f8015D90a89EfD',
     hup: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
+    scheduleForwarder: SCHEDULE_FORWARDER,
     status: '',
     followerSystem: '',
     community: '',

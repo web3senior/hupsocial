@@ -193,3 +193,25 @@ Deployed 2026-09-22: Base Sepolia `0x0bbac84D…5852`, LUKSO `0x232AD313…987a`
 refuse historical `getCode`; find a deploy block there from the constructor's
 `ReputationRegistryUpdated` log plus the receipt (base.gateway.tenderly.co serves 50-block
 `getLogs`).
+
+## HupScheduleForwarder
+
+ERC-2771 forwarder for scheduled posts (`src/contracts/v2/HupScheduleForwarder.sol`): nonces are
+single-use numbers the signer picks, `notBefore` is enforced onchain, and Universal Profiles sign
+through ERC-1271. Same build as HupFund: **foundry, solc 0.8.36, optimizer 200, viaIR, cancun**.
+Suite: `forge test --match-contract HupScheduleForwarderTest` from `src/contracts`.
+
+**Salt: `hup-schedule-forwarder`**:
+
+    0x702a7c0339ba73161750265fe88e7a92d78849baa061c5aa65698a096b616ae2
+
+No constructor arguments, so this artifact lands on **`0xcCD906822d2D89CE6587759BE6777a843E64048C`
+on every chain**. That address is already in `src/config/contracts.js` as `scheduleForwarder` for
+each gasless chain; nothing to fill in. Rebuilding changes the bytecode and the address, so keep
+this artifact as is.
+
+After deploying on a chain: open `/admin/contracts#scheduling` and press **Trust on Hup** (the
+Hup admin wallet calls `setTrustedForwarder`). Scheduling goes live on that chain at that moment.
+No cidex rows: scheduled posts are ordinary `create` calls, indexed like any other post.
+
+Deployed 2026-09-22: Base Sepolia (block 47162184), LUKSO. Trusted by Hup on neither yet.

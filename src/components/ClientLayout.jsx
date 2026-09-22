@@ -69,8 +69,7 @@ export default function ClientLayout({ children }) {
         <ComposerRecovery />
         {/* A task post publishes first and is funded once indexed; the composer is gone by then */}
         <TaskFundingHost />
-        {/* Publishes scheduled posts the relayer cannot, and asks for the one signature a due
-            post still needs — the author's side of lib/scheduledDelivery.js */}
+        {/* Asks the relayer for a due scheduled post the moment its author is online */}
         <ScheduledPostsRunner />
         {/* Offchain messenger docked on the right edge; the onchain /chat page hides it */}
         <ChatDock />
