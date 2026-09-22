@@ -32,7 +32,7 @@ import {
   PLAN_YEARLY,
   PREMIUM_MAX_BATCH,
 } from '@/lib/premium'
-import { TIP_TOKENS } from '@/lib/tokens'
+import { TIP_TOKENS, USDC } from '@/lib/tokens'
 import styles from './page.module.scss'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
@@ -99,6 +99,7 @@ const BALANCE_CONTRACTS = [
   { key: 'predict', label: 'HupPredict' },
   { key: 'apps', label: 'HupApps' },
   { key: 'drops', label: 'HupDrops' },
+  { key: 'premium', label: 'HupPremium' },
   { key: 'community', label: 'HupCommunity' },
   { key: 'miner', label: 'HupMiner' },
   { key: 'forwarder', label: 'Forwarder' },
@@ -109,11 +110,12 @@ const BALANCE_CONTRACTS = [
 // printed as the figure it is, never rounded to "0" or hidden behind a "<" placeholder.
 const nativeFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 4 })
 const dustFormat = new Intl.NumberFormat('en', { maximumSignificantDigits: 3 })
-const formatNative = (wei) => {
-  const value = Number(formatEther(wei ?? 0n))
+const formatToken = (raw, decimals = 18) => {
+  const value = Number(formatUnits(raw ?? 0n, decimals))
   if (value === 0) return '0'
   return value < 0.0001 ? dustFormat.format(value) : nativeFormat.format(value)
 }
+const formatNative = (wei) => formatToken(wei, 18)
 
 // One card per chain per contract adds up to a hundred-plus cards, so each group is a tab
 // rather than another stretch of scroll. `contractKey` is the CONTRACTS field a chain must
@@ -200,6 +202,8 @@ export default function Page() {
   const [premiumTxStates, setPremiumTxStates] = useState({})
   const [premiumReceiverInputs, setPremiumReceiverInputs] = useState({})
   const [premiumWithdrawStates, setPremiumWithdrawStates] = useState({})
+  const [premiumTokenCatalogue, setPremiumTokenCatalogue] = useState(null)
+  const [premiumTokenBalances, setPremiumTokenBalances] = useState({})
   const [eventsFees, setEventsFees] = useState({})
   const [eventsFeeInputs, setEventsFeeInputs] = useState({})
   const [eventsFeeTxStates, setEventsFeeTxStates] = useState({})
@@ -710,6 +714,85 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
 
+  // The tokens each chain's plans are priced in, as cidex indexed them
+  useEffect(() => {
+    if (!isAdmin) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await fetch('/api/v1/premium')
+        const body = response.ok ? await response.json() : null
+        if (!cancelled) setPremiumTokenCatalogue(body?.data?.tokens ?? [])
+      } catch (err) {
+        console.error('Premium token catalogue read failed:', err)
+        if (!cancelled) setPremiumTokenCatalogue([])
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAdmin])
+
+  // Token revenue sits on the contract until swept. The chain's USDC is always read, so a
+  // balance still shows before cidex has indexed its price.
+  const loadPremiumTokenBalances = async (chain, premiumAddress) => {
+    const candidates = new Map()
+    const canonical = USDC[chain.id]?.address
+    if (isAddress(canonical ?? '')) candidates.set(canonical.toLowerCase(), { token: canonical, symbol: 'USDC', decimals: null })
+    ;(premiumTokenCatalogue ?? [])
+      .filter((entry) => String(entry.networkId) === String(chain.id) && isAddress(entry.token ?? ''))
+      .forEach((entry) => {
+        const key = entry.token.toLowerCase()
+        const known = candidates.get(key)
+        candidates.set(key, {
+          token: entry.token,
+          symbol: entry.symbol ?? known?.symbol ?? null,
+          decimals: entry.decimals ?? known?.decimals ?? null,
+        })
+      })
+    if (candidates.size === 0) return
+
+    setPremiumTokenBalances((prev) => ({ ...prev, [chain.id]: { ...prev[chain.id], loading: true } }))
+
+    const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
+    const readOne = async ({ token, symbol, decimals }) => {
+      const [value, scale] = await Promise.all([
+        client.readContract({ address: token, abi: erc20Abi, functionName: 'balanceOf', args: [premiumAddress] }),
+        decimals ?? client.readContract({ address: token, abi: erc20Abi, functionName: 'decimals' }),
+      ])
+      const curated = TIP_TOKENS[chain.id]?.find((entry) => entry.address.toLowerCase() === token.toLowerCase())?.symbol
+      return { token, value, decimals: Number(scale), symbol: symbol ?? curated ?? `${token.slice(0, 6)}…${token.slice(-4)}` }
+    }
+
+    const entries = [...candidates.values()]
+    const settled = await Promise.allSettled(entries.map(readOne))
+    const items = entries.map((entry, index) =>
+      settled[index].status === 'fulfilled' ? settled[index].value : { ...entry, value: undefined }
+    )
+    settled.forEach((result, index) => {
+      if (result.status === 'rejected') console.error(`Premium token balance read error for ${entries[index].token} on chain ${chain.id}:`, result.reason)
+    })
+
+    setPremiumTokenBalances((prev) => ({ ...prev, [chain.id]: { loading: false, items } }))
+  }
+
+  // Re-read on tab open and on window focus, like the native balance
+  useEffect(() => {
+    if (!isAdmin || activeSection !== 'premium') return
+
+    const refresh = () =>
+      config.chains.forEach((chain) => {
+        const premiumAddress = CONTRACTS[`chain${chain.id}`]?.premium
+        if (isAddress(premiumAddress ?? '')) loadPremiumTokenBalances(chain, premiumAddress)
+      })
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, activeSection, premiumTokenCatalogue])
+
   /* Premium is priced in native wei per chain to hit one dollar target, so the lever is
      useless without knowing what a coin is worth today. Same keyless upstream the Assets tab
      reads; a chain it has no price for simply shows none. */
@@ -1073,6 +1156,7 @@ export default function Page() {
       })
 
       setPremiumManageStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash, note: 'Token swept' } }))
+      setTimeout(() => loadPremiumTokenBalances(chain, premiumAddress), 3000)
     } catch (err) {
       console.error(`Premium token sweep error on chain ${chain.id}:`, err)
       setPremiumManageStates((prev) => ({
@@ -5279,6 +5363,7 @@ export default function Page() {
                   const isPaused = Boolean(plans?.paused)
                   const takesTokens = Boolean(plans?.takesTokens)
                   const nativeBalance = renderBalance(chain.id, deployment.premium, symbol)
+                  const tokenBalances = premiumTokenBalances[chain.id]
                   const nativeHidden = Boolean(deployment.premiumNativeDisabled)
 
                   // What a typed amount would cost a subscriber, so the target is reachable
@@ -5335,6 +5420,30 @@ export default function Page() {
                           <span className={styles['admin-contracts__detail-label']}>Native Balance</span>
                           <div className={styles['admin-contracts__detail-value']}>{nativeBalance}</div>
                         </div>
+
+                        {tokenBalances && (
+                          <div className={styles['admin-contracts__detail-row']}>
+                            <span className={styles['admin-contracts__detail-label']}>Token Balances</span>
+                            <div className={styles['admin-contracts__detail-value']}>
+                              {!tokenBalances.items ? (
+                                <span>Loading…</span>
+                              ) : (
+                                tokenBalances.items.map((item, index) => (
+                                  <span key={item.token}>
+                                    {index > 0 && ' · '}
+                                    {item.value === undefined ? (
+                                      <span>— {item.symbol ?? ''}</span>
+                                    ) : (
+                                      <strong>
+                                        {formatToken(item.value, item.decimals)} {item.symbol}
+                                      </strong>
+                                    )}
+                                  </span>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Current Prices</span>
