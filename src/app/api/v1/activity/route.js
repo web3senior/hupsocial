@@ -478,6 +478,112 @@ const SOURCES = [
       }
     },
   },
+
+  // Hup Tasks. Both timestamps are already unix seconds, so they pass through like the bet and
+  // swap columns. A payout names both parties, which the worker's `task_paid` notification does
+  // too — but the notification carries no rating and no agent id, and this table does.
+  {
+    id: 'tasks',
+    kinds: ['task_posted', 'task_paid'],
+    build: ({ kinds, networkId, before, limit }) => {
+      const branches = []
+
+      if (kinds.includes('task_posted')) {
+        const where = ['t.hidden = 0']
+        const params = []
+
+        if (networkId !== null) {
+          where.push('t.network_id = ?')
+          params.push(networkId)
+        }
+        if (before !== null) {
+          where.push('t.posted_at < ?')
+          params.push(before)
+        }
+
+        params.push(limit)
+
+        branches.push({
+          sql: `
+            SELECT
+              ${text("'task_posted'")} AS kind,
+              ${text('t.poster')} AS actor,
+              ${text('NULL')} AS subject,
+              t.network_id AS network_id,
+              ${text("'post'")} AS entity_type,
+              ${text('CAST(t.post_id AS CHAR)')} AS entity_id,
+              t.posted_at AS ts,
+              ${text("CONCAT('task:', t.network_id, ':', t.post_id)")} AS uid,
+              t.block_number AS block_number,
+              ${text('t.tx_hash')} AS tx_hash,
+              t.log_index AS log_index,
+              ${text(`JSON_OBJECT(
+                'category', t.category,
+                'reward', CAST(t.reward_per_slot AS CHAR),
+                'symbol', COALESCE(t.token_symbol, ''),
+                'decimals', t.token_decimals,
+                'slots', t.slots,
+                'sealed', t.is_sealed
+              )`)} AS meta
+            FROM task_bounties t
+            WHERE ${where.join(' AND ')}
+            ORDER BY t.posted_at DESC
+            LIMIT ?
+          `,
+          params,
+        })
+      }
+
+      if (kinds.includes('task_paid')) {
+        const where = ['t.hidden = 0']
+        const params = []
+
+        if (networkId !== null) {
+          where.push('w.network_id = ?')
+          params.push(networkId)
+        }
+        if (before !== null) {
+          where.push('w.paid_at < ?')
+          params.push(before)
+        }
+
+        params.push(limit)
+
+        branches.push({
+          sql: `
+            SELECT
+              ${text("'task_paid'")} AS kind,
+              ${text('t.poster')} AS actor,
+              ${text('w.worker')} AS subject,
+              w.network_id AS network_id,
+              ${text("'post'")} AS entity_type,
+              ${text('CAST(w.post_id AS CHAR)')} AS entity_id,
+              w.paid_at AS ts,
+              ${text("CONCAT('taskpaid:', w.id)")} AS uid,
+              w.block_number AS block_number,
+              ${text('w.tx_hash')} AS tx_hash,
+              w.log_index AS log_index,
+              ${text(`JSON_OBJECT(
+                'category', t.category,
+                'amount', CAST(w.amount AS CHAR),
+                'symbol', COALESCE(t.token_symbol, ''),
+                'decimals', t.token_decimals,
+                'rating', w.rating,
+                'agent_id', w.agent_id
+              )`)} AS meta
+            FROM task_payouts w
+            JOIN task_bounties t ON t.network_id = w.network_id AND t.post_id = w.post_id
+            WHERE ${where.join(' AND ')}
+            ORDER BY w.paid_at DESC
+            LIMIT ?
+          `,
+          params,
+        })
+      }
+
+      return branches
+    },
+  },
 ]
 
 export const ACTIVITY_KINDS = SOURCES.flatMap((source) => source.kinds)

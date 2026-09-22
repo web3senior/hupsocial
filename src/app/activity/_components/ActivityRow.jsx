@@ -10,6 +10,7 @@ import { ArrowSquareOutIcon, CopySimpleIcon, EyeIcon, EyeSlashIcon } from '@phos
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { useProfile } from '@/hooks/useProfile'
 import { profilePath } from '@/lib/username'
+import { categoryLabel } from '@/lib/task'
 import { getPostById } from '@/lib/api'
 import { amountOf, assetOf, explorerTxUrl, getKindMeta, hrefOf, shortAddress } from './activityModel'
 import styles from './ActivityRow.module.scss'
@@ -298,6 +299,46 @@ function Sentence({ row, amount, asset, nftName }) {
         <>
           {actor} <span className={styles.row__verb}>opened the drop</span>{' '}
           <span className={styles.row__asset}>{row.meta?.name || `#${row.entity_id}`}</span>
+        </>
+      )
+    // A task states the reward per reply and how many replies it pays for, because both decide
+    // whether the line is worth acting on.
+    case 'task_posted': {
+      const slots = Number(row.meta?.slots ?? 0)
+      // "other" is the catch-all bucket, and "posted a other task" reads as a bug
+      const kindOfWork = row.meta?.category && row.meta.category !== 'other' ? categoryLabel(row.meta.category) : null
+      return (
+        <>
+          {actor} <span className={styles.row__verb}>posted a{kindOfWork ? '' : ' task'}</span>
+          {kindOfWork ? (
+            <>
+              {' '}
+              <span className={styles.row__asset}>{kindOfWork}</span> <span className={styles.row__verb}>task</span>
+            </>
+          ) : null}
+          {amount ? (
+            <>
+              <span className={styles.row__verb}> paying</span>
+              <Amount value={amount} />
+            </>
+          ) : null}
+          {slots > 0 ? <span className={styles.row__verb}> × {slots}</span> : null}
+        </>
+      )
+    }
+    // The payout names both sides: the poster paid, the worker was paid. A rating only shows when
+    // the approval actually wrote one to the worker's ERC-8004 identity.
+    case 'task_paid':
+      return (
+        <>
+          {actor} <span className={styles.row__verb}>paid</span>
+          {amount ? <Amount value={amount} /> : null}
+          {row.subject ? (
+            <>
+              <span className={styles.row__verb}> to</span> <ActorLink address={row.subject} />
+            </>
+          ) : null}
+          {Number(row.meta?.rating) > 0 ? <span className={styles.row__verb}> · rated {row.meta.rating}</span> : null}
         </>
       )
     case 'bet':

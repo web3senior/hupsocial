@@ -16,6 +16,7 @@ import {
   SparkleIcon,
   StampIcon,
   TagIcon,
+  ToolboxIcon,
   UserPlusIcon,
   UsersThreeIcon,
 } from '@phosphor-icons/react'
@@ -38,6 +39,7 @@ export const TABS = [
     empty: 'No sales, offers or mints yet.',
   },
   { id: 'money', label: 'Money', kinds: ['tip', 'bet', 'swap'], empty: 'No tips, bets or swaps yet.' },
+  { id: 'tasks', label: 'Tasks', kinds: ['task_posted', 'task_paid'], empty: 'No tasks have been posted or paid yet.' },
 ]
 
 const DEFAULT_META = { icon: PulseIcon, tone: 'neutral' }
@@ -68,6 +70,8 @@ export const KIND_META = {
   community_joined: { icon: UsersThreeIcon, tone: 'community', label: 'Joined a community' },
   sell_purchase: { icon: ShoppingBagOpenIcon, tone: 'money', weight: 'fill', previews: true, label: 'Unlock bought' },
   sell_unlock: { icon: LockKeyOpenIcon, tone: 'money', weight: 'fill', previews: true, label: 'Key released' },
+  task_posted: { icon: ToolboxIcon, tone: 'money', weight: 'fill', previews: true, label: 'Task posted' },
+  task_paid: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', previews: true, label: 'Task paid' },
 }
 
 export function getKindMeta(kind) {
@@ -89,6 +93,8 @@ const AMOUNT_KEY = {
   offer_filled: 'payout',
   bet: 'amount',
   mint: 'amount',
+  task_posted: 'reward',
+  task_paid: 'amount',
 }
 
 const amountFormatter = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
