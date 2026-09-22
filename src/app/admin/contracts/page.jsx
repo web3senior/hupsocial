@@ -36,6 +36,7 @@ import {
 import { TIP_TOKENS, USDC } from '@/lib/tokens'
 import styles from './page.module.scss'
 import ScheduleForwarderSection from './_components/ScheduleForwarderSection'
+import RelayerSweepSection from './_components/RelayerSweepSection'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
 
@@ -124,6 +125,7 @@ const formatNative = (wei) => formatToken(wei, 18)
 // have set for the tab to have anything to show (null = every configured chain).
 const SECTIONS = [
   { id: 'balances', label: 'Balances', icon: '💰', contractKey: null },
+  { id: 'relayer', label: 'Relayer', icon: '⛽', contractKey: null },
   { id: 'forwarders', label: 'Forwarders', icon: '✍️', contractKey: 'forwarder' },
   { id: 'scheduling', label: 'Scheduling', icon: '⏰', contractKey: 'scheduleForwarder' },
   { id: 'sell-fees', label: 'Sell Fees', icon: '💸', contractKey: 'sell' },
@@ -2873,6 +2875,8 @@ export default function Page() {
               {visibleChains(null).length === 0 && <p className={styles['admin-contracts__empty']}>No chains configured.</p>}
             </section>
           )}
+
+          {activeSection === 'relayer' && <RelayerSweepSection chains={visibleChains(null)} />}
 
           {activeSection === 'scheduling' && <ScheduleForwarderSection chains={visibleChains('scheduleForwarder')} />}
 
