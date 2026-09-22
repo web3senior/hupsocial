@@ -20,6 +20,7 @@ import communityAbi from '@/abis/HupCommunity.json'
 import pollsAbi from '@/abis/HupPolls.json'
 import dropsAbi from '@/abis/HupDrops.json'
 import fundAbi from '@/abis/HupFund.json'
+import tasksAbi from '@/abis/HupTasks.json'
 import premiumAbi from '@/abis/HupPremium.json'
 import { dropStandardLabel, dropStandardRowsFor } from '@/lib/drops'
 import {
@@ -135,6 +136,7 @@ const SECTIONS = [
   { id: 'community', label: 'Community', icon: '👥', contractKey: 'community' },
   { id: 'polls', label: 'Polls', icon: '📊', contractKey: 'polls' },
   { id: 'fund', label: 'Fundraise', icon: '🪙', contractKey: 'fund' },
+  { id: 'tasks', label: 'Tasks', icon: '🧰', contractKey: 'tasks' },
   { id: 'premium', label: 'Premium', icon: '⭐', contractKey: 'premium' },
   { id: 'chat', label: 'Chat', icon: '💬', contractKey: 'chat' },
 ]
@@ -263,6 +265,12 @@ export default function Page() {
   const [fundReceiverInputs, setFundReceiverInputs] = useState({})
   const [fundWithdrawStates, setFundWithdrawStates] = useState({})
   const [fundPauseTxStates, setFundPauseTxStates] = useState({})
+  const [taskConfigs, setTaskConfigs] = useState({})
+  const [taskFeeInputs, setTaskFeeInputs] = useState({})
+  const [taskSweepInputs, setTaskSweepInputs] = useState({})
+  const [taskRegistryInputs, setTaskRegistryInputs] = useState({})
+  const [taskHideInputs, setTaskHideInputs] = useState({})
+  const [taskTxStates, setTaskTxStates] = useState({})
   // HupChat: one paused() read per chain, then the pause toggle
   const [chatConfigs, setChatConfigs] = useState({})
   const [chatPauseTxStates, setChatPauseTxStates] = useState({})
@@ -2022,6 +2030,109 @@ export default function Page() {
         [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
       }))
     }
+  }
+
+  // Everything the Tasks card shows for one chain's HupTasks, in one pass. Native fees only here;
+  // per-token ledgers are read on demand when a token address is typed into the sweep field.
+  const loadTaskConfig = async (chain, tasksAddress) => {
+    setTaskConfigs((prev) => ({ ...prev, [chain.id]: { loading: true } }))
+
+    try {
+      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
+      const read = (functionName, args = []) => client.readContract({ address: tasksAddress, abi: tasksAbi, functionName, args })
+      const [version, feeBps, nativeFees, paused, reputationRegistry, identityRegistry] = await Promise.all([
+        read('version'),
+        read('taskFeeBps'),
+        read('collectedFees', [zeroAddress]),
+        read('paused'),
+        read('reputationRegistry'),
+        read('identityRegistry'),
+      ])
+
+      setTaskConfigs((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, version, feeBps: Number(feeBps), nativeFees, paused, reputationRegistry, identityRegistry },
+      }))
+      setTaskFeeInputs((prev) => (prev[chain.id] === undefined ? { ...prev, [chain.id]: String(Number(feeBps)) } : prev))
+      setTaskRegistryInputs((prev) => (prev[chain.id] === undefined ? { ...prev, [chain.id]: reputationRegistry } : prev))
+    } catch (err) {
+      console.error(`Tasks config read error for chain ${chain.id}:`, err)
+      setTaskConfigs((prev) => ({
+        ...prev,
+        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Failed to read the tasks contract' },
+      }))
+    }
+  }
+
+  useEffect(() => {
+    if (!isAdmin) return
+    config.chains.forEach((chain) => {
+      const tasksAddress = CONTRACTS[`chain${chain.id}`]?.tasks
+      if (tasksAddress) loadTaskConfig(chain, tasksAddress)
+    })
+  }, [isAdmin])
+
+  // One tx-state slot per chain per action, so a fee write and a sweep never overwrite each
+  // other's verdict on the same card
+  const setTaskTx = (chain, action, state) =>
+    setTaskTxStates((prev) => ({ ...prev, [chain.id]: { ...(prev[chain.id] ?? {}), [action]: state } }))
+
+  const runTaskWrite = async (chain, tasksAddress, action, request, refreshBalances = false) => {
+    setTaskTx(chain, action, { loading: true, error: null })
+    try {
+      const txHash = await writeContractAsync({ address: tasksAddress, abi: tasksAbi, chainId: chain.id, ...request })
+      setTaskTx(chain, action, { loading: false, success: true, hash: txHash })
+      setTimeout(() => loadTaskConfig(chain, tasksAddress), 3000)
+      if (refreshBalances) setTimeout(() => loadChainBalances(chain), 3000)
+    } catch (err) {
+      console.error(`Tasks ${action} error on chain ${chain.id}:`, err)
+      setTaskTx(chain, action, { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' })
+    }
+  }
+
+  // The fee is frozen into each task when it is funded, so this only reprices tasks posted afterwards
+  const handleSetTaskFee = (chain, tasksAddress) => {
+    const bps = Number(taskFeeInputs[chain.id])
+    if (!Number.isInteger(bps) || bps < 0 || bps > 1000) {
+      setTaskTx(chain, 'fee', { error: 'Enter a whole number of basis points, 0 to 1000 (10%)' })
+      return
+    }
+    runTaskWrite(chain, tasksAddress, 'fee', { functionName: 'setTaskFeeBps', args: [BigInt(bps)] })
+  }
+
+  // Only the fee ledger for one token moves; escrow is never counted in collectedFees
+  const handleSweepTaskFees = (chain, tasksAddress) => {
+    const draft = taskSweepInputs[chain.id] ?? {}
+    const receiver = draft.receiver?.trim() || address
+    const token = draft.token?.trim() || zeroAddress
+    if (!isAddress(receiver) || !isAddress(token)) {
+      setTaskTx(chain, 'sweep', { error: 'Enter valid addresses' })
+      return
+    }
+    runTaskWrite(chain, tasksAddress, 'sweep', { functionName: 'withdrawFees', args: [token, Boolean(draft.lsp7), receiver] }, true)
+  }
+
+  const handleTaskPause = (chain, tasksAddress, pause) =>
+    runTaskWrite(chain, tasksAddress, 'pause', { functionName: pause ? 'pause' : 'unpause' })
+
+  // address(0) switches ERC-8004 feedback off; anything else must answer getIdentityRegistry()
+  const handleSetTaskRegistry = (chain, tasksAddress) => {
+    const registry = taskRegistryInputs[chain.id]?.trim()
+    if (!isAddress(registry)) {
+      setTaskTx(chain, 'registry', { error: 'Enter a registry address, or 0x0000…0000 to disable ratings' })
+      return
+    }
+    runTaskWrite(chain, tasksAddress, 'registry', { functionName: 'setReputationRegistry', args: [registry] })
+  }
+
+  // Display flag only: the escrow stays exactly where it is
+  const handleHideTask = (chain, tasksAddress, hidden) => {
+    const postId = taskHideInputs[chain.id]?.trim()
+    if (!/^\d+$/.test(postId || '')) {
+      setTaskTx(chain, 'hide', { error: 'Enter the task post id' })
+      return
+    }
+    runTaskWrite(chain, tasksAddress, 'hide', { functionName: 'setHidden', args: [BigInt(postId), hidden] })
   }
 
   // Read the LSP26 follower registry a chain's contract is currently wired to. It is never a
@@ -5325,6 +5436,300 @@ export default function Page() {
               </div>
               {visibleChains('fund').length === 0 && (
                 <p className={styles['admin-contracts__empty']}>No HupFund deployments match this filter.</p>
+              )}
+            </section>
+          )}
+
+          {activeSection === 'tasks' && (
+            <section className={styles['admin-contracts__section']}>
+              <header className={styles['admin-contracts__header']}>
+                <h2 className={styles['admin-contracts__title']}>HupTasks</h2>
+                <p className={styles['admin-contracts__subtitle']}>
+                  Micro bounties escrowed against a post. The fee is charged on top of each reward and frozen into a task when it is
+                  funded, so a change here only affects tasks posted afterwards. Fees collect per payment token in their own ledger, the
+                  only balance this page can move. Pause stops new tasks and approvals; cancel and reclaim always go through. The ERC-8004
+                  registry is what approvals rate workers in; address(0) turns ratings off.
+                </p>
+              </header>
+
+              <div className={styles['admin-contracts__grid']}>
+                {visibleChains('tasks').map((chain) => {
+                  const deployment = CONTRACTS[`chain${chain.id}`]
+                  const taskConfig = taskConfigs[chain.id]
+                  const tx = taskTxStates[chain.id] ?? {}
+                  const sweepDraft = taskSweepInputs[chain.id] ?? {}
+                  const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
+                  const symbol = chain.nativeCurrency?.symbol ?? 'ETH'
+                  const isLocked = !taskConfig || taskConfig.loading || Boolean(taskConfig.error)
+                  const nativeFees = taskConfig?.nativeFees ?? 0n
+                  const feePercent = taskConfig ? (taskConfig.feeBps / 100).toFixed(2).replace(/\.?0+$/, '') : ''
+                  const ratingsOn = taskConfig?.reputationRegistry && taskConfig.reputationRegistry !== zeroAddress
+                  const txRow = (key, label, done) =>
+                    tx[key] && (
+                      <div className={styles['admin-contracts__detail-row']}>
+                        <span className={styles['admin-contracts__detail-label']}>{label}</span>
+                        <div className={styles['admin-contracts__detail-value']}>
+                          {tx[key].loading && <span style={{ color: '#d97706' }}>Signing & broadcasting tx...</span>}
+                          {tx[key].error && <span style={{ color: '#ef4444' }}>❌ {tx[key].error}</span>}
+                          {tx[key].success && <span style={{ color: '#10b981' }}>🚀 {done}</span>}
+                        </div>
+                      </div>
+                    )
+
+                  return (
+                    <div
+                      key={`tasks-${chain.id}`}
+                      className={styles['admin-contracts__card']}
+                      style={{
+                        '--network-color-primary': chain.primaryColor || '#f97316',
+                        '--network-color-text': chain.textColor || '#0d0d0d',
+                      }}
+                    >
+                      <div className={styles['admin-contracts__card-header']}>
+                        <div className={styles['admin-contracts__network-info']}>
+                          <div className={styles['admin-contracts__card-icon']}>
+                            <img src={chain.iconUrl} alt="" />
+                          </div>
+                          <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
+                        </div>
+                        <span className={styles['admin-contracts__badge']}>HUPTASKS</span>
+                      </div>
+
+                      <div className={styles['admin-contracts__details']}>
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Tasks Address</span>
+                          <span className={styles['admin-contracts__detail-value']}>
+                            {explorerUrl ? (
+                              <a href={`${explorerUrl}/address/${deployment.tasks}`} target="_blank" rel="noopener noreferrer">
+                                <code>{deployment.tasks}</code> ↗
+                              </a>
+                            ) : (
+                              <code>{deployment.tasks}</code>
+                            )}
+                          </span>
+                        </div>
+
+                        <div className={styles['admin-contracts__detail-row']}>
+                          <span className={styles['admin-contracts__detail-label']}>Contract</span>
+                          <div className={styles['admin-contracts__detail-value']}>
+                            {(!taskConfig || taskConfig.loading) && <span>Loading…</span>}
+                            {taskConfig?.error && (
+                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
+                                {taskConfig.error}
+                              </div>
+                            )}
+                            {taskConfig?.version && !taskConfig.paused && (
+                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--success'])}>
+                                ✓ v{taskConfig.version} — live
+                              </div>
+                            )}
+                            {taskConfig?.version && taskConfig.paused && (
+                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
+                                ⚠️ v{taskConfig.version} — PAUSED: no new tasks or approvals
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {taskConfig?.version && (
+                          <>
+                            <div className={styles['admin-contracts__detail-row']}>
+                              <span className={styles['admin-contracts__detail-label']}>Fee For New Tasks</span>
+                              <span className={styles['admin-contracts__detail-value']}>
+                                {taskConfig.feeBps} bps ({feePercent}%)
+                              </span>
+                            </div>
+                            <div className={styles['admin-contracts__detail-row']}>
+                              <span className={styles['admin-contracts__detail-label']}>Native Fees Collected</span>
+                              <span className={styles['admin-contracts__detail-value']}>
+                                {formatEther(nativeFees)} {symbol}
+                              </span>
+                            </div>
+                            <div className={styles['admin-contracts__detail-row']}>
+                              <span className={styles['admin-contracts__detail-label']}>ERC-8004 Ratings</span>
+                              <span className={styles['admin-contracts__detail-value']}>
+                                {ratingsOn ? (
+                                  <>
+                                    on · reputation <code>{taskConfig.reputationRegistry}</code> · identity <code>{taskConfig.identityRegistry}</code>
+                                  </>
+                                ) : (
+                                  'off'
+                                )}
+                              </span>
+                            </div>
+                          </>
+                        )}
+
+                        {txRow('fee', 'Fee Tx', 'Fee updated for tasks posted from now on.')}
+                        {txRow('sweep', 'Sweep Tx', 'Fees swept.')}
+                        {txRow('pause', 'Pause Tx', taskConfig?.paused ? 'Contract paused.' : 'Contract resumed.')}
+                        {txRow('registry', 'Registry Tx', 'Reputation registry updated.')}
+                        {txRow('hide', 'Hide Tx', 'Task visibility updated.')}
+                      </div>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSetTaskFee(chain, deployment.tasks)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Fee (basis points, 100 = 1%, max 1000)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="1000"
+                            step="1"
+                            className={styles['admin-contracts__input']}
+                            value={taskFeeInputs[chain.id] ?? ''}
+                            onChange={(e) => setTaskFeeInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={isLocked || tx.fee?.loading || (taskFeeInputs[chain.id] ?? '') === '' || Number(taskFeeInputs[chain.id]) === taskConfig?.feeBps}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {tx.fee?.loading ? 'Writing...' : 'Set Fee'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleTaskPause(chain, deployment.tasks, !taskConfig?.paused)}
+                            disabled={isLocked || tx.pause?.loading}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                          >
+                            {tx.pause?.loading ? 'Writing...' : taskConfig?.paused ? 'Unpause' : 'Pause'}
+                          </button>
+                        </div>
+                      </form>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSweepTaskFees(chain, deployment.tasks)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Sweep Fees To (defaults to your wallet)</label>
+                          <input
+                            type="text"
+                            className={styles['admin-contracts__input']}
+                            value={sweepDraft.receiver ?? ''}
+                            onChange={(e) => setTaskSweepInputs((prev) => ({ ...prev, [chain.id]: { ...sweepDraft, receiver: e.target.value } }))}
+                            placeholder={address || '0x...'}
+                          />
+                        </div>
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Token (blank = native {symbol})</label>
+                          <div className={styles['admin-contracts__field-row']}>
+                            <input
+                              type="text"
+                              className={styles['admin-contracts__input']}
+                              value={sweepDraft.token ?? ''}
+                              onChange={(e) => setTaskSweepInputs((prev) => ({ ...prev, [chain.id]: { ...sweepDraft, token: e.target.value } }))}
+                              placeholder="0x… ERC20 or LSP7"
+                            />
+                            <label className={styles['admin-contracts__hint']}>
+                              <input
+                                type="checkbox"
+                                checked={Boolean(sweepDraft.lsp7)}
+                                onChange={(e) => setTaskSweepInputs((prev) => ({ ...prev, [chain.id]: { ...sweepDraft, lsp7: e.target.checked } }))}
+                              />{' '}
+                              LSP7
+                            </label>
+                          </div>
+                        </div>
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={isLocked || tx.sweep?.loading || (!sweepDraft.token && nativeFees === 0n)}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                          >
+                            {tx.sweep?.loading
+                              ? 'Writing...'
+                              : sweepDraft.token
+                                ? 'Sweep Token Fees'
+                                : nativeFees === 0n
+                                  ? 'Nothing To Sweep'
+                                  : `Sweep ${formatEther(nativeFees)} ${symbol}`}
+                          </button>
+                        </div>
+                      </form>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleSetTaskRegistry(chain, deployment.tasks)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>ERC-8004 Reputation Registry (0x0 disables ratings)</label>
+                          <input
+                            type="text"
+                            className={styles['admin-contracts__input']}
+                            value={taskRegistryInputs[chain.id] ?? ''}
+                            onChange={(e) => setTaskRegistryInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                            placeholder="0x8004BAa1…"
+                          />
+                        </div>
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={isLocked || tx.registry?.loading || (taskRegistryInputs[chain.id] ?? '').toLowerCase() === String(taskConfig?.reputationRegistry ?? '').toLowerCase()}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                          >
+                            {tx.registry?.loading ? 'Writing...' : 'Set Registry'}
+                          </button>
+                        </div>
+                      </form>
+
+                      <form
+                        className={styles['admin-contracts__edit-form']}
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleHideTask(chain, deployment.tasks, true)
+                        }}
+                      >
+                        <div className={styles['admin-contracts__input-group']}>
+                          <label className={styles['admin-contracts__detail-label']}>Hide A Task (post id; escrow untouched)</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            className={styles['admin-contracts__input']}
+                            value={taskHideInputs[chain.id] ?? ''}
+                            onChange={(e) => setTaskHideInputs((prev) => ({ ...prev, [chain.id]: e.target.value }))}
+                            placeholder="Post id"
+                          />
+                        </div>
+                        <div className={styles['admin-contracts__actions']}>
+                          <button
+                            type="submit"
+                            disabled={isLocked || tx.hide?.loading || !(taskHideInputs[chain.id] ?? '').trim()}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                          >
+                            {tx.hide?.loading ? 'Writing...' : 'Hide'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleHideTask(chain, deployment.tasks, false)}
+                            disabled={isLocked || tx.hide?.loading || !(taskHideInputs[chain.id] ?? '').trim()}
+                            className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                          >
+                            Unhide
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )
+                })}
+              </div>
+              {visibleChains('tasks').length === 0 && (
+                <p className={styles['admin-contracts__empty']}>No HupTasks deployments match this filter.</p>
               )}
             </section>
           )}
