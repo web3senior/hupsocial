@@ -31,7 +31,7 @@ const fetchSuggestions = async (viewer) => {
   const response = await fetch(`${SUGGESTIONS_ENDPOINT}?${params}`)
   if (!response.ok) throw new Error(`Suggestions request failed (${response.status})`)
   const body = await response.json()
-  return body?.data ?? { live: false, users: [] }
+  return body?.data ?? { users: [] }
 }
 
 const readUpsellDismissed = () => {
@@ -46,7 +46,7 @@ const readUpsellDismissed = () => {
 /**
  * Home Rail
  * The column beside the home feed on wide screens: an upgrade card for viewers without Premium
- * and a "Who to follow" card that suggests a random handful of current subscribers.
+ * and a "Who to follow" card that suggests a random handful of accounts.
  */
 export default function HomeRail() {
   return (
@@ -86,7 +86,7 @@ const PremiumUpsell = () => {
         Upgrade to Premium
         <img className={styles.upsell__mark} src={blueCheckMark.src || blueCheckMark} alt="" width={16} height={16} aria-hidden="true" />
       </h2>
-      <p className={styles.upsell__body}>Stand out with the mark beside your name, your own profile colour, and a place in Who to follow.</p>
+      <p className={styles.upsell__body}>Stand out with the mark beside your name and your own profile colour.</p>
       <Link href="/premium" className={styles.upsell__cta}>
         Upgrade to Premium
       </Link>
@@ -102,7 +102,7 @@ const WhoToFollow = () => {
   })
 
   const users = data?.users ?? []
-  // No one left to suggest (or no Premium on this build, or the read failed): no card at all.
+  // No one left to suggest (or the read failed): no card at all.
   if (!isLoading && users.length === 0) return null
 
   return (
