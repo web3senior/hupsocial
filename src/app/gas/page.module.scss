@@ -49,6 +49,13 @@
     line-height: 1.6;
   }
 
+  &__link {
+    align-self: flex-start;
+    color: var(--text);
+    font-size: 0.875rem;
+    text-decoration: underline;
+  }
+
   &__total {
     margin: 0;
     color: var(--text-muted);

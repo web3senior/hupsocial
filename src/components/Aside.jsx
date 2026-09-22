@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import clsx from 'clsx'
-import { ArticleIcon, BookIcon, BugIcon, CalendarDotsIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HandCoinsIcon, HeadCircuitIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, RobotIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
+import { ArticleIcon, BookIcon, BugIcon, CalendarDotsIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HandCoinsIcon, HeadCircuitIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, ReceiptIcon, RobotIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
 import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
@@ -465,6 +465,12 @@ export default function Aside() {
                     <Link href="/gas" onClick={close} className="flex align-items-center gap-050">
                       <GasPumpIcon size={16} />
                       <span>Gas tank</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/fees" onClick={close} className="flex align-items-center gap-050">
+                      <ReceiptIcon size={16} />
+                      <span>Fees</span>
                     </Link>
                   </li>
                   <li>

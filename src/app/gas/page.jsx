@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import useSWR from 'swr'
 import { useConnection, useSendTransaction, useSwitchChain, useChainId } from 'wagmi'
 import { parseEther } from 'viem'
@@ -235,6 +236,10 @@ export default function GasPage() {
               This is what it has left, per network. Anyone can top it up, and everything sent here goes to covering
               other people&apos;s activity.
             </p>
+
+            <Link href="/fees" className={styles.hero__link}>
+              See what each action costs and where the fee goes
+            </Link>
 
             {data?.totalUsd > 0 && (
               <p className={styles.hero__total}>
