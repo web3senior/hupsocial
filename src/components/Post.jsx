@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useId, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useId, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { isArticle } from '@/lib/article'
 import Link from 'next/link'
@@ -1245,7 +1245,8 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
     }
   )
 
-  useEffect(() => {
+  // Before paint, or the button lands a frame late and pushes the feed below it down
+  useLayoutEffect(() => {
     if (!isCollapsible) return
     const el = contentRef.current
     if (!el) return
