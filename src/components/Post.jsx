@@ -83,6 +83,7 @@ import Tip from './ui/Tip'
 import View from './ui/View'
 import Bookmark from './ui/Bookmark'
 import Share from './ui/Share'
+import { PostSkeleton } from './ui/PostSkeleton'
 import clsx from 'clsx'
 import styles from './Post.module.scss'
 // Encrypted community content (posts, comments, quoted cards — everything inside encrypted
@@ -510,19 +511,6 @@ const RepostLabel = ({ walletAddress }) => {
     </Link>
   )
 }
-
-const PostSkeleton = () => (
-  <div style={{ padding: '20px 20px 0.5rem 20px' }}>
-    <div className="flex align-items-start gap-050">
-      <div className="shimmer rounded" style={{ width: 36, height: 36, flexShrink: 0 }} />
-      <div className="flex flex-column gap-025" style={{ flex: 1 }}>
-        <div className="shimmer rounded" style={{ width: '25%', height: 12 }} />
-        <div className="shimmer rounded" style={{ width: '60%', height: 12, marginTop: 4 }} />
-        <div className="shimmer rounded" style={{ width: '45%', height: 12, marginTop: 2 }} />
-      </div>
-    </div>
-  </div>
-)
 
 const LastCommentShimmer = () => (
   <aside className={styles.post__lastCommentShimmer} onClick={(e) => e.stopPropagation()}>
