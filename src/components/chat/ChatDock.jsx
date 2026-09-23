@@ -51,6 +51,7 @@ import {
 } from '@/lib/chatApi'
 import { REACTIONS } from '@/lib/chatRows'
 import { useChatDockStore } from '@/stores/useChatDockStore'
+import { useEmbedBridge } from './useEmbedBridge'
 import styles from './ChatDock.module.scss'
 
 const POLL_LIVE_MS = 4_000
@@ -143,9 +144,10 @@ const mergeSorted = (current, incoming) => {
  * a card when open, a taller card when expanded. Anyone can read; posting takes one wallet
  * signature. The loaded window is a slice of the room paged from a cursor in both directions, so
  * a reader who left days ago reopens on the line they left and reads forward from there.
- * Distinct from the onchain /chat page, which it stays off.
+ * Distinct from the onchain /chat page, which it stays off. `embedded` is the same room inside
+ * another site's frame (public/chat-widget.js): it fills the frame and the host page places it.
  */
-export default function ChatDock() {
+export default function ChatDock({ embedded = false }) {
   const pathname = usePathname()
   const { address, isConnected, status } = useConnection()
   const { signMessageAsync } = useSignMessage()
@@ -204,7 +206,7 @@ export default function ChatDock() {
   )
   const [isSigningIn, setIsSigningIn] = useState(false)
 
-  const hidden = !isClient || pathname === '/chat'
+  const hidden = !isClient || (!embedded && pathname === '/chat')
 
   const { data: chatMe, mutate: mutateChatMe } = useSWR(token ? ['chat-me', token] : null, () => fetchChatMe(token), {
     revalidateOnFocus: false,
@@ -261,7 +263,8 @@ export default function ChatDock() {
     setMentionAlert({ count: 0, firstId: 0 })
   }, [])
 
-  const { dockRef, dragProps, isDragging, dragStyle } = useDraggableCard({ enabled: isOpen, offset, setOffset })
+  const { dockRef, dragProps, isDragging, dragStyle } = useDraggableCard({ enabled: isOpen && !embedded, offset, setOffset })
+  useEmbedBridge({ enabled: embedded && !hidden, dockRef, mode })
 
   if (hidden) return null
 
@@ -281,7 +284,7 @@ export default function ChatDock() {
   return (
     <section
       ref={dockRef}
-      className={clsx(styles.dock, styles[`dock--${mode}`], isDragging && styles['dock--dragging'])}
+      className={clsx(styles.dock, styles[`dock--${mode}`], embedded && styles['dock--embed'], isDragging && styles['dock--dragging'])}
       style={dragStyle}
       aria-label="Chat"
     >
@@ -446,7 +449,7 @@ function useDraggableCard({ enabled, offset, setOffset }) {
     dockRef,
     isDragging,
     dragStyle,
-    dragProps: isMobile ? {} : { onPointerDown, onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag },
+    dragProps: isMobile || !enabled ? {} : { onPointerDown, onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag },
   }
 }
 

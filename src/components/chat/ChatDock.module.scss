@@ -74,6 +74,38 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
     }
   }
 
+  // Inside another site's frame the frame is the card: public/chat-widget.js sizes, rounds and
+  // shadows it, so the dock fills it edge to edge. Two classes, so it beats the md-down seat
+  // above, which a 360px-wide frame always matches.
+  &--embed {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    transition: none;
+
+    &.dock--minimized {
+      inset: auto 0 0 auto;
+      // Its true width even when the frame is still narrower, so the loader can grow the frame
+      width: max-content;
+      border-radius: 999px;
+    }
+
+    &.dock--open,
+    &.dock--expanded {
+      inset: 0;
+      width: auto;
+      height: auto;
+    }
+
+    .dock__bar {
+      cursor: default;
+    }
+
+    .dock__iconButton--expand {
+      display: inline-flex;
+    }
+  }
+
   // The bar is the drag handle: the card goes wherever it is pulled (ChatDock.jsx)
   &__bar {
     display: flex;

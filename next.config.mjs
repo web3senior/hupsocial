@@ -1,3 +1,5 @@
+import { CHAT_EMBED_ORIGINS } from './src/config/chatEmbed.mjs'
+
 /**
  * Frame policy for mini apps.
  *
@@ -44,6 +46,19 @@ const EMBED_CONTENT_SECURITY_POLICY = [
   "base-uri 'self'",
 ].join('; ')
 
+/**
+ * The chat widget is framed by a fixed allowlist, not by anyone: unlike the post embed it holds
+ * a wallet session and a composer, which is exactly what a hostile wrapper would harvest clicks on.
+ */
+const CHAT_EMBED_CONTENT_SECURITY_POLICY = [
+  `frame-ancestors 'self' ${CHAT_EMBED_ORIGINS.join(' ')}${
+    process.env.NODE_ENV === 'development' ? ' http://localhost:* https://localhost:*' : ''
+  }`,
+  'frame-src *',
+  "object-src 'none'",
+  "base-uri 'self'",
+].join('; ')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -77,6 +92,18 @@ const nextConfig = {
         // the last value wins — this is what lifts frame-ancestors for the embed document alone.
         source: '/networks/:networkId/:postId/embed',
         headers: [{ key: 'Content-Security-Policy', value: EMBED_CONTENT_SECURITY_POLICY }],
+      },
+      {
+        // After the catch-all for the same reason as the post embed above
+        source: '/embed/chat',
+        headers: [{ key: 'Content-Security-Policy', value: CHAT_EMBED_CONTENT_SECURITY_POLICY }],
+      },
+      {
+        source: '/chat-widget.js',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Cache-Control', value: 'public, max-age=3600' },
+        ],
       },
       {
         // The embed loader runs on the pages that host embeds, i.e. anyone's origin

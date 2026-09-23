@@ -22,6 +22,8 @@ let provider = null
 /** True when Hup is running inside another page's iframe (the Grid, or the dev harness). */
 export const isFramedByGridHost = () => {
   if (typeof window === 'undefined') return false
+  // /embed/* documents are framed by ordinary sites (public/chat-widget.js), never by the Grid
+  if (window.location.pathname.startsWith('/embed/')) return false
   try {
     return window.self !== window.top
   } catch {

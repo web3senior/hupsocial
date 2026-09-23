@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import SplashScreen from '@/components/SplashScreen'
 import NextToast from './NextToast'
 import WagmiContext from '@/contexts/WagmiContext'
@@ -17,6 +18,7 @@ import ComposerRecovery from './ComposerRecovery'
 import TaskFundingHost from './TaskFundingHost'
 import ScheduledPostsRunner from './ScheduledPostsRunner'
 import ChatDock from './chat/ChatDock'
+import { WalletConnectDialog } from './ConnectWallet'
 import OfflineBanner from './ui/OfflineBanner'
 import { Providers } from '@/app/providers'
 import styles from './ClientLayout.module.scss'
@@ -36,12 +38,15 @@ const SPLASH_FADE_MS = 900
  * arrives. This state only takes the faded-out element back out of the tree.
  */
 export default function ClientLayout({ children }) {
+  const pathname = usePathname()
   const [isBooting, setIsBooting] = useState(true)
 
   useEffect(() => {
     const doneTimer = setTimeout(() => setIsBooting(false), SPLASH_FADE_MS)
     return () => clearTimeout(doneTimer)
   }, [])
+
+  if (pathname?.startsWith('/embed/')) return <EmbedShell>{children}</EmbedShell>
 
   return (
     <Providers>
@@ -76,6 +81,33 @@ export default function ClientLayout({ children }) {
       </WagmiContext>
 
       {isBooting && <SplashScreen />}
+    </Providers>
+  )
+}
+
+/**
+ * Documents framed by other sites (/embed/*): the wallet and the surfaces a signed-out or
+ * email-wallet visitor needs, none of the app's chrome and no splash.
+ */
+function EmbedShell({ children }) {
+  // The page scroller's always-on track would show as a bar down the frame's edge. A rule, not
+  // inline style: lib/scrollLock.js clears html's inline overflow-y when a dialog closes.
+  useEffect(() => {
+    const sheet = document.createElement('style')
+    sheet.textContent = 'html { overflow: hidden !important; scrollbar-gutter: auto !important; }'
+    document.head.appendChild(sheet)
+    return () => sheet.remove()
+  }, [])
+
+  return (
+    <Providers>
+      <NextToast />
+      <WagmiContext>
+        {children}
+        <WalletConnectDialog />
+        <EmailLoginDialog />
+        <EmbeddedTxConfirm />
+      </WagmiContext>
     </Providers>
   )
 }

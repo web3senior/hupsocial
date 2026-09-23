@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Chat widget test</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 2rem 1rem;
+        font-family: system-ui, sans-serif;
+        line-height: 1.6;
+        color: #2b2118;
+        background: #f3e9d2;
+      }
+
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+      }
+
+      code {
+        padding: 0.1rem 0.3rem;
+        background: rgba(0, 0, 0, 0.06);
+        border-radius: 4px;
+      }
+
+      .filler {
+        height: 150vh;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Chat widget test</h1>
+      <p>A stand-in host page. The Hup chat should appear as a pill in the bottom-right corner.</p>
+      <p>The snippet a site adds:</p>
+      <p><code>&lt;script async src="https://hup.social/chat-widget.js" data-theme="auto"&gt;&lt;/script&gt;</code></p>
+      <div class="filler"></div>
+      <p>Bottom of the page: the widget stays fixed while this scrolls.</p>
+    </main>
+
+    <script async src="/chat-widget.js" data-theme="auto" charset="utf-8"></script>
+  </body>
+</html>
