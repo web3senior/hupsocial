@@ -7,7 +7,7 @@ const LINE_WIDTHS = ['53%', '77%', '62%', '63%', '70%']
 const ACTION_COUNT = 4
 
 /**
- * Placeholder for a single timeline row: avatar with chain badge, handle, two lines of body and
+ * Placeholder for a single timeline row: avatar, handle with chain badge, two lines of body and
  * the action row. Extracted from HomeFeedTab so every feed (For you, Following, Trending, Status)
  * shows the same shape while its first page is in flight — and so the shape is already in the
  * bundle when a cached shell boots with no network.
@@ -17,10 +17,7 @@ export const PostSkeleton = ({ variant = 0, divided = false }) => {
 
   return (
     <div className={clsx(styles['post-skeleton'], divided && styles['post-skeleton--divided'])}>
-      <div className={styles['post-skeleton__avatar']}>
-        <div className={clsx('shimmer', styles['post-skeleton__avatar-image'])} />
-        <div className={clsx('shimmer', styles['post-skeleton__avatar-badge'])} />
-      </div>
+      <div className={clsx('shimmer', styles['post-skeleton__avatar'])} />
 
       <div className={styles['post-skeleton__main']}>
         <div className={styles['post-skeleton__header']}>
