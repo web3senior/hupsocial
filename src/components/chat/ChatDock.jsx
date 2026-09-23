@@ -55,8 +55,9 @@ import { useChatDockStore } from '@/stores/useChatDockStore'
 import { useEmbedBridge } from './useEmbedBridge'
 import styles from './ChatDock.module.scss'
 
-const POLL_LIVE_MS = 4_000
-const POLL_MINIMIZED_MS = 30_000
+// Every poll is a billed function call; a background tab never polls
+const POLL_LIVE_MS = 8_000
+const POLL_MINIMIZED_MS = 180_000
 const BODY_MAX_CHARS = 1000
 // Two lines from one wallet within this gap share a run
 const GROUP_GAP_MS = 5 * 60_000
@@ -77,6 +78,18 @@ const compactCount = new Intl.NumberFormat(undefined, { notation: 'compact', max
 const stampDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 const noopSubscribe = () => () => {}
+
+const subscribeVisibility = (onChange) => {
+  document.addEventListener('visibilitychange', onChange)
+  return () => document.removeEventListener('visibilitychange', onChange)
+}
+
+const usePageVisible = () =>
+  useSyncExternalStore(
+    subscribeVisibility,
+    () => !document.hidden,
+    () => false
+  )
 
 const numericId = (message) => (typeof message.id === 'number' ? message.id : 0)
 
@@ -234,8 +247,9 @@ export default function ChatDock({ embedded = false }) {
   const [recentSenders, setRecentSenders] = useState([])
   // Unread lines that mention the reader: the badge turns into an @ and opening lands on the first
   const [mentionAlert, setMentionAlert] = useState({ count: 0, firstId: 0 })
+  const pageVisible = usePageVisible()
   useEffect(() => {
-    if (hidden || isOpen) return undefined
+    if (hidden || isOpen || !pageVisible) return undefined
     let cancelled = false
     const check = async () => {
       try {
@@ -254,7 +268,7 @@ export default function ChatDock({ embedded = false }) {
       cancelled = true
       clearInterval(timer)
     }
-  }, [hidden, isOpen, lastSeenId, me, token])
+  }, [hidden, isOpen, pageVisible, lastSeenId, me, token])
 
   // Who is around, refreshed by the room's own poll while it is open
   const [presence, setPresence] = useState({ wallets: [], count: 0 })
@@ -505,6 +519,7 @@ function Room({
   onModerated,
 }) {
   const [messages, setMessages] = useState(null)
+  const pageVisible = usePageVisible()
   const [hasOlder, setHasOlder] = useState(false)
   const [hasNewer, setHasNewer] = useState(false)
   const [isPaging, setIsPaging] = useState(false)
@@ -609,7 +624,7 @@ function Room({
 
   // Polling only at the live edge; a reader still catching up loads forward by scrolling
   useEffect(() => {
-    if (!isLoaded || hasNewer || !active) return undefined
+    if (!isLoaded || hasNewer || !active || !pageVisible) return undefined
     let cancelled = false
     const tick = async () => {
       try {
@@ -632,7 +647,7 @@ function Room({
       cancelled = true
       clearInterval(timer)
     }
-  }, [isLoaded, hasNewer, maxId, active, applyRemoved, applyEdited, applyPresence])
+  }, [isLoaded, hasNewer, maxId, active, pageVisible, applyRemoved, applyEdited, applyPresence])
 
   // Following the newest line while the reader sits at the bottom
   const stickRef = useRef(true)

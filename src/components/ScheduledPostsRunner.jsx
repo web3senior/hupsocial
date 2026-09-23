@@ -18,7 +18,7 @@ const nowSeconds = () => Math.floor(Date.now() / 1000)
 
 /**
  * Speeds up scheduled posts while their author happens to be online. The relayer publishes them
- * either way (the cron in app/api/v1/cron/scheduled-posts); this only asks for the sweep the moment
+ * either way (cidex's scheduled-posts worker); this only asks for the sweep the moment
  * a post is due instead of at the next tick, and shows the usual publishing toast when it goes out.
  * Never prompts and renders nothing. Needs the list token, so it stays idle for an author who has
  * never opened /scheduled.
