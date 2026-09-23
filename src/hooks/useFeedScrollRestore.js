@@ -41,8 +41,8 @@ const measureExit = (container) => {
  * card's rendered height. On a remount with a snapshot, those heights go back onto the cards as
  * min-heights (`cardStyle`) so nothing can reflow while media and async card content resolve, and
  * a pre-paint loop keeps the anchor card at its old offset until the page has been still past the
- * settle window. Settling releases the reservations in one synchronous step and scrolls by
- * whatever that shrank above the anchor, so the release itself never shows.
+ * settle window. Settling releases only the reservations below the viewport; cards above and on
+ * screen keep theirs, so nothing the reader has passed can regrow and push the page.
  *
  * Cards are the `data-post-key` elements inside `containerRef`.
  *
@@ -120,24 +120,36 @@ export function useFeedScrollRestore({ containerRef, restore = null, ready = fal
     }
   }, [])
 
-  // Drops the per-card reservations without letting the reader see it: the styles come off the
-  // DOM directly, the anchor is re-measured in the same task, and the page scrolls by the shrink.
-  // React's next render only agrees with what is already there.
+  // Only cards wholly below the viewport give up their reservation: anything above or on screen
+  // keeps its exit height, so media still loading there can never shift the reader's place.
+  // Styles come off the DOM directly; React's next render only agrees with what is already there.
   const releaseCards = useCallback(() => {
     const container = containerRef.current
-    if (reservedRef.current?.cards && container) {
-      const anchor = lastAnchorRef.current
-      const card = anchor ? container.querySelector(cardSelector(anchor.key)) : null
-      const before = card ? card.getBoundingClientRect().top : 0
+    const cards = reservedRef.current?.cards
+    if (!cards || !container) return
 
-      for (const element of container.querySelectorAll(CARD_SELECTOR)) element.style.minHeight = ''
-
-      if (card) {
-        const delta = card.getBoundingClientRect().top - before
-        if (Math.abs(delta) >= 1) window.scrollBy({ top: delta, behavior: 'instant' })
-      }
+    const kept = {}
+    for (const element of container.querySelectorAll(CARD_SELECTOR)) {
+      const key = element.dataset.postKey
+      if (!cards[key]) continue
+      if (element.getBoundingClientRect().top < window.innerHeight) kept[key] = cards[key]
+      else element.style.minHeight = ''
     }
-    setReserved((prev) => (prev?.cards ? { ...prev, cards: null } : prev))
+    setReserved((prev) => (prev?.cards ? { ...prev, cards: kept } : prev))
+  }, [containerRef])
+
+  // Kept reservations outlive the restore, so a later width change must drop them too.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver(() => {
+      const width = reservedRef.current?.width
+      if (!reservedRef.current?.cards || !width) return
+      if (Math.abs(container.offsetWidth - width) > 1) setReserved((prev) => (prev ? { ...prev, cards: null } : prev))
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
   }, [containerRef])
 
   // Heights only mean anything at the width they were measured at (a rotated phone, a resized
