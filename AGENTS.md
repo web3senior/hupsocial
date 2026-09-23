@@ -58,7 +58,12 @@ Once the plan is stated, adhere strictly to the following coding guidelines:
 ### 5. Terminology
 * **"onchain", never "on-chain":** Always write **onchain** (one word, no hyphen) in all code, comments, UI copy, and documentation. Apply the same to "offchain".
 
-### 6. Git & Internationalization
+### 6. Loading & Motion
+* **One loader primitive:** Every spinner comes from `src/components/Loading.jsx` (`Spinner`, `ContentSpinner`, `GlobalLoader`, `MessageLoader`), which wraps **`loading-dev`**. Never hand-roll an SVG spinner or a CSS keyframe rotation. The app-wide indicator is the `Indicator` constant at the top of that file — change it there, not at a call site.
+* **Package manager is pnpm:** `npm install` crashes on this repo's tree with a misleading arborist error. Use `pnpm add`.
+* **Motion:** Entrances, exits, label morphs and scroll reveals use **`cube-motion`** (`rise`, `leave`, `morph`, `reveal`; React components under `cube-motion/react`). It has no duration/easing knobs by design — a motion that feels wrong needs a different function, not a new option. It is not a shimmer library: skeleton shimmer stays on `ui/Shimmer.jsx`.
+
+### 7. Git & Internationalization
 * **Commits:** Prefix all architectural or structural intentions with Conventional Commit standards (`feat:`, `fix:`, `chore:`, `refactor:`).
 * **Data Formatting:** Use native JavaScript **`Intl`** utilities for compact ticker numbers and localized relative time strings.
 * **String Normalization:** Ensure slug/URL generation processes properly preserve and normalize Unicode characters, including Zero Width Non-Joiners (ZWNJ).

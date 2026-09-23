@@ -74,6 +74,9 @@ importers:
       crypto-js:
         specifier: ^4.2.0
         version: 4.2.0
+      cube-motion:
+        specifier: ^0.1.0
+        version: 0.1.0(react@19.2.8)
       dompurify:
         specifier: ^3.4.2
         version: 3.4.11
@@ -104,6 +107,9 @@ importers:
       lightweight-charts:
         specifier: ^5.2.0
         version: 5.2.0
+      loading-dev:
+        specifier: ^0.3.4
+        version: 0.3.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       marked:
         specifier: ^18.0.3
         version: 18.0.5
@@ -2315,6 +2321,23 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
+  cube-motion@0.1.0:
+    resolution: {integrity: sha512-oaUvTgw6CHT2CGJcT+l5gPh4mqHagkaik40GkIQhDhECc3tRkit+RTLyI6P5zuLxz7NlQBwAfJltUHXUwxqqXg==}
+    peerDependencies:
+      react: '>=18 <20'
+      solid-js: '>=1.8 <2'
+      svelte: '>=4 <6'
+      vue: '>=3.4 <4'
+    peerDependenciesMeta:
+      react:
+        optional: true
+      solid-js:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+
   d3-array@3.2.4:
     resolution: {integrity: sha512-tdQAmyA18i4J7wprpYq8ClcxZy3SC31QMeByyCFyRt7BVHdREQZ5lpzoe5mFEYZUWe+oq8HBvk9JjpibyEV4Jg==}
     engines: {node: '>=12'}
@@ -3353,6 +3376,12 @@ packages:
 
   lit@3.3.3:
     resolution: {integrity: sha512-fycuvZg/hkpozL00lm1pEJH5nN/lr9ZXd6mJI2HSN4+Bzc+LDNdEApJ6HFbPkdFNHLvOplIIuJvxkS4XUxqirw==}
+
+  loading-dev@0.3.4:
+    resolution: {integrity: sha512-vFwHrUk4QFVya4FKvGWP0q1eSJUlFQAQIPI1KScxiLExxCEhlsRAumjtD72m45yKMYX8fGK7i+yxAj+wdYLSkQ==}
+    peerDependencies:
+      react: '>=19.0.0'
+      react-dom: '>=19.0.0'
 
   locate-path@5.0.0:
     resolution: {integrity: sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g==}
@@ -7828,6 +7857,10 @@ snapshots:
   csstype@3.2.3:
     optional: true
 
+  cube-motion@0.1.0(react@19.2.8):
+    optionalDependencies:
+      react: 19.2.8
+
   d3-array@3.2.4:
     dependencies:
       internmap: 2.0.3
@@ -9058,6 +9091,11 @@ snapshots:
       '@lit/reactive-element': 2.1.2
       lit-element: 4.2.2
       lit-html: 3.3.3
+
+  loading-dev@0.3.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+    dependencies:
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
 
   locate-path@5.0.0:
     dependencies:

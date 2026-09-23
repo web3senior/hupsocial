@@ -1,4 +1,18 @@
-.globalLoader{
+// Wrapper carries the accessible label; loading-dev sizes the svg itself.
+.spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.contentSpinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.globalLoader {
   position: fixed;
   inset: 0;
   display: flex;
@@ -7,6 +21,15 @@
   background-color: var(--background);
   z-index: 9999;
   isolation: isolate;
+
+  &__container {
+    row-gap: 0.4rem;
+  }
+
+  &__message {
+    color: var(--text-muted, #666666);
+    font-size: 0.875rem;
+  }
 }
 
 // Loading
@@ -62,12 +85,5 @@
   100% {
     right: 0;
     width: 0;
-  }
-}
-
-.inline-loading {
-  svg {
-    width: 18px;
-    height: 18px;
   }
 }
