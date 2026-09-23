@@ -391,7 +391,7 @@ export function Profile({ addr }) {
     )
 
   return (
-    <Link href={profilePath(addr, profile.username)}>
+    <Link href={profilePath(addr, profile.username)} prefetch={false}>
       <figure className={`${styles.pfp} relative d-f-c flex-column grid--gap-050 rounded`} title={profile.name}>
         <Avatar alt={profile.name || `PFP`} src={profile.profileImage} size={38} className={`rounded`} />
       </figure>

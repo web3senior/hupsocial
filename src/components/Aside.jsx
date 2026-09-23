@@ -161,6 +161,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
     <Tooltip content={showTooltip ? item.name : null} placement="right" size="compact" hoverOnly>
       <Link
         href={item.path}
+        prefetch={item.prefetch}
         className={clsx(styles.link, isActive && styles.linkActive)}
         aria-label={item.name}
         aria-current={isActive ? 'page' : undefined}
@@ -253,6 +254,8 @@ export default function Aside() {
         id: 'profile',
         name: 'Profile',
         path: myProfilePath,
+        // Always on screen, so a viewport prefetch re-renders /[wallet] on every cache invalidation
+        prefetch: false,
         icon: UserIcon,
         avatarSrc: isConnected && address ? profile?.profileImage : null,
       },
