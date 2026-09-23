@@ -586,6 +586,13 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
     display: inline-flex;
     align-items: center;
   }
+
+  &__views {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    margin-right: 0.125rem;
+  }
 }
 
 .bubble {

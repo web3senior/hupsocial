@@ -13,6 +13,7 @@ import {
   ChatCircleIcon,
   CheckIcon,
   DotsThreeIcon,
+  EyeIcon,
   GifIcon,
   PaperPlaneRightIcon,
   PaperPlaneTiltIcon,
@@ -34,6 +35,7 @@ import { openConnect } from '@/lib/connectDialog'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { sameAddress } from '@/lib/address'
 import { splitChatText } from '@/lib/chatText'
+import { getViewerId } from '@/lib/viewer'
 import { mentionLabel, mentionMarkdown } from '@/lib/mentions'
 import {
   clearChatToken,
@@ -47,6 +49,7 @@ import {
   leaveRoom,
   moderateChat,
   readChatToken,
+  recordLineViews,
   sendRoomMessage,
   setTyping as reportTyping,
   subscribeChatToken,
@@ -60,6 +63,8 @@ import styles from './ChatDock.module.scss'
 // Every poll is a billed function call; a background tab never polls
 const POLL_LIVE_MS = 8_000
 const POLL_MINIMIZED_MS = 180_000
+// Lines that came on screen are sent together once this long has passed since the first of them
+const VIEW_FLUSH_MS = 2_000
 const BODY_MAX_CHARS = 1000
 // Two lines from one wallet within this gap share a run
 const GROUP_GAP_MS = 5 * 60_000
@@ -77,6 +82,7 @@ const WALLET_GRACE_MS = 4_000
 const MENTION_QUERY_PATTERN = /(^|\s)@([^\s@]{0,48})$/
 
 const compactCount = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 0 })
+const viewCount = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 const stampDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 const lineTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
 
@@ -573,6 +579,14 @@ function Room({
     setMessages((current) => (current ?? []).map((message) => byId.get(message.id) ?? message))
   }, [])
 
+  const applyViews = useCallback((views) => {
+    if (!views) return
+    setMessages((current) => {
+      if (!current?.some((message) => message.id in views && views[message.id] !== message.views)) return current
+      return current.map((message) => (message.id in views && views[message.id] !== message.views ? { ...message, views: views[message.id] } : message))
+    })
+  }, [])
+
   // Initial window: the page around the last seen line when there is one, else the newest page
   useEffect(() => {
     let cancelled = false
@@ -639,6 +653,7 @@ function Room({
         applyRemoved(data.removed)
         applyEdited(data.edited)
         if (data.messages.length) setMessages((current) => mergeSorted(current ?? [], data.messages))
+        applyViews(data.views)
         if (data.hasMore) setHasNewer(true)
       } catch {
         /* The next tick tries again */
@@ -650,7 +665,60 @@ function Room({
       cancelled = true
       clearInterval(timer)
     }
-  }, [isLoaded, hasNewer, maxId, active, pageVisible, applyRemoved, applyEdited, applyPresence])
+  }, [isLoaded, hasNewer, maxId, active, pageVisible, applyRemoved, applyEdited, applyPresence, applyViews])
+
+  // A line counts as viewed once most of it has been on screen with the card open and the tab
+  // in front; each line is sent once per page, and the server counts each reader once
+  const viewedRef = useRef(new Set())
+  const viewQueueRef = useRef(new Set())
+  const viewTimerRef = useRef(0)
+  const meRef = useRef(me)
+  useEffect(() => {
+    meRef.current = me
+  }, [me])
+  const flushViews = useCallback(() => {
+    viewTimerRef.current = 0
+    const ids = [...viewQueueRef.current]
+    viewQueueRef.current.clear()
+    if (!ids.length) return
+    let viewer = meRef.current
+    try {
+      viewer = getViewerId(meRef.current)
+    } catch {
+      /* storage blocked: a guest cannot be told apart from the next one, so only wallets count */
+    }
+    if (!viewer) return
+    recordLineViews(tokenRef.current, ids, viewer).catch(() => {
+      for (const id of ids) viewedRef.current.delete(id)
+    })
+  }, [])
+  useEffect(() => {
+    const list = listRef.current
+    const content = contentRef.current
+    if (!isLoaded || !active || !pageVisible || !list || !content) return undefined
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = Number(entry.target.dataset.lineId)
+          if (!entry.isIntersecting || !Number.isInteger(id) || id <= 0 || viewedRef.current.has(id)) continue
+          viewedRef.current.add(id)
+          viewQueueRef.current.add(id)
+        }
+        if (viewQueueRef.current.size && !viewTimerRef.current) viewTimerRef.current = window.setTimeout(flushViews, VIEW_FLUSH_MS)
+      },
+      { root: list, threshold: 0.6 }
+    )
+    content.querySelectorAll('[data-line-id]').forEach((line) => observer.observe(line))
+    return () => observer.disconnect()
+  }, [isLoaded, active, pageVisible, messages, flushViews])
+  // Whatever is still queued goes out when the room goes away
+  useEffect(
+    () => () => {
+      if (viewTimerRef.current) window.clearTimeout(viewTimerRef.current)
+      flushViews()
+    },
+    [flushViews]
+  )
 
   // Following the newest line while the reader sits at the bottom
   const stickRef = useRef(true)
@@ -1109,6 +1177,12 @@ function ChatLine({
   // Edited, time and the clock-then-check, tucked into the bubble's bottom-right as Telegram does
   const meta = (
     <span className={styles.meta}>
+      {settled && message.views > 0 && (
+        <span className={styles.meta__views} title={`${message.views} ${message.views === 1 ? 'view' : 'views'}`}>
+          <EyeIcon size={12} aria-hidden />
+          {viewCount.format(message.views)}
+        </span>
+      )}
       {message.editedAt && <span>edited</span>}
       <time dateTime={sentAt.toISOString()}>{lineTime.format(sentAt)}</time>
       {mine && (

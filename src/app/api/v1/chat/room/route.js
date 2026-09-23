@@ -14,6 +14,7 @@ import {
   LIVE_LINES,
   attachReactions,
   fetchPresence,
+  fetchRecentViews,
   fetchTyping,
   isGifUrl,
   pruneOldLines,
@@ -124,6 +125,8 @@ export async function GET(request) {
     await attachReactions(pool, edited, viewer?.id ?? null)
     const presence = await fetchPresence(pool)
     const typing = await fetchTyping(pool, viewer?.id ?? null)
+    // Counts move while lines sit still, so the live edge refreshes them for the newest lines
+    const views = after > 0 ? await fetchRecentViews(pool, room) : null
 
     return NextResponse.json(
       {
@@ -136,6 +139,7 @@ export async function GET(request) {
         online: presence.wallets,
         onlineCount: presence.count,
         typing,
+        views,
         serverTime: new Date().toISOString(),
       },
       { headers }

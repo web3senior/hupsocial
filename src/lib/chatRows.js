@@ -141,7 +141,7 @@ export const viewerAddress = (raw) => {
 }
 
 /** Live lines of a room, with their sender and the line they answer. Append conditions and ORDER BY. */
-export const LIVE_LINES = `SELECT m.id, m.kind, m.body, m.gif_url, m.reply_to, m.created_at, m.edited_at,
+export const LIVE_LINES = `SELECT m.id, m.kind, m.body, m.gif_url, m.reply_to, m.views, m.created_at, m.edited_at,
                                   u.wallet AS sender, u.role AS sender_role,
                                   r.body AS reply_body, r.kind AS reply_kind, r.gif_url AS reply_gif, r.deleted_at AS reply_deleted,
                                   ru.wallet AS reply_sender
@@ -200,6 +200,49 @@ export const attachReactions = async (pool, lines, viewerId = null) => {
   return lines
 }
 
+// A reader is a wallet or the guest id lib/viewer.js keeps for readers without one
+const GUEST_ID = /^guest_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export const VIEWS_BATCH_MAX = 100
+// How many of the newest lines carry fresh view counts on each live poll
+const VIEWS_REFRESHED = 40
+
+export const viewerKey = (raw) => {
+  const address = viewerAddress(raw)
+  if (address) return address
+  return typeof raw === 'string' && GUEST_ID.test(raw) ? raw.toLowerCase() : null
+}
+
+/**
+ * Counts a reader once on each live line they have seen, never on their own, and brings the
+ * counters of the lines that gained a reader up to date.
+ * @returns {Promise<number>} how many lines gained a reader
+ */
+export const recordViews = async (pool, ids, viewer) => {
+  const unique = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0).slice(0, VIEWS_BATCH_MAX)
+  if (!unique.length || !viewer) return 0
+  const [result] = await pool.query(
+    `INSERT IGNORE INTO chat_message_views (message_id, viewer)
+     SELECT m.id, ? FROM chat_messages m JOIN chat_users u ON u.id = m.sender_id
+      WHERE m.id IN (?) AND m.deleted_at IS NULL AND u.wallet <> ?`,
+    [viewer, unique, viewer]
+  )
+  if (!result.affectedRows) return 0
+  await pool.query(
+    'UPDATE chat_messages m SET m.views = (SELECT COUNT(*) FROM chat_message_views v WHERE v.message_id = m.id) WHERE m.id IN (?)',
+    [unique]
+  )
+  return result.affectedRows
+}
+
+/** @returns {Promise<Record<number, number>>} view counts of the newest live lines of a room */
+export const fetchRecentViews = async (pool, room) => {
+  const [rows] = await pool.execute(
+    `SELECT id, views FROM chat_messages WHERE room = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT ${VIEWS_REFRESHED}`,
+    [room]
+  )
+  return Object.fromEntries(rows.map((row) => [Number(row.id), Number(row.views) || 0]))
+}
+
 /** @returns the browser shape of one line */
 export const serializeLine = (row) => ({
   id: Number(row.id),
@@ -210,6 +253,7 @@ export const serializeLine = (row) => ({
   gif: row.gif_url || null,
   createdAt: row.created_at,
   editedAt: row.edited_at,
+  views: Number(row.views) || 0,
   replyTo: row.reply_to
     ? {
         id: Number(row.reply_to),

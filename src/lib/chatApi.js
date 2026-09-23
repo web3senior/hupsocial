@@ -120,6 +120,10 @@ export const fetchRoomMessages = ({ room = 'global', after, before, deletedSince
 export const toggleReaction = (token, messageId, emoji) =>
   call(token, '/api/v1/chat/reaction', { method: 'POST', body: JSON.stringify({ messageId, emoji }) })
 
+/** Counts the reader on lines they have had on screen; keepalive so a closing tab still lands. */
+export const recordLineViews = (token, ids, viewer, room = 'global') =>
+  call(token, '/api/v1/chat/view', { method: 'POST', keepalive: true, body: JSON.stringify({ room, ids, viewer }) })
+
 /**
  * How many live messages are newer than `sinceId`, capped, plus the newest id, the last few
  * faces, and (with a viewer) how many of those lines mention them and which comes first.
