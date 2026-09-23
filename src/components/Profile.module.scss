@@ -81,13 +81,19 @@
   max-width: 100%;
 }
 
+// Text shares one baseline (the 13px time centred against the 16px name sat high); glyphs
+// have no text baseline, so they centre on the row instead.
 .nameRow {
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: baseline;
   gap: 0.25rem;
   min-width: 0;
   max-width: 100%;
+
+  > :not(.name, .handle, .createdAt) {
+    align-self: center;
+  }
 }
 
 .name {
