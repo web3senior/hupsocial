@@ -66,6 +66,8 @@ export async function GET(request) {
       // case-insensitive so the checksummed form in the body matches the lowercase wallet
       let mentions = 0
       let firstMentionId = 0
+      // Read only for the viewer: a minimized dock is not around, so no presence stamp here
+      const actor = await chatActorFromRequest(pool, request).catch(() => null)
       const viewer = actor?.wallet ?? normalizeAddress(searchParams.get('viewer'))
       if (isEvmAddress(viewer)) {
         const [hits] = await pool.execute(
