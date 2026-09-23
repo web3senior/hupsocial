@@ -234,7 +234,7 @@ export default function ChatDock() {
     let cancelled = false
     const check = async () => {
       try {
-        const data = await fetchRoomUnread(lastSeenId, me)
+        const data = await fetchRoomUnread(lastSeenId, { viewer: me, token })
         if (cancelled) return
         setUnread(data.count)
         setRecentSenders(data.recentSenders ?? [])
@@ -249,7 +249,10 @@ export default function ChatDock() {
       cancelled = true
       clearInterval(timer)
     }
-  }, [hidden, isOpen, lastSeenId, me])
+  }, [hidden, isOpen, lastSeenId, me, token])
+
+  // Who is around, refreshed by the room's own poll while it is open
+  const [presence, setPresence] = useState({ wallets: [], count: 0 })
 
   const onSeen = useCallback(() => {
     setUnread(0)
@@ -286,6 +289,7 @@ export default function ChatDock() {
             <div className={styles.dock__title}>
               <span>Chat</span>
               {badge}
+              {presence.count > 0 && <OnlineChip presence={presence} />}
             </div>
             <div className={styles.dock__actions}>
               <button
@@ -334,6 +338,7 @@ export default function ChatDock() {
             lastSeenId={lastSeenId}
             markSeen={markSeen}
             onSeen={onSeen}
+            onPresence={setPresence}
             onSignIn={signIn}
             isSigningIn={isSigningIn}
             onConnect={() => openConnect() || minimize()}
@@ -465,7 +470,21 @@ function PillFace({ wallet }) {
   return <Avatar src={profile?.profileImage} size={28} alt="" title={profile?.name} className={styles.pill__face} />
 }
 
-function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, onSeen, onSignIn, isSigningIn, onConnect, onModerated }) {
+function Room({
+  active,
+  focusId = 0,
+  me,
+  token,
+  chatMe,
+  lastSeenId,
+  markSeen,
+  onSeen,
+  onPresence,
+  onSignIn,
+  isSigningIn,
+  onConnect,
+  onModerated,
+}) {
   const [messages, setMessages] = useState(null)
   const [hasOlder, setHasOlder] = useState(false)
   const [hasNewer, setHasNewer] = useState(false)
@@ -500,6 +519,14 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
     setMessages((current) => (current ?? []).filter((message) => !gone.has(message.id)))
   }, [])
 
+  // Who is around rides on every paged read; the header upstairs shows it
+  const applyPresence = useCallback(
+    (data) => {
+      if (data?.online) onPresence({ wallets: data.online, count: data.onlineCount ?? data.online.length })
+    },
+    [onPresence]
+  )
+
   const applyEdited = useCallback((edited) => {
     if (!edited?.length) return
     const byId = new Map(edited.map((message) => [message.id, message]))
@@ -518,6 +545,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
           ])
           if (cancelled) return
           serverTimeRef.current = newerPage.serverTime
+          applyPresence(newerPage)
           setMessages(mergeSorted(olderPage.messages, newerPage.messages))
           setHasOlder(olderPage.hasMore)
           setHasNewer(newerPage.hasMore)
@@ -525,6 +553,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
           const page = await fetchRoomMessages({ token: tokenRef.current })
           if (cancelled) return
           serverTimeRef.current = page.serverTime
+          applyPresence(page)
           setMessages(page.messages)
           setHasOlder(page.hasMore)
           setHasNewer(false)
@@ -541,7 +570,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
     return () => {
       cancelled = true
     }
-  }, [openedAtId])
+  }, [openedAtId, applyPresence])
 
   // First paint of the window: rest on the divider when there is one, else on the newest line
   useEffect(() => {
@@ -565,6 +594,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
         const data = await fetchRoomMessages({ token: tokenRef.current, after: maxId, deletedSince: serverTimeRef.current })
         if (cancelled) return
         serverTimeRef.current = data.serverTime
+        applyPresence(data)
         setLoadFailed(false)
         applyRemoved(data.removed)
         applyEdited(data.edited)
@@ -580,7 +610,7 @@ function Room({ active, focusId = 0, me, token, chatMe, lastSeenId, markSeen, on
       cancelled = true
       clearInterval(timer)
     }
-  }, [isLoaded, hasNewer, maxId, active, applyRemoved, applyEdited])
+  }, [isLoaded, hasNewer, maxId, active, applyRemoved, applyEdited, applyPresence])
 
   // Following the newest line while the reader sits at the bottom
   const stickRef = useRef(true)
@@ -1205,6 +1235,49 @@ function LineEditor({ body, onSave, onCancel }) {
         </button>
       </div>
     </div>
+  )
+}
+
+/**
+ * Who is in the room, in the header. A green dot and a count that opens the list on hover or on
+ * click, so it is reachable by touch too. Only wallets signed in to chat can be counted.
+ */
+function OnlineChip({ presence }) {
+  const [opened, setOpened] = useState(false)
+  const extra = presence.count - presence.wallets.length
+
+  return (
+    <NativePopover
+      openOnHover
+      placement="bottom-start"
+      className={styles.who}
+      onToggle={(event) => {
+        if (event.newState === 'open') setOpened(true)
+      }}
+      trigger={
+        <button type="button" className={styles.online} aria-label={`${presence.count} in the room`}>
+          <span className={styles.online__dot} aria-hidden="true" />
+          {compactCount.format(presence.count)}
+        </button>
+      }
+    >
+      {() =>
+        opened ? (
+          <>
+            <div className={styles.who__head}>
+              <span className={styles.online__dot} aria-hidden="true" />
+              <span>{presence.count} in the room</span>
+            </div>
+            <div className={styles.who__list}>
+              {presence.wallets.map((wallet) => (
+                <Profile key={wallet} creator={wallet} variant="fullWithoutTime" size={20} hoverCard={false} fingerprint={false} />
+              ))}
+              {extra > 0 && <span className={styles.who__more}>and {extra} more</span>}
+            </div>
+          </>
+        ) : null
+      }
+    </NativePopover>
   )
 }
 

@@ -124,10 +124,11 @@ export const toggleReaction = (token, messageId, emoji) =>
  * How many live messages are newer than `sinceId`, capped, plus the newest id, the last few
  * faces, and (with a viewer) how many of those lines mention them and which comes first.
  */
-export const fetchRoomUnread = (sinceId, viewer = null, room = 'global') => {
+export const fetchRoomUnread = (sinceId, { viewer = null, token = null, room = 'global' } = {}) => {
   const params = new URLSearchParams({ room, countAfter: String(sinceId || 0) })
   if (viewer) params.set('viewer', viewer)
-  return call(null, `/api/v1/chat/room?${params}`)
+  // The token also keeps a minimized reader counted as around
+  return call(token, `/api/v1/chat/room?${params}`)
 }
 
 /**

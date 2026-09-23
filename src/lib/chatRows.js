@@ -27,6 +27,50 @@ export const pruneOldLines = async (pool) => {
   }
 }
 
+// Who counts as around: a signed-in wallet whose room poll landed inside this window. The open
+// room polls every 4s and the minimized pill every 30s, so this is a wide margin over both.
+const PRESENCE_WINDOW_S = 150
+const PRESENCE_SHOWN = 20
+// One stamp per wallet per instance in this window: the open room would otherwise write every 4s
+const PRESENCE_WRITE_EVERY_MS = 15 * 1000
+const lastTouch = new Map()
+
+/** Marks a wallet as around, at most once every few seconds. Never throws. */
+export const touchPresence = async (pool, userId) => {
+  if (!userId) return
+  const now = Date.now()
+  if (now - (lastTouch.get(userId) ?? 0) < PRESENCE_WRITE_EVERY_MS) return
+  lastTouch.set(userId, now)
+  // The map would otherwise hold every wallet the instance has ever seen
+  if (lastTouch.size > 500) for (const [id, at] of lastTouch) if (now - at > PRESENCE_WINDOW_S * 1000) lastTouch.delete(id)
+  try {
+    await pool.execute('UPDATE chat_users SET last_seen_at = NOW(3) WHERE id = ?', [userId])
+  } catch (error) {
+    console.error('[CHAT_PRESENCE_ERROR]:', error)
+  }
+}
+
+/** @returns {Promise<{wallets: string[], count: number}>} who is around, most recent first */
+export const fetchPresence = async (pool) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT wallet FROM chat_users WHERE last_seen_at > NOW(3) - INTERVAL ? SECOND
+        ORDER BY last_seen_at DESC LIMIT ${PRESENCE_SHOWN}`,
+      [PRESENCE_WINDOW_S]
+    )
+    const wallets = rows.map((row) => row.wallet)
+    // Only a full page can be hiding more, so the usual quiet room costs one query
+    if (wallets.length < PRESENCE_SHOWN) return { wallets, count: wallets.length }
+    const [[total]] = await pool.execute('SELECT COUNT(*) AS n FROM chat_users WHERE last_seen_at > NOW(3) - INTERVAL ? SECOND', [
+      PRESENCE_WINDOW_S,
+    ])
+    return { wallets, count: Number(total.n) }
+  } catch (error) {
+    console.error('[CHAT_PRESENCE_READ_ERROR]:', error)
+    return { wallets: [], count: 0 }
+  }
+}
+
 const GIF_HOSTS = new Set([
   'media.giphy.com',
   'media0.giphy.com',

@@ -9,7 +9,16 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { isEvmAddress, normalizeAddress } from '@/lib/address'
 import { chatActorFromRequest, isBanned } from '@/lib/chatSession'
-import { BODY_MAX_CHARS, LIVE_LINES, attachReactions, isGifUrl, pruneOldLines, serializeLine } from '@/lib/chatRows'
+import {
+  BODY_MAX_CHARS,
+  LIVE_LINES,
+  attachReactions,
+  fetchPresence,
+  isGifUrl,
+  pruneOldLines,
+  serializeLine,
+  touchPresence,
+} from '@/lib/chatRows'
 
 export const runtime = 'nodejs'
 
@@ -39,6 +48,9 @@ export async function GET(request) {
     if (Number.isFinite(countAfter) && searchParams.has('countAfter')) {
       // The minimized poll is the one call that keeps coming while nobody writes
       await pruneOldLines(pool)
+      // A minimized reader is still around; the token says so, the query param only claims it
+      const actor = await chatActorFromRequest(pool, request).catch(() => null)
+      if (actor) await touchPresence(pool, actor.id)
       const [[row]] = await pool.execute(
         `SELECT COUNT(*) AS n FROM (SELECT id FROM chat_messages WHERE room = ? AND deleted_at IS NULL AND id > ? LIMIT ${UNREAD_CAP + 1}) c`,
         [room, Math.max(0, countAfter)]
@@ -56,7 +68,7 @@ export async function GET(request) {
       // case-insensitive so the checksummed form in the body matches the lowercase wallet
       let mentions = 0
       let firstMentionId = 0
-      const viewer = normalizeAddress(searchParams.get('viewer'))
+      const viewer = actor?.wallet ?? normalizeAddress(searchParams.get('viewer'))
       if (isEvmAddress(viewer)) {
         const [hits] = await pool.execute(
           `SELECT id FROM chat_messages WHERE room = ? AND deleted_at IS NULL AND id > ? AND body LIKE ? ORDER BY id ASC LIMIT ${UNREAD_CAP + 1}`,
@@ -104,10 +116,13 @@ export async function GET(request) {
       }
     }
 
-    // Reading is public, but a token on the request lets the chips say which reactions are the reader's
+    // Reading is public, but a token on the request lets the chips say which reactions are the
+    // reader's, and marks them as around
     const viewer = await chatActorFromRequest(pool, request).catch(() => null)
+    if (viewer) await touchPresence(pool, viewer.id)
     const messages = await attachReactions(pool, rows.map(serialize), viewer?.id ?? null)
     await attachReactions(pool, edited, viewer?.id ?? null)
+    const presence = await fetchPresence(pool)
 
     return NextResponse.json(
       {
@@ -117,6 +132,8 @@ export async function GET(request) {
         hasMore: rows.length === PAGE_LIMIT,
         removed,
         edited,
+        online: presence.wallets,
+        onlineCount: presence.count,
         serverTime: new Date().toISOString(),
       },
       { headers }
