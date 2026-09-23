@@ -136,7 +136,6 @@ export default function VaultUnlockDialog() {
         <input
           className={styles.vaultUnlock__pin}
           type="password"
-          inputMode="numeric"
           autoComplete="off"
           placeholder="Security Vault PIN"
           value={pin}

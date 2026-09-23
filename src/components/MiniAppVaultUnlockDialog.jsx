@@ -109,7 +109,6 @@ const MiniAppVaultUnlockDialog = forwardRef(function MiniAppVaultUnlockDialog(pr
         <input
           className={styles.vaultDialog__pin}
           type="password"
-          inputMode="numeric"
           autoComplete="off"
           placeholder="Security Vault PIN"
           value={pin}
