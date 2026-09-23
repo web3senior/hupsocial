@@ -55,7 +55,6 @@
     // No hand-written -webkit- twin here: lightningcss drops BOTH declarations when the
     // legacy alias is present, and it already emits the prefix per browser target itself.
     backdrop-filter: blur(28px) saturate(180%);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
     overflow: hidden;
     max-width: 400px;
     margin: auto;
