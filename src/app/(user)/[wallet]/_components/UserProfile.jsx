@@ -36,6 +36,7 @@ import { isUniversalProfile, linksToRows, normalizeIpfsUri, readImageSize, readL
 import { syncProfileToUniversalProfile } from '@/lib/profileUpdateTracking'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import AssetsTab from '@/components/tabs/AssetsTab'
+import PostSkeletonGrid from '@/components/ui/PostSkeleton'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 import { useProfile } from '@/hooks/useProfile'
 import { handleBrokenAvatar } from '@/lib/utils'
@@ -360,8 +361,8 @@ export default function UserProfile({ address: routeAddress }) {
  * @returns
  */
 const PostFeed = ({ feed, emptyLabel, cardStyle, onPostClick, onPostPrefetch }) => {
-  // Stay blank until the first page settles so the empty state can't flash mid-fetch.
-  if (feed.posts.list.length === 0) return feed.isLoaded ? <NoData name={emptyLabel} /> : null
+  // Shimmer until the first page settles so the empty state can't flash mid-fetch.
+  if (feed.posts.list.length === 0) return feed.isLoaded ? <NoData name={emptyLabel} /> : <PostSkeletonGrid count={6} />
 
   return (
     <>

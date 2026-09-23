@@ -331,26 +331,6 @@
     margin: 0;
   }
 
-  &:after {
-    right: 0;
-    background: linear-gradient(to right, transparent 10%, var(--background));
-  }
-
-  &:before {
-    left: 0;
-    background: linear-gradient(to left, transparent 10%, var(--background));
-  }
-
-  &:before,
-  &:after {
-    content: '';
-    position: absolute;
-    top: 0;
-    height: 80%;
-    width: 20px;
-    z-index: 1;
-  }
-
   &__container {
     padding: 0 0.2em 0 0.2em;
     display: flex;
