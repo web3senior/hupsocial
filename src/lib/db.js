@@ -13,7 +13,12 @@ const createPool = () =>
     database: process.env.DB_NAME,
     port: parseInt(process.env.DB_PORT || '3306'),
     waitForConnections: true,
-    connectionLimit: 10,
+    // Every serverless instance owns a pool; idle ones must hand connections back or a few warm
+    // instances exhaust max_connections.
+    connectionLimit: process.env.NODE_ENV === 'production' ? 3 : 10,
+    maxIdle: 1,
+    idleTimeout: 30000,
+    enableKeepAlive: true,
     queueLimit: 0,
     // This is often required for modern MySQL/MariaDB versions
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
