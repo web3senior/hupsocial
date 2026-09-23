@@ -25,6 +25,7 @@ import { useProfile } from '@/hooks/useProfile'
 import EmojiPicker from '@/components/EmojiPicker'
 import GifPicker from '@/components/GifPicker'
 import EmptyState from '@/components/ui/EmptyState'
+import { Spinner } from '@/components/Loading'
 import NativePopover from '@/components/ui/NativePopover'
 import { toast } from '@/components/NextToast'
 import { openConnect } from '@/lib/connectDialog'
@@ -44,6 +45,7 @@ import {
   moderateChat,
   readChatToken,
   sendRoomMessage,
+  setTyping as reportTyping,
   subscribeChatToken,
   toggleReaction,
 } from '@/lib/chatApi'
@@ -499,6 +501,8 @@ function Room({
   const [initialScrollDone, setInitialScrollDone] = useState(false)
   // Whether the last load was refused: an outage must not read as an empty room
   const [loadFailed, setLoadFailed] = useState(false)
+  // Everyone else with something half-written, from the room's own poll
+  const [typists, setTypists] = useState([])
   // Reads carry the token for the reader-owned reaction flags without re-running on sign-in
   const tokenRef = useRef(token)
   useEffect(() => {
@@ -523,6 +527,7 @@ function Room({
   const applyPresence = useCallback(
     (data) => {
       if (data?.online) onPresence({ wallets: data.online, count: data.onlineCount ?? data.online.length })
+      if (data?.typing) setTypists(data.typing)
     },
     [onPresence]
   )
@@ -906,6 +911,18 @@ function Room({
         </div>
       </div>
 
+      {typists.length > 0 && (
+        <div className={styles.typing}>
+          <Spinner size={12} color="currentColor" label="Typing" />
+          <span className={styles.typing__faces}>
+            {typists.map((wallet) => (
+              <Profile key={wallet} creator={wallet} variant="imageOnly" size={18} hoverCard={false} fingerprint={false} />
+            ))}
+          </span>
+          <span>{typists.length === 1 ? 'is typing…' : 'are typing…'}</span>
+        </div>
+      )}
+
       {showJump && messages?.length > 0 && (
         <button type="button" className={styles.jump} onClick={jumpToLatest}>
           <ArrowDownIcon size={14} weight="bold" />
@@ -935,7 +952,13 @@ function Room({
           </span>
         </div>
       ) : (
-        <Composer onSend={send} viewer={me} replyTo={replyTarget} onCancelReply={() => setReplyTarget(null)} />
+        <Composer
+          onSend={send}
+          viewer={me}
+          onTyping={token ? (on) => reportTyping(token, on).catch(() => {}) : null}
+          replyTo={replyTarget}
+          onCancelReply={() => setReplyTarget(null)}
+        />
       )}
     </>
   )
@@ -1380,7 +1403,7 @@ function Quote({ reply, onJump }) {
   )
 }
 
-function Composer({ onSend, viewer, replyTo, onCancelReply }) {
+function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
   const inputRef = useRef(null)
@@ -1393,6 +1416,25 @@ function Composer({ onSend, viewer, replyTo, onCancelReply }) {
   const mentionsRef = useRef(new Map())
   // A picked GIF waits here for its caption; Send carries both
   const [gif, setGif] = useState(null)
+  // Keystrokes are not requests: the server is told at most every few seconds, and once on stop
+  const typingSentAt = useRef(0)
+  const reportWriting = (on) => {
+    if (!onTyping) return
+    if (on && Date.now() - typingSentAt.current < 3000) return
+    typingSentAt.current = on ? Date.now() : 0
+    onTyping(on)
+  }
+  // A card closed mid-sentence would otherwise leave the line up until the stamp expires
+  const onTypingRef = useRef(onTyping)
+  useEffect(() => {
+    onTypingRef.current = onTyping
+  }, [onTyping])
+  useEffect(
+    () => () => {
+      if (typingSentAt.current) onTypingRef.current?.(false)
+    },
+    []
+  )
 
   useEffect(() => {
     if (replyTo) inputRef.current?.focus()
@@ -1434,6 +1476,7 @@ function Composer({ onSend, viewer, replyTo, onCancelReply }) {
     setIsSending(true)
     setDraft('')
     setMention(null)
+    reportWriting(false)
     const sent = await onSend({ body: toWire(text), gif: gif?.full?.url ?? null })
     if (sent) {
       mentionsRef.current.clear()
@@ -1507,6 +1550,7 @@ function Composer({ onSend, viewer, replyTo, onCancelReply }) {
           value={draft}
           onChange={(event) => {
             setDraft(event.target.value)
+            reportWriting(event.target.value.trim().length > 0)
             syncMention(event.target.value, event.target.selectionStart ?? event.target.value.length)
           }}
           onKeyUp={(event) => {

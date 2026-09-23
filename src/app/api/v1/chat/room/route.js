@@ -14,6 +14,7 @@ import {
   LIVE_LINES,
   attachReactions,
   fetchPresence,
+  fetchTyping,
   isGifUrl,
   pruneOldLines,
   serializeLine,
@@ -123,6 +124,7 @@ export async function GET(request) {
     const messages = await attachReactions(pool, rows.map(serialize), viewer?.id ?? null)
     await attachReactions(pool, edited, viewer?.id ?? null)
     const presence = await fetchPresence(pool)
+    const typing = await fetchTyping(pool, viewer?.id ?? null)
 
     return NextResponse.json(
       {
@@ -134,6 +136,7 @@ export async function GET(request) {
         edited,
         online: presence.wallets,
         onlineCount: presence.count,
+        typing,
         serverTime: new Date().toISOString(),
       },
       { headers }

@@ -71,6 +71,46 @@ export const fetchPresence = async (pool) => {
   }
 }
 
+// How long a keystroke keeps someone on the "typing…" line. The room polls every 4s, so this is
+// a little over two polls: long enough to survive a pause for thought, short enough to go quiet.
+const TYPING_WINDOW_S = 7
+const TYPING_SHOWN = 3
+const TYPING_WRITE_EVERY_MS = 2500
+const lastTyping = new Map()
+
+/** Marks a wallet as writing, or clears it. Never throws. */
+export const touchTyping = async (pool, userId, on) => {
+  if (!userId) return
+  const now = Date.now()
+  // Stopping always goes through; starting is throttled, since a keystroke is not a write
+  if (on) {
+    if (now - (lastTyping.get(userId) ?? 0) < TYPING_WRITE_EVERY_MS) return
+    lastTyping.set(userId, now)
+  } else {
+    lastTyping.delete(userId)
+  }
+  try {
+    await pool.execute(`UPDATE chat_users SET typing_at = ${on ? 'NOW(3)' : 'NULL'} WHERE id = ?`, [userId])
+  } catch (error) {
+    console.error('[CHAT_TYPING_ERROR]:', error)
+  }
+}
+
+/** @returns {Promise<string[]>} wallets writing right now, never the reader's own */
+export const fetchTyping = async (pool, excludeId = null) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT wallet FROM chat_users WHERE typing_at > NOW(3) - INTERVAL ? SECOND AND id <> ?
+        ORDER BY typing_at DESC LIMIT ${TYPING_SHOWN}`,
+      [TYPING_WINDOW_S, excludeId ?? 0]
+    )
+    return rows.map((row) => row.wallet)
+  } catch (error) {
+    console.error('[CHAT_TYPING_READ_ERROR]:', error)
+    return []
+  }
+}
+
 const GIF_HOSTS = new Set([
   'media.giphy.com',
   'media0.giphy.com',

@@ -144,6 +144,9 @@ export const editRoomMessage = (token, messageId, body) =>
 export const deleteRoomMessage = (token, messageId) =>
   call(token, '/api/v1/chat/message', { method: 'DELETE', body: JSON.stringify({ messageId }) })
 
+/** Says the reader is writing, or has stopped; the server lets it expire either way. */
+export const setTyping = (token, typing) => call(token, '/api/v1/chat/typing', { method: 'POST', body: JSON.stringify({ typing }) })
+
 export const fetchChatMe = (token) => call(token, '/api/v1/chat/me')
 
 export const moderateChat = (token, payload) => call(token, '/api/v1/chat/moderation', { method: 'POST', body: JSON.stringify(payload) })
