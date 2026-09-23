@@ -1096,6 +1096,7 @@ function ChatLine({
                   <Link
                     key={index}
                     href={`/${part.address}`}
+                    prefetch={false}
                     className={clsx(styles.bubble__mention, sameAddress(part.address, me) && styles['bubble__mention--me'])}
                   >
                     @{part.label}

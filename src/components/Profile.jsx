@@ -153,8 +153,11 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
       ) : (
         <Link
           href={profileHref}
+          prefetch={false}
           className={styles.imageWrapper}
           onClick={(e) => e.stopPropagation()}
+          onMouseEnter={() => creator && router.prefetch(profileHref)}
+          onFocus={() => creator && router.prefetch(profileHref)}
           aria-label={`Open the profile of ${profile.name}`}
         >
           {picture}
@@ -164,8 +167,11 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
       {variant !== 'imageOnly' && (
         <div className={clsx(styles.nameColumn, 'flex flex-column align-items-start justify-content-center gap-025')}>
           <div className={styles.nameRow}>
+            {/* Hover-only prefetch: visible links re-prefetch on every router cache invalidation,
+                which looped the chat's sender names into a render per link per second */}
             <Link
               href={profileHref}
+              prefetch={false}
               className={styles.name}
               onClick={(e) => e.stopPropagation()}
               onMouseEnter={() => creator && router.prefetch(profileHref)}
