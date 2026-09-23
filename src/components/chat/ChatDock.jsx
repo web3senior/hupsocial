@@ -78,6 +78,7 @@ const MENTION_QUERY_PATTERN = /(^|\s)@([^\s@]{0,48})$/
 
 const compactCount = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 0 })
 const stampDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+const lineTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
 
 const noopSubscribe = () => () => {}
 
@@ -1104,13 +1105,21 @@ function ChatLine({
   // Only a line typed here rises in; history and polled lines are already in place
   const [arrived] = useState(Boolean(message.pending))
   const Root = arrived ? Rise : 'div'
-  const status = mine && (
-    <Morph
-      className={styles.status}
-      active={!message.pending}
-      off={<MessageLoader />}
-      on={<CheckIcon size={12} weight="bold" aria-label="Sent" />}
-    />
+  const sentAt = new Date(parseTime(message.createdAt))
+  // Edited, time and the clock-then-check, tucked into the bubble's bottom-right as Telegram does
+  const meta = (
+    <span className={styles.meta}>
+      {message.editedAt && <span>edited</span>}
+      <time dateTime={sentAt.toISOString()}>{lineTime.format(sentAt)}</time>
+      {mine && (
+        <Morph
+          className={styles.meta__status}
+          active={!message.pending}
+          off={<MessageLoader />}
+          on={<CheckIcon size={12} weight="bold" aria-label="Sent" />}
+        />
+      )}
+    </span>
   )
 
   const items = []
@@ -1151,7 +1160,7 @@ function ChatLine({
               {/* A Giphy CDN URL straight from the picker: the optimizer would only re-fetch it */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className={styles.line__gif} src={message.gif} alt="GIF" loading="lazy" title={when} />
-              {!message.body && status && <span className={styles.line__mediaStatus}>{status}</span>}
+              {!message.body && <span className={styles.line__mediaMeta}>{meta}</span>}
             </span>
           )}
           {message.body && (
@@ -1174,8 +1183,7 @@ function ChatLine({
                   <span key={index}>{part.value}</span>
                 )
               )}
-              {message.editedAt && <span className={styles.bubble__edited}>(edited)</span>}
-              {status}
+              {meta}
             </p>
           )}
           {message.reactions?.length > 0 && (

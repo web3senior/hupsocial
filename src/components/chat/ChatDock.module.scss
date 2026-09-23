@@ -517,8 +517,8 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
     max-width: 100%;
   }
 
-  // A GIF without a caption carries the status on a dark chip over its corner
-  &__mediaStatus {
+  // A GIF without a caption carries the meta on a dark chip over its corner
+  &__mediaMeta {
     position: absolute;
     right: 0.375rem;
     bottom: 0.375rem;
@@ -528,8 +528,10 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
     background-color: rgb(0 0 0 / 45%);
     border-radius: 999px;
 
-    .status {
-      margin-inline-start: 0;
+    .meta {
+      float: none;
+      top: 0;
+      margin: 0;
       opacity: 1;
     }
   }
@@ -563,13 +565,27 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
   }
 }
 
-// The clock-then-check at the tail of an own line, as Telegram draws it
-.status {
+// Floated at the end of the text: it shares the last line when there is room, and drops to a
+// line of its own at the bubble's bottom-right when there is not
+.meta {
+  float: right;
+  position: relative;
+  top: 0.3125rem;
   display: inline-flex;
   align-items: center;
-  margin-inline-start: 0.375rem;
-  vertical-align: -1px;
-  opacity: 0.75;
+  gap: 0.25rem;
+  margin: -0.25rem -0.25rem 0 0.625rem;
+  font-size: var(--font-size-12);
+  line-height: 1.35;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+  user-select: none;
+
+  &__status {
+    display: inline-flex;
+    align-items: center;
+  }
 }
 
 .bubble {
@@ -614,13 +630,6 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
   // A GIF with a caption: the picture above, the words in a bubble under it
   &--caption {
     margin-top: 2px;
-  }
-
-  // A rewritten line says so, quietly, after the text
-  &__edited {
-    margin-inline-start: 0.375rem;
-    font-size: var(--font-size-10);
-    opacity: 0.7;
   }
 
   // A mention is a name, not a URL: bold and unadorned, and the reader's own is picked out
