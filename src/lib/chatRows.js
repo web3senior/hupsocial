@@ -27,24 +27,29 @@ export const pruneOldLines = async (pool) => {
   }
 }
 
-// Who counts as around: a signed-in wallet whose room poll landed inside this window. The open
-// room polls every 4s and the minimized pill every 30s, so this is a wide margin over both.
-const PRESENCE_WINDOW_S = 150
+// Who counts as around: a signed-in wallet with the room open. The open room polls every 4s and
+// stamps at most every 15s, so this outlasts a missed poll; minimizing clears the stamp at once.
+const PRESENCE_WINDOW_S = 45
 const PRESENCE_SHOWN = 20
 // One stamp per wallet per instance in this window: the open room would otherwise write every 4s
 const PRESENCE_WRITE_EVERY_MS = 15 * 1000
 const lastTouch = new Map()
 
-/** Marks a wallet as around, at most once every few seconds. Never throws. */
-export const touchPresence = async (pool, userId) => {
+/** Marks a wallet as around, at most once every few seconds, or takes it off. Never throws. */
+export const touchPresence = async (pool, userId, on = true) => {
   if (!userId) return
   const now = Date.now()
-  if (now - (lastTouch.get(userId) ?? 0) < PRESENCE_WRITE_EVERY_MS) return
-  lastTouch.set(userId, now)
+  // Leaving always goes through; staying is throttled
+  if (on) {
+    if (now - (lastTouch.get(userId) ?? 0) < PRESENCE_WRITE_EVERY_MS) return
+    lastTouch.set(userId, now)
+  } else {
+    lastTouch.delete(userId)
+  }
   // The map would otherwise hold every wallet the instance has ever seen
   if (lastTouch.size > 500) for (const [id, at] of lastTouch) if (now - at > PRESENCE_WINDOW_S * 1000) lastTouch.delete(id)
   try {
-    await pool.execute('UPDATE chat_users SET last_seen_at = NOW(3) WHERE id = ?', [userId])
+    await pool.execute(`UPDATE chat_users SET last_seen_at = ${on ? 'NOW(3)' : 'NULL'} WHERE id = ?`, [userId])
   } catch (error) {
     console.error('[CHAT_PRESENCE_ERROR]:', error)
   }

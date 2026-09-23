@@ -127,7 +127,6 @@ export const toggleReaction = (token, messageId, emoji) =>
 export const fetchRoomUnread = (sinceId, { viewer = null, token = null, room = 'global' } = {}) => {
   const params = new URLSearchParams({ room, countAfter: String(sinceId || 0) })
   if (viewer) params.set('viewer', viewer)
-  // The token also keeps a minimized reader counted as around
   return call(token, `/api/v1/chat/room?${params}`)
 }
 
@@ -146,6 +145,9 @@ export const deleteRoomMessage = (token, messageId) =>
 
 /** Says the reader is writing, or has stopped; the server lets it expire either way. */
 export const setTyping = (token, typing) => call(token, '/api/v1/chat/typing', { method: 'POST', body: JSON.stringify({ typing }) })
+
+/** Takes the reader off the online list; keepalive so it still lands while the tab closes. */
+export const leaveRoom = (token) => call(token, '/api/v1/chat/presence', { method: 'DELETE', keepalive: true })
 
 export const fetchChatMe = (token) => call(token, '/api/v1/chat/me')
 

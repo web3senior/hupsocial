@@ -49,9 +49,6 @@ export async function GET(request) {
     if (Number.isFinite(countAfter) && searchParams.has('countAfter')) {
       // The minimized poll is the one call that keeps coming while nobody writes
       await pruneOldLines(pool)
-      // A minimized reader is still around; the token says so, the query param only claims it
-      const actor = await chatActorFromRequest(pool, request).catch(() => null)
-      if (actor) await touchPresence(pool, actor.id)
       const [[row]] = await pool.execute(
         `SELECT COUNT(*) AS n FROM (SELECT id FROM chat_messages WHERE room = ? AND deleted_at IS NULL AND id > ? LIMIT ${UNREAD_CAP + 1}) c`,
         [room, Math.max(0, countAfter)]

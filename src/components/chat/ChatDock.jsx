@@ -42,6 +42,7 @@ import {
   fetchRoomMessages,
   fetchRoomUnread,
   isChatUnauthorized,
+  leaveRoom,
   moderateChat,
   readChatToken,
   sendRoomMessage,
@@ -257,6 +258,19 @@ export default function ChatDock({ embedded = false }) {
 
   // Who is around, refreshed by the room's own poll while it is open
   const [presence, setPresence] = useState({ wallets: [], count: 0 })
+
+  // Only an open room counts as online: minimizing or closing the tab leaves at once
+  const wasOpenRef = useRef(false)
+  useEffect(() => {
+    const wasOpen = wasOpenRef.current
+    wasOpenRef.current = isOpen && !hidden
+    if (!token) return undefined
+    if (wasOpen && !wasOpenRef.current) leaveRoom(token).catch(() => {})
+    if (!wasOpenRef.current) return undefined
+    const onPageHide = () => leaveRoom(token).catch(() => {})
+    window.addEventListener('pagehide', onPageHide)
+    return () => window.removeEventListener('pagehide', onPageHide)
+  }, [isOpen, hidden, token])
 
   const onSeen = useCallback(() => {
     setUnread(0)
