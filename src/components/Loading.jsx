@@ -1,6 +1,6 @@
 import React from 'react'
 import clsx from 'clsx'
-import { Ring } from 'loading-dev'
+import { Clock, Ring } from 'loading-dev'
 import styles from './Loading.module.scss'
 
 // Swap this for any other loading-dev export to restyle every spinner in the app.
@@ -48,7 +48,11 @@ export const LinearLoading = () => (
   </div>
 )
 
-// Sits beside a 12px check icon in the chat message status slot.
-export const MessageLoader = () => <Spinner color="currentColor" label="Sending" size={12} />
+// The chat message status slot: a ticking clock until it turns into the 12px sent check.
+export const MessageLoader = () => (
+  <span className={styles.spinner} role="status" aria-label="Sending">
+    <Clock color="currentColor" size={12} />
+  </span>
+)
 
 export default GlobalLoader

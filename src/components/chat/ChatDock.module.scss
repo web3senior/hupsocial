@@ -492,13 +492,6 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
     flex-direction: row-reverse;
   }
 
-  // A line being sent slides up into place, then breathes until the server has it
-  &--pending {
-    animation:
-      chat-line-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
-      chat-line-breathe 1.2s ease-in-out 0.22s infinite;
-  }
-
   @media (hover: hover) {
     .line__menuButton {
       opacity: 0;
@@ -516,6 +509,28 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
 
     .line__menuButton {
       margin-top: 0.25rem;
+    }
+  }
+
+  &__media {
+    position: relative;
+    max-width: 100%;
+  }
+
+  // A GIF without a caption carries the status on a dark chip over its corner
+  &__mediaStatus {
+    position: absolute;
+    right: 0.375rem;
+    bottom: 0.375rem;
+    display: inline-flex;
+    padding: 0.125rem 0.25rem;
+    color: #fff;
+    background-color: rgb(0 0 0 / 45%);
+    border-radius: 999px;
+
+    .status {
+      margin-inline-start: 0;
+      opacity: 1;
     }
   }
 
@@ -548,34 +563,13 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
   }
 }
 
-@keyframes chat-line-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.96);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes chat-line-breathe {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-
-  50% {
-    opacity: 0.85;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .line--pending {
-    animation: none;
-    opacity: 0.6;
-  }
+// The clock-then-check at the tail of an own line, as Telegram draws it
+.status {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.375rem;
+  vertical-align: -1px;
+  opacity: 0.75;
 }
 
 .bubble {

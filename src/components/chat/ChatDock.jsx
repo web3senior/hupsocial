@@ -4,12 +4,14 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { usePathname } from 'next/navigation'
 import useSWR from 'swr'
 import clsx from 'clsx'
+import { Morph, Rise } from 'cube-motion/react'
 import { useChainId, useConnection, useSignMessage } from 'wagmi'
 import {
   ArrowDownIcon,
   ArrowsInSimpleIcon,
   ArrowsOutSimpleIcon,
   ChatCircleIcon,
+  CheckIcon,
   DotsThreeIcon,
   GifIcon,
   PaperPlaneRightIcon,
@@ -25,7 +27,7 @@ import { useProfile } from '@/hooks/useProfile'
 import EmojiPicker from '@/components/EmojiPicker'
 import GifPicker from '@/components/GifPicker'
 import EmptyState from '@/components/ui/EmptyState'
-import { Spinner } from '@/components/Loading'
+import { MessageLoader, Spinner } from '@/components/Loading'
 import NativePopover from '@/components/ui/NativePopover'
 import { toast } from '@/components/NextToast'
 import { openConnect } from '@/lib/connectDialog'
@@ -791,12 +793,13 @@ function Room({
     setReplyTarget(null)
     try {
       const data = await sendRoomMessage(token, { body, gif, replyTo: quoted?.id ?? null })
-      setMessages((current) =>
-        mergeSorted(
-          (current ?? []).filter((message) => message.id !== tempId),
-          [data.message]
-        )
-      )
+      // The sent line keeps the pending line's key, so its clock turns into the check in place
+      setMessages((current) => {
+        const rest = (current ?? []).filter((message) => message.id !== tempId)
+        return rest.some((message) => message.id === data.message.id)
+          ? rest.map((message) => (message.id === data.message.id ? { ...message, clientKey: tempId } : message))
+          : mergeSorted(rest, [{ ...data.message, clientKey: tempId }])
+      })
       return true
     } catch (error) {
       setMessages((current) => (current ?? []).filter((message) => message.id !== tempId))
@@ -1053,7 +1056,7 @@ function ChatRun({
           )}
           {run.messages.map((message) => (
             <ChatLine
-              key={message.id}
+              key={message.clientKey ?? message.id}
               message={message}
               mine={mine}
               me={me}
@@ -1098,6 +1101,17 @@ function ChatLine({
   const canOwn = mine && settled
   const canModerateLine = Boolean(chatMe?.canModerate) && !mine && settled
   const when = message.pending ? 'Sending…' : toRelativeTime(message.createdAt)
+  // Only a line typed here rises in; history and polled lines are already in place
+  const [arrived] = useState(Boolean(message.pending))
+  const Root = arrived ? Rise : 'div'
+  const status = mine && (
+    <Morph
+      className={styles.status}
+      active={!message.pending}
+      off={<MessageLoader />}
+      on={<CheckIcon size={12} weight="bold" aria-label="Sent" />}
+    />
+  )
 
   const items = []
   if (onReply && settled) items.push({ label: 'Reply', run: () => onReply(message) })
@@ -1126,19 +1140,19 @@ function ChatLine({
   }
 
   return (
-    <div
-      className={clsx(styles.line, message.gif && styles['line--media'], message.pending && styles['line--pending'])}
-      data-line-id={message.id}
-    >
+    <Root className={clsx(styles.line, message.gif && styles['line--media'])} data-line-id={message.id}>
       {editing ? (
         <LineEditor body={message.body} onSave={(text) => onSaveEdit(message.id, text)} onCancel={onCancelEdit} />
       ) : (
         <div className={styles.stack}>
           {message.replyTo && <Quote reply={message.replyTo} onJump={onJump} />}
           {message.gif && (
-            // A Giphy CDN URL straight from the picker: the optimizer would only re-fetch it
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className={styles.line__gif} src={message.gif} alt="GIF" loading="lazy" title={when} />
+            <span className={styles.line__media}>
+              {/* A Giphy CDN URL straight from the picker: the optimizer would only re-fetch it */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className={styles.line__gif} src={message.gif} alt="GIF" loading="lazy" title={when} />
+              {!message.body && status && <span className={styles.line__mediaStatus}>{status}</span>}
+            </span>
           )}
           {message.body && (
             <p className={clsx(styles.bubble, message.gif && styles['bubble--caption'])} title={when}>
@@ -1161,6 +1175,7 @@ function ChatLine({
                 )
               )}
               {message.editedAt && <span className={styles.bubble__edited}>(edited)</span>}
+              {status}
             </p>
           )}
           {message.reactions?.length > 0 && (
@@ -1226,7 +1241,7 @@ function ChatLine({
           )}
         </NativePopover>
       )}
-    </div>
+    </Root>
   )
 }
 
