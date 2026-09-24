@@ -85,22 +85,24 @@ div[class*='__container'] {
   margin: 0 auto;
   width: 100%;
 
-  // Every page is the home column: one width, one seat beside the sidebar, whatever step the
-  // page asks for — the steps stay as names only, so no page has to change to follow the token.
-  $column-steps: ('small', 'medium', 'large', 'xlarge', 'xxlarge');
+  // Map configuration for conventional data-width modifiers
+  $container-widths: (
+    'small': 640px,   // Mobile landscape / Small tablets
+    'medium': 768px,  // Tablets
+    'large': 1024px,  // Small laptops
+    'xlarge': 1280px, // Desktops
+    'xxlarge': 1536px, // Large screens
+    // Edge to edge, for trading surfaces that want every pixel. The clearance maths below still
+    // applies, so it seats flush beside the aside instead of sliding under it.
+    'full': 100%
+  );
 
-  @each $name in $column-steps {
+  // Loop to generate data-width attribute selectors dynamically
+  @each $name, $width in $container-widths {
     &[data-width='#{$name}'] {
-      --container-max: var(--home-feed-width);
-      max-width: var(--home-feed-width);
+      --container-max: #{$width};
+      max-width: $width;
     }
-  }
-
-  // Edge to edge, the one opt-out: for a surface that genuinely needs every pixel. The clearance
-  // maths below still applies, so it seats flush beside the aside instead of sliding under it.
-  &[data-width='full'] {
-    --container-max: 100%;
-    max-width: 100%;
   }
 
   // Sidebar-aware centring. The aside is fixed over the viewport's left edge and publishes
@@ -115,7 +117,7 @@ div[class*='__container'] {
   // card glides alongside a collapsing menu rather than teleporting.
   @media (min-width: 768px) {
     &[data-width] {
-      --container-clearance: calc(var(--aside-width, 0px) + var(--layout-gap, 1.5rem));
+      --container-clearance: calc(var(--aside-width, 0px) + 1rem);
       max-width: min(var(--container-max), calc(100% - var(--container-clearance) - 1rem));
       margin-inline-start: max(var(--container-clearance), calc((100% - min(var(--container-max), 100%)) / 2));
       margin-inline-end: auto;
