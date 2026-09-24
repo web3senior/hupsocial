@@ -652,6 +652,43 @@ export const requestAuthNonce = async (address) => {
 }
 
 /**
+ * The $HUP whitelist total, and whether `address` is on it.
+ * @param {string} [address]
+ * @returns {Promise<{success: boolean, total?: number, joined?: boolean, joinedAt?: string|null, error?: string}>}
+ */
+export const getWhitelistStatus = async (address) => {
+  const params = new URLSearchParams()
+  if (address) params.set('address', address)
+
+  try {
+    const response = await fetch(`/api/v1/whitelist?${params}`)
+    const data = await response.json()
+    return response.ok ? data : { success: false, error: data.error || 'Could not read the whitelist' }
+  } catch {
+    return { success: false, error: 'Network communication error' }
+  }
+}
+
+/**
+ * Adds a wallet to the $HUP whitelist — see api/v1/whitelist/route.js.
+ * @param {{address: string, nonce: string, issuedAt: number, signature: string, chainId?: number}} request
+ * @returns {Promise<{success: boolean, alreadyJoined?: boolean, joinedAt?: string, total?: number, error?: string}>}
+ */
+export const joinWhitelist = async (request) => {
+  try {
+    const response = await fetch('/api/v1/whitelist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    })
+    const data = await response.json()
+    return response.ok ? data : { success: false, error: data.error || 'Could not join the whitelist' }
+  } catch {
+    return { success: false, error: 'Network communication error' }
+  }
+}
+
+/**
  * Sends updated profile details to the server backend.
  *
  * The route requires a signed claim: every field here is shown to other people as this wallet, so
