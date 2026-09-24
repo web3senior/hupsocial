@@ -66,6 +66,7 @@ dialog.newPost {
     color: var(--text);
     border-radius: 999px;
     cursor: pointer;
+    touch-action: manipulation;
 
     &:hover {
       background: var(--hover);

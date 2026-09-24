@@ -252,7 +252,8 @@ export const useSidebarStore = create(
         }),
 
       // UI Actions
-      setIsComponentOpen: () => set((state) => ({ isComponentOpen: !state.isComponentOpen })),
+      // A setter, never a toggle: the composer's close paths can fire twice for one dismissal
+      setIsComponentOpen: (isOpen) => set({ isComponentOpen: Boolean(isOpen) }),
       openComponent: () => set({ isComponentOpen: true }),
 
       openMenu: () => set({ isMenuOpen: true }),
@@ -272,7 +273,7 @@ export const useSidebarStore = create(
     {
       name: 'hup-sidebar-state',
       storage: createJSONStorage(() => localStorage),
-      version: 2,
+      version: 3,
       migrate: (persistedState, version) => {
         const migrated = { ...persistedState }
 
@@ -291,6 +292,11 @@ export const useSidebarStore = create(
           migrated.likedPostIds = hasLegacyEntries ? { [LEGACY_BATCH_KEY]: legacyMap } : {}
         }
 
+        // v3: the composer's open state stopped persisting — a stored true reopened it on every visit
+        if (version < 3) {
+          delete migrated.isComponentOpen
+        }
+
         return migrated
       },
       // Only persist specific variables to localStorage to keep things fast
@@ -298,7 +304,6 @@ export const useSidebarStore = create(
         isMenuOpen: state.isMenuOpen,
         likedPostIds: state.likedPostIds,
         likeOverrides: state.likeOverrides,
-        isComponentOpen: state.isComponentOpen,
       }),
     }
   )
