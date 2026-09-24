@@ -4,13 +4,14 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useConnection } from 'wagmi'
-import { HouseIcon, PlayCircleIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
+import { HouseIcon, PaperPlaneTiltIcon, PlayCircleIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
+import { useChatDockStore } from '@/stores/useChatDockStore'
 import { openConnect } from '@/lib/connectDialog'
 import styles from './Footer.module.scss'
 
@@ -39,6 +40,13 @@ export default function Footer() {
   // Pull global sidebar states to match functional action layers
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
   const requestFeedRefresh = usePostStore((state) => state.requestFeedRefresh)
+
+  // The chat room is a tab here rather than a floating pill (components/chat/ChatDock)
+  const chatMode = useChatDockStore((state) => state.mode)
+  const chatUnread = useChatDockStore((state) => state.unread)
+  const openChat = useChatDockStore((state) => state.open)
+  const minimizeChat = useChatDockStore((state) => state.minimize)
+  const isChatOpen = chatMode !== 'minimized'
 
   useEffect(() => {
     let lastY = window.scrollY
@@ -112,19 +120,34 @@ export default function Footer() {
         },
         icon: PlusIcon,
       },
+      // The /chat page is the onchain messenger and hides the dock, so the tab would open nothing there
+      pathname !== '/chat' && {
+        name: 'Chat',
+        action: () => (isChatOpen ? minimizeChat() : openChat()),
+        icon: PaperPlaneTiltIcon,
+        isActive: isChatOpen,
+        hasDot: chatUnread > 0,
+      },
       { name: 'Profile', path: profilePath, icon: UserIcon },
-    ]
-  }, [address, isConnected, setIsComponentOpen])
+    ].filter(Boolean)
+  }, [address, isConnected, setIsComponentOpen, pathname, isChatOpen, chatUnread, openChat, minimizeChat])
+
+  // The open room covers the page, so leaving for another tab has to put it away
+  const closeChatOnNavigate = () => {
+    if (isChatOpen) minimizeChat()
+  }
 
   if (!mounted) return null
 
   return (
-    <footer className={clsx(styles.footer, isHidden && styles['footer--hidden'])}>
+    // The open room is seated above the bar and closes from it, so the bar stays while it is open
+    <footer className={clsx(styles.footer, isHidden && !isChatOpen && styles['footer--hidden'])}>
       <nav className={styles['footer__bar']} aria-label="Mobile Navigation">
         <ul className={styles['footer__list']}>
           {navLinks.map((item, index) => {
             const Icon = item.icon
-            const isActive = item.path ? isActivePath(pathname, item.path) : false
+            // While the room is open it owns the screen, so only the Chat tab reads as selected
+            const isActive = item.path ? !isChatOpen && isActivePath(pathname, item.path) : Boolean(item.isActive)
 
             // One UI keeps the same outline glyph in both states and only thickens the
             // selected one — the pill and the brighter label carry the rest
@@ -132,6 +155,7 @@ export default function Footer() {
               <>
                 <span className={styles['footer__icon']} data-icon={item.name}>
                   <Icon size={24} weight={isActive ? 'bold' : 'regular'} />
+                  {item.hasDot && <span className={styles['footer__dot']} aria-hidden="true" />}
                 </span>
                 <span className={styles['footer__label']}>{item.name}</span>
               </>
@@ -141,7 +165,13 @@ export default function Footer() {
             if (item.action) {
               return (
                 <li key={`action-${index}`} className={styles['footer__item']}>
-                  <button type="button" className={styles['footer__link']} onClick={item.action} aria-label={item.name}>
+                  <button
+                    type="button"
+                    className={clsx(styles['footer__link'], isActive && styles['footer__link--active'])}
+                    onClick={item.action}
+                    aria-label={item.hasDot ? `${item.name}, unread messages` : item.name}
+                    aria-pressed={item.isActive === undefined ? undefined : isActive}
+                  >
                     {itemContent}
                   </button>
                 </li>
@@ -155,7 +185,10 @@ export default function Footer() {
                   href={item.path}
                   className={clsx(styles['footer__link'], isActive && styles['footer__link--active'])}
                   aria-current={isActive ? 'page' : undefined}
-                  onClick={item.path === '/' ? handleHomeLinkClick : undefined}
+                  onClick={(event) => {
+                    closeChatOnNavigate()
+                    if (item.path === '/') handleHomeLinkClick(event)
+                  }}
                 >
                   {itemContent}
                 </Link>

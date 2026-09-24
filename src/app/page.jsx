@@ -6,6 +6,7 @@ import { useHomeTabsStore, resolveTabs } from '@/stores/useHomeTabsStore'
 import HomeTabStrip from '@/components/HomeTabStrip'
 import HomeFeedTab from '@/components/tabs/HomeFeedTab'
 import HomeRail from '@/components/home/HomeRail'
+import ComposePrompt from '@/components/home/ComposePrompt'
 import clsx from 'clsx'
 import styles from './page.module.scss'
 
@@ -34,9 +35,11 @@ export default function Page() {
       {/* Keyed per tab: switching between two network tabs must remount the
           feed (not reuse the instance) so each one hydrates its own session
           cache and snapshots its own state on exit. */}
-      {activeTab?.type === 'foryou' && <HomeFeedTab key={activeTab.id} feedMode="foryou" title="For you" />}
-      {activeTab?.type === 'network' && <HomeFeedTab key={activeTab.id} feedMode="network" networkId={activeTab.chainId} title={activeTab.label} />}
-      {activeTab?.type === 'nft' && <HomeFeedTab key={activeTab.id} feedMode="nft" title="NFTs" />}
+      {activeTab?.type === 'foryou' && <HomeFeedTab key={activeTab.id} feedMode="foryou" title="For you" lead={<ComposePrompt />} />}
+      {activeTab?.type === 'network' && (
+        <HomeFeedTab key={activeTab.id} feedMode="network" networkId={activeTab.chainId} title={activeTab.label} lead={<ComposePrompt />} />
+      )}
+      {activeTab?.type === 'nft' && <HomeFeedTab key={activeTab.id} feedMode="nft" title="NFTs" lead={<ComposePrompt />} />}
       {activeTab?.type === 'following' && <FollowingFeedTab />}
       {activeTab?.type === 'trending' && <TrendingFeedTab />}
       {activeTab?.type === 'status' && <StatusFeedTab />}

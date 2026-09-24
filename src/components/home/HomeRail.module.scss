@@ -2,7 +2,7 @@
   position: sticky;
   // Level with the first feed card: under the fixed header and the sticky tab bar (~3.4rem, the
   // same offset page.module.scss gives .new-posts), so the tab bar never paints over the cards.
-  top: calc(var(--app-header-clearance, calc(1.4rem + 38px)) + 3.4rem);
+  top: var(--sticky-bar-clearance, calc(var(--app-header-clearance, calc(1.4rem + 38px)) + 3.4rem));
   display: flex;
   flex-direction: column;
   gap: 1rem;

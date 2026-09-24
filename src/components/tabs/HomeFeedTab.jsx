@@ -73,6 +73,8 @@ export default function HomeFeedTab({
   changeDocumentTitle = false,
   // Section pages (bazaar) run wider so the feed lines up with their sibling tabs
   containerWidth = 'small',
+  // Rendered at the top of the feed card, above the posts (home passes its compose prompt)
+  lead = null,
 }) {
   const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
@@ -469,6 +471,7 @@ export default function HomeFeedTab({
         <div className={clsx(styles.tabContent, styles.feedTab, 'relative')}>
           <div className={clsx(styles.page, 'motion-slideDownIn')}>
             <div className={clsx('__container', styles.page__container)} data-width="medium">
+              {lead}
               {isRefreshing && (
               <div className={clsx(styles.refreshSpinnerWrap, 'animate fade')}>
                 <svg

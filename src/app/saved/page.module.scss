@@ -15,7 +15,7 @@
     min-height: 100svh;
     background-color: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 24px;
+    border-radius: var(--page-border-radius);
     // clip, not hidden: both round off the corners, but `hidden` makes this a scroll container
     // and a scroll container that can't scroll never lets the toolbar inside it stick
     overflow: clip;

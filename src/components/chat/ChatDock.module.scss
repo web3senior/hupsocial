@@ -34,7 +34,7 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
   flex-direction: column;
   color: var(--dock-text);
   background-color: var(--dock-surface);
-  border: 1px solid var(--dock-border);
+  // border: 1px solid var(--dock-border);
   border-radius: var(--dock-radius);
   box-shadow: var(--shadow-md);
   overflow: hidden;
@@ -59,18 +59,25 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
   }
 
   @include md-down() {
-    &--minimized {
-      bottom: calc(var(--bottom-nav-space) + 1rem);
+    // The tab bar's Chat tab (components/Footer) opens the room on a phone, so the pill steps
+    // aside. Not inside another site's frame, where the pill is the only way in.
+    &--minimized:not(.dock--embed) {
+      display: none;
     }
 
+    // Open, the room takes the whole screen over the header and tab bar; its own bar's close
+    // button puts it away. The padding keeps the bar and composer clear of notches and the
+    // home indicator, and a scroll that runs out inside it never scrolls the page behind.
     &--open,
     &--expanded {
-      inset: var(--header-height) 0 var(--bottom-nav-space) 0;
+      inset: 0;
       width: auto;
       height: auto;
+      padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
       border: 0;
       border-radius: 0;
       box-shadow: none;
+      overscroll-behavior: contain;
     }
   }
 

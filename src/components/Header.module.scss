@@ -12,11 +12,45 @@
   background-color: var(--background);
   z-index: 2;
 
+  // Home on a desktop: no background and no hit area of its own, so the sticky heading row shows
+  // through and stays clickable; only the Connect control floats above it. Phones keep the solid
+  // header (menu button, Connect) with the heading row sticking under it.
+  &--bare {
+    @include md-up() {
+      background-color: transparent;
+      pointer-events: none;
+      z-index: 3;
+
+      .connectWallet {
+        pointer-events: auto;
+      }
+    }
+  }
+
   // Spans the whole header so percentages inside resolve against the viewport, like <main>'s
   &__bar {
     position: absolute;
     inset: 0;
     pointer-events: none;
+
+    // The column's top cell: seated over the page's measured shell (Header.jsx), side borders
+    // carrying the shell's up to the viewport's top, bottom border laid over the shell's top edge
+    &--cell {
+      right: auto;
+      bottom: auto;
+      left: var(--title-cell-left);
+      width: var(--title-cell-width);
+      height: var(--title-cell-height);
+      border: 1px solid var(--border);
+      border-top: 0;
+      background-color: var(--background);
+    }
+
+    // Something sits between the title and the shell, so the cell is the header's height and
+    // closes on its own bottom border
+    &--closed {
+      height: var(--header-height);
+    }
   }
 
   &__inner {
@@ -72,24 +106,6 @@
   }
 }
 
-.menuButton {
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  width: 38px;
-  height: 38px;
-  border-radius: 1000px;
-
-  svg {
-    color: var(--text-muted);
-  }
-  &:hover {
-    background-color: var(--hover);
-  }
-}
-
 // Round back arrow at the container's left edge, the heading following it
 .back {
   display: inline-flex;
@@ -117,10 +133,29 @@
 }
 
 .connectWallet {
-  // Never shrinks: on "/" the search box shares this row, and it is the flexible one
-  // (min-width: 0). Without this, overflow squeezes both sides and the 38px avatar
-  // gets crushed along with the search.
+  // The one flex child in the row on most routes, so it has to push itself to the end
   flex: none;
+  margin-inline-start: auto;
+}
+
+// Opens the phone nav drawer (components/Aside); desktops have the sidebar instead
+.menuButton {
+  display: none;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 1000px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  pointer-events: auto;
+
+  &:hover {
+    background-color: var(--hover);
+  }
 }
 
 @include md-down() {

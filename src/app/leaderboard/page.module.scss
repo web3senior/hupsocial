@@ -15,7 +15,7 @@
     min-height: 100svh;
     background-color: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 24px;
+    border-radius: var(--page-border-radius);
     overflow: hidden;
     isolation: isolate;
     padding: 1.25rem;
@@ -298,7 +298,10 @@
   }
 }
 
+// The rows fold to rank / profile / score by the list's own width, not the viewport's: every
+// page is the home column now, so a wide screen no longer means a wide list
 .leaderList {
+  container: leaderboard / inline-size;
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--border);
@@ -326,7 +329,7 @@ background-color: var(--surface-muted);
         text-align: center;
       }
 
-  @media (max-width: 960px) {
+  @container leaderboard (max-width: 960px) {
     grid-template-columns: 36px minmax(0, 1fr) 72px; // Tracks the row below, column for column
 
     span:not(:nth-of-type(1), :nth-of-type(2),:last-child) {
@@ -352,7 +355,7 @@ background-color: var(--surface-muted);
     background-color: var(--hover);
   }
 
-  @media (max-width: 960px) {
+  @container leaderboard (max-width: 960px) {
     // Rank, profile, score — the three that survive the metrics being hidden. The byline takes
     // the flexible track, not a 42px one sized for the avatar it used to be.
     grid-template-columns: 36px minmax(0, 1fr) 72px;

@@ -294,7 +294,7 @@ $secondary-color: #9e481d;
   --selection-background-color: rgba(#{$primary-color-rgb}, 0.4);
   --selection-color: inherit;
   --global-border-radius: 0.8rem;
-  --page-border-radius: 24px;
+  --page-border-radius: 0px;
   --chip-border-radius: 4px;
 
   // Floating mobile bottom nav (components/Footer). The bar is inset from the viewport
@@ -306,6 +306,12 @@ $secondary-color: #9e481d;
 
   // Fixed header (components/Header)
   --header-height: 70px;
+
+  // Home grid (app/page.module.scss): feed | rail with this gap between them, and the smallest
+  // gap any page's containers keep from the sidebar (styles/Global.scss).
+  --home-feed-width: 640px;
+  --home-rail-width: 320px;
+  --layout-gap: 1.5rem;
 
   // Card Specifics
   --card-padding: 16px;

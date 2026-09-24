@@ -28,6 +28,9 @@ export const useChatDockStore = create(
       open: () => set({ mode: 'open' }),
       toggleExpanded: () => set((state) => ({ mode: state.mode === 'expanded' ? 'open' : 'expanded' })),
       markSeen: (id) => set((state) => (id > state.lastSeenId ? { lastSeenId: id } : {})),
+      // The pill's unread count, mirrored for the mobile tab bar's Chat tab. Not persisted
+      unread: 0,
+      setUnread: (unread) => set({ unread }),
     }),
     {
       name: `${prefix}chat-dock`,

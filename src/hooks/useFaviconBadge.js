@@ -6,7 +6,8 @@ import { useEffect } from 'react'
 const ICON_SIZE = 64
 // The SVG rasterises crisply at any size; the PNG is the fallback if it ever fails to decode
 const BASE_ICON_SOURCES = ['/favicon.svg', '/favicon-96x96.png']
-const BADGE_COLOR = '#ff007a'
+// Matches the sidebar's notification badge (--blue-300); canvas can't read the token
+const BADGE_COLOR = '#6cbbf7'
 const BADGE_RING_COLOR = '#ffffff'
 const BADGE_TEXT_COLOR = '#ffffff'
 const FONT_STACK = 'system-ui, -apple-system, "Segoe UI", sans-serif'

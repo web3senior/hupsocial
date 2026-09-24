@@ -11,7 +11,7 @@
     background-color: var(--surface);
     border: 1px solid var(--border);
     box-shadow: var(--card-elevation, var(--shadow-md));
-    border-radius: 24px;
+    border-radius: var(--page-border-radius);
     overflow: hidden;
 
     @media (max-width: 600px) {

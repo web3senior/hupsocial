@@ -253,6 +253,11 @@ export default function ChatDock({ embedded = false }) {
   // Unread while minimized: a cheap count newer than the last seen line, plus the faces of the
   // last few people who spoke
   const [unread, setUnread] = useState(0)
+  // Mirrored to the store: on a phone the pill hides and the tab bar's Chat tab carries the dot
+  const setDockUnread = useChatDockStore((state) => state.setUnread)
+  useEffect(() => {
+    setDockUnread(unread)
+  }, [unread, setDockUnread])
   const [recentSenders, setRecentSenders] = useState([])
   // Unread lines that mention the reader: the badge turns into an @ and opening lands on the first
   const [mentionAlert, setMentionAlert] = useState({ count: 0, firstId: 0 })

@@ -26,26 +26,65 @@
     transition: none;
   }
 
-  // The home shell. The rail hangs off the feed column in an absolute slot rather than sharing a
-  // flex row with it, so the feed stays exactly where it is on every viewport and the rail simply
-  // appears once there is room for it to the right: 640px feed + 1.5rem gap + 320px rail, doubled
-  // around the centre, is ~1330px, and at that width the feed's left edge already clears the aside.
+  // The home shell is a three-track grid: the feed centred between two equal side tracks, one
+  // --layout-gap on either side of it, and the rail in the right track. The left track never
+  // gets narrower than the fixed aside, so the feed keeps a gap from it instead of sliding under.
   &.home {
     position: relative;
+    display: grid;
+    grid-template-columns:
+      [left-start] minmax(var(--aside-width, 0px), 1fr)
+      [feed-start] minmax(0, var(--home-feed-width))
+      [feed-end] minmax(0, 1fr);
+    column-gap: var(--layout-gap);
+    align-items: start;
+
+    // On a desktop the heading row is home's top bar (the app header only floats Connect there),
+    // so what sticks beneath it — the rail, the new-posts pill — clears the bar's height alone
+    @include resp.md-up {
+      --sticky-bar-clearance: var(--header-height);
+    }
+
+    > * {
+      grid-column: feed;
+    }
+
+    // Phones: one full-width column; the icon rail is cleared by <main>'s own padding
+    @include resp.md-down {
+      grid-template-columns: [feed-start] minmax(0, 1fr) [feed-end];
+      column-gap: 0;
+    }
   }
 
-  .home__rail {
-    display: none;
+  &.home &__tab-bar {
+    @include resp.md-up {
+      top: 0;
+      margin-top: 0;
+      min-height: var(--header-height);
+      display: flex;
+      align-items: center;
+      // The feed column's bordered top cell, like the header's page titles elsewhere: sides carry
+      // the feed card's up to the viewport's top, and the bottom border lies over the card's top
+      // edge (the -1px), so the two read as one column with a single rule between them
+      padding-inline: 1.25rem;
+      border: 1px solid var(--border);
+      border-top: 0;
+      margin-bottom: -1px;
+    }
+  }
 
+  // In the right track, level with the feed card (row 2, under the heading row). Stretched down
+  // the feed's row so the sticky card inside (HomeRail) has a column to travel in.
+  &.home > .home__rail {
+    display: none;
+    grid-column: feed-end / -1;
+    grid-row: 2;
+    align-self: stretch;
+    width: min(100%, var(--home-rail-width));
+
+    // Room for the rail: feed + rail + two gaps, doubled around the centre
     @media (min-width: 1340px) {
       display: block;
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: calc(50% + 320px + 1.5rem);
-      width: 320px;
-      // Over the tab bar's full-width background (2), under the aside (3).
-      z-index: 2;
     }
   }
 
@@ -411,7 +450,7 @@
   position: sticky;
   // Below the sticky tab bar (header clearance + ~bar height); z-index sits
   // under the bar's 2 so any overlap tucks beneath the tabs, not over them.
-  top: calc(var(--app-header-clearance, calc(1.4rem + 38px)) + 3.4rem);
+  top: var(--sticky-bar-clearance, calc(var(--app-header-clearance, calc(1.4rem + 38px)) + 3.4rem));
   left: 0;
   right: 0;
   z-index: 1;

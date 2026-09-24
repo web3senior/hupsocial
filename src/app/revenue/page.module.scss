@@ -11,7 +11,7 @@
         var(--surface) 55%
       );
     border: 1px solid var(--border);
-    border-radius: 24px;
+    border-radius: var(--page-border-radius);
     overflow: hidden;
     isolation: isolate;
     padding: 1.25rem;

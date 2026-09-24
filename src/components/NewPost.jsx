@@ -64,6 +64,7 @@ import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS as uploadToIPFS, withAuthor } from '@/lib/ipfs'
 import { captureVideoPoster } from '@/lib/videoPoster'
 import { shortUploadError } from '@/lib/uploadErrors'
+import { describeWalletError } from '@/lib/walletErrors'
 import { canOptimizeVideo, optimizeVideo } from '@/lib/videoOptimizer'
 import { detectAiProvenance } from '@/lib/aiProvenance'
 import { FREE_VIDEO_MB, PREMIUM_VIDEO_MB } from '@/lib/premium'
@@ -1941,7 +1942,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
   useEffect(() => {
     if (!submitError) return
-    toast(submitError.shortMessage || submitError.message || 'Transaction rejected', 'error')
+    toast(describeWalletError(submitError, { fallback: 'Transaction rejected' }), 'error')
   }, [submitError])
 
   useEffect(() => {

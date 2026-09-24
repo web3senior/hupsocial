@@ -23,7 +23,7 @@
     background-color: var(--background);
     box-shadow: var(--card-elevation, 0px 0px 8px rgba(0, 0, 0, 0.04));
     border: 1px solid var(--border);
-    border-radius: var(--global-border-radius);
+    border-radius: var(--page-border-radius);
     overflow: hidden;
     isolation: isolate;
 
