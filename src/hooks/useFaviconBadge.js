@@ -12,11 +12,9 @@ const BADGE_RING_COLOR = '#ffffff'
 // Any rel a browser does not recognise parks the app's own icons while the badge is up
 const IDLE_REL = 'hup-idle-icon'
 const BADGE_LINK_ID = 'hup-favicon-badge'
-// Background tabs clamp timers to 1s anyway, so a faster blink would just stutter
-const BLINK_INTERVAL_MS = 1000
 
 let baseIconPromise = null
-let blinkFramesPromise = null
+let dotIconPromise = null
 
 const loadImage = (src) =>
   new Promise((resolve, reject) => {
@@ -35,7 +33,7 @@ const loadBaseIcon = () => {
   return baseIconPromise
 }
 
-const drawIcon = (baseIcon, withDot) => {
+const drawDottedIcon = (baseIcon) => {
   const canvas = document.createElement('canvas')
   canvas.width = ICON_SIZE
   canvas.height = ICON_SIZE
@@ -44,7 +42,6 @@ const drawIcon = (baseIcon, withDot) => {
   if (!ctx) return null
 
   ctx.drawImage(baseIcon, 0, 0, ICON_SIZE, ICON_SIZE)
-  if (!withDot) return canvas.toDataURL('image/png')
 
   const ringWidth = ICON_SIZE * 0.07
   const radius = ICON_SIZE * 0.17
@@ -61,19 +58,13 @@ const drawIcon = (baseIcon, withDot) => {
   return canvas.toDataURL('image/png')
 }
 
-// Both blink frames are drawn once per document; the plain one is a data URL too so swapping never refetches
-const loadBlinkFrames = () => {
-  if (!blinkFramesPromise) {
-    blinkFramesPromise = loadBaseIcon().then((baseIcon) => {
-      if (!baseIcon) return null
-
-      const on = drawIcon(baseIcon, true)
-      const off = drawIcon(baseIcon, false)
-      return on && off ? { on, off } : null
-    })
+// Drawn once per document; the dot never changes with the count
+const loadDotIcon = () => {
+  if (!dotIconPromise) {
+    dotIconPromise = loadBaseIcon().then((baseIcon) => (baseIcon ? drawDottedIcon(baseIcon) : null))
   }
 
-  return blinkFramesPromise
+  return dotIconPromise
 }
 
 const showBadge = (href) => {
@@ -114,7 +105,7 @@ const syncAppBadge = (count) => {
 }
 
 /**
- * Blink a dot on the browser-tab favicon while there is anything unread and the tab is in the background,
+ * Show a dot on the browser-tab favicon while there is anything unread and the tab is in the background,
  * and put the count on the installed app's icon whenever the Badging API is there.
  * @param {number} count
  * @param {{onlyWhenHidden?: boolean}} [options] pass onlyWhenHidden: false to badge a focused tab too
@@ -128,32 +119,20 @@ export const useFaviconBadge = (count, { onlyWhenHidden = true } = {}) => {
 
   useEffect(() => {
     let cancelled = false
-    let blinkTimer = null
-
-    const stopBlink = () => {
-      clearInterval(blinkTimer)
-      blinkTimer = null
-    }
 
     const shouldBadge = () => hasUnread && (!onlyWhenHidden || document.hidden)
 
     const sync = async () => {
       if (!shouldBadge()) {
-        stopBlink()
         clearBadge()
         return
       }
 
-      const frames = await loadBlinkFrames()
-      // Visibility may have flipped back while the frames were decoding
-      if (!frames || cancelled || blinkTimer || !shouldBadge()) return
+      const href = await loadDotIcon()
+      // Visibility may have flipped back while the icon was decoding
+      if (!href || cancelled || !shouldBadge()) return
 
-      let dotShown = true
-      showBadge(frames.on)
-      blinkTimer = setInterval(() => {
-        dotShown = !dotShown
-        showBadge(dotShown ? frames.on : frames.off)
-      }, BLINK_INTERVAL_MS)
+      showBadge(href)
     }
 
     sync()
@@ -161,7 +140,6 @@ export const useFaviconBadge = (count, { onlyWhenHidden = true } = {}) => {
 
     return () => {
       cancelled = true
-      stopBlink()
       document.removeEventListener('visibilitychange', sync)
     }
   }, [hasUnread, onlyWhenHidden])
