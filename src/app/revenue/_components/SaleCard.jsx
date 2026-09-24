@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { toRelativeTimestamp } from '@/lib/dateHelper'
+import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 import { formatTokenAmount } from './formatTokenAmount'
 import styles from './SaleCard.module.scss'
 
@@ -24,6 +26,20 @@ function shortTokenId(tokenId) {
   } catch (e) {
     return shortAddress(tokenId)
   }
+}
+
+// Inline credit inside the meta line, so a text link rather than the Profile byline
+function PayerName({ address }) {
+  const { profile } = useProfile(address)
+  const name = profile?.username
+    ? `@${profile.username}`
+    : profile?.fullName || (profile?.name && profile.name !== 'new-user' ? profile.name : null)
+
+  return (
+    <Link href={profilePath(address, profile?.username)} title={address} className={styles.saleCard__payer}>
+      {name || shortAddress(address)}
+    </Link>
+  )
 }
 
 export default function SaleCard({ sale }) {
@@ -52,7 +68,7 @@ export default function SaleCard({ sale }) {
           {sale.quantity > 1 && <span className={styles.saleCard__quantity}>×{sale.quantity}</span>}
           <span>
             {isTip ? 'Tipped by ' : ''}
-            {shortAddress(sale.payer)}
+            <PayerName address={sale.payer} />
           </span>
           <span aria-hidden="true">·</span>
           <span>{toRelativeTimestamp(sale.at)}</span>

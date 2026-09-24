@@ -60,6 +60,16 @@
     color: var(--text-muted);
   }
 
+  &__payer {
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
   &__quantity {
     font-weight: 600;
     color: var(--text);
