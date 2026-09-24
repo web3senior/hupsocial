@@ -1,6 +1,6 @@
 /**
  * @file lib/whitelist.js
- * @description The $HUP pre-launch whitelist, shared by the page and the route that writes it.
+ * @description The $HUP mint whitelist, shared by the page and the route that writes it.
  */
 
 /**
@@ -11,7 +11,7 @@
  */
 export const whitelistJoinMessage = ({ address, nonce, issuedAt }) =>
   [
-    'Join the $HUP whitelist',
+    'Join the $HUP mint whitelist',
     '',
     'This signature is free and sends no transaction.',
     '',
