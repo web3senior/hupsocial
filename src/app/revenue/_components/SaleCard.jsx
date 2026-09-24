@@ -29,8 +29,10 @@ function shortTokenId(tokenId) {
 }
 
 // Inline credit inside the meta line, so a text link rather than the Profile byline
-function PayerName({ address }) {
-  const { profile } = useProfile(address)
+// The row's name paints first — a cold profile fetch otherwise shows the bare address for seconds
+function PayerName({ address, rowName, rowUsername }) {
+  const fallback = rowName || rowUsername ? { wallet_address: address, name: rowName, username: rowUsername } : undefined
+  const { profile } = useProfile(address, fallback)
   const name = profile?.username
     ? `@${profile.username}`
     : profile?.fullName || (profile?.name && profile.name !== 'new-user' ? profile.name : null)
@@ -68,7 +70,7 @@ export default function SaleCard({ sale }) {
           {sale.quantity > 1 && <span className={styles.saleCard__quantity}>×{sale.quantity}</span>}
           <span>
             {isTip ? 'Tipped by ' : ''}
-            <PayerName address={sale.payer} />
+            <PayerName address={sale.payer} rowName={sale.payer_name} rowUsername={sale.payer_username} />
           </span>
           <span aria-hidden="true">·</span>
           <span>{toRelativeTimestamp(sale.at)}</span>

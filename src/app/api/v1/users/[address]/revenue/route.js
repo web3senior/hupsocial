@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { fetchUsdPrices, priceKeyFor } from '@/lib/prices'
+import { hasColumn } from '@/lib/schema'
 
 export const runtime = 'nodejs'
 
@@ -119,9 +120,14 @@ export async function GET(request, { params }) {
   }
 }
 
+// Probed: naming a column an unmigrated database lacks would reject the whole row query
+const payerColumns = async () =>
+  (await hasColumn('users', 'username_key')) ? 'u.name AS payer_name, u.username AS payer_username' : 'u.name AS payer_name'
+
 // Keyset pagination on id for every source (insert order tracks chain order) — offset pages
 // would drift when the indexer inserts new rows between fetches. limit + 1 detects the next page.
-function fetchRows(source, wallet, before, limit, network) {
+async function fetchRows(source, wallet, before, limit, network) {
+  const payer = await payerColumns()
   const tail = `${network ? ' AND s.network_id = ?' : ''}${before ? ' AND s.id < ?' : ''}
        ORDER BY s.id DESC
        LIMIT ${limit + 1}`
@@ -131,9 +137,10 @@ function fetchRows(source, wallet, before, limit, network) {
     return pool.execute(
       `SELECT s.id, s.network_id, n.name AS network_name, s.post_id, p.content, s.tipper AS payer,
               s.token, t.symbol, t.decimals, CAST(s.amount - s.fee_amount AS CHAR) AS amount,
-              s.tx_hash, s.tipped_at AS at
+              s.tx_hash, s.tipped_at AS at, ${payer}
        FROM tips s
        LEFT JOIN posts p ON p.id = s.post_id AND p.network_id = s.network_id
+       LEFT JOIN users u ON u.wallet_address = s.tipper
        LEFT JOIN networks n ON n.id = s.network_id
        LEFT JOIN store_tokens t ON t.network_id = s.network_id AND t.token = s.token
        WHERE s.creator = ?${tail}`,
@@ -146,8 +153,9 @@ function fetchRows(source, wallet, before, limit, network) {
       `SELECT s.id, s.network_id, n.name AS network_name, s.collection, s.token_id, s.buyer AS payer,
               s.payment_token AS token, t.symbol, t.decimals,
               CAST(s.price - s.fee_amount - s.referral_amount AS CHAR) AS amount,
-              s.tx_hash, s.sold_at AS at
+              s.tx_hash, s.sold_at AS at, ${payer}
        FROM nft_trades s
+       LEFT JOIN users u ON u.wallet_address = s.buyer
        LEFT JOIN networks n ON n.id = s.network_id
        LEFT JOIN store_tokens t ON t.network_id = s.network_id AND t.token = s.payment_token
        WHERE s.seller = ?${tail}`,
@@ -158,9 +166,10 @@ function fetchRows(source, wallet, before, limit, network) {
   return pool.execute(
     `SELECT s.id, s.network_id, n.name AS network_name, s.post_id, p.content, s.buyer AS payer,
             s.quantity, s.payment_token AS token, t.symbol, t.decimals,
-            CAST(s.amount - s.fee_amount AS CHAR) AS amount, s.tx_hash, s.sold_at AS at
+            CAST(s.amount - s.fee_amount AS CHAR) AS amount, s.tx_hash, s.sold_at AS at, ${payer}
      FROM store_sales s
      LEFT JOIN posts p ON p.id = s.post_id AND p.network_id = s.network_id
+     LEFT JOIN users u ON u.wallet_address = s.buyer
      LEFT JOIN networks n ON n.id = s.network_id
      LEFT JOIN store_tokens t ON t.network_id = s.network_id AND t.token = s.payment_token
      WHERE s.seller = ?${tail}`,
@@ -175,6 +184,8 @@ function normalizeRow(source, row) {
     network_id: row.network_id,
     network_name: row.network_name,
     payer: row.payer,
+    payer_name: row.payer_name ?? null,
+    payer_username: row.payer_username ?? null,
     token: row.token,
     symbol: row.symbol || 'tokens',
     decimals: row.decimals ?? 18,
