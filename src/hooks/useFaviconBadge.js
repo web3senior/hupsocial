@@ -6,16 +6,17 @@ import { useEffect } from 'react'
 const ICON_SIZE = 64
 // The SVG rasterises crisply at any size; the PNG is the fallback if it ever fails to decode
 const BASE_ICON_SOURCES = ['/favicon.svg', '/favicon-96x96.png']
-// Matches the sidebar's notification badge (--blue-300); canvas can't read the token
-const BADGE_COLOR = '#6cbbf7'
+// Telegram-style unread dot; canvas can't read CSS tokens
+const BADGE_COLOR = '#ef4444'
 const BADGE_RING_COLOR = '#ffffff'
-const BADGE_TEXT_COLOR = '#ffffff'
-const FONT_STACK = 'system-ui, -apple-system, "Segoe UI", sans-serif'
 // Any rel a browser does not recognise parks the app's own icons while the badge is up
 const IDLE_REL = 'hup-idle-icon'
 const BADGE_LINK_ID = 'hup-favicon-badge'
+// Background tabs clamp timers to 1s anyway, so a faster blink would just stutter
+const BLINK_INTERVAL_MS = 1000
 
 let baseIconPromise = null
+let blinkFramesPromise = null
 
 const loadImage = (src) =>
   new Promise((resolve, reject) => {
@@ -34,19 +35,7 @@ const loadBaseIcon = () => {
   return baseIconPromise
 }
 
-const tracePill = (ctx, x, y, width, height) => {
-  const radius = height / 2
-
-  ctx.beginPath()
-  ctx.moveTo(x + radius, y)
-  ctx.arcTo(x + width, y, x + width, y + height, radius)
-  ctx.arcTo(x + width, y + height, x, y + height, radius)
-  ctx.arcTo(x, y + height, x, y, radius)
-  ctx.arcTo(x, y, x + width, y, radius)
-  ctx.closePath()
-}
-
-const drawBadgedIcon = (baseIcon, label) => {
+const drawIcon = (baseIcon, withDot) => {
   const canvas = document.createElement('canvas')
   canvas.width = ICON_SIZE
   canvas.height = ICON_SIZE
@@ -55,27 +44,36 @@ const drawBadgedIcon = (baseIcon, label) => {
   if (!ctx) return null
 
   ctx.drawImage(baseIcon, 0, 0, ICON_SIZE, ICON_SIZE)
+  if (!withDot) return canvas.toDataURL('image/png')
 
-  const height = ICON_SIZE * 0.5
-  // A single digit sits in a circle, two characters need the pill stretched
-  const width = height + (label.length > 1 ? height * 0.46 : 0)
-  const x = ICON_SIZE - width - 1
-  const y = 1
+  const ringWidth = ICON_SIZE * 0.07
+  const radius = ICON_SIZE * 0.17
+  const center = ICON_SIZE - radius - ringWidth / 2 - 1
 
-  tracePill(ctx, x, y, width, height)
-  ctx.lineWidth = ICON_SIZE * 0.075
+  ctx.beginPath()
+  ctx.arc(center, radius + ringWidth / 2 + 1, radius, 0, Math.PI * 2)
+  ctx.lineWidth = ringWidth
   ctx.strokeStyle = BADGE_RING_COLOR
   ctx.stroke()
   ctx.fillStyle = BADGE_COLOR
   ctx.fill()
 
-  ctx.fillStyle = BADGE_TEXT_COLOR
-  ctx.font = `700 ${Math.round(ICON_SIZE * 0.34)}px ${FONT_STACK}`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(label, x + width / 2, y + height / 2 + ICON_SIZE * 0.02)
-
   return canvas.toDataURL('image/png')
+}
+
+// Both blink frames are drawn once per document; the plain one is a data URL too so swapping never refetches
+const loadBlinkFrames = () => {
+  if (!blinkFramesPromise) {
+    blinkFramesPromise = loadBaseIcon().then((baseIcon) => {
+      if (!baseIcon) return null
+
+      const on = drawIcon(baseIcon, true)
+      const off = drawIcon(baseIcon, false)
+      return on && off ? { on, off } : null
+    })
+  }
+
+  return blinkFramesPromise
 }
 
 const showBadge = (href) => {
@@ -116,31 +114,46 @@ const syncAppBadge = (count) => {
 }
 
 /**
- * Stamp the unread count on the browser-tab favicon while the tab is in the background,
- * and on the installed app's icon whenever the Badging API is there.
+ * Blink a dot on the browser-tab favicon while there is anything unread and the tab is in the background,
+ * and put the count on the installed app's icon whenever the Badging API is there.
  * @param {number} count
  * @param {{onlyWhenHidden?: boolean}} [options] pass onlyWhenHidden: false to badge a focused tab too
  */
 export const useFaviconBadge = (count, { onlyWhenHidden = true } = {}) => {
   const total = Number(count) || 0
+  const hasUnread = total > 0
 
   // Split from the sync effect so a changing count never flickers the icon off and on
   useEffect(() => clearBadge, [])
 
   useEffect(() => {
     let cancelled = false
+    let blinkTimer = null
+
+    const stopBlink = () => {
+      clearInterval(blinkTimer)
+      blinkTimer = null
+    }
+
+    const shouldBadge = () => hasUnread && (!onlyWhenHidden || document.hidden)
 
     const sync = async () => {
-      if (total < 1 || (onlyWhenHidden && !document.hidden)) {
+      if (!shouldBadge()) {
+        stopBlink()
         clearBadge()
         return
       }
 
-      const baseIcon = await loadBaseIcon()
-      if (cancelled || !baseIcon) return
+      const frames = await loadBlinkFrames()
+      // Visibility may have flipped back while the frames were decoding
+      if (!frames || cancelled || blinkTimer || !shouldBadge()) return
 
-      const href = drawBadgedIcon(baseIcon, total > 9 ? '9+' : String(total))
-      if (href && !cancelled) showBadge(href)
+      let dotShown = true
+      showBadge(frames.on)
+      blinkTimer = setInterval(() => {
+        dotShown = !dotShown
+        showBadge(dotShown ? frames.on : frames.off)
+      }, BLINK_INTERVAL_MS)
     }
 
     sync()
@@ -148,9 +161,10 @@ export const useFaviconBadge = (count, { onlyWhenHidden = true } = {}) => {
 
     return () => {
       cancelled = true
+      stopBlink()
       document.removeEventListener('visibilitychange', sync)
     }
-  }, [total, onlyWhenHidden])
+  }, [hasUnread, onlyWhenHidden])
 
   useEffect(() => {
     syncAppBadge(total)
