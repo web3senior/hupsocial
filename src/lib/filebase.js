@@ -2,14 +2,9 @@
  * @file lib/filebase.js
  * @description The Filebase IPFS RPC upload, with the retry the pinning path was missing.
  *
- * Filebase is the primary pin target for every upload in the app; Pinata is only a fallback, and
- * on an account over its plan limits it is not even that. That made a single connection blip on
- * Filebase — undici's `TypeError: fetch failed`, which says nothing about the file and everything
- * about the socket — into a total upload failure, reported as a confusing pair of errors where
- * the actionable half was transient and the permanent half was irrelevant.
- *
- * One transient failure is not a reason to give up on the only working provider, so it retries
- * here before anything falls back.
+ * Filebase is the only pin target in the app, so a single connection blip — undici's
+ * `TypeError: fetch failed`, which says nothing about the file and everything about the socket —
+ * is retried here rather than surfacing as a failed upload.
  */
 
 /* Connection-level failures get another go; a 4xx that is not rate limiting is the request's own
@@ -18,8 +13,7 @@ const ATTEMPTS = 3
 const BACKOFF_MS = [400, 1200]
 /* A hung socket used to sit until the platform killed the whole request. Bounded per attempt, and
    deliberately well under a third of the callers' 60s maxDuration: three of these plus the backoff
-   is ~38s worst case, which still leaves the Pinata fallback room to run inside the budget. Raise
-   this and the last retry gets killed mid-flight instead of failing over. */
+   is ~38s worst case. Raise this and the last retry gets killed mid-flight instead of reporting. */
 const ATTEMPT_TIMEOUT_MS = 12_000
 
 const FILEBASE_RPC_ADD = 'https://rpc.filebase.io/api/v0/add'

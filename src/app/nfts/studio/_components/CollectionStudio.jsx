@@ -110,7 +110,7 @@ function LinkExamples({ kind, suffix = '' }) {
           { ok: false, label: 'Gateway address', url: 'https://ipfs.io/ipfs/bafybeig…/', note: 'Ties the collection to that one gateway. Use ipfs:// instead.' },
         ]
       : [
-          { ok: true, label: 'IPFS', url: 'ipfs://bafybeig…/metadata.json', note: 'Pinned on IPFS — Pinata, Filebase, web3.storage or your own node.' },
+          { ok: true, label: 'IPFS', url: 'ipfs://bafybeig…/metadata.json', note: 'Pinned on IPFS — Filebase, web3.storage or your own node.' },
           { ok: true, label: 'Your own server', url: 'https://yourdomain.com/collection.json', note: 'Over HTTPS, on a site you keep running.' },
           {
             ok: true,
@@ -118,7 +118,7 @@ function LinkExamples({ kind, suffix = '' }) {
             url: 'data:application/json;base64,eyJ…',
             note: 'The whole document lives inside the link, on the blockchain: nothing to host, nothing to lose, the top storage score. Every byte costs gas, so keep it short and link to the artwork.',
           },
-          { ok: false, label: 'Gateway address', url: 'https://gateway.pinata.cloud/ipfs/bafybeig…', note: 'Ties the collection to that one gateway. Use ipfs:// instead.' },
+          { ok: false, label: 'Gateway address', url: 'https://ipfs.io/ipfs/bafybeig…', note: 'Ties the collection to that one gateway. Use ipfs:// instead.' },
         ]
 
   // One pill per shape; the example link and the reason ride in the tooltip, so the row stays a row

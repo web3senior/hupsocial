@@ -180,7 +180,7 @@ export const improvementsFor = ({ badges = [], categories = {}, contract = null,
   if (has('web2')) fix('web2', 'Move the files off the web server', 'A website disappears the day its hosting stops being paid. Upload the files to IPFS or Arweave and point the collection there.', studio && { label: 'Open in Studio', href: studio })
   if (has('hash-mismatch')) fix('hash', 'Serve the original files', 'What is served today is not what was committed onchain. Pin the originals again, or point the collection at where they really are.', studio && { label: 'Open in Studio', href: studio })
   if (has('at-risk') || (has('ipfs') && (categories.availability ?? 100) < 100)) {
-    fix('pin', 'Keep more than one copy pinned', 'IPFS only keeps what someone pins. Pin the files with a second provider — Filebase, Pinata or web3.storage — so one lapsed subscription cannot take them down.')
+    fix('pin', 'Keep more than one copy pinned', 'IPFS only keeps what someone pins. Pin the files with a second provider — Filebase or web3.storage — so one lapsed subscription cannot take them down.')
   }
   if (has('no-metadata')) fix('metadata', 'Give the collection its metadata', 'No metadata could be found at all. Point the collection at a document describing it.', studio && { label: 'Open in Studio', href: studio })
   if (has('unverified-source')) fix('source', 'Verify the contract on the explorer', 'Publishing the source lets anyone confirm what the contract does. Explorers verify it from the compiler settings in a minute or two.', explorer && { label: 'Open the explorer', href: explorer, external: true })

@@ -4,22 +4,18 @@
 // payload limit that caps /api/ipfs/file. Video is the reason this exists — a phone clip
 // clears that limit within a couple of seconds of footage.
 //
-// Filebase is primary (it is already the primary pinner for small uploads, so CIDs come from
-// the same place either way) with Pinata as the fallback, mirroring the provider order
-// /api/ipfs/file already uses. Filebase speaks S3 rather than a bespoke signed-upload API,
-// which means the CID is not known at signing time — the client uploads to a key we choose,
-// then resolves that key to a CID via /api/ipfs/cid.
+// Filebase is the pinner for small uploads too, so CIDs come from the same place either way.
+// It speaks S3 rather than a bespoke signed-upload API, which means the CID is not known at
+// signing time — the client uploads to a key we choose, then resolves that key to a CID via
+// /api/ipfs/cid.
 
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
-import { PinataSDK } from 'pinata'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { shortUploadError } from '@/lib/uploadErrors'
 import { FREE_VIDEO_MB, PREMIUM_VIDEO_MB } from '@/lib/premium'
 import { readPremium } from '@/lib/premiumServer'
-
-const pinata = new PinataSDK({ pinataJwt: process.env.PINATA_JWT })
 
 export const dynamic = 'force-dynamic'
 
@@ -82,17 +78,6 @@ async function filebasePresign({ name, mimeType, size }) {
   return { provider: 'filebase', url, key, method: 'PUT' }
 }
 
-async function pinataPresign({ name, mimeType, size }) {
-  const url = await pinata.upload.public.createSignedURL({
-    expires: SIGNED_URL_TTL_SECONDS,
-    name: name ?? 'upload',
-    maxFileSize: size,
-    ...(mimeType ? { mimeTypes: [mimeType] } : {}),
-  })
-
-  return { provider: 'pinata', url, method: 'POST' }
-}
-
 export async function POST(request) {
   try {
     const { name, mimeType, size, address } = await request.json()
@@ -114,15 +99,11 @@ export async function POST(request) {
       return NextResponse.json({ error: `File exceeds the ${Math.floor(ceiling / (1024 * 1024))}MB upload limit` }, { status: 413 })
     }
 
-    if (filebaseConfigured()) {
-      try {
-        return NextResponse.json(await filebasePresign({ name, mimeType, size: declaredSize }))
-      } catch (e) {
-        console.warn('[presign] Filebase signing failed, falling back to Pinata:', e.message)
-      }
+    if (!filebaseConfigured()) {
+      return NextResponse.json({ error: 'Large uploads are not configured on this deployment' }, { status: 503 })
     }
 
-    return NextResponse.json(await pinataPresign({ name, mimeType, size: declaredSize }))
+    return NextResponse.json(await filebasePresign({ name, mimeType, size: declaredSize }))
   } catch (e) {
     console.error('Presign error:', e)
     return NextResponse.json({ error: shortUploadError(e, 'Could not create an upload URL') }, { status: 502 })

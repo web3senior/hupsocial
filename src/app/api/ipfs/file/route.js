@@ -1,18 +1,13 @@
 // app/api/ipfs/file/route.js
 
 import { after, NextResponse } from 'next/server'
-import { PinataSDK } from 'pinata'
 import sharp from 'sharp'
 import { webpAnimationOptions } from '@/lib/webpAnimation'
-import { bothProvidersFailed, shortUploadError } from '@/lib/uploadErrors'
+import { filebaseFailed, shortUploadError } from '@/lib/uploadErrors'
 import { addToFilebase } from '@/lib/filebase'
 import { gatewayList, gatewayUrl } from '@/lib/ipfsGateways'
 import { DEAD_FAILURE_TTL_MS, DISCOVERY_FAILURE_TTL_MS, FAILURE_TTL_MS, TRANSIENT_FAILURE_TTL_MS, coalesceMedia, mediaSourceKey, readMedia, readMediaSource, writeMediaBody, writeMediaFailure, writeMediaRedirect, writeMediaSource } from '@/lib/mediaCache'
 import { readDurableFailure, recordDurableFailure } from '@/lib/mediaFailureStore'
-
-const pinata = new PinataSDK({
-  pinataJwt: process.env.PINATA_JWT,
-})
 
 /* Detect HEIC/HEIF by container magic ("ftyp" box + brand) — browsers frequently
    report an empty or generic mime for .heic files, so headers can't be trusted */
@@ -52,14 +47,6 @@ async function uploadToFilebase(file) {
   })
 }
 
-async function uploadToPinata(file) {
-  const result = await pinata.upload.public.file(file, {
-    pinataMetadata: { name: file.name },
-  })
-  console.log('[pinata] uploaded, CID:', result.cid)
-  return result.cid
-}
-
 export async function POST(request) {
   try {
     const data = await request.formData()
@@ -85,13 +72,8 @@ export async function POST(request) {
     try {
       rawCID = await uploadToFilebase(file)
     } catch (filebaseError) {
-      console.warn('[filebase] upload failed, falling back to Pinata:', filebaseError.message)
-      try {
-        rawCID = await uploadToPinata(file)
-      } catch (pinataError) {
-        console.error('[pinata] fallback upload failed:', pinataError.message)
-        return NextResponse.json({ error: bothProvidersFailed(filebaseError, pinataError) }, { status: 502 })
-      }
+      console.error('[filebase] upload failed:', filebaseError.message)
+      return NextResponse.json({ error: filebaseFailed(filebaseError) }, { status: 502 })
     }
 
     const cid = `ipfs://${rawCID}`

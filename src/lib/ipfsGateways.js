@@ -1,15 +1,10 @@
 /* Where IPFS bytes come from. Filebase leads every list because it is where our uploads pin: it
-   holds the blocks before any other host has ever heard of the CID, it is the one gateway of the
-   three that honours HTTP ranges, and it is the one we can put a dedicated (unmetered, directly
+   holds the blocks before any other host has ever heard of the CID, it is the one gateway here
+   that honours HTTP ranges, and it is the one we can put a dedicated (unmetered, directly
    peered) endpoint in front of. The configured gateways follow, then the public resolvers, so a
    bad minute at one host no longer decides whether content loads. */
 const FILEBASE_GATEWAY = 'https://ipfs.filebase.io/ipfs/'
-/* Pinata rides along because it is where content we did NOT upload actually lives. A DHT
-   provider lookup on the NFT market's collection icons names bitswap.pinata.cloud for most of
-   the ones still reachable: creators pinned their own artwork to their own Pinata accounts, and
-   until now no gateway in this list was the host holding it — we were asking Filebase to go
-   find blocks over bitswap instead of asking the node that has them. */
-const BUILT_IN_FALLBACK_GATEWAYS = [FILEBASE_GATEWAY, 'https://gateway.pinata.cloud/ipfs/']
+const BUILT_IN_FALLBACK_GATEWAYS = [FILEBASE_GATEWAY]
 /* ipfs.io is asked last wherever the environment puts it: it rate-limits hard, and a throttled
    or errored answer from it carries no Access-Control-Allow-Origin header at all. */
 const LAST_RESORT_GATEWAYS = ['https://ipfs.io/ipfs/']

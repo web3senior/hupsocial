@@ -1,21 +1,14 @@
 // app/api/ipfs/object/route.js
 
 import { NextResponse } from 'next/server'
-import { PinataSDK } from 'pinata'
 import { addToFilebase } from '@/lib/filebase'
-import { bothProvidersFailed, shortUploadError } from '@/lib/uploadErrors'
+import { filebaseFailed, shortUploadError } from '@/lib/uploadErrors'
 import { gatewayUrl, raceIPFS } from '@/lib/ipfsGateways'
-
-const pinata = new PinataSDK({
-  pinataJwt: process.env.PINATA_JWT,
-})
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-/* This route now retries Filebase before falling back to Pinata, and an article body is the
-   largest thing it pins. Left on the platform default (10–15s without Fluid Compute) the last
-   retry would be killed mid-flight — the failure the retry exists to prevent. Same figure the
-   media route uses. */
+/* Filebase is retried, and an article body is the largest thing this pins. Left on the platform
+   default (10–15s without Fluid Compute) the last retry would be killed mid-flight. */
 export const maxDuration = 60
 
 async function uploadToFilebase(json) {
@@ -27,14 +20,6 @@ async function uploadToFilebase(json) {
     form.append('file', new Blob([body], { type: 'application/json' }), 'metadata.json')
     return form
   })
-}
-
-async function uploadToPinata(json) {
-  const result = await pinata.upload.public.json(json, {
-    pinataMetadata: { name: 'metadata' },
-  })
-  console.log('[pinata] uploaded, CID:', result.cid)
-  return result.cid
 }
 
 export async function POST(request) {
@@ -49,13 +34,8 @@ export async function POST(request) {
     try {
       rawCID = await uploadToFilebase(json)
     } catch (filebaseError) {
-      console.warn('[filebase] upload failed, falling back to Pinata:', filebaseError.message)
-      try {
-        rawCID = await uploadToPinata(json)
-      } catch (pinataError) {
-        console.error('[pinata] fallback upload failed:', pinataError.message)
-        return NextResponse.json({ error: bothProvidersFailed(filebaseError, pinataError) }, { status: 502 })
-      }
+      console.error('[filebase] upload failed:', filebaseError.message)
+      return NextResponse.json({ error: filebaseFailed(filebaseError) }, { status: 502 })
     }
 
     const cid = `ipfs://${rawCID}`

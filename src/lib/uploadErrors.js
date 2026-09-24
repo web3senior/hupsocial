@@ -3,8 +3,7 @@
  *
  * Provider failures arrive in three shapes: S3-style XML (`<Message>…</Message>`), JSON with the
  * sentence nested somewhere (`{error:{message}}`, `{error:"…"}`, `{Message:"…"}`), or plain text —
- * and often behind a prefix ("Authentication Failed: {…}" from the Pinata SDK, "Filebase RPC 403:
- * {…}" from our own routes). Fetch itself throws a TypeError whose message ("Failed to fetch",
+ * and often behind a prefix ("Filebase RPC 403: {…}" from our own routes). Fetch itself throws a TypeError whose message ("Failed to fetch",
  * "Load failed") tells a user nothing. Without this, the composer showed "Error uploading file"
  * for a plan limit, a missing CORS rule, and a dead network alike.
  *
@@ -92,29 +91,13 @@ export function shortUploadError(error, fallback = 'Upload failed', maxLength = 
   return `${message.slice(0, maxLength - 1).replace(/\s+\S*$/, '')}…`
 }
 
-/* A Pinata account that is over its plan, or whose key is rejected, will refuse every upload
-   until someone changes the billing or the token. Reporting that beside a transient Filebase
-   blip reads as two equal causes, when only one of them is about this upload at all. */
-const PINATA_UNAVAILABLE = /plan limit|surpass|quota|exceeded|payment|unauthorized|forbidden|invalid api key|401|403/i
-
 /**
- * Both pinning providers refused an upload: name each with its reason, kept short enough for one
- * toast line. Filebase leads because it is the primary and the one worth fixing — and when the
- * Pinata fallback was never going to work, it is named as unavailable rather than as a second
- * failure, so the reader is not sent chasing the wrong one.
+ * Filebase refused an upload: its reason, and how many tries it took, in one toast line.
  * @param {unknown} filebaseError
- * @param {unknown} pinataError
  * @returns {string}
  */
-export function bothProvidersFailed(filebaseError, pinataError) {
+export function filebaseFailed(filebaseError) {
   const attempts = filebaseError?.attempts
   const tried = attempts > 1 ? ` after ${attempts} tries` : ''
-  const filebase = `Filebase${tried}: ${shortUploadError(filebaseError, 'failed', 70)}`
-
-  const pinataReason = shortUploadError(pinataError, 'failed', 70)
-  const pinata = PINATA_UNAVAILABLE.test(pinataReason)
-    ? 'Pinata fallback unavailable (account limits)'
-    : `Pinata: ${pinataReason}`
-
-  return `${filebase} · ${pinata}`
+  return `Filebase${tried}: ${shortUploadError(filebaseError, 'failed', 100)}`
 }

@@ -43,7 +43,7 @@ function sendUpload({ method, url, body, headers = {}, onProgress, signal }) {
   })
 }
 
-// Upload through the server-side /api/ipfs/file route (Filebase primary, Pinata fallback).
+// Upload through the server-side /api/ipfs/file route, which pins to Filebase.
 // Subject to the Vercel 4.5 MB function payload limit.
 async function uploadViaServer(file, filename, { onProgress, signal }) {
   const form = new FormData()
@@ -61,8 +61,7 @@ async function uploadViaServer(file, filename, { onProgress, signal }) {
 // earn a 413, then upload them all over again on the fallback.
 const PRESIGN_THRESHOLD_BYTES = 4 * 1024 * 1024
 
-// Ask the server for somewhere to upload to. Filebase (S3) and Pinata sign uploads
-// differently, so the response says which shape came back.
+// Ask the server for a Filebase (S3) URL to upload to.
 async function requestPresign(file, filename, signal, address) {
   const res = await fetch('/api/ipfs/presign', {
     method: 'POST',
@@ -130,27 +129,9 @@ async function uploadViaFilebasePresign(file, { url, key }, { onProgress, signal
   return resolveFilebaseCid(key, signal)
 }
 
-// Pinata's signed URL takes a multipart POST and answers with the CID directly.
-async function uploadViaPinataPresign(file, filename, { url }, { onProgress, signal }) {
-  /* The v3 uploads endpoint expects the same form shape the Pinata SDK sends:
-     network and name alongside the file, not the file alone */
-  const form = new FormData()
-  form.append('file', file, filename)
-  form.append('network', 'public')
-  form.append('name', filename)
-  const uploadRes = await sendUpload({ method: 'POST', url, body: form, onProgress, signal })
-  if (!uploadRes.ok) throw new Error(await readFailure(uploadRes, 'Storage rejected the upload'))
-
-  const { data } = await uploadRes.json()
-  return `ipfs://${data.cid}`
-}
-
 async function uploadViaPresign(file, filename, transfer) {
   const presigned = await requestPresign(file, filename, transfer.signal, transfer.address)
-
-  return presigned.provider === 'filebase'
-    ? uploadViaFilebasePresign(file, presigned, transfer)
-    : uploadViaPinataPresign(file, filename, presigned, transfer)
+  return uploadViaFilebasePresign(file, presigned, transfer)
 }
 
 /**
@@ -244,7 +225,7 @@ export async function uploadObjectToIPFS(contentObj, { timeoutMs = OBJECT_UPLOAD
 /* The platform rejects an oversized function body only after the whole thing has been sent, so a
    folder past the cap costs a full upload to earn a 413. Checked here instead, against the same
    budget the artwork batches are planned to. Single files have the presigned path; a directory
-   does not, because neither presigned path produces a directory root. */
+   does not, because the presigned path produces no directory root. */
 const FOLDER_BUDGET_BYTES = 4 * 1024 * 1024
 
 const folderTooLarge = (bytes) =>
@@ -256,8 +237,8 @@ const folderTooLarge = (bytes) =>
  * directory root can serve `<cid>/7.json`. File names are flattened to their basename server
  * side, so a folder picked with webkitdirectory lands flat under the root.
  *
- * Goes through the server route rather than a presign: the presigned paths pin objects
- * individually and produce no directory root. That caps a folder at the platform's request
+ * Goes through the server route rather than a presign: the presigned path pins objects
+ * individually and produces no directory root. That caps a folder at the platform's request
  * body limit, which is ample for a JSON manifest and not for thousands of images — for those,
  * pin externally and paste the CID.
  *
