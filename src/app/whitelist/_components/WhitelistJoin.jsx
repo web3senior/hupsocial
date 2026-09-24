@@ -19,9 +19,9 @@ const countFormatter = new Intl.NumberFormat(undefined, { notation: 'compact', m
 const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 
 const STEPS = [
-  { id: 'connect', icon: WalletIcon, title: 'Connect your wallet', description: 'The wallet you want to mint $HUP with.' },
+  { id: 'connect', icon: WalletIcon, title: 'Connect your wallet', description: 'The wallet you want $HUP to reach.' },
   { id: 'sign', icon: PenNibIcon, title: 'Sign one message', description: 'Free. No transaction, no gas.' },
-  { id: 'listed', icon: ListChecksIcon, title: 'You’re on the list', description: 'One entry per wallet, kept until the $HUP mint.' },
+  { id: 'listed', icon: ListChecksIcon, title: 'You’re on the list', description: 'One entry per wallet, kept until launch.' },
 ]
 
 const isDeclined = (error) => /rejected|denied|User rejected/i.test(error?.shortMessage || error?.message || '')
@@ -51,7 +51,7 @@ export default function WhitelistJoin() {
       if (!result.success) throw new Error(result.error)
 
       mutate({ success: true, total: result.total, joined: true, joinedAt: result.joinedAt }, { revalidate: false })
-      toast(result.alreadyJoined ? 'This wallet was already on the list' : 'You’re on the $HUP mint whitelist', 'success')
+      toast(result.alreadyJoined ? 'This wallet was already on the list' : 'You’re on the $HUP whitelist', 'success')
     } catch (error) {
       if (!isDeclined(error)) toast(error?.message || 'Could not join the whitelist', 'error')
     } finally {
@@ -68,8 +68,8 @@ export default function WhitelistJoin() {
         <span className={styles.whitelist__mark} aria-hidden="true">
           <ListChecksIcon size={28} weight="fill" />
         </span>
-        <h1 className={styles.whitelist__title}>Mint whitelist</h1>
-        <p className={styles.whitelist__lede}>Get your wallet on the list to mint $HUP when it launches. It takes one signature and costs nothing.</p>
+        <h1 className={styles.whitelist__title}>$HUP whitelist</h1>
+        <p className={styles.whitelist__lede}>Get your wallet on the list before $HUP launches. It takes one signature and costs nothing.</p>
         {total !== null && (
           <span className={styles.whitelist__count}>
             <UsersThreeIcon size={14} weight="bold" aria-hidden="true" />

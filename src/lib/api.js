@@ -652,7 +652,7 @@ export const requestAuthNonce = async (address) => {
 }
 
 /**
- * The mint whitelist total, and whether `address` is on it.
+ * The $HUP whitelist total, and whether `address` is on it.
  * @param {string} [address]
  * @returns {Promise<{success: boolean, total?: number, joined?: boolean, joinedAt?: string|null, error?: string}>}
  */
@@ -670,7 +670,7 @@ export const getWhitelistStatus = async (address) => {
 }
 
 /**
- * Adds a wallet to the mint whitelist — see api/v1/whitelist/route.js.
+ * Adds a wallet to the $HUP whitelist — see api/v1/whitelist/route.js.
  * @param {{address: string, nonce: string, issuedAt: number, signature: string, chainId?: number}} request
  * @returns {Promise<{success: boolean, alreadyJoined?: boolean, joinedAt?: string, total?: number, error?: string}>}
  */
