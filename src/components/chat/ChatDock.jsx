@@ -43,6 +43,7 @@ import {
   editRoomMessage,
   ensureChatSession,
   fetchChatMe,
+  fetchReadCursor,
   fetchRoomMessages,
   fetchRoomUnread,
   isChatUnauthorized,
@@ -50,6 +51,7 @@ import {
   moderateChat,
   readChatToken,
   recordLineViews,
+  saveReadCursor,
   sendRoomMessage,
   setTyping as reportTyping,
   subscribeChatToken,
@@ -250,6 +252,51 @@ export default function ChatDock({ embedded = false }) {
     }
   }, [me, isSigningIn, signMessageAsync, chainId])
 
+  // How far the wallet has read lives on the server, so every device shows the same unread
+  // state: the server's position is taken in before the room first renders, and every step
+  // forward here is sent up. markSeen only moves forward, so an older value changes nothing.
+  const sentReadRef = useRef(0)
+  const adoptReadCursor = useCallback(
+    (id) => {
+      if (!(id > 0)) return
+      sentReadRef.current = Math.max(sentReadRef.current, id)
+      markSeen(id)
+    },
+    [markSeen]
+  )
+  const [readSyncedFor, setReadSyncedFor] = useState(null)
+  useEffect(() => {
+    if (!token) return undefined
+    let cancelled = false
+    sentReadRef.current = 0
+    fetchReadCursor(token)
+      .then((data) => {
+        if (!cancelled) adoptReadCursor(data.lastReadId)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setReadSyncedFor(token)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token, adoptReadCursor])
+  useEffect(() => {
+    if (!token || readSyncedFor !== token || lastSeenId <= sentReadRef.current) return
+    sentReadRef.current = lastSeenId
+    saveReadCursor(token, lastSeenId)
+      .then((data) => adoptReadCursor(data.lastReadId))
+      .catch(() => {
+        /* The next step forward sends a newer position */
+      })
+  }, [token, readSyncedFor, lastSeenId, adoptReadCursor])
+
+  // The room first renders once the read position is known, so its divider and first scroll
+  // match wherever the wallet read last. Once shown it stays, even through a later sign-in
+  const [readReady, setReadReady] = useState(false)
+  if (!readReady && !isSettling && (!token || readSyncedFor === token)) setReadReady(true)
+  const roomPending = isSettling || !readReady
+
   // Unread while minimized: a cheap count newer than the last seen line, plus the faces of the
   // last few people who spoke
   const [unread, setUnread] = useState(0)
@@ -267,8 +314,10 @@ export default function ChatDock({ embedded = false }) {
     let cancelled = false
     const check = async () => {
       try {
-        const data = await fetchRoomUnread(lastSeenId, { viewer: me, token })
+        // Read at call time: a position taken in from the reply must not restart the poll
+        const data = await fetchRoomUnread(useChatDockStore.getState().lastSeenId, { viewer: me, token })
         if (cancelled) return
+        adoptReadCursor(data.lastReadId)
         setUnread(data.count)
         setRecentSenders(data.recentSenders ?? [])
         setMentionAlert({ count: data.mentions ?? 0, firstId: data.firstMentionId ?? 0 })
@@ -282,7 +331,7 @@ export default function ChatDock({ embedded = false }) {
       cancelled = true
       clearInterval(timer)
     }
-  }, [hidden, isOpen, pageVisible, lastSeenId, me, token])
+  }, [hidden, isOpen, pageVisible, me, token, adoptReadCursor])
 
   // Who is around, refreshed by the room's own poll while it is open
   const [presence, setPresence] = useState({ wallets: [], count: 0 })
@@ -353,7 +402,7 @@ export default function ChatDock({ embedded = false }) {
               </button>
             </div>
           </header>
-          {isSettling && <RoomSkeleton />}
+          {roomPending && <RoomSkeleton />}
         </>
       ) : (
         <button type="button" className={styles.pill} onClick={open} aria-label="Maximize chat" title="Open chat">
@@ -374,7 +423,7 @@ export default function ChatDock({ embedded = false }) {
 
       {/* Mounted once and kept across close/open, so reopening lands exactly where the reader
           left instead of refetching and re-scrolling; hidden, it neither polls nor marks seen */}
-      {!isSettling && (
+      {!roomPending && (
         <div className={styles.dock__room} hidden={!isOpen}>
           <Room
             active={isOpen}
@@ -541,8 +590,12 @@ function Room({
   const listRef = useRef(null)
   const serverTimeRef = useRef(null)
   const pagingRef = useRef(false)
-  // Where the reader was when the room opened: the divider sits after this line
-  const [openedAtId] = useState(lastSeenId)
+  // Where the reader was when the room opened: the divider sits after this line. Until the room
+  // is first opened here, reading on another device moves it along
+  const [openedAtId, setOpenedAtId] = useState(lastSeenId)
+  const [wasActive, setWasActive] = useState(active)
+  if (active && !wasActive) setWasActive(true)
+  if (!active && !wasActive && lastSeenId > openedAtId) setOpenedAtId(lastSeenId)
   const dividerRef = useRef(null)
   const [initialScrollDone, setInitialScrollDone] = useState(false)
   // Whether the last load was refused: an outage must not read as an empty room

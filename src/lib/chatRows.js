@@ -9,6 +9,45 @@ import { isEvmAddress, normalizeAddress } from '@/lib/address'
 
 export const BODY_MAX_CHARS = 1000
 
+const ROOMS = new Set(['global'])
+
+/** @returns {string|null} the room a request names, 'global' when it names none, null when unknown */
+export const chatRoomFrom = (raw) => {
+  const room = typeof raw === 'string' && raw ? raw : 'global'
+  return ROOMS.has(room) ? room : null
+}
+
+// --- Read cursors: how far a wallet has read a room, kept here so every device agrees ---
+
+/** @returns {Promise<number>} the newest line the wallet has read in the room, 0 before any. Never throws. */
+export const loadReadCursor = async (pool, userId, room) => {
+  try {
+    const [[row]] = await pool.execute('SELECT last_read_id FROM chat_reads WHERE user_id = ? AND room = ? LIMIT 1', [userId, room])
+    return Number(row?.last_read_id) || 0
+  } catch (error) {
+    console.error('[CHAT_READ_CURSOR_ERROR]:', error)
+    return 0
+  }
+}
+
+/**
+ * Moves the wallet's cursor forward, never back and never past the room's newest line, so a
+ * cursor left over from a rebuilt table cannot swallow every line that comes after it.
+ * @returns {Promise<number>} where the cursor now sits
+ */
+export const advanceReadCursor = async (pool, userId, room, lineId) => {
+  const [[latest]] = await pool.execute('SELECT MAX(id) AS id FROM chat_messages WHERE room = ? AND deleted_at IS NULL', [room])
+  const target = Math.min(lineId, Number(latest?.id) || 0)
+  if (target > 0) {
+    await pool.execute(
+      `INSERT INTO chat_reads (user_id, room, last_read_id) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE last_read_id = GREATEST(last_read_id, ?)`,
+      [userId, room, target, target]
+    )
+  }
+  return loadReadCursor(pool, userId, room)
+}
+
 // The room keeps four weeks. Older lines are dropped for good, at most once an hour per server
 // instance, from the write and poll paths, so no scheduler has to exist for it to happen.
 export const RETENTION_DAYS = 28

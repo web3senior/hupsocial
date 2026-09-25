@@ -13,10 +13,12 @@ import {
   BODY_MAX_CHARS,
   LIVE_LINES,
   attachReactions,
+  chatRoomFrom,
   fetchPresence,
   fetchRecentViews,
   fetchTyping,
   isGifUrl,
+  loadReadCursor,
   pruneOldLines,
   serializeLine,
   touchPresence,
@@ -29,20 +31,14 @@ const RATE_WINDOW_S = 60
 const RATE_LIMIT = 20
 const UNREAD_CAP = 99
 const RECENT_FACES = 3
-const ROOMS = new Set(['global'])
 
 const serialize = serializeLine
 const LIVE = LIVE_LINES
 
-const roomFrom = (raw) => {
-  const room = typeof raw === 'string' && raw ? raw : 'global'
-  return ROOMS.has(room) ? room : null
-}
-
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
-    const room = roomFrom(searchParams.get('room'))
+    const room = chatRoomFrom(searchParams.get('room'))
     if (!room) return NextResponse.json({ success: false, error: 'Unknown room' }, { status: 404 })
 
     const headers = { 'Cache-Control': 'no-store' }
@@ -50,9 +46,14 @@ export async function GET(request) {
     if (Number.isFinite(countAfter) && searchParams.has('countAfter')) {
       // The minimized poll is the one call that keeps coming while nobody writes
       await pruneOldLines(pool)
+      // Read only for the viewer: a minimized dock is not around, so no presence stamp here
+      const actor = await chatActorFromRequest(pool, request).catch(() => null)
+      // A signed-in wallet counts from wherever it read furthest, on this device or another
+      const lastReadId = actor ? await loadReadCursor(pool, actor.id, room) : 0
+      const since = Math.max(0, countAfter, lastReadId)
       const [[row]] = await pool.execute(
         `SELECT COUNT(*) AS n FROM (SELECT id FROM chat_messages WHERE room = ? AND deleted_at IS NULL AND id > ? LIMIT ${UNREAD_CAP + 1}) c`,
-        [room, Math.max(0, countAfter)]
+        [room, since]
       )
       const [[latest]] = await pool.execute('SELECT MAX(id) AS id FROM chat_messages WHERE room = ? AND deleted_at IS NULL', [room])
       // The last few distinct voices, for the faces on the minimized pill
@@ -67,20 +68,18 @@ export async function GET(request) {
       // case-insensitive so the checksummed form in the body matches the lowercase wallet
       let mentions = 0
       let firstMentionId = 0
-      // Read only for the viewer: a minimized dock is not around, so no presence stamp here
-      const actor = await chatActorFromRequest(pool, request).catch(() => null)
       const viewer = actor?.wallet ?? normalizeAddress(searchParams.get('viewer'))
       if (isEvmAddress(viewer)) {
         const [hits] = await pool.execute(
           `SELECT id FROM chat_messages WHERE room = ? AND deleted_at IS NULL AND id > ? AND body LIKE ? ORDER BY id ASC LIMIT ${UNREAD_CAP + 1}`,
-          [room, Math.max(0, countAfter), `%](/${viewer})%`]
+          [room, since, `%](/${viewer})%`]
         )
         mentions = hits.length
         firstMentionId = Number(hits[0]?.id) || 0
       }
 
       return NextResponse.json(
-        { success: true, count: Number(row.n), latestId: Number(latest.id) || 0, recentSenders, mentions, firstMentionId },
+        { success: true, count: Number(row.n), latestId: Number(latest.id) || 0, recentSenders, mentions, firstMentionId, lastReadId },
         { headers }
       )
     }
@@ -162,7 +161,7 @@ export async function POST(request) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const room = roomFrom(body?.room)
+    const room = chatRoomFrom(body?.room)
     if (!room) return NextResponse.json({ success: false, error: 'Unknown room' }, { status: 404 })
 
     // A line is text, a GIF, or a GIF with a caption; a reply points at a live line of the room

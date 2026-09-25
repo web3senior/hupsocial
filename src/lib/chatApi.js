@@ -126,13 +126,26 @@ export const recordLineViews = (token, ids, viewer, room = 'global') =>
 
 /**
  * How many live messages are newer than `sinceId`, capped, plus the newest id, the last few
- * faces, and (with a viewer) how many of those lines mention them and which comes first.
+ * faces, and (with a viewer) how many of those lines mention them and which comes first. With a
+ * token the count starts at the wallet's own read position when that is further, returned as
+ * `lastReadId`.
  */
 export const fetchRoomUnread = (sinceId, { viewer = null, token = null, room = 'global' } = {}) => {
   const params = new URLSearchParams({ room, countAfter: String(sinceId || 0) })
   if (viewer) params.set('viewer', viewer)
   return call(token, `/api/v1/chat/room?${params}`)
 }
+
+// The room waits for the wallet's read position before it first renders, so a slow answer is cut short
+const READ_SYNC_TIMEOUT_MS = 4_000
+
+/** How far the wallet has read, as every device it chats from last reported it. */
+export const fetchReadCursor = (token, room = 'global') =>
+  call(token, `/api/v1/chat/read?${new URLSearchParams({ room })}`, { signal: AbortSignal.timeout(READ_SYNC_TIMEOUT_MS) })
+
+/** Moves the wallet's read position forward; the reply says where it now sits. */
+export const saveReadCursor = (token, lastReadId, room = 'global') =>
+  call(token, '/api/v1/chat/read', { method: 'POST', keepalive: true, body: JSON.stringify({ room, lastReadId }) })
 
 /**
  * One line: text, a Giphy GIF, or both, optionally answering another line.
