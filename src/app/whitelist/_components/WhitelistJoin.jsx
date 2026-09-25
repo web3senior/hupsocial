@@ -51,7 +51,7 @@ export default function WhitelistJoin() {
       if (!result.success) throw new Error(result.error)
 
       mutate({ success: true, total: result.total, joined: true, joinedAt: result.joinedAt }, { revalidate: false })
-      toast(result.alreadyJoined ? 'This wallet was already on the list' : 'You’re on the $HUP whitelist', 'success')
+      toast(result.alreadyJoined ? 'This wallet was already on the list' : 'You’re on the Mint Whitelist', 'success')
     } catch (error) {
       if (!isDeclined(error)) toast(error?.message || 'Could not join the whitelist', 'error')
     } finally {
@@ -68,7 +68,7 @@ export default function WhitelistJoin() {
         <span className={styles.whitelist__mark} aria-hidden="true">
           <ListChecksIcon size={28} weight="fill" />
         </span>
-        <h1 className={styles.whitelist__title}>$HUP whitelist</h1>
+        <h1 className={styles.whitelist__title}>Mint Whitelist</h1>
         <p className={styles.whitelist__lede}>Get your wallet on the list before $HUP launches. It takes one signature and costs nothing.</p>
         {total !== null && (
           <span className={styles.whitelist__count}>

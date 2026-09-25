@@ -1,6 +1,6 @@
 /**
  * @file api/v1/whitelist/route.js
- * @description The $HUP whitelist. Joining demands a signature so the list only holds
+ * @description The Mint Whitelist. Joining demands a signature so the list only holds
  * wallets whose owners asked — never a pasted exchange deposit address. The primary key on
  * wallet_address refuses duplicates, not a check-then-write.
  */
