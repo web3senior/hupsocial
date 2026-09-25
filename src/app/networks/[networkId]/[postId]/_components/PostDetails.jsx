@@ -8,6 +8,7 @@ import { recordPostView } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import Comments from '@/components/Comments'
+import PostLikes from './PostLikes'
 import PostTippers from './PostTippers'
 import { usePostStore } from '@/stores/usePostStore'
 import styles from './PostDetails.module.scss'
@@ -135,7 +136,9 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
         )}
 
         {/* Both mount with the post rather than after a request for it, so on a cold open the
-            thread and the supporters strip are already loading while the post is on screen */}
+            thread and the likes and supporters strips are already loading while the post is on screen */}
+        {post && <PostLikes networkId={resolvedNetworkId} postId={post.is_repost > 0 ? post.is_repost : resolvedPostId} />}
+
         {post && <PostTippers networkId={resolvedNetworkId} postId={post.is_repost > 0 ? post.is_repost : resolvedPostId} />}
 
         {post && (

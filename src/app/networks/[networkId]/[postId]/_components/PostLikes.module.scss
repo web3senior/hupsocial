@@ -1,0 +1,79 @@
+.likes {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+
+  &__faces {
+    display: flex;
+    align-items: center;
+  }
+
+  // Nested to outrank Profile's own root rule
+  .likes__face {
+    position: relative;
+    flex-shrink: 0;
+
+    &:not(:first-child) {
+      margin-left: -8px;
+    }
+
+    &:hover {
+      z-index: 1;
+    }
+
+    img {
+      border: 2px solid var(--background);
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__open {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+
+    strong {
+      color: var(--text);
+    }
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.likers {
+  min-height: 12rem;
+
+  // Nested to outrank Profile's own root rule
+  .likers__profile {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  &__loading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__skeleton {
+    height: 56px;
+    border-radius: var(--radius-16);
+  }
+
+  &__sentinel {
+    height: 1px;
+    flex-shrink: 0;
+  }
+}
