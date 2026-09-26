@@ -28,7 +28,7 @@ import { useProfile } from '@/hooks/useProfile'
 import EmojiPicker from '@/components/EmojiPicker'
 import GifPicker from '@/components/GifPicker'
 import EmptyState from '@/components/ui/EmptyState'
-import { MessageLoader, Spinner } from '@/components/Loading'
+import { MessageLoader } from '@/components/Loading'
 import NativePopover from '@/components/ui/NativePopover'
 import { toast } from '@/components/NextToast'
 import { openConnect } from '@/lib/connectDialog'
@@ -1075,7 +1075,6 @@ function Room({
 
       {typists.length > 0 && (
         <div className={styles.typing}>
-          <Spinner size={12} color="currentColor" label="Typing" />
           <span className={styles.typing__faces}>
             {typists.map((wallet) => (
               <Profile key={wallet} creator={wallet} variant="imageOnly" size={18} hoverCard={false} fingerprint={false} />
