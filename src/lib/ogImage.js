@@ -13,11 +13,37 @@
  * null on any failure — a card missing one picture still reads, a card that never arrives does not.
  */
 
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import sharp from 'sharp'
 import { extractIPFSCid, resolveIPFSImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
 
 /* Artwork past this is a broken or hostile source, not something worth decoding into a card */
 export const MAX_IMAGE_BYTES = 12 * 1024 * 1024
+
+export const OG_FONT_FAMILY = 'Geist'
+
+const OG_FONT_FACES = [
+  ['Geist-Regular.ttf', 400, 'normal'],
+  ['Geist-Bold.ttf', 700, 'normal'],
+  ['Geist-Italic.ttf', 400, 'italic'],
+  ['Geist-BoldItalic.ttf', 700, 'italic'],
+]
+
+/* Satori never synthesizes a face: without a bold or italic file loaded, both draw as regular.
+   Passing `fonts` replaces the bundled default, so the regular face has to be in the list too.
+   Null on a failed read — the card then falls back to the bundled regular rather than failing. */
+export const OG_FONTS = await Promise.all(
+  OG_FONT_FACES.map(async ([file, weight, style]) => ({
+    name: OG_FONT_FAMILY,
+    data: await readFile(join(process.cwd(), 'src', 'assets', 'fonts', file)),
+    weight,
+    style,
+  })),
+).catch((error) => {
+  console.warn('[og] card fonts unavailable:', error.message)
+  return null
+})
 
 /**
  * Makes a resolved reference reachable from the server: the storage helpers emit app-relative

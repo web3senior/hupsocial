@@ -8,7 +8,76 @@
  * machine-made. Both live here so there is one place to change the wording.
  */
 
-import { MENTION_LINK_PATTERN } from '@/lib/mentions'
+import { marked } from 'marked'
+
+const BLOCK_TOKENS = new Set(['paragraph', 'heading', 'blockquote', 'code', 'list_item', 'space', 'br'])
+
+const sameStyle = (a, b) => Boolean(a.bold) === Boolean(b.bold) && Boolean(a.italic) === Boolean(b.italic) && Boolean(a.strike) === Boolean(b.strike)
+
+/**
+ * A post body as runs of plain text carrying the emphasis the feed would draw them with.
+ * Lexed by the same parser the feed renders through, so both agree on what counts as markup.
+ *
+ * @param {string} markdown
+ * @returns {Array<{text: string, bold?: boolean, italic?: boolean, strike?: boolean}>}
+ */
+export const toRuns = (markdown) => {
+  const source = typeof markdown === 'string' ? markdown.trim() : ''
+  if (!source) return []
+
+  const runs = []
+  const push = (text, style) => {
+    if (!text) return
+    const last = runs.at(-1)
+    if (last && sameStyle(last, style)) last.text += text
+    else runs.push({ ...style, text })
+  }
+
+  const walk = (tokens, style) => {
+    for (const token of tokens || []) {
+      if (token.type === 'strong') walk(token.tokens, { ...style, bold: true })
+      else if (token.type === 'em') walk(token.tokens, { ...style, italic: true })
+      else if (token.type === 'del') walk(token.tokens, { ...style, strike: true })
+      else if (token.type === 'heading') walk(token.tokens, { ...style, bold: true })
+      else if (token.type === 'list') {
+        token.items.forEach((item, index) => {
+          push(token.ordered ? `${Number(token.start || 1) + index}. ` : '• ', style)
+          walk([item], style)
+        })
+      } else if (token.type === 'table') {
+        ;[token.header, ...token.rows].flat().forEach((cell) => {
+          walk(cell.tokens, style)
+          push(' ', style)
+        })
+      } else if (token.type === 'html' || token.type === 'image' || token.type === 'hr') continue
+      else if (token.tokens?.length) walk(token.tokens, style)
+      else if (token.type !== 'space' && token.type !== 'br') push(token.text || '', style)
+
+      if (BLOCK_TOKENS.has(token.type)) push(' ', style)
+    }
+  }
+
+  try {
+    walk(marked.lexer(source, { gfm: true, breaks: true }), {})
+  } catch {
+    return [{ text: source.replace(/\s+/g, ' ') }]
+  }
+
+  /* Whitespace is collapsed across run boundaries, not just inside each run */
+  const collapsed = []
+  for (const run of runs) {
+    let text = run.text.replace(/\s+/g, ' ')
+    const previous = collapsed.at(-1)
+    if (!previous || previous.text.endsWith(' ')) text = text.trimStart()
+    if (text) collapsed.push({ ...run, text })
+  }
+
+  const last = collapsed.at(-1)
+  if (last) last.text = last.text.trimEnd()
+  if (last && !last.text) collapsed.pop()
+
+  return collapsed
+}
 
 /**
  * Cuts to a word boundary. A bare slice ends mid-word ("swipe for the next, an"), which reads
@@ -18,18 +87,40 @@ import { MENTION_LINK_PATTERN } from '@/lib/mentions'
  * a contract address — happens to straddle the limit; below that it is better to split the
  * token than to return almost nothing.
  *
- * @param {string} text - Raw post text; whitespace is collapsed first.
+ * @param {string} text - Raw post markdown.
  * @param {number} max - Maximum length of the result, ellipsis included.
- * @returns {string}
+ * @returns {Array<{text: string, bold?: boolean, italic?: boolean, strike?: boolean}>}
  */
-export const truncate = (text, max) => {
-  const clean = (text || '').replace(MENTION_LINK_PATTERN, '@$1').replace(/\s+/g, ' ').trim()
-  if (clean.length <= max) return clean
+export const truncateToRuns = (text, max) => {
+  const runs = toRuns(text)
+  const clean = runs.map((run) => run.text).join('')
+  if (clean.length <= max) return runs
 
   const cut = clean.slice(0, max - 1)
   const boundary = cut.lastIndexOf(' ')
-  return `${(boundary > max * 0.6 ? cut.slice(0, boundary) : cut).trimEnd()}…`
+  let budget = (boundary > max * 0.6 ? cut.slice(0, boundary) : cut).trimEnd().length
+
+  const kept = []
+  for (const run of runs) {
+    if (budget <= 0) break
+    kept.push({ ...run, text: run.text.slice(0, budget) })
+    budget -= run.text.length
+  }
+
+  kept[kept.length - 1].text += '…'
+  return kept
 }
+
+/**
+ * truncateToRuns as one plain string, for the surfaces that cannot draw emphasis.
+ * @param {string} text - Raw post markdown.
+ * @param {number} max
+ * @returns {string}
+ */
+export const truncate = (text, max) =>
+  truncateToRuns(text, max)
+    .map((run) => run.text)
+    .join('')
 
 /**
  * What a post did, for the posts that carry no words of their own. An NFT listing or a bare

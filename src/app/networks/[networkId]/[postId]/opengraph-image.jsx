@@ -36,8 +36,8 @@ import { getPostById } from '@/lib/api'
 import { getChainIconSvg } from '@/lib/chains'
 import { readUniversalProfile } from '@/lib/lukso'
 import { getNftMetadata } from '@/lib/nftMetadataCache'
-import { truncate, summarizePostContent } from '@/lib/postSummary'
-import { resolveArtworkUrl, svgToPngDataUri, toFetchable, toPngDataUri } from '@/lib/ogImage'
+import { truncateToRuns, summarizePostContent } from '@/lib/postSummary'
+import { OG_FONTS, OG_FONT_FAMILY, resolveArtworkUrl, svgToPngDataUri, toFetchable, toPngDataUri } from '@/lib/ogImage'
 import { resolveAvatarImageUrl } from '@/lib/storageHelper'
 
 export const runtime = 'nodejs'
@@ -126,6 +126,7 @@ const styles = {
     backgroundColor: COLORS.background,
     color: COLORS.text,
     padding: '56px 60px',
+    ...(OG_FONTS ? { fontFamily: OG_FONT_FAMILY } : {}),
   },
   header: {
     display: 'flex',
@@ -215,6 +216,14 @@ const styles = {
     color: COLORS.text,
     lineHeight: 1.35,
   },
+  /* The gap stands in for the space character, so it is Geist's own space advance */
+  words: {
+    flexWrap: 'wrap',
+    columnGap: '0.24em',
+  },
+  word: {
+    display: 'flex',
+  },
   media: {
     width: '380px',
     height: '380px',
@@ -257,6 +266,59 @@ const fontSizeFor = (length) => {
   if (length <= 150) return 44
   if (length <= 240) return 36
   return 30
+}
+
+const IMAGE_OPTIONS = { ...size, ...(OG_FONTS ? { fonts: OG_FONTS } : {}) }
+
+/* Hebrew through Arabic presentation forms: a flex row of words would lay these out backwards */
+const RTL_PATTERN = /[֐-ࣿיִ-﷿ﹰ-﻿]/
+
+const runStyle = (run) => ({
+  ...(run.bold ? { fontWeight: 700 } : {}),
+  ...(run.italic ? { fontStyle: 'italic' } : {}),
+  ...(run.strike ? { textDecoration: 'line-through' } : {}),
+})
+
+/* A word is a list of segments because emphasis can start mid-word: "(**bo**ld)" is one word */
+const toWords = (runs) => {
+  const words = [[]]
+
+  for (const run of runs) {
+    for (const part of run.text.split(/(\s+)/)) {
+      if (!part) continue
+      if (part.trim()) words.at(-1).push({ ...run, text: part })
+      else if (words.at(-1).length) words.push([])
+    }
+  }
+
+  return words.filter((word) => word.length)
+}
+
+/**
+ * The post's words with their emphasis drawn. Satori lays a styled span out as a flex item, not
+ * as inline text, so a run that wraps would wrap as a block of its own — each word is an item
+ * instead. Unstyled text stays one node, which is also what right-to-left scripts need.
+ */
+const PostText = ({ runs }) => {
+  const plain = runs.map((run) => run.text).join('')
+  const style = { ...styles.text, fontSize: `${fontSizeFor(plain.length)}px` }
+  const isStyled = runs.some((run) => run.bold || run.italic || run.strike)
+
+  if (!isStyled || RTL_PATTERN.test(plain)) return <div style={style}>{plain}</div>
+
+  return (
+    <div style={{ ...style, ...styles.words }}>
+      {toWords(runs).map((word, index) => (
+        <div key={index} style={styles.word}>
+          {word.map((segment, part) => (
+            <span key={part} style={runStyle(segment)}>
+              {segment.text}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 /**
@@ -372,10 +434,10 @@ const FallbackCard = () => (
  */
 const render = async (build) => {
   try {
-    return Buffer.from(await new ImageResponse(build(true), { ...size }).arrayBuffer())
+    return Buffer.from(await new ImageResponse(build(true), IMAGE_OPTIONS).arrayBuffer())
   } catch (error) {
     console.warn('[post-og] render failed, retrying without post text:', error.message)
-    return Buffer.from(await new ImageResponse(build(false), { ...size }).arrayBuffer())
+    return Buffer.from(await new ImageResponse(build(false), IMAGE_OPTIONS).arrayBuffer())
   }
 }
 
@@ -406,7 +468,8 @@ export default async function Image({ params }) {
     const fingerprint = post.wallet_address ? makeBlockie(normalizeAddress(post.wallet_address)) : null
 
     /* A post with artwork gets less room for words, so it is cut shorter */
-    const text = truncate(bodyText, artwork ? 180 : 300)
+    const runs = truncateToRuns(bodyText, artwork ? 180 : 300)
+    const text = runs.map((run) => run.text).join('')
 
     /* A post with neither words nor artwork still has to say something. The header already
        names the author, so the headline carries only what they did — the same phrasing the
@@ -442,7 +505,7 @@ export default async function Image({ params }) {
 
         <div style={styles.body}>
           {withText && text ? (
-            <div style={{ ...styles.text, fontSize: `${fontSizeFor(text.length)}px` }}>{text}</div>
+            <PostText runs={runs} />
           ) : artwork ? null : (
             /* Nothing to letter and nothing to show, so a headline takes the whole card. Text
                that exists but could not be shaped says so rather than claiming the post is
