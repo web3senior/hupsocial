@@ -96,10 +96,17 @@
   }
 }
 
+// The ellipsis needs overflow:hidden, which crops at the line box, and a system font's descenders
+// can hang below a 20px one. Padding widens the clip; the matching negative margin keeps the layout.
+%clip-clears-descenders {
+  padding-block: 0.2em;
+  margin-block: -0.2em;
+}
+
 .name {
+  @extend %clip-clears-descenders;
   position: relative;
   font-weight: 600;
-  // Must clear the descenders — overflow:hidden (for the ellipsis) crops anything below the box.
   line-height: var(--system-16-line-height);
   font-family: var(--font-sans);
   color: inherit;
@@ -229,6 +236,7 @@
 // The same face too: the name is set in the system sans, and Inter's taller x-height made the
 // handle look a size up at the same pixel size.
 .handle {
+  @extend %clip-clears-descenders;
   font-weight: 400;
   font-family: var(--font-sans);
   font-size: inherit;
