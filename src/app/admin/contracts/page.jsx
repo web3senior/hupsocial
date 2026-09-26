@@ -37,6 +37,7 @@ import { TIP_TOKENS, USDC } from '@/lib/tokens'
 import styles from './page.module.scss'
 import ScheduleForwarderSection from './_components/ScheduleForwarderSection'
 import RelayerSweepSection from './_components/RelayerSweepSection'
+import UsernamesSection from './_components/UsernamesSection'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
 
@@ -126,6 +127,7 @@ const formatNative = (wei) => formatToken(wei, 18)
 const SECTIONS = [
   { id: 'balances', label: 'Balances', icon: '💰', contractKey: null },
   { id: 'relayer', label: 'Relayer', icon: '⛽', contractKey: null },
+  { id: 'usernames', label: 'Usernames', icon: '🏷️', contractKey: null, offchain: true },
   { id: 'forwarders', label: 'Forwarders', icon: '✍️', contractKey: 'forwarder' },
   { id: 'scheduling', label: 'Scheduling', icon: '⏰', contractKey: 'scheduleForwarder' },
   { id: 'sell-fees', label: 'Sell Fees', icon: '💸', contractKey: 'sell' },
@@ -378,6 +380,7 @@ export default function Page() {
   useEffect(() => {
     if (!isAdmin) return
     const section = SECTIONS.find((entry) => entry.id === activeSection)
+    if (section?.offchain) return
     if (!section?.contractKey) {
       config.chains.forEach((chain) => loadChainBalances(chain))
       return
@@ -2732,7 +2735,7 @@ export default function Page() {
           <div className={styles['admin-contracts__nav']}>
             <div className={styles['admin-contracts__tabs']} role="tablist" aria-label="Contract groups" ref={tabsRef}>
               {SECTIONS.map((section) => {
-                const count = visibleChains(section.contractKey).length
+                const count = section.offchain ? null : visibleChains(section.contractKey).length
                 const isActive = activeSection === section.id
 
                 return (
@@ -2749,7 +2752,7 @@ export default function Page() {
                   >
                     <span aria-hidden="true">{section.icon}</span>
                     {section.label}
-                    <span className={styles['admin-contracts__tab-count']}>{count}</span>
+                    {count !== null && <span className={styles['admin-contracts__tab-count']}>{count}</span>}
                   </button>
                 )
               })}
@@ -2877,6 +2880,8 @@ export default function Page() {
           )}
 
           {activeSection === 'relayer' && <RelayerSweepSection chains={visibleChains(null)} />}
+
+          {activeSection === 'usernames' && <UsernamesSection />}
 
           {activeSection === 'scheduling' && <ScheduleForwarderSection chains={visibleChains('scheduleForwarder')} />}
 
