@@ -123,7 +123,8 @@ const groupRuns = (messages, openedAtId) => {
       current.messages.push(message)
       return
     }
-    runs.push({ key: String(message.id), sender: message.sender, stamped, divider, messages: [message] })
+    // The sent line keeps its pending key, so the run it opened is not remounted when its id lands
+    runs.push({ key: String(message.clientKey ?? message.id), sender: message.sender, stamped, divider, messages: [message] })
   })
   return runs
 }
@@ -157,10 +158,13 @@ const toEditable = (body) => {
   return { text, mentions }
 }
 
+// A line still sending has no id yet; it stays at the end, after everything the server has
+const sortId = (message) => (typeof message.id === 'number' ? message.id : Number.MAX_SAFE_INTEGER)
+
 const mergeSorted = (current, incoming) => {
   const seen = new Set(current.map((message) => message.id))
   const next = [...current, ...incoming.filter((message) => !seen.has(message.id))]
-  next.sort((a, b) => numericId(a) - numericId(b))
+  next.sort((a, b) => sortId(a) - sortId(b))
   return next
 }
 
@@ -614,7 +618,8 @@ function Room({
 
   const isLoaded = messages !== null
   const minId = messages?.length ? numericId(messages[0]) : 0
-  const maxId = messages?.length ? numericId(messages[messages.length - 1]) : 0
+  // The newest settled line: a pending one must not reset the poll cursor or the seen mark to 0
+  const maxId = messages?.length ? numericId(messages.findLast((message) => typeof message.id === 'number') ?? messages[0]) : 0
 
   const applyRemoved = useCallback((removed) => {
     if (!removed?.length) return
