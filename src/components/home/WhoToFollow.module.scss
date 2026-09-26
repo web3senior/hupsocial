@@ -84,10 +84,17 @@
     &:hover {
       text-decoration: underline;
     }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.5;
+      text-decoration: none;
+    }
   }
 
-  &__skeletonAvatar,
-  &__skeletonLine {
+  // Two classes deep so the pill radius beats Shimmer's own 4px regardless of stylesheet order.
+  &__row--skeleton &__skeletonAvatar,
+  &__row--skeleton &__skeletonLine {
     display: block;
     border-radius: 999px;
     background-color: var(--surface-muted, var(--gray-100));

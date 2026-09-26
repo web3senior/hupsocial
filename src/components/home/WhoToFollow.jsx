@@ -5,6 +5,7 @@ import useSWR from 'swr'
 import { useConnection, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import clsx from 'clsx'
 import Profile from '@/components/Profile'
+import Shimmer from '@/components/ui/Shimmer'
 import { toast } from '@/components/NextToast'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { profileFallbackFromRow } from '@/hooks/useProfile'
@@ -33,34 +34,36 @@ const fetchSuggestions = async (viewer) => {
  */
 export default function WhoToFollow() {
   const { address: viewer } = useActiveWallet()
-  const { data, isLoading, mutate } = useSWR(['suggested-users', viewer ?? 'anon'], () => fetchSuggestions(viewer), {
+  const { data, isLoading, isValidating, mutate } = useSWR(['suggested-users', viewer ?? 'anon'], () => fetchSuggestions(viewer), {
     revalidateOnFocus: false,
     keepPreviousData: true,
   })
 
   const users = data?.users ?? []
-  if (!isLoading && users.length === 0) return null
+  // "Show more" revalidates with the old list kept, so isLoading alone never flips; isValidating does.
+  const refreshing = isLoading || isValidating
+  if (!refreshing && users.length === 0) return null
 
   return (
     <>
       <section className={styles.follow} aria-label="Who to follow">
         <h2 className={styles.follow__title}>Who to follow</h2>
 
-        {isLoading && !data && (
+        {refreshing && (
           <ul className={styles.follow__list} aria-hidden="true">
             {Array.from({ length: SUGGESTION_COUNT }, (_, index) => (
               <li key={index} className={clsx(styles.follow__row, styles['follow__row--skeleton'])}>
-                <span className={styles.follow__skeletonAvatar} />
+                <Shimmer className={styles.follow__skeletonAvatar} />
                 <span className={styles.follow__skeletonLines}>
-                  <span className={styles.follow__skeletonLine} />
-                  <span className={clsx(styles.follow__skeletonLine, styles['follow__skeletonLine--short'])} />
+                  <Shimmer className={styles.follow__skeletonLine} />
+                  <Shimmer className={clsx(styles.follow__skeletonLine, styles['follow__skeletonLine--short'])} />
                 </span>
               </li>
             ))}
           </ul>
         )}
 
-        {users.length > 0 && (
+        {!refreshing && users.length > 0 && (
           <ul className={styles.follow__list}>
             {users.map((user) => (
               <li key={user.address} className={styles.follow__row}>
@@ -84,7 +87,13 @@ export default function WhoToFollow() {
         )}
 
         {users.length > 0 && (
-          <button type="button" className={styles.follow__more} onClick={() => mutate()}>
+          <button
+            type="button"
+            className={styles.follow__more}
+            onClick={() => mutate()}
+            disabled={refreshing}
+            aria-busy={refreshing}
+          >
             Show more
           </button>
         )}
