@@ -33,13 +33,14 @@ export const enqueueRelayerSend = (chainId, task) => {
 export const relayerWallet = (provider) => new ethers.Wallet(process.env.RELAYER_PRIVATE_KEY, provider)
 
 /**
- * EIP-1559 fees for a relayer send. maxFeePerGas must be >= maxPriorityFeePerGas, so it is clamped
- * up on low-base-fee chains (LUKSO) that would otherwise reject the tx with "priorityFee > maxFee".
+ * EIP-1559 fees for a relayer send at the network's own suggested tip. A fixed 2 gwei tip overpaid
+ * ~330x on Base, where it also priced a single relayed like past a small tank's balance. Chains with
+ * no EIP-1559 fields (BNB reports a zero base fee) fall back to the legacy gas price.
  * @returns {Promise<{maxPriorityFeePerGas: bigint, maxFeePerGas: bigint}>}
  */
 export const relayerFees = async (provider) => {
-  const maxPriorityFeePerGas = ethers.parseUnits('2', 'gwei')
   const feeData = await provider.getFeeData()
-  const networkMax = feeData.maxFeePerGas ?? 0n
+  const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas ?? feeData.gasPrice ?? ethers.parseUnits('1', 'gwei')
+  const networkMax = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n
   return { maxPriorityFeePerGas, maxFeePerGas: networkMax >= maxPriorityFeePerGas ? networkMax : maxPriorityFeePerGas }
 }

@@ -66,6 +66,11 @@ const FORWARD_REQUEST_TYPES = {
   ],
 }
 
+// An EIP-7702 upgraded EOA (MetaMask Smart Account) still signs with its own key, so the forwarder accepts it
+const EIP7702_DESIGNATOR = '0xef0100'
+
+const isContractAccountCode = (code) => Boolean(code) && code !== '0x' && !code.toLowerCase().startsWith(EIP7702_DESIGNATOR)
+
 const unsupported = (message) => {
   const error = new Error(message)
   error.code = 'RELAY_UNSUPPORTED'
@@ -317,7 +322,7 @@ export const signHupForwardRequest = async ({
     // ECDSA-recovers the signer, which never matches a contract address. They reach the
     // relay through the session-key path above instead.
     const code = await publicClient.getCode({ address: owner }).catch(() => null)
-    if (code && code !== '0x') throw unsupported('Smart account wallets need an active session key for gasless actions')
+    if (isContractAccountCode(code)) throw unsupported('Smart account wallets need an active session key for gasless actions')
 
     from = owner
     sign = (domain, message) =>
