@@ -29,6 +29,9 @@ const DOCUMENT_TIMEOUT_MS = 6000
 const DOCUMENT_CONCURRENCY = 6
 const POINTER_BATCH = 40
 
+// Sentinel for "the pointer names a document nobody could read right now" — never an answer
+const UNREADABLE = Symbol('unreadable')
+
 /**
  * What "the profile changed" means with no indexer block number to lean on: the pointer itself.
  * Hashed and cut to 16 bytes because `users.profile_indexed_stamp` is varchar(64) and a base32
@@ -162,10 +165,15 @@ export async function readUniversalProfiles(addresses, { timeoutMs = DOCUMENT_TI
     if (!pointer || pointer === '0x') return null
 
     const doc = await readDocument(pointer, timeoutMs)
-    return doc ? shapeProfile(entry.address, pointer, doc) : null
+    /* A pointer whose document cannot be fetched right now (a CID pinned seconds ago, a slow
+       gateway, the proxy's negative cache) is NOT a wallet without a profile: it is unanswered,
+       or the caller would remember the wallet as "not a Universal Profile" and serve its row. */
+    return doc ? shapeProfile(entry.address, pointer, doc) : UNREADABLE
   })
 
-  wanted.forEach((entry, index) => answers.set(entry.key, documents[index]))
+  wanted.forEach((entry, index) => {
+    if (documents[index] !== UNREADABLE) answers.set(entry.key, documents[index])
+  })
 
   return answers
 }
