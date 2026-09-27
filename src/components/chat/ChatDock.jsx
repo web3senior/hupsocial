@@ -1152,7 +1152,7 @@ function Room({
               <Profile key={wallet} creator={wallet} variant="imageOnly" size={18} hoverCard={false} fingerprint={false} />
             ))}
           </span>
-          <span>{typists.length === 1 ? 'is typing…' : 'are typing…'}</span>
+          <span className={styles.typing__label}>{typists.length === 1 ? 'is typing…' : 'are typing…'}</span>
         </div>
       )}
 

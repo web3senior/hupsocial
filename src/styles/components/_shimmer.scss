@@ -24,6 +24,33 @@
   }
 }
 
+// A band of $glint gliding through $base text. The band starts and ends off the text, so
+// the loop has a rest between passes.
+// --text is as dim as --text-muted in the dark theme, so the glint reads --foreground.
+@mixin text-shimmer($base: var(--text-muted), $glint: var(--foreground)) {
+  color: $base;
+
+  @supports (background-clip: text) {
+    color: transparent;
+    background-image: linear-gradient(90deg, $base 0%, $base 42%, $glint 50%, $base 58%, $base 100%);
+    background-size: 300% 100%;
+    background-position: 100% 0;
+    background-repeat: no-repeat;
+    background-clip: text;
+    animation: text-shimmer-sweep 2.4s linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
+  @keyframes text-shimmer-sweep {
+    to {
+      background-position: 0 0;
+    }
+  }
+}
+
 @keyframes shimmer-sweep {
   100% {
     transform: translateX(100%);

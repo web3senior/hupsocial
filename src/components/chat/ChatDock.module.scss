@@ -18,6 +18,7 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
   --dock-border-strong: var(--border-strong);
   --dock-text: var(--text);
   --dock-text-muted: var(--text-muted);
+  --dock-glint: var(--foreground);
   --dock-badge: var(--status-error);
   --dock-jump: var(--text);
   --dock-jump-text: var(--background);
@@ -385,6 +386,10 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
   border-radius: 999px;
   box-shadow: var(--shadow-md);
   pointer-events: none;
+
+  &__label {
+    @include text-shimmer(var(--dock-text-muted), var(--dock-glint));
+  }
 
   &__faces {
     display: inline-flex;
