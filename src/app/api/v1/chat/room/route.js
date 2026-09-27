@@ -9,10 +9,12 @@ import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { isEvmAddress, normalizeAddress } from '@/lib/address'
 import { chatActorFromRequest, isBanned } from '@/lib/chatSession'
+import { moderateImages } from '@/lib/moderation'
 import {
   BODY_MAX_CHARS,
   LIVE_LINES,
   attachReactions,
+  chatFileFrom,
   chatRoomFrom,
   fetchPresence,
   fetchRecentViews,
@@ -25,6 +27,8 @@ import {
 } from '@/lib/chatRows'
 
 export const runtime = 'nodejs'
+// A picture is read back from a gateway and checked before its line is stored
+export const maxDuration = 60
 
 const PAGE_LIMIT = 40
 const RATE_WINDOW_S = 60
@@ -164,11 +168,16 @@ export async function POST(request) {
     const room = chatRoomFrom(body?.room)
     if (!room) return NextResponse.json({ success: false, error: 'Unknown room' }, { status: 404 })
 
-    // A line is text, a GIF, or a GIF with a caption; a reply points at a live line of the room
+    // A line is text, or a GIF, a picture or a file with the text as its caption; a reply
+    // points at a live line of the room
     const text = typeof body?.body === 'string' ? body.body.trim() : ''
     const gif = typeof body?.gif === 'string' && body.gif ? body.gif.trim() : null
-    const kind = gif ? 'gif' : 'text'
-    if (!text && !gif) return NextResponse.json({ success: false, error: 'Write something first' }, { status: 400 })
+    const declared = body?.file ? chatFileFrom(body.file) : null
+    if (declared?.error) return NextResponse.json({ success: false, error: declared.error }, { status: 400 })
+    const file = declared?.file ?? null
+    if (gif && file) return NextResponse.json({ success: false, error: 'A message carries one attachment' }, { status: 400 })
+    const kind = file ? file.kind : gif ? 'gif' : 'text'
+    if (!text && !gif && !file) return NextResponse.json({ success: false, error: 'Write something first' }, { status: 400 })
     if (text.length > BODY_MAX_CHARS) {
       return NextResponse.json({ success: false, error: `Messages are capped at ${BODY_MAX_CHARS} characters` }, { status: 400 })
     }
@@ -194,9 +203,35 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Slow down a little' }, { status: 429 })
     }
 
+    // The gate profile pictures pass: a public room shows the picture to everyone in it.
+    // Without a verdict (no key, moderator unreachable) the line goes through, as posts do
+    if (file?.kind === 'image') {
+      const verdict = await moderateImages([file.cid])
+      if (verdict?.unreadable.length) {
+        return NextResponse.json({ success: false, error: 'That image could not be checked. Try again in a moment' }, { status: 503 })
+      }
+      if (verdict?.rejected) {
+        return NextResponse.json({ success: false, error: "That image can't be sent on Hup" }, { status: 422 })
+      }
+    }
+
     const [result] = await pool.execute(
-      'INSERT INTO chat_messages (room, sender_id, kind, body, gif_url, reply_to) VALUES (?, ?, ?, ?, ?, ?)',
-      [room, me.id, kind, text, gif, replyTo]
+      `INSERT INTO chat_messages (room, sender_id, kind, body, gif_url, file_cid, file_name, file_mime, file_size, file_width, file_height, reply_to)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        room,
+        me.id,
+        kind,
+        text,
+        gif,
+        file?.cid ?? null,
+        file?.name ?? null,
+        file?.mime ?? null,
+        file?.size ?? null,
+        file?.width ?? null,
+        file?.height ?? null,
+        replyTo,
+      ]
     )
     const [[row]] = await pool.execute(`${LIVE} AND m.id = ?`, [room, result.insertId])
     await pruneOldLines(pool)

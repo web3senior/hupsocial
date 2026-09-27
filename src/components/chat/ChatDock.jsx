@@ -14,7 +14,9 @@ import {
   CheckIcon,
   DotsThreeIcon,
   EyeIcon,
+  FileIcon,
   GifIcon,
+  PaperclipIcon,
   PaperPlaneRightIcon,
   PaperPlaneTiltIcon,
   ShieldCheckIcon,
@@ -58,7 +60,12 @@ import {
   toggleReaction,
 } from '@/lib/chatApi'
 import { REACTIONS } from '@/lib/chatRows'
+import { CHAT_FILE_ACCEPT, chatFileUrl } from '@/lib/chatFiles'
+import { formatBytes } from '@/lib/nftInspect'
+import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { useChatDockStore } from '@/stores/useChatDockStore'
+import ImageViewer from './ImageViewer'
+import { useChatAttachments } from './useChatAttachments'
 import { useEmbedBridge } from './useEmbedBridge'
 import styles from './ChatDock.module.scss'
 
@@ -82,11 +89,26 @@ const DRAG_MARGIN = 8
 const WALLET_GRACE_MS = 4_000
 // An `@` and what follows it, up to the caret, when nothing but a space or the start sits before
 const MENTION_QUERY_PATTERN = /(^|\s)@([^\s@]{0,48})$/
+// The box a picture is laid out in, and the width it is encoded at for it
+const IMAGE_BOX = { width: 240, height: 280 }
+const IMAGE_THUMB_WIDTH = 480
+
+/** A picture's laid-out size, known before it loads so the lines under it never move. */
+const imageBoxStyle = (file) => {
+  if (!file?.width || !file?.height) return undefined
+  const scale = Math.min(1, IMAGE_BOX.width / file.width, IMAGE_BOX.height / file.height)
+  return { width: Math.max(1, Math.round(file.width * scale)), aspectRatio: `${file.width} / ${file.height}` }
+}
+
+// A line still sending shows the copy on this device; a sent one comes through the proxy
+const imageThumbUrl = (file) => file.localUrl ?? resolveIPFSImageUrl(file.cid, { width: IMAGE_THUMB_WIDTH })
+const imageFullUrl = (file) => (file.cid ? resolveIPFSImageUrl(file.cid) : file.localUrl)
 
 const compactCount = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 0 })
 const viewCount = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 const stampDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 const lineTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+const uploadPercent = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 0 })
 
 const noopSubscribe = () => () => {}
 
@@ -902,20 +924,58 @@ function Room({
 
   // The line the next send answers, picked from a line's menu
   const [replyTarget, setReplyTarget] = useState(null)
+  // The picture opened at full size
+  const [viewed, setViewed] = useState(null)
 
-  const send = async ({ body = '', gif = null }) => {
-    if ((!body && !gif) || !token) return false
-    const tempId = `pending-${Date.now()}`
+  // A sent picture keeps showing the copy on this device until the proxy has its own ready,
+  // so the line never blanks while the first encode is made
+  const settlePreview = (id, file, localUrl) => {
+    const swap = () => {
+      setMessages((current) =>
+        (current ?? []).map((message) => (message.id === id && message.file?.localUrl === localUrl ? { ...message, file } : message))
+      )
+      // Let the swapped source paint before the local copy goes
+      setTimeout(() => URL.revokeObjectURL(localUrl), 1_000)
+    }
+    const preload = new Image()
+    preload.onload = swap
+    preload.onerror = swap
+    preload.src = imageThumbUrl(file)
+  }
+
+  const send = async ({ body = '', gif = null, attachment = null }) => {
+    if ((!body && !gif && !attachment) || !token) return false
+    const tempId = `pending-${Date.now()}-${attachment?.key ?? ''}`
     const previousTarget = replyTarget
     const quoted = replyTarget
-      ? { id: replyTarget.id, sender: replyTarget.sender, body: replyTarget.body, gif: replyTarget.gif ?? null, deleted: false }
+      ? {
+          id: replyTarget.id,
+          sender: replyTarget.sender,
+          body: replyTarget.body,
+          gif: replyTarget.gif ?? null,
+          file: replyTarget.file ? { name: replyTarget.file.name, image: replyTarget.file.image } : null,
+          deleted: false,
+        }
+      : null
+    const staged = attachment
+      ? {
+          cid: null,
+          localUrl: attachment.previewUrl,
+          name: attachment.name,
+          mime: attachment.mime,
+          size: attachment.size,
+          width: attachment.width,
+          height: attachment.height,
+          image: attachment.kind === 'image',
+        }
       : null
     const pending = {
       id: tempId,
       sender: me,
-      kind: gif ? 'gif' : 'text',
+      kind: attachment ? attachment.kind : gif ? 'gif' : 'text',
       body,
       gif,
+      file: staged,
       replyTo: quoted,
       createdAt: new Date().toISOString(),
       pending: true,
@@ -924,14 +984,20 @@ function Room({
     setMessages((current) => [...(current ?? []), pending])
     setReplyTarget(null)
     try {
-      const data = await sendRoomMessage(token, { body, gif, replyTo: quoted?.id ?? null })
+      const uploaded = attachment ? await attachment.ready : null
+      const file = uploaded
+        ? { cid: uploaded.cid, name: attachment.name, mime: attachment.mime, size: attachment.size, width: uploaded.width, height: uploaded.height }
+        : null
+      const data = await sendRoomMessage(token, { body, gif, file, replyTo: quoted?.id ?? null })
+      const local = staged?.localUrl && data.message.file ? { file: { ...data.message.file, localUrl: staged.localUrl } } : null
       // The sent line keeps the pending line's key, so its clock turns into the check in place
       setMessages((current) => {
         const rest = (current ?? []).filter((message) => message.id !== tempId)
         return rest.some((message) => message.id === data.message.id)
-          ? rest.map((message) => (message.id === data.message.id ? { ...message, clientKey: tempId } : message))
-          : mergeSorted(rest, [{ ...data.message, clientKey: tempId }])
+          ? rest.map((message) => (message.id === data.message.id ? { ...message, ...local, clientKey: tempId } : message))
+          : mergeSorted(rest, [{ ...data.message, ...local, clientKey: tempId }])
       })
+      if (local) settlePreview(data.message.id, data.message.file, staged.localUrl)
       return true
     } catch (error) {
       setMessages((current) => (current ?? []).filter((message) => message.id !== tempId))
@@ -1068,6 +1134,7 @@ function Room({
                   onReply={token ? setReplyTarget : null}
                   onReact={token ? reactLine : null}
                   onJump={jumpToLine}
+                  onOpenImage={setViewed}
                 />
               ))}
               {hasNewer && (
@@ -1126,6 +1193,8 @@ function Room({
           onCancelReply={() => setReplyTarget(null)}
         />
       )}
+
+      <ImageViewer image={viewed} onClose={() => setViewed(null)} />
     </>
   )
 }
@@ -1145,6 +1214,7 @@ function ChatRun({
   onReply,
   onReact,
   onJump,
+  onOpenImage,
 }) {
   const mine = sameAddress(run.sender, me)
   const first = run.messages[0]
@@ -1203,6 +1273,7 @@ function ChatRun({
               onReply={onReply}
               onReact={onReact}
               onJump={onJump}
+              onOpenImage={onOpenImage}
             />
           ))}
         </div>
@@ -1225,10 +1296,14 @@ function ChatLine({
   onReply,
   onReact,
   onJump,
+  onOpenImage,
   onModerate,
   onRemoved,
 }) {
   const settled = !message.pending && typeof message.id === 'number'
+  const picture = message.file?.image ? message.file : null
+  const attached = message.file && !message.file.image ? message.file : null
+  const isMedia = Boolean(message.gif || picture)
   const canOwn = mine && settled
   const canModerateLine = Boolean(chatMe?.canModerate) && !mine && settled
   const when = message.pending ? 'Sending…' : toRelativeTime(message.createdAt)
@@ -1285,7 +1360,7 @@ function ChatLine({
   }
 
   return (
-    <Root className={clsx(styles.line, message.gif && styles['line--media'])} data-line-id={message.id}>
+    <Root className={clsx(styles.line, isMedia && styles['line--media'])} data-line-id={message.id}>
       {editing ? (
         <LineEditor body={message.body} onSave={(text) => onSaveEdit(message.id, text)} onCancel={onCancelEdit} />
       ) : (
@@ -1293,14 +1368,49 @@ function ChatLine({
           {message.replyTo && <Quote reply={message.replyTo} onJump={onJump} />}
           {message.gif && (
             <span className={styles.line__media}>
-              {/* A Giphy CDN URL straight from the picker: the optimizer would only re-fetch it */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className={styles.line__gif} src={message.gif} alt="GIF" loading="lazy" title={when} />
+              <button
+                type="button"
+                className={styles.line__open}
+                onClick={() => onOpenImage({ src: message.gif, alt: 'GIF' })}
+                aria-label="Open the GIF at full size"
+              >
+                {/* A Giphy CDN URL straight from the picker: the optimizer would only re-fetch it */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className={styles.line__gif} src={message.gif} alt="GIF" loading="lazy" title={when} />
+              </button>
               {!message.body && <span className={styles.line__mediaMeta}>{meta}</span>}
             </span>
           )}
+          {picture && (
+            <span className={styles.line__media}>
+              <button
+                type="button"
+                className={styles.line__open}
+                onClick={() =>
+                  onOpenImage({
+                    src: imageFullUrl(picture),
+                    name: picture.name,
+                    href: picture.cid ? chatFileUrl(picture.cid, picture.name) : null,
+                  })
+                }
+                aria-label={`Open ${picture.name} at full size`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className={styles.line__image}
+                  src={imageThumbUrl(picture)}
+                  alt={picture.name}
+                  loading="lazy"
+                  title={when}
+                  style={imageBoxStyle(picture)}
+                />
+              </button>
+              {!message.body && <span className={styles.line__mediaMeta}>{meta}</span>}
+            </span>
+          )}
+          {attached && <FileChip file={attached} meta={message.body ? null : meta} title={when} />}
           {message.body && (
-            <p className={clsx(styles.bubble, message.gif && styles['bubble--caption'])} title={when}>
+            <p className={clsx(styles.bubble, (isMedia || attached) && styles['bubble--caption'])} title={when}>
               {splitChatText(message.body).map((part, index) =>
                 part.type === 'link' ? (
                   <a key={index} href={part.value} target="_blank" rel="nofollow noopener noreferrer" className={styles.bubble__link}>
@@ -1386,6 +1496,40 @@ function ChatLine({
         </NativePopover>
       )}
     </Root>
+  )
+}
+
+// A file as a bubble: its name and size, and a tap away from the download once it is pinned
+function FileChip({ file, meta, title }) {
+  const body = (
+    <>
+      <span className={styles.file__icon}>
+        <FileIcon size={22} />
+      </span>
+      <span className={styles.file__text}>
+        <span className={styles.file__name}>{file.name}</span>
+        <span className={styles.file__size}>{formatBytes(file.size)}</span>
+      </span>
+    </>
+  )
+  return (
+    <div className={clsx(styles.bubble, styles.file)} title={title}>
+      {file.cid ? (
+        <a
+          className={styles.file__link}
+          href={chatFileUrl(file.cid, file.name)}
+          download={file.name}
+          target="_blank"
+          rel="nofollow noopener noreferrer"
+          aria-label={`Download ${file.name}`}
+        >
+          {body}
+        </a>
+      ) : (
+        <span className={styles.file__link}>{body}</span>
+      )}
+      {meta}
+    </div>
   )
 }
 
@@ -1555,7 +1699,10 @@ function ReactionChip({ reaction, onReact }) {
 /** The first words of a quoted line, mentions collapsed to their handle. */
 const quoteText = (reply) => {
   const { text } = toEditable(reply?.body || '')
-  return text || (reply?.gif ? 'GIF' : '')
+  if (text) return text
+  if (reply?.gif) return 'GIF'
+  if (reply?.file) return reply.file.image ? 'Photo' : reply.file.name
+  return ''
 }
 
 // The line being answered, above the bubble. A div, not a button: the name inside is a link
@@ -1607,6 +1754,14 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
   const mentionsRef = useRef(new Map())
   // A picked GIF waits here for its caption; Send carries both
   const [gif, setGif] = useState(null)
+  // Pictures and files picked or pasted, uploading while the caption is written
+  const attachments = useChatAttachments({ address: viewer })
+  const fileInputRef = useRef(null)
+  // A line carries one attachment, so staging files puts a waiting GIF away
+  const attach = (files) => {
+    if (attachments.add(files)) setGif(null)
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
   // Keystrokes are not requests: the server is told at most every few seconds, and once on stop
   const typingSentAt = useRef(0)
   const reportWriting = (on) => {
@@ -1661,14 +1816,28 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
 
   const toWire = (text) => mentionsToWire(text, mentionsRef.current)
 
+  // Each attachment goes out as a line of its own, in order, the caption under the last
+  const sendAttachments = async (text) => {
+    const staged = attachments.take()
+    for (const [index, attachment] of staged.entries()) {
+      const isLast = index === staged.length - 1
+      const sent = await onSend({ body: isLast ? toWire(text) : '', attachment })
+      if (sent) continue
+      attachments.restore(staged.slice(index))
+      return false
+    }
+    return true
+  }
+
   const submit = async () => {
     const text = draft.trim()
-    if ((!text && !gif) || isSending) return
+    const hasAttachments = attachments.items.length > 0
+    if ((!text && !gif && !hasAttachments) || isSending) return
     setIsSending(true)
     setDraft('')
     setMention(null)
     reportWriting(false)
-    const sent = await onSend({ body: toWire(text), gif: gif?.full?.url ?? null })
+    const sent = hasAttachments ? await sendAttachments(text) : await onSend({ body: toWire(text), gif: gif?.full?.url ?? null })
     if (sent) {
       mentionsRef.current.clear()
       setGif(null)
@@ -1692,7 +1861,7 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
     })
   }
 
-  const canSend = draft.trim().length > 0 || Boolean(gif)
+  const canSend = draft.trim().length > 0 || Boolean(gif) || attachments.items.length > 0
 
   return (
     <form
@@ -1731,10 +1900,62 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
           </button>
         </div>
       )}
+      {attachments.items.length > 0 && (
+        <div className={styles.tray}>
+          {attachments.items.map((item) => (
+            <div key={item.key} className={clsx(styles.tray__tile, item.kind === 'file' && styles['tray__tile--file'])} title={item.name}>
+              {item.previewUrl ? (
+                // The copy on this device, shown while it uploads
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className={styles.tray__image} src={item.previewUrl} alt={item.name} />
+              ) : (
+                <>
+                  <FileIcon size={20} />
+                  <span className={styles.tray__name}>{item.name}</span>
+                </>
+              )}
+              {item.status === 'uploading' && (
+                <span className={styles.tray__progress} role="status" aria-label={`Uploading ${item.name}`}>
+                  {uploadPercent.format(item.progress)}
+                </span>
+              )}
+              <button
+                type="button"
+                className={styles.tray__remove}
+                onClick={() => attachments.remove(item.key)}
+                aria-label={`Remove ${item.name}`}
+              >
+                <XIcon size={12} weight="bold" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className={styles.composer__pill}>
         <div className={styles.composer__tool}>
           <EmojiPicker onSelect={insertEmoji} />
         </div>
+        <button
+          type="button"
+          className={styles.composer__tool}
+          onClick={() => fileInputRef.current?.click()}
+          title="Attach"
+          aria-label="Attach an image or a file"
+        >
+          <PaperclipIcon size={22} />
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={CHAT_FILE_ACCEPT}
+          multiple
+          hidden
+          onChange={(event) => {
+            attach(event.target.files)
+            // The same file picked twice in a row still has to fire a change
+            event.target.value = ''
+          }}
+        />
         <textarea
           ref={inputRef}
           className={styles.composer__input}
@@ -1750,6 +1971,13 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
             }
           }}
           onBlur={() => setMention(null)}
+          onPaste={(event) => {
+            const files = Array.from(event.clipboardData?.files ?? [])
+            // Text copied from a document arrives with a picture of itself beside it; the text wins
+            if (!files.length || event.clipboardData.getData('text/plain')) return
+            event.preventDefault()
+            attach(files)
+          }}
           onKeyDown={(event) => {
             if (mentionPickerRef.current?.handleKeyDown(event)) return
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -1794,6 +2022,7 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
       <GifPicker
         ref={gifPickerRef}
         onSelect={(picked) => {
+          attachments.clear()
           setGif(picked)
           requestAnimationFrame(() => inputRef.current?.focus())
         }}

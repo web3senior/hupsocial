@@ -46,7 +46,7 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, error: `Messages are capped at ${BODY_MAX_CHARS} characters` }, { status: 400 })
     }
 
-    // For a GIF line the body is its caption
+    // For a GIF, picture or file line the body is its caption
     await pool.execute('UPDATE chat_messages SET body = ?, edited_at = NOW(3) WHERE id = ?', [text, found.row.id])
     const [[row]] = await pool.execute(`${LIVE_LINES} AND m.id = ?`, [found.row.room, found.row.id])
     const [message] = await attachReactions(pool, [serializeLine(row)], me.id)

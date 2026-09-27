@@ -1,11 +1,12 @@
 /**
  * @file lib/chatRows.js
  * @description The one SELECT and the one shape for a chat line, shared by every route that
- * hands lines to the browser. A line carries its sender, an optional GIF beside its text, and
- * the line it replies to, joined in so the quote renders without a second trip.
+ * hands lines to the browser. A line carries its sender, an optional GIF, picture or file beside
+ * its text, and the line it replies to, joined in so the quote renders without a second trip.
  */
 
 import { isEvmAddress, normalizeAddress } from '@/lib/address'
+import { chatCidFrom, classifyChatFile } from '@/lib/chatFiles'
 
 export const BODY_MAX_CHARS = 1000
 
@@ -174,6 +175,29 @@ export const isGifUrl = (value) => {
   }
 }
 
+const SIDE_MAX = 20000
+const sideFrom = (raw) => {
+  const side = Number(raw)
+  return Number.isInteger(side) && side > 0 && side <= SIDE_MAX ? side : null
+}
+
+/**
+ * The picture or file a line declares, checked against the same rules the browser applied.
+ * @param {unknown} raw what the request sent as `file`
+ * @returns {{file: {cid, kind, name, mime, size, width, height}}|{error: string}}
+ */
+export const chatFileFrom = (raw) => {
+  const cid = chatCidFrom(raw?.cid)
+  if (!cid) return { error: 'That upload did not finish' }
+  const checked = classifyChatFile({ name: raw?.name, mime: raw?.mime, size: raw?.size })
+  if (checked.error) return { error: checked.error }
+  const isImage = checked.kind === 'image'
+  const width = isImage ? sideFrom(raw?.width) : null
+  const height = isImage ? sideFrom(raw?.height) : null
+  // A box is reserved from both sides or from neither
+  return { file: { cid, ...checked, width: width && height ? width : null, height: width && height ? height : null } }
+}
+
 export const viewerAddress = (raw) => {
   const address = normalizeAddress(raw)
   return isEvmAddress(address) ? address : null
@@ -181,8 +205,10 @@ export const viewerAddress = (raw) => {
 
 /** Live lines of a room, with their sender and the line they answer. Append conditions and ORDER BY. */
 export const LIVE_LINES = `SELECT m.id, m.kind, m.body, m.gif_url, m.reply_to, m.views, m.created_at, m.edited_at,
+                                  m.file_cid, m.file_name, m.file_mime, m.file_size, m.file_width, m.file_height,
                                   u.wallet AS sender, u.role AS sender_role,
                                   r.body AS reply_body, r.kind AS reply_kind, r.gif_url AS reply_gif, r.deleted_at AS reply_deleted,
+                                  r.file_name AS reply_file_name,
                                   ru.wallet AS reply_sender
                              FROM chat_messages m
                              JOIN chat_users u ON u.id = m.sender_id
@@ -290,6 +316,17 @@ export const serializeLine = (row) => ({
   kind: row.kind,
   body: row.body,
   gif: row.gif_url || null,
+  file: row.file_cid
+    ? {
+        cid: row.file_cid,
+        name: row.file_name || 'file',
+        mime: row.file_mime || '',
+        size: Number(row.file_size) || 0,
+        width: Number(row.file_width) || null,
+        height: Number(row.file_height) || null,
+        image: row.kind === 'image',
+      }
+    : null,
   createdAt: row.created_at,
   editedAt: row.edited_at,
   views: Number(row.views) || 0,
@@ -299,6 +336,7 @@ export const serializeLine = (row) => ({
         sender: row.reply_sender || null,
         body: row.reply_deleted ? '' : row.reply_body || '',
         gif: row.reply_deleted ? null : row.reply_gif || null,
+        file: !row.reply_deleted && row.reply_file_name ? { name: row.reply_file_name, image: row.reply_kind === 'image' } : null,
         deleted: Boolean(row.reply_deleted) || !row.reply_sender,
       }
     : null,

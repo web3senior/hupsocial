@@ -148,11 +148,12 @@ export const saveReadCursor = (token, lastReadId, room = 'global') =>
   call(token, '/api/v1/chat/read', { method: 'POST', keepalive: true, body: JSON.stringify({ room, lastReadId }) })
 
 /**
- * One line: text, a Giphy GIF, or both, optionally answering another line.
- * @param {{body?: string, gif?: string|null, replyTo?: number|null, room?: string}} line
+ * One line: text, or a Giphy GIF, a picture or a file with the text as its caption, optionally
+ * answering another line. `file` names an upload already pinned (lib/chatFiles.js).
+ * @param {{body?: string, gif?: string|null, file?: {cid: string, name: string, mime: string, size: number, width?: number|null, height?: number|null}|null, replyTo?: number|null, room?: string}} line
  */
-export const sendRoomMessage = (token, { body = '', gif = null, replyTo = null, room = 'global' }) =>
-  call(token, '/api/v1/chat/room', { method: 'POST', body: JSON.stringify({ room, body, gif, replyTo }) })
+export const sendRoomMessage = (token, { body = '', gif = null, file = null, replyTo = null, room = 'global' }) =>
+  call(token, '/api/v1/chat/room', { method: 'POST', body: JSON.stringify({ room, body, gif, file, replyTo }) })
 
 export const editRoomMessage = (token, messageId, body) =>
   call(token, '/api/v1/chat/message', { method: 'PATCH', body: JSON.stringify({ messageId, body }) })
