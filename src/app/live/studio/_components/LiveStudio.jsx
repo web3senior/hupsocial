@@ -212,7 +212,7 @@ export default function LiveStudio() {
     if (!address || isSigningIn) return
     setIsSigningIn(true)
     try {
-      await ensureChatSession(address, signMessageAsync, chainId)
+      await ensureChatSession(address, signMessageAsync, chainId, 'live')
     } catch (error) {
       if (error?.name !== 'UserRejectedRequestError') toast(error?.message || 'Could not sign in', 'error')
     } finally {
@@ -321,7 +321,7 @@ export default function LiveStudio() {
           </button>
         }
       >
-        Sign one message to prove this wallet is yours. It is the same sign-in the chat uses.
+        Sign one message to prove this wallet is yours. It costs nothing and sends no transaction.
       </EmptyState>
     )
   }

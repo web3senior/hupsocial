@@ -58,21 +58,22 @@ export const clearChatToken = (address) => {
  * @param {string} address
  * @param {(args: {message: string}) => Promise<string>} signMessageAsync
  * @param {number} [chainId]
+ * @param {'chat'|'live'} [purpose] what the wallet is told it is signing in to
  * @returns {Promise<string>} bearer token
  */
-export const ensureChatSession = async (address, signMessageAsync, chainId) => {
+export const ensureChatSession = async (address, signMessageAsync, chainId, purpose = 'chat') => {
   const stored = readChatToken(address)
   if (stored) return stored
 
   const nonce = await requestAuthNonce(address)
   if (!nonce) throw new Error('Could not start the sign-in')
   const issuedAt = Date.now()
-  const signature = await signMessageAsync({ message: chatSessionMessage({ address, nonce, issuedAt }) })
+  const signature = await signMessageAsync({ message: chatSessionMessage({ address, nonce, issuedAt, purpose }) })
 
   const response = await fetch('/api/v1/chat/session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ address, nonce, issuedAt, signature, chainId }),
+    body: JSON.stringify({ address, nonce, issuedAt, signature, chainId, purpose }),
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok || !data?.token) throw new Error(data?.error || 'Sign-in was rejected')

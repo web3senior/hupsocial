@@ -36,7 +36,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Nonce is missing or expired' }, { status: 400 })
     }
 
-    const message = chatSessionMessage({ address, nonce, issuedAt })
+    const message = chatSessionMessage({ address, nonce, issuedAt, purpose: body?.purpose })
     const signed = await verifyWalletSignature(address, message, signature, { chainId: body?.chainId })
     if (!signed) {
       return NextResponse.json({ success: false, error: 'Signature does not match this wallet' }, { status: 401 })
