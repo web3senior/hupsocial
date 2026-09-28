@@ -410,8 +410,8 @@ function AppCard({ app, onChanged, onEdit, onDelist }) {
 
         <div className={styles.card__title}>
           <h3>
-            {app.name}
-            {app.featured && <StarIcon size={13} weight="fill" className={styles.card__featured} aria-label="Featured" />}
+            <span className={styles.card__name}>{app.name}</span>
+            {app.featured && <StarIcon size={14} weight="fill" className={styles.card__featured} aria-label="Featured" />}
           </h3>
           <div className={styles.card__badges}>
             <span className={styles.card__category}>{app.category.name}</span>
