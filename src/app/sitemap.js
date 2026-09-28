@@ -28,6 +28,7 @@ const ARTICLE_LIMIT = 5000
 const STATIC_ROUTES = [
   { path: '/', priority: 1, changeFrequency: 'hourly' },
   { path: '/shorts', priority: 0.8, changeFrequency: 'hourly' },
+  { path: '/live', priority: 0.7, changeFrequency: 'hourly' },
   /* Above the other section indexes: it is the doorway to the pages here written to be found */
   { path: '/articles', priority: 0.9, changeFrequency: 'daily' },
   { path: '/apps', priority: 0.7, changeFrequency: 'daily' },

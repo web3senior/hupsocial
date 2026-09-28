@@ -23,7 +23,7 @@ const DOUBLE_UNDERSCORE = /__/
 const RESERVED = new Set([
   'activity', 'admin', 'api', 'apps', 'articles', 'bazaar', 'chat', 'communities', 'compose',
   'connect', 'drops', 'events', 'fund', 'gas', 'help', 'insights', 'install', 'leaderboard',
-  'liked', 'networks', 'nfts', 'notifications', 'offline', 'p2p', 'polls', 'predict', 'premium',
+  'liked', 'live', 'networks', 'nfts', 'notifications', 'offline', 'p2p', 'polls', 'predict', 'premium',
   'privacy_policy', 'profiles', 'register', 'revenue', 'saved', 'screensaver', 'search',
   'secure_account', 'settings', 'share', 'shorts', 'tasks', 'unlock', 'whitelist',
   'about', 'auth', 'billing', 'blog', 'contact', 'developer', 'developers', 'docs', 'download',

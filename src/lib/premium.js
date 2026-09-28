@@ -44,6 +44,11 @@ export const PREMIUM_PERKS = [
     description: 'Post video up to 500MB instead of 100MB — minutes rather than seconds.',
   },
   {
+    id: 'live',
+    title: 'Go live',
+    description: 'Stream your camera or screen to your followers and take tips while you do.',
+  },
+  {
     id: 'insights',
     title: 'Longer history',
     description: '90-day and 12-month views on /insights, instead of stopping at 30 days.',
