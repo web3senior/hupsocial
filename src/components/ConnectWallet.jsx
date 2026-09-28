@@ -5,7 +5,9 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import useSWRImmutable from 'swr/immutable'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useConnect, useConnection, useConnectors } from 'wagmi'
+import { switchConnection } from 'wagmi/actions'
 import { EMAIL_CONNECTOR_ID, openEmailLogin } from '@/lib/embeddedWallet/connector'
+import { heldConnection } from '@/lib/heldConnection'
 import { setConnectHandler } from '@/lib/connectDialog'
 import { isFramedByGridHost, UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
@@ -17,7 +19,7 @@ import { setActiveChainId, useActiveChain } from '@/hooks/useActiveChain'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import { SOLANA_CHAINS, SOLANA_ICON_URL } from '@/config/solana'
-import { setNetworkColor } from '@/config/wagmi'
+import { config, setNetworkColor } from '@/config/wagmi'
 import { profilePath } from '@/lib/username'
 import { markFirstConnect } from '@/lib/firstConnect'
 import styles from './ConnectWallet.module.scss'
@@ -266,7 +268,15 @@ export function WalletOptions({ onConnected }) {
   }
   const ordered = [...connectors].sort((a, b) => rank(a) - rank(b))
 
-  const handleConnect = (connector) => {
+  // The network follows the wallet that just connected: an EVM wallet picked while a Solana
+  // cluster was active moves the app onto the wallet's chain, so the header never shows a
+  // connected wallet the active network cannot use
+  const finishConnect = (chainId) => {
+    if (activeChain?.isSolana && chainId) setActiveChainId(chainId)
+    onConnected?.()
+  }
+
+  const handleConnect = async (connector) => {
     // Email is not a one-click connect: it runs its own dialog (OTP, recovery
     // password) and calls connect() itself once the key is in memory.
     if (connector.id === EMAIL_CONNECTOR_ID) {
@@ -275,18 +285,16 @@ export function WalletOptions({ onConnected }) {
       return
     }
 
-    // The network follows the wallet that just connected: an EVM wallet picked while a Solana
-    // cluster was active moves the app onto the wallet's chain, so the header never shows a
-    // connected wallet the active network cannot use
-    connect(
-      { connector },
-      {
-        onSuccess: (data) => {
-          if (activeChain?.isSolana && data?.chainId) setActiveChainId(data.chainId)
-          onConnected?.()
-        },
-      },
-    )
+    // This list shows while a wallet is already held — mid-reconnect, or on a Solana network.
+    // connect() throws for the current wallet and re-prompts any other, so pick it up instead.
+    const held = heldConnection(connector)
+    if (held) {
+      await switchConnection(config, { connector })
+      finishConnect(held.chainId)
+      return
+    }
+
+    connect({ connector }, { onSuccess: (data) => finishConnect(data?.chainId) })
 
     // WalletConnect draws its QR sheet as a <w3m-modal> inside the page, but this list lives in
     // the top layer either way (showModal() sheet, or popover), and the top layer paints above

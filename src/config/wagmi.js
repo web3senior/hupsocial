@@ -15,8 +15,9 @@ import {
   unichainSepolia,
   // soneium,
 } from 'wagmi/chains'
-import { injected, safe, walletConnect } from 'wagmi/connectors'
+import { injected, safe } from 'wagmi/connectors'
 import { emailWallet } from '@/lib/embeddedWallet/connector'
+import { lazyWalletConnect } from '@/lib/lazyWalletConnect'
 import { CHAIN_ICONS } from './chainIcons'
 import { appChains, arc, CONTRACTS, robinhood } from './contracts'
 
@@ -160,19 +161,44 @@ export const browserTransport = (chainId) => {
   return urls?.length ? fallback(urls.map((url) => http(url))) : http()
 }
 
+const isBrowser = typeof window !== 'undefined'
+
+// createConfig resets its store as it is created and the persist layer writes that reset
+// through, so the last session is gone before rehydrate() can read it. Carried across, wagmi
+// opens in `reconnecting` with the remembered address instead of as a stranger.
+const STORE_KEY = 'wagmi.store'
+
+const readStore = () => {
+  try {
+    return window.localStorage.getItem(STORE_KEY)
+  } catch {
+    return null
+  }
+}
+
+const lastSession = isBrowser ? readStore() : null
+
 export const config = createConfig({
   chains: appChains,
   // WalletConnect's provider touches browser-only storage (indexedDB) the
   // moment it is constructed, and this module also evaluates on the server
   // (SSR and any API route reaching wagmi through an import chain) — so
   // connectors only exist in the browser.
-  connectors: typeof window === 'undefined' ? [] : [injected(), walletConnect({ projectId }), safe(), emailWallet()],
+  connectors: isBrowser ? [injected(), lazyWalletConnect({ projectId }), safe(), emailWallet()] : [],
   transports: Object.fromEntries(appChains.map((chain) => [chain.id, browserTransport(chain.id)])),
   ssr: true,
   // storage: createStorage({
   //   storage: noopStorage, // <-- Tell wagmi to use a no-op storage on the server
   // }),
 })
+
+if (lastSession) {
+  try {
+    window.localStorage.setItem(STORE_KEY, lastSession)
+  } catch {
+    // Storage is unavailable: the wallet still reconnects, only without the head start
+  }
+}
 
 /**
  * Set network colors

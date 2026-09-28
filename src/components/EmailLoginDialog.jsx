@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { EnvelopeSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { useConnect, useConnectors } from 'wagmi'
+import { switchConnection } from 'wagmi/actions'
 import { privateKeyToAccount } from 'viem/accounts'
 import clsx from 'clsx'
 import { toast } from '@/components/NextToast'
@@ -28,6 +29,8 @@ import {
   splitKey,
 } from '@/lib/embeddedWallet/crypto'
 import { onboardingChainId } from '@/config/gasless'
+import { config } from '@/config/wagmi'
+import { heldConnection } from '@/lib/heldConnection'
 import styles from './EmailLoginDialog.module.scss'
 
 const MIN_PASSWORD_LENGTH = 8
@@ -72,9 +75,16 @@ export default function EmailLoginDialog() {
   const connector = connectors.find((c) => c.id === EMAIL_CONNECTOR_ID)
 
   const finishConnect = async (accountEmail) => {
-    // A brand-new wallet has no chain preference, so pin a sponsored one: the connector's own
-    // seed would otherwise make the first post a real L1 transaction against an empty balance.
-    await connect({ connector, chainId: onboardingChainId() })
+    if (heldConnection(connector)) {
+      // Already connected, possibly as another saved account: connect() would throw, so move
+      // the connection onto the key that was just unlocked
+      connector.emitter.emit('change', { accounts: [getEmbeddedAddress()] })
+      await switchConnection(config, { connector })
+    } else {
+      // A brand-new wallet has no chain preference, so pin a sponsored one: the connector's own
+      // seed would otherwise make the first post a real L1 transaction against an empty balance.
+      await connect({ connector, chainId: onboardingChainId() })
+    }
 
     // One email maps to one live wallet server-side, so any other record under
     // this email is a dead entry (a crash-orphaned or reset-abandoned wallet)
