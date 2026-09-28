@@ -8,10 +8,7 @@ Disallow: /api/
 Disallow: /admin
 Disallow: /compose
 Disallow: /settings
-Disallow: /unlock
-Disallow: /secure-account
 Disallow: /connect
-Disallow: /register
 Disallow: /notifications
 Disallow: /saved
 Disallow: /liked

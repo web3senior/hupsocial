@@ -569,10 +569,10 @@ The protocol is currently open and free. If monetization is introduced, the pref
 
 A separate `HupSubscription` ERC-721 (or ERC-1155) contract is deployed independently of the core protocol. Users mint a subscription token with an expiry timestamp encoded in the token metadata or a contract mapping.
 
-The **relayer/meta-transaction forwarder** checks subscription validity before forwarding a transaction. The core `Tunnel` contract itself stays unchanged — no license gate added to `sendMessage` or any other function.
+The **relayer/meta-transaction forwarder** checks subscription validity before forwarding a transaction. The core contracts stay unchanged — no license gate added to any function.
 
 ```
-User → Relayer → [check: does this wallet hold a valid subscription token?] → Tunnel contract
+User → Relayer → [check: does this wallet hold a valid subscription token?] → Hup contracts
 ```
 
 If the user has no valid subscription, the relayer rejects the request off-chain. Gas cost: zero.
@@ -583,7 +583,7 @@ If the user has no valid subscription, the relayer rejects the request off-chain
 - **Protocol stays trustless** — anyone can call the contract directly without the relayer; subscription is a product-layer concern, not a protocol constraint
 - **Non-custodial** — subscription NFTs can be transferred, gifted, or sold on secondary markets
 - **Upgradeable without redeployment** — subscription tiers, pricing, and logic live in a separate contract; the core protocol is never touched
-- **Avoids the alternative** — adding an on-chain `licenseOf[address]` check to every `sendMessage` call would add gas to every transaction and break permissionlessness
+- **Avoids the alternative** — adding an onchain `licenseOf[address]` check to every call would add gas to every transaction and break permissionlessness
 
 ## What stays free
 

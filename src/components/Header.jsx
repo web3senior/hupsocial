@@ -84,18 +84,16 @@ export default function Header() {
 
   return (
     <header className={clsx(styles.header, isBare && styles['header--bare'])}>
-      {pathname !== '/chat' && (
-        <button
-          type="button"
-          className={styles.menuButton}
-          onClick={openMobileMenu}
-          aria-label="Open menu"
-          aria-expanded={isMobileMenuOpen}
-          data-mobile-menu-trigger
-        >
-          <Menu />
-        </button>
-      )}
+      <button
+        type="button"
+        className={styles.menuButton}
+        onClick={openMobileMenu}
+        aria-label="Open menu"
+        aria-expanded={isMobileMenuOpen}
+        data-mobile-menu-trigger
+      >
+        <Menu />
+      </button>
 
       {hasTitle && (
         // Full-width layer so the container inside centres against the same box as the page's

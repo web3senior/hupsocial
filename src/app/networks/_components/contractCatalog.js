@@ -24,7 +24,6 @@ const CORE_CONTRACTS = [
 // Feature extensions. A chain missing a key simply has not received that feature yet.
 const FEATURE_CONTRACTS = [
   { key: 'community', label: 'HupCommunity', description: 'Communities with onchain membership' },
-  { key: 'chat', label: 'HupChat', description: 'Onchain chat' },
   { key: 'sell', label: 'HupSell', description: 'Gated content with onchain key delivery' },
   { key: 'tipper', label: 'HupTipper', description: 'Post tipping' },
   { key: 'trade', label: 'HupTrade', description: 'NFT sales inside posts' },

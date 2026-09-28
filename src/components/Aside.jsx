@@ -587,25 +587,23 @@ export default function Aside() {
         </div>
       </div>
 
-      {pathname !== '/chat' && (
-        <div className={styles.floatingActions}>
-          <BatchLikeTrigger className={styles.floatingActions__button} badgeClassName={styles.floatingActions__badge} />
+      <div className={styles.floatingActions}>
+        <BatchLikeTrigger className={styles.floatingActions__button} badgeClassName={styles.floatingActions__badge} />
 
-          <button
-            className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])}
-            onClick={() => {
-              if (!canCompose) {
-                if (!openConnect()) toast('Please connect wallet', 'error')
-                return
-              }
-              setIsComponentOpen(true)
-            }}
-            aria-label="Create new post"
-          >
-            <PlusIcon/>
-          </button>
-        </div>
-      )}
+        <button
+          className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])}
+          onClick={() => {
+            if (!canCompose) {
+              if (!openConnect()) toast('Please connect wallet', 'error')
+              return
+            }
+            setIsComponentOpen(true)
+          }}
+          aria-label="Create new post"
+        >
+          <PlusIcon/>
+        </button>
+      </div>
     </aside>
   )
 }

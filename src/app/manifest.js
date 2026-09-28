@@ -55,7 +55,6 @@ export default function manifest() {
     shortcuts: [
       { name: 'Search', short_name: 'Search', description: 'Search posts and people', url: '/search' },
       { name: 'Notifications', short_name: 'Alerts', description: 'See what you missed', url: '/notifications' },
-      { name: 'Chat', short_name: 'Chat', description: 'Open your conversations', url: '/chat' },
       { name: 'Saved', short_name: 'Saved', description: 'Posts you bookmarked', url: '/saved' },
     ],
     // Puts Hup in the OS share sheet. The POST is answered by the service worker, which

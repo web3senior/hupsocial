@@ -52,7 +52,6 @@ keys directly from that account, which is why profiles there are dynamic and cli
 
 - [Home feed](https://hup.social/): the cross-network timeline, with tabs for following, latest, and media.
 - [Communities](https://hup.social/communities): group feeds with composable membership rules (token, NFT, whitelist, follower, or pay-to-join gates), consent-based two-step invites, optional end-to-end encryption, and optional DAO governance.
-- [Chat](https://hup.social/chat): wallet-to-wallet encrypted messaging.
 - [NFT market](https://hup.social/nfts): ERC-721 and LSP8 listings sold inside posts, with referral splits and a disclosed platform fee.
 - [Prediction markets](https://hup.social/predict): judge-resolved onchain markets; escrowed stakes are never admin-withdrawable and refunds open automatically if a market goes unresolved.
 - [Events](https://hup.social/events): a paid onchain events directory.

@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { usePathname } from 'next/navigation'
 import useSWR from 'swr'
 import clsx from 'clsx'
 import { Morph, Rise } from 'cube-motion/react'
@@ -195,11 +194,10 @@ const mergeSorted = (current, incoming) => {
  * a card when open, a taller card when expanded. Anyone can read; posting takes one wallet
  * signature. The loaded window is a slice of the room paged from a cursor in both directions, so
  * a reader who left days ago reopens on the line they left and reads forward from there.
- * Distinct from the onchain /chat page, which it stays off. `embedded` is the same room inside
- * another site's frame (public/chat-widget.js): it fills the frame and the host page places it.
+ * `embedded` is the same room inside another site's frame (public/chat-widget.js): it fills the
+ * frame and the host page places it.
  */
 export default function ChatDock({ embedded = false }) {
-  const pathname = usePathname()
   const { address, isConnected, status } = useConnection()
   const { signMessageAsync } = useSignMessage()
   const chainId = useChainId()
@@ -257,7 +255,7 @@ export default function ChatDock({ embedded = false }) {
   )
   const [isSigningIn, setIsSigningIn] = useState(false)
 
-  const hidden = !isClient || (!embedded && pathname === '/chat')
+  const hidden = !isClient
 
   const { data: chatMe, mutate: mutateChatMe } = useSWR(token ? ['chat-me', token] : null, () => fetchChatMe(token), {
     revalidateOnFocus: false,

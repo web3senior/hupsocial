@@ -120,8 +120,7 @@ export default function Footer() {
         },
         icon: PlusIcon,
       },
-      // The /chat page is the onchain messenger and hides the dock, so the tab would open nothing there
-      pathname !== '/chat' && {
+      {
         name: 'Chat',
         action: () => (isChatOpen ? minimizeChat() : openChat()),
         icon: PaperPlaneTiltIcon,
@@ -129,8 +128,8 @@ export default function Footer() {
         hasDot: chatUnread > 0,
       },
       { name: 'Profile', path: profilePath, icon: UserIcon },
-    ].filter(Boolean)
-  }, [address, isConnected, setIsComponentOpen, pathname, isChatOpen, chatUnread, openChat, minimizeChat])
+    ]
+  }, [address, isConnected, setIsComponentOpen, isChatOpen, chatUnread, openChat, minimizeChat])
 
   // The open room covers the page, so leaving for another tab has to put it away
   const closeChatOnNavigate = () => {

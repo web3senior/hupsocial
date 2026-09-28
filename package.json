@@ -39,7 +39,6 @@
     "@walletconnect/ethereum-provider": "^2.23.9",
     "bs58": "^6.0.0",
     "clsx": "^2.1.1",
-    "crypto-js": "^4.2.0",
     "cube-motion": "^0.1.0",
     "dompurify": "^3.4.2",
     "driver.js": "^1.6.0",

@@ -24,7 +24,7 @@ unconnected wallet writes no key at all rather than an empty string.
 
 ### What is *not* stamped, and why
 
-**Chat and posts to an encrypted community carry no `author`.** Not on the envelope, and not
+**Posts to an encrypted community carry no `author`.** Not on the envelope, and not
 inside the ciphertext either — the key is simply never written, anywhere, in any form.
 
 Sealing it inside would have been the tempting half-measure, and it is the wrong one. A ciphertext
@@ -33,12 +33,11 @@ rotates its key to every member who joins later, and keys leak. An author sealed
 record that has to be decrypted exactly once, years later, to attribute every word in a private
 room to the wallet that wrote it. An author that was never written down cannot be recovered at all.
 
-The envelopes already give up more than they look like they do — an encrypted community post
-names its `communityId` and `keyVersion` in the clear, and a chat message is pinned against a
-topic. Adding identity to that is the difference between "someone in this room said something"
-and a full transcript with names on it.
+The envelope already gives up more than it looks like it does — an encrypted community post
+names its `communityId` and `keyVersion` in the clear. Adding identity to that is the difference
+between "someone in this room said something" and a full transcript with names on it.
 
-Neither is an oversight to be tidied up later. Do not add the stamp to either one.
+It is not an oversight to be tidied up later. Do not add the stamp.
 
 | Payload | Stamped? |
 | --- | --- |
@@ -46,11 +45,9 @@ Neither is an oversight to be tidied up later. Do not add the stamp to either on
 | Community profiles — public, listed in the directory either way | yes |
 | Posts to a *plaintext* community | yes |
 | Posts to an *encrypted* community | **no** |
-| Chat messages and chat contact lists | **no** |
 
 Mechanically: the post composer applies the stamp *after* `sealForCommunity` has decided the
-payload's shape, and skips it when what came back is an encrypted envelope. `Chat.jsx` has its
-own uploader and never calls the helper at all.
+payload's shape, and skips it when what came back is an encrypted envelope.
 
 ## Posts
 
@@ -135,22 +132,6 @@ the `LSP4Metadata` data key is itself a VerifiableURI hashed over the JSON *as t
 it*, since the pinning service re-serializes what we posted. `author` sits at the top level beside
 `LSP4Metadata` rather than inside it: LSP4 defines the contents of that one key, and a reader
 following the standard reaches for `json.LSP4Metadata` and ignores whatever else the file carries.
-
-## Chat — no author stamp
-
-| Sample | What it is |
-| --- | --- |
-| [chat-message-sample.json](chat-message-sample.json) | What is actually pinned: an AES-GCM envelope, and nothing else. |
-| [chat-message-plaintext-sample.json](chat-message-plaintext-sample.json) | What decrypts out of it. Never pinned in this form. |
-| [chat-contacts-sample.json](chat-contacts-sample.json) | The contact list, encrypted under the user's own key. |
-
-All three from [../app/chat/_components/Chat.jsx](../app/chat/_components/Chat.jsx). The room key
-is derived by ECDH from the topic, so the envelope names neither party — which is the whole point,
-and why the author stamp stops at this boundary.
-
-`senderAddr` in the plaintext sample is not the stamp under another name: it is decrypted by the
-recipient to label the bubble, and it never leaves the browser unencrypted. The pinned document is
-the envelope, and the envelope names nobody.
 
 ## Not a JSON scheme
 

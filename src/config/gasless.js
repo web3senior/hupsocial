@@ -80,10 +80,9 @@ export const GASLESS_POLICY = {
   unlike: { cooldownMs: 0, windowMs: 3600000, max: 5 },
   repost: { cooldownMs: 0, windowMs: 3600000, max: 30 },
   poll: { cooldownMs: 0, windowMs: 3600000, max: 40 },
-  chat: { cooldownMs: 0, windowMs: 60000, max: 30 },
 }
 
-export const gaslessPolicyFor = (bucket) => GASLESS_POLICY[bucket] ?? GASLESS_POLICY.chat
+export const gaslessPolicyFor = (bucket) => GASLESS_POLICY[bucket] ?? GASLESS_POLICY.create
 
 // Which bucket a relayed Hup call belongs to; anything absent here is not sponsored.
 // deleteContent covers both removing your own content and undoing a repost. The contract is

@@ -80,21 +80,11 @@ const FORWARDER_WRITE_ABI = [
   },
 ]
 
-// pause() / unpause() halt new sendMessage calls on HupChat; paused() reads the current state.
-// Gated by ADMIN_ROLE on the contract, so the connected wallet must hold that role or the tx
-// reverts. Pausing does not retract already-published messages — those stay onchain.
-const CHAT_PAUSE_ABI = [
-  { inputs: [], name: 'pause', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-  { inputs: [], name: 'unpause', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-  { inputs: [], name: 'paused', outputs: [{ internalType: 'bool', name: '', type: 'bool' }], stateMutability: 'view', type: 'function' },
-]
-
 // Contracts whose native balance the overview tracks, in display order. Keys map to the
 // per-chain entries in CONTRACTS — anything unset on a given chain is skipped.
 const BALANCE_CONTRACTS = [
   { key: 'hup', label: 'Hup' },
   { key: 'status', label: 'HupStatus' },
-  { key: 'chat', label: 'HupChat' },
   { key: 'sell', label: 'HupSell' },
   { key: 'tipper', label: 'HupTipper' },
   { key: 'trade', label: 'HupTrade' },
@@ -144,7 +134,6 @@ const SECTIONS = [
   { id: 'fund', label: 'Fundraise', icon: '🪙', contractKey: 'fund' },
   { id: 'tasks', label: 'Tasks', icon: '🧰', contractKey: 'tasks' },
   { id: 'premium', label: 'Premium', icon: '⭐', contractKey: 'premium' },
-  { id: 'chat', label: 'Chat', icon: '💬', contractKey: 'chat' },
 ]
 
 const DEFAULT_SECTION = SECTIONS[0].id
@@ -277,9 +266,6 @@ export default function Page() {
   const [taskRegistryInputs, setTaskRegistryInputs] = useState({})
   const [taskHideInputs, setTaskHideInputs] = useState({})
   const [taskTxStates, setTaskTxStates] = useState({})
-  // HupChat: one paused() read per chain, then the pause toggle
-  const [chatConfigs, setChatConfigs] = useState({})
-  const [chatPauseTxStates, setChatPauseTxStates] = useState({})
 
   const isAdmin = isConnected && address?.toLowerCase() === ADMIN_WALLET
 
@@ -1901,56 +1887,6 @@ export default function Page() {
       if (fundAddress) loadFundConfig(chain, fundAddress)
     })
   }, [isAdmin])
-
-  // Read the one thing the Chat card acts on: whether the contract is paused. A read failure
-  // means no live HupChat answers at that address, so the card shows the error and locks the
-  // toggle rather than offering a write that would revert.
-  const loadChatConfig = async (chain, chatAddress) => {
-    setChatConfigs((prev) => ({ ...prev, [chain.id]: { loading: true } }))
-
-    try {
-      const client = createPublicClient({ chain, transport: browserTransport(chain.id) })
-      const paused = await client.readContract({ address: chatAddress, abi: CHAT_PAUSE_ABI, functionName: 'paused' })
-      setChatConfigs((prev) => ({ ...prev, [chain.id]: { loading: false, paused } }))
-    } catch (err) {
-      setChatConfigs((prev) => ({
-        ...prev,
-        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'No HupChat contract answers at this address' },
-      }))
-    }
-  }
-
-  useEffect(() => {
-    if (!isAdmin) return
-    config.chains.forEach((chain) => {
-      const chatAddress = CONTRACTS[`chain${chain.id}`]?.chat
-      if (chatAddress) loadChatConfig(chain, chatAddress)
-    })
-  }, [isAdmin])
-
-  // Stop or resume new messages on a chain's HupChat. The connected wallet must hold ADMIN_ROLE
-  // on the contract or the write reverts.
-  const handleChatPause = async (chain, chatAddress, pause) => {
-    setChatPauseTxStates((prev) => ({ ...prev, [chain.id]: { loading: true, error: null } }))
-
-    try {
-      const txHash = await writeContractAsync({
-        address: chatAddress,
-        abi: CHAT_PAUSE_ABI,
-        functionName: pause ? 'pause' : 'unpause',
-        chainId: chain.id,
-      })
-
-      setChatPauseTxStates((prev) => ({ ...prev, [chain.id]: { loading: false, success: true, hash: txHash, action: pause ? 'paused' : 'resumed' } }))
-      setTimeout(() => loadChatConfig(chain, chatAddress), 3000)
-    } catch (err) {
-      console.error(`Chat ${pause ? 'pause' : 'unpause'} error on chain ${chain.id}:`, err)
-      setChatPauseTxStates((prev) => ({
-        ...prev,
-        [chain.id]: { loading: false, error: err.shortMessage || err.message || 'Transaction rejected or failed' },
-      }))
-    }
-  }
 
   // Set the platform fee for campaigns created from now on. Campaigns already open keep the
   // rate they were created with — the contract freezes it — so this never reprices a live pot.
@@ -6389,111 +6325,6 @@ export default function Page() {
                   )
                 })}
               </div>
-            </section>
-          )}
-
-          {activeSection === 'chat' && (
-            <section className={styles['admin-contracts__section']}>
-              <header className={styles['admin-contracts__header']}>
-                <h2 className={styles['admin-contracts__title']}>HupChat</h2>
-                <p className={styles['admin-contracts__subtitle']}>
-                  Encrypted messaging. Pause stops new messages being sent on the contract; it does not touch messages already onchain, which
-                  stay exactly where they are. Signed by your wallet, which must hold ADMIN_ROLE on the contract.
-                </p>
-              </header>
-
-              <div className={styles['admin-contracts__grid']}>
-                {visibleChains('chat').map((chain) => {
-                  const deployment = CONTRACTS[`chain${chain.id}`]
-                  const chatConfig = chatConfigs[chain.id]
-                  const pauseTx = chatPauseTxStates[chain.id]
-                  const explorerUrl = chain.blockExplorers?.default?.url?.replace(/\/$/, '')
-                  const isLocked = !chatConfig || chatConfig.loading || Boolean(chatConfig.error)
-
-                  return (
-                    <div
-                      key={`chat-${chain.id}`}
-                      className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
-                    >
-                      <div className={styles['admin-contracts__card-header']}>
-                        <div className={styles['admin-contracts__network-info']}>
-                          <div className={styles['admin-contracts__card-icon']}>
-                            <img src={chain.iconUrl} alt="" />
-                          </div>
-                          <h3 className={styles['admin-contracts__card-title']}>{chain.name}</h3>
-                        </div>
-                        <span className={styles['admin-contracts__badge']}>HUPCHAT</span>
-                      </div>
-
-                      <div className={styles['admin-contracts__details']}>
-                        <div className={styles['admin-contracts__detail-row']}>
-                          <span className={styles['admin-contracts__detail-label']}>Chat Address</span>
-                          <span className={styles['admin-contracts__detail-value']}>
-                            {explorerUrl ? (
-                              <a href={`${explorerUrl}/address/${deployment.chat}`} target="_blank" rel="noopener noreferrer">
-                                <code>{deployment.chat}</code> ↗
-                              </a>
-                            ) : (
-                              <code>{deployment.chat}</code>
-                            )}
-                          </span>
-                        </div>
-
-                        <div className={styles['admin-contracts__detail-row']}>
-                          <span className={styles['admin-contracts__detail-label']}>Contract</span>
-                          <div className={styles['admin-contracts__detail-value']}>
-                            {(!chatConfig || chatConfig.loading) && <span>Loading…</span>}
-                            {chatConfig?.error && (
-                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
-                                {chatConfig.error}
-                              </div>
-                            )}
-                            {chatConfig && !chatConfig.loading && !chatConfig.error && !chatConfig.paused && (
-                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--success'])}>
-                                ✓ Live — messages can be sent
-                              </div>
-                            )}
-                            {chatConfig && !chatConfig.loading && !chatConfig.error && chatConfig.paused && (
-                              <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
-                                ⚠️ PAUSED — no new messages can be sent
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {pauseTx && (
-                          <div className={styles['admin-contracts__detail-row']}>
-                            <span className={styles['admin-contracts__detail-label']}>Pause Tx</span>
-                            <div className={styles['admin-contracts__detail-value']}>
-                              {pauseTx.loading && <span style={{ color: '#d97706' }}>Signing &amp; broadcasting tx...</span>}
-                              {pauseTx.error && <span style={{ color: '#ef4444' }}>❌ {pauseTx.error}</span>}
-                              {pauseTx.success && <span style={{ color: '#10b981' }}>🚀 Contract {pauseTx.action}.</span>}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className={styles['admin-contracts__actions']}>
-                        <button
-                          type="button"
-                          onClick={() => handleChatPause(chain, deployment.chat, !chatConfig?.paused)}
-                          disabled={isLocked || pauseTx?.loading}
-                          className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
-                        >
-                          {pauseTx?.loading ? 'Writing...' : chatConfig?.paused ? 'Unpause' : 'Pause'}
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              {visibleChains('chat').length === 0 && (
-                <p className={styles['admin-contracts__empty']}>No HupChat deployments match this filter.</p>
-              )}
             </section>
           )}
         </div>

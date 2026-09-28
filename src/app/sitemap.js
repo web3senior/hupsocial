@@ -23,7 +23,7 @@ export const revalidate = 3600
 const ARTICLE_LIMIT = 5000
 
 /* Everything reachable without an id. Deliberately hand-listed: the app has routes that should
-   never be in an index (/compose, /settings, /unlock, /secure-account, anything behind a wallet),
+   never be in an index (/compose, /settings, anything behind a wallet),
    and enumerating the app directory would sweep those in. */
 const STATIC_ROUTES = [
   { path: '/', priority: 1, changeFrequency: 'hourly' },

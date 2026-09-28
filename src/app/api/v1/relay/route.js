@@ -1,7 +1,6 @@
 import { ethers } from 'ethers'
 import { NextResponse } from 'next/server'
 import forwarderAbi from '../../../../abis/Forwarder.json'
-import chatAbi from '../../../../abis/Chat.json'
 import hupAbi from '../../../../abi/post.json'
 import pollsAbi from '../../../../abis/HupPolls.json'
 import { CONTRACTS } from '../../../../config/contracts'
@@ -11,7 +10,7 @@ import { enqueueRelayerSend, relayerFees, relayerWallet } from '../../../../lib/
 
 // --- Relay policy ---
 // The relayer's key pays for everything that lands here, so a request may only target one of
-// the contracts we actually sponsor on that chain: Hup, HupPolls and HupChat. Everything else
+// the contracts we actually sponsor on that chain: Hup and HupPolls. Everything else
 // in config/contracts.js (HupCommunity, HupTipper, the LSP26 registry, …) is refused outright
 // — a forwarder executes against whatever target the request names, so this list is the whole
 // defence. The Hup contract is narrowed further to the sponsored selectors in
@@ -36,7 +35,7 @@ const POLL_SELECTORS = new Map(
 
 // The relayer sends `execute` to whatever forwarder the caller names, so that address has to
 // be one of ours too — otherwise a crafted request points us at an arbitrary contract and we
-// pay the gas for whatever it does. A chain can have two: the chat forwarder and, where Hup
+// pay the gas for whatever it does. A chain can have two: the shared `forwarder` and, where Hup
 // was deployed against its own, `hupForwarder`.
 const isConfiguredForwarder = (chainId, forwarderAddress) => {
   const contracts = CONTRACTS[`chain${chainId}`]
@@ -73,13 +72,6 @@ const sponsoredBucket = (chainId, to, data) => {
   if (isTarget(contracts.polls)) {
     return POLL_SELECTORS.get((data || '').slice(0, 10).toLowerCase()) ?? null
   }
-
-  // Chat is sponsored wholesale — every selector on it is a message-shaped tap, and the chat
-  // app's identity setup (`activateIdentity` / `revokeSession`) rides through here too. It is
-  // an explicit match, not a fallback: this used to return the chat bucket for ANY address in
-  // config/contracts.js, which would have paid for community joins, tips and follows at chat
-  // limits the moment a forwarder request named one of them.
-  if (isTarget(contracts.chat)) return 'chat'
 
   return null
 }
@@ -175,7 +167,7 @@ export async function POST(request) {
   let relayChainId = null
 
   // Decode a revert error into a human-readable string.
-  // Checks forwarder custom errors, then Chat and Hup custom errors, then falls back
+  // Checks forwarder custom errors, then Hup custom errors, then falls back
   // to the ethers short message.  If the error is FailedCall it also simulates the
   // inner EIP-2771 call (appending `from`) to recover the target contract's reason.
   const decodeRevert = async (err) => {
@@ -184,10 +176,6 @@ export async function POST(request) {
       try {
         const decoded = new ethers.Interface(forwarderAbi).parseError(err.data)
         if (decoded) { msg = decoded.name; console.error('RELAY_FWD_REVERT:', decoded.name, decoded.args) }
-      } catch {}
-      try {
-        const decoded = new ethers.Interface(chatAbi).parseError(err.data)
-        if (decoded) { msg = decoded.name; console.error('RELAY_INNER_REVERT:', decoded.name, decoded.args) }
       } catch {}
       try {
         const decoded = new ethers.Interface(hupAbi).parseError(err.data)
@@ -200,10 +188,6 @@ export async function POST(request) {
         await provider.call({ to: fullRequest.to, from: forwarderAddress, data: innerData })
       } catch (simErr) {
         if (simErr.data) {
-          try {
-            const decoded = new ethers.Interface(chatAbi).parseError(simErr.data)
-            if (decoded) { msg = decoded.name; console.error('RELAY_INNER_REVERT_DECODED:', decoded.name, decoded.args) }
-          } catch {}
           try {
             const decoded = new ethers.Interface(hupAbi).parseError(simErr.data)
             if (decoded) { msg = decoded.name; console.error('RELAY_INNER_REVERT_DECODED:', decoded.name, decoded.args) }
@@ -260,8 +244,8 @@ export async function POST(request) {
 
     // The gasless trial is per-chain, and the client cannot be the one enforcing that — a
     // crafted request would otherwise spend our key on a chain we never opted into (an L1
-    // post being the expensive case). Chat predates the trial and keeps its own chains.
-    if (bucket !== 'chat' && !isGaslessChainId(chainId)) {
+    // post being the expensive case).
+    if (!isGaslessChainId(chainId)) {
       console.error('RELAY_CHAIN_REJECTED:', chainId)
       return NextResponse.json({ error: 'The relayer does not sponsor this network.' }, { status: 403 })
     }
@@ -404,7 +388,6 @@ export async function POST(request) {
         let reason = simErr.shortMessage || simErr.message || 'unknown revert'
         if (simErr.data) {
           try { reason = new ethers.Interface(forwarderAbi).parseError(simErr.data)?.name ?? reason } catch {}
-          try { reason = new ethers.Interface(chatAbi).parseError(simErr.data)?.name ?? reason } catch {}
         }
 
         // For InvalidSigner: read the forwarder's actual EIP-712 domain to surface mismatches.

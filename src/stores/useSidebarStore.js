@@ -9,7 +9,6 @@ import {
   CalendarBlankIcon,
   ChartBarIcon,
   ChartLineUpIcon,
-  ChatCircleIcon,
   CurrencyCircleDollarIcon,
   CurrencyDollarIcon,
   HandshakeIcon,
@@ -77,9 +76,6 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
   { id: 'divider-secondary', type: 'divider' },
-  // Chat is out of the nav until it is deployed: contracts.chat is '' on all ten chains, so the
-  // page can only ever fail, and a BETA badge on a broken row reads as a broken product.
-  // { id: 'chat', name: 'Chat', path: '/chat', icon: ChatCircleIcon, badge: 'beta' },
   { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
   // Reads with Insights as a pair: what the network did, then what you did.
   { id: 'activity', name: 'Activity', path: '/activity', icon: PulseIcon },
