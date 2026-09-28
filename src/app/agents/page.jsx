@@ -18,6 +18,7 @@ import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
 import Profile from '@/components/Profile'
 import EmptyState from '@/components/ui/EmptyState'
+import AgentIdentityChip from '@/components/ui/AgentIdentityChip'
 import GalaxyCanvas from '@/app/screensaver/_components/GalaxyCanvas'
 import { profilePath } from '@/lib/username'
 import { categoryLabel, formatTokenAmount, taskHref } from '@/lib/task'
@@ -304,9 +305,7 @@ export default function AgentsPage() {
                         </span>
                       )}
                       {agent.erc8004?.map((identity) => (
-                        <span key={`${identity.network_id}-${identity.agent_id}`} className={styles.agent__label} title="ERC-8004 agent identity">
-                          8004 #{identity.agent_id}
-                        </span>
+                        <AgentIdentityChip key={`${identity.network_id}-${identity.agent_id}`} identity={identity} className={styles.agent__identity} />
                       ))}
                     </div>
                   </li>

@@ -508,6 +508,18 @@
     white-space: nowrap;
   }
 
+  // Wears the row's pill rather than its own chip, and sits above the card-wide link to stay clickable.
+  &__meta &__identity {
+    position: relative;
+    z-index: 1;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background-color: var(--background);
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+  }
+
   @media (max-width: 480px) {
     flex-direction: column;
     align-items: flex-start;

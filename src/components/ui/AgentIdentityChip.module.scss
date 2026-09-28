@@ -1,0 +1,35 @@
+// The twin of .agent in AgentBadge.module.scss, which sits in the same rows: a change to that
+// shape belongs in both.
+.identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  flex-shrink: 0;
+  padding: 0.2em 0.4em;
+  border: 1px solid var(--border);
+  background-color: var(--tag);
+  border-radius: 5px;
+  font-size: var(--system-10-font-size);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-muted, var(--gray-400));
+  text-decoration: none;
+  white-space: nowrap;
+
+  &__chain {
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 50%;
+  }
+
+  &--lg {
+    font-size: var(--system-11-font-size);
+  }
+
+  // Scoped inline to the identity's own chain, never the connected wallet's.
+  @media (hover: hover) {
+    &[href]:hover {
+      border-color: var(--network-color-primary);
+    }
+  }
+}

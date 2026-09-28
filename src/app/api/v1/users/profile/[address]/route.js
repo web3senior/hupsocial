@@ -1,11 +1,12 @@
 import { after, NextResponse } from 'next/server'
-import { isWalletAddress, normalizeAddress } from '@/lib/address'
+import { isEvmAddress, isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
 import { AVATAR_MAX_SIZE, isSameStoredImage, resolveAvatarImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
 import { readUniversalProfile } from '@/lib/lukso'
 import { moderateImages } from '@/lib/moderation'
 import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/badge'
 import { resolveAgentProfile } from '@/lib/agentProfile'
+import { readAgentIdentities } from '@/lib/agentIdentities'
 import { readPremium } from '@/lib/premiumServer'
 import { isAccentColor, parseAccentSelection } from '@/lib/premium'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
@@ -192,7 +193,7 @@ function scheduleChainRecheck(address, row) {
  * A Universal Profile as the read serves it, from the onchain document — live, or the row's copy
  * of it. The row can be AHEAD of that document: see cidex/scripts/add-profile-sync-stamp.sql.
  */
-function shapeUniversalProfile(profile, row, address, { badge, origin, premium }) {
+function shapeUniversalProfile(profile, row, address, { badge, origin, premium, erc8004 }) {
   const liveStamp = String(profile.lastMetadataUpdate ?? '')
   const storedStamp = row?.profile_sync_stamp ?? null
   const hupIsAhead = storedStamp !== null && storedStamp === liveStamp
@@ -246,12 +247,14 @@ function shapeUniversalProfile(profile, row, address, { badge, origin, premium }
   /* Read from the profile's OWN tags and description, so the mark travels with the metadata
      rather than with anything Hup remembers about the account — see lib/agentProfile.js. */
   profile.agent = resolveAgentProfile(profile)
+  // Independent of the mark above: that one is declared, this one is registered onchain.
+  profile.erc8004 = erc8004
 
   return profile
 }
 
 /** A profile the chain has nothing for, from the row alone. */
-function shapeDatabaseProfile(row, { badge, origin, premium }) {
+function shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) {
   const dbProfile = row
 
   // The notification email is private contact data on a public endpoint —
@@ -298,6 +301,7 @@ function shapeDatabaseProfile(row, { badge, origin, premium }) {
   /* Same mark, same rule, off the cached copy of the same two fields — the resolver takes the
      JSON-string form of `tags` this branch carries as readily as the array the branch above has. */
   dbProfile.agent = resolveAgentProfile(dbProfile)
+  dbProfile.erc8004 = erc8004
 
   return dbProfile
 }
@@ -332,7 +336,7 @@ export async function GET(request, { params }) {
        and adds no latency running in the same batch. It is re-verified against
        community_members on every call — see lib/badge.js for why it is never stored already
        resolved. */
-    const [[rows], badge, premium] = await Promise.all([
+    const [[rows], badge, premium, erc8004] = await Promise.all([
       pool.execute(
         `SELECT
           u.*,
@@ -356,6 +360,11 @@ export async function GET(request, { params }) {
         console.error('[PREMIUM_RESOLVE_ERROR]:', premiumError.message)
         return null
       }),
+      /* Guarded like the two above: agent_identities only exists once add-huptasks-contracts.sql has run. */
+      (isEvmAddress(address) ? readAgentIdentities(address) : Promise.resolve([])).catch((identityError) => {
+        console.error('[AGENT_IDENTITY_RESOLVE_ERROR]:', identityError.message)
+        return []
+      }),
     ])
     const row = rows[0]
 
@@ -376,11 +385,11 @@ export async function GET(request, { params }) {
       if (row.is_universal_profile) {
         return NextResponse.json({
           source: 'universal_profile',
-          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin, premium }),
+          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin, premium, erc8004 }),
         })
       }
 
-      return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium }) })
+      return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) })
     }
 
     const { answered, profile: live } = await readUniversalProfile(address)
@@ -399,7 +408,7 @@ export async function GET(request, { params }) {
     if (isUP) {
       return NextResponse.json({
         source: 'universal_profile',
-        data: shapeUniversalProfile(live, row, address, { badge, origin, premium }),
+        data: shapeUniversalProfile(live, row, address, { badge, origin, premium, erc8004 }),
       })
     }
 
@@ -409,7 +418,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium }) })
+    return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) })
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

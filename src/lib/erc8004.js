@@ -4,6 +4,8 @@
  * one CREATE2 pair and testnets another; both verified onchain on every Hup chain.
  */
 
+import { BaseError, ContractFunctionRevertedError } from 'viem'
+
 const MAINNET = {
   identity: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
   reputation: '0x8004BAa17C55a88189AE136b182e5fdA19dE9b63',
@@ -70,23 +72,36 @@ export const reputationRegistryAbi = [
   },
 ]
 
+const isRevert = (error) => error instanceof BaseError && Boolean(error.walk((cause) => cause instanceof ContractFunctionRevertedError))
+
 /**
- * True when `wallet` controls `agentId` on the chain `client` reads: owner, approved operator, or
+ * Whether `wallet` controls `agentId` on the chain `client` reads: owner, approved operator, or
  * the agent's registered wallet. The same test HupTasks applies before rating an agent.
+ * @returns {Promise<boolean|null>} Null when the chain did not answer, so a stored link can tell
+ * an RPC failure from a transfer.
  */
-export async function controlsAgent(client, chainId, wallet, agentId) {
+export async function readAgentControl(client, chainId, wallet, agentId) {
   const { identity } = erc8004For(chainId)
   const id = BigInt(agentId)
   try {
     const authorized = await client.readContract({ address: identity, abi: identityRegistryAbi, functionName: 'isAuthorizedOrOwner', args: [wallet, id] })
     if (authorized) return true
-  } catch {
-    return false
+  } catch (error) {
+    return isRevert(error) ? false : null
   }
   try {
     const agentWallet = await client.readContract({ address: identity, abi: identityRegistryAbi, functionName: 'getAgentWallet', args: [id] })
     return String(agentWallet).toLowerCase() === String(wallet).toLowerCase()
-  } catch {
-    return false
+  } catch (error) {
+    return isRevert(error) ? false : null
   }
+}
+
+/** True only on a positive answer: what a new link has to pass before it is stored. */
+export const controlsAgent = async (client, chainId, wallet, agentId) => (await readAgentControl(client, chainId, wallet, agentId)) === true
+
+/** The Identity Registry on a chain's explorer, or null for a chain without one. */
+export const registryExplorerUrl = (chain) => {
+  const explorer = chain?.blockExplorers?.default?.url
+  return explorer ? `${explorer.replace(/\/$/, '')}/address/${erc8004For(chain.id).identity}` : null
 }

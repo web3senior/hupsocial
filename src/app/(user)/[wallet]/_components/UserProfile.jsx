@@ -41,6 +41,7 @@ import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdenti
 import { useProfile } from '@/hooks/useProfile'
 import { handleBrokenAvatar } from '@/lib/utils'
 import AgentBadge from '@/components/ui/AgentBadge'
+import AgentIdentityChip from '@/components/ui/AgentIdentityChip'
 import PremiumBadge from '@/components/ui/PremiumBadge'
 import Avatar from '@/components/ui/Avatar'
 import UsernameField from '@/components/UsernameField'
@@ -746,6 +747,15 @@ const Profile = ({ addr }) => {
                 {displayWalletString}
               </Link>
             </code>
+
+            {/* A row of its own: an agent registers once per chain, and the name row does not wrap. */}
+            {profile.erc8004?.length > 0 && (
+              <div className={styles.profile__identities}>
+                {profile.erc8004.map((identity) => (
+                  <AgentIdentityChip key={`${identity.network_id}-${identity.agent_id}`} identity={identity} size="lg" />
+                ))}
+              </div>
+            )}
 
             {birthdayLabel &&
               (isCelebratingBirthday ? (

@@ -3,6 +3,7 @@ import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
 import { summarizePost } from '@/lib/postSummary'
 import { resolveInterests } from '@/config/interestOptions'
+import { agentRegistryRef } from '@/lib/erc8004'
 
 /**
  * @file (user)/[wallet]/llms.txt/route.js
@@ -171,6 +172,9 @@ export async function GET(request, { params }) {
   if (profile.origin?.label) lines.push(`- Origin: ${profile.origin.label}`)
   if (profile.badge?.name) lines.push(`- Community badge: ${profile.badge.name}`)
   if (profile.agent?.label) lines.push(`- Automated: this account declares itself ${profile.agent.label}`)
+  for (const identity of profile.erc8004 ?? []) {
+    lines.push(`- ERC-8004 agent: #${identity.agent_id} in ${agentRegistryRef(identity.network_id)}`)
+  }
 
   if (interests.length > 0) lines.push(`- Interests: ${interests.join(', ')}`)
 

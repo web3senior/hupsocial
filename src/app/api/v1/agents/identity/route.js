@@ -10,12 +10,12 @@ import pool from '@/lib/db'
 import { appChains } from '@/config/contracts'
 import { getServerPublicClient } from '@/lib/serverPublicClient'
 import { controlsAgent, erc8004For, identityRegistryAbi } from '@/lib/erc8004'
+import { isStaleIdentity, reverifyAgentIdentity } from '@/lib/agentIdentities'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/
-const STALE_SECONDS = 24 * 3600
 
 const nowSeconds = () => Math.floor(Date.now() / 1000)
 
@@ -26,18 +26,6 @@ const readAgentUri = async (client, chainId, agentId) => {
   } catch {
     return null
   }
-}
-
-const reverify = async (row) => {
-  const client = getServerPublicClient(row.network_id)
-  if (!client) return row
-  const ok = await controlsAgent(client, row.network_id, row.wallet_address, row.agent_id)
-  if (!ok) {
-    await pool.execute('DELETE FROM agent_identities WHERE wallet_address = ? AND network_id = ?', [row.wallet_address, row.network_id])
-    return null
-  }
-  await pool.execute('UPDATE agent_identities SET verified_at = ? WHERE wallet_address = ? AND network_id = ?', [nowSeconds(), row.wallet_address, row.network_id])
-  return { ...row, verified_at: nowSeconds() }
 }
 
 export async function GET(request) {
@@ -56,7 +44,7 @@ export async function GET(request) {
 
     const fresh = []
     for (const row of rows) {
-      const current = nowSeconds() - Number(row.verified_at) > STALE_SECONDS ? await reverify(row) : row
+      const current = isStaleIdentity(row) ? await reverifyAgentIdentity(row) : row
       if (current) fresh.push({ ...current, registry: erc8004For(current.network_id).identity })
     }
 
