@@ -49,9 +49,9 @@ export const advanceReadCursor = async (pool, userId, room, lineId) => {
   return loadReadCursor(pool, userId, room)
 }
 
-// The room keeps four weeks. Older lines are dropped for good, at most once an hour per server
-// instance, from the write and poll paths, so no scheduler has to exist for it to happen.
-export const RETENTION_DAYS = 28
+// A room keeps its newest thousand live lines. Older ones are dropped for good, at most once an
+// hour per server instance, from the write and poll paths, so no scheduler has to exist for it.
+export const RETENTION_LINES = 1000
 const PRUNE_EVERY_MS = 60 * 60 * 1000
 let lastPruneAt = 0
 
@@ -61,7 +61,14 @@ export const pruneOldLines = async (pool) => {
   if (now - lastPruneAt < PRUNE_EVERY_MS) return
   lastPruneAt = now
   try {
-    await pool.execute('DELETE FROM chat_messages WHERE created_at < NOW(3) - INTERVAL ? DAY LIMIT 5000', [RETENTION_DAYS])
+    for (const room of ROOMS) {
+      const [[cutoff]] = await pool.execute(
+        `SELECT id FROM chat_messages WHERE room = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1 OFFSET ${RETENTION_LINES}`,
+        [room]
+      )
+      if (!cutoff) continue
+      await pool.execute('DELETE FROM chat_messages WHERE room = ? AND id <= ? LIMIT 5000', [room, cutoff.id])
+    }
   } catch (error) {
     console.error('[CHAT_PRUNE_ERROR]:', error)
   }
