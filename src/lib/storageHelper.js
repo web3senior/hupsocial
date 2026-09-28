@@ -292,11 +292,12 @@ export const AVATAR_PIXEL_DENSITY = 2
  *
  * Rounding UP rather than to the nearest is what leaves this without a downside — every slot
  * stays supersampled, and none is ever upscaled into softness. */
-const AVATAR_WIDTHS = [48, 96, 192, 384]
+const AVATAR_WIDTHS = [48, 96, 192, 384, 768]
 
-/* The size a route with no slot to go on should ask for — the top rung, so a consumer that
-   renders the URL as-is still gets a picture that holds up in the biggest box the app has. */
-export const AVATAR_MAX_SIZE = AVATAR_WIDTHS[AVATAR_WIDTHS.length - 1] / AVATAR_PIXEL_DENSITY
+/* The size a route with no slot to go on should ask for — the top slot rung, so a consumer that
+   renders the URL as-is still gets a picture that holds up in the biggest box the app has.
+   Pinned below the 768 rung, which only the profile picture viewer asks for. */
+export const AVATAR_MAX_SIZE = 384 / AVATAR_PIXEL_DENSITY
 
 /* Why every rung animates, including the small ones.
  *

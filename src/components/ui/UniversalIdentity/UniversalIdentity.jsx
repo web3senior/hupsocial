@@ -1,7 +1,9 @@
-import React from 'react'
+'use client'
+
+import React, { useRef } from 'react'
 import clsx from 'clsx'
-import { Identicon } from './Identicon'
 import Avatar from '../Avatar'
+import AvatarViewer from '../AvatarViewer'
 import styles from './UniversalIdentity.module.scss'
 
 /* The widest the only slot this renders in ever gets: the profile header's min(8rem, 28vw).
@@ -11,44 +13,39 @@ const SLOT_WIDTH_PX = 128
 
 export const UniversalIdentity = ({
   displayName,
-  smartContractAddress,
   profileImageUrl,
   fallbackAvatarUrl = '/default-pfp.svg',
   className,
 }) => {
-  const resolvedAvatar = profileImageUrl || fallbackAvatarUrl
+  const viewerRef = useRef(null)
+  const alt = `${displayName}'s avatar`
+
+  const avatar = (
+    <Avatar
+      src={profileImageUrl || fallbackAvatarUrl}
+      size={SLOT_WIDTH_PX}
+      className={styles['user-identity__avatar']}
+      alt={alt}
+    />
+  )
 
   return (
     <div className={clsx(styles['user-identity'], className)}>
-      <div className={styles['user-identity__avatar-wrapper']}>
-        <div className={styles['user-identity__flipper']}>
-          
-          {/* FRONT SIDE: The standard uploaded profile image */}
-          <div className={clsx(styles['user-identity__face'], styles['user-identity__face--front'])}>
-            <Avatar
-              src={resolvedAvatar}
-              size={SLOT_WIDTH_PX}
-              className={styles['user-identity__avatar']}
-              alt={`${displayName}'s avatar`}
-            />
-          </div>
-
-          {/* BACK SIDE: The full-size canvas identicon signature */}
-          <div className={clsx(styles['user-identity__face'], styles['user-identity__face--back'])}>
-            <Identicon
-              name={displayName}
-              profileImage={resolvedAvatar}
-              address={smartContractAddress}
-              /* Identicon writes its size as an inline style, which outranks the class below —
-                 a px value here would pin the back face to one diameter while the front one
-                 tracks the slot */
-              size="100%"
-              className={styles['user-identity__fingerprint-canvas']}
-            />
-          </div>
-
-        </div>
-      </div>
+      {profileImageUrl ? (
+        <>
+          <button
+            type="button"
+            className={styles['user-identity__button']}
+            onClick={() => viewerRef.current?.open()}
+            aria-label="View profile picture"
+          >
+            {avatar}
+          </button>
+          <AvatarViewer ref={viewerRef} src={profileImageUrl} alt={alt} />
+        </>
+      ) : (
+        <div className={styles['user-identity__button']}>{avatar}</div>
+      )}
     </div>
   )
 }
