@@ -18,7 +18,7 @@ export const LIVE_STATUS_URL = trimSlash(process.env.NEXT_PUBLIC_LIVE_STATUS_URL
 export const liveIsConfigured = Boolean(LIVE_MEDIA_URL && LIVE_STATUS_URL)
 
 // 'premium' keeps going live to Premium members and the admin; 'everyone' opens it
-export const LIVE_ACCESS = 'premium'
+export const LIVE_ACCESS = 'everyone'
 
 export const LIVE_TITLE_MAX = 120
 export const LIVE_STARTS_PER_HOUR = 12
