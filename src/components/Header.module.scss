@@ -33,23 +33,12 @@
     inset: 0;
     pointer-events: none;
 
-    // The column's top cell: seated over the page's measured shell (Header.jsx), side borders
-    // carrying the shell's up to the viewport's top, bottom border laid over the shell's top edge
+    // Seated over the page's measured shell (Header.jsx), so the title centres on the card and
+    // the back arrow starts at its edge. Borderless: the shell is a rounded card of its own.
     &--cell {
       right: auto;
-      bottom: auto;
       left: var(--title-cell-left);
       width: var(--title-cell-width);
-      height: var(--title-cell-height);
-      border: 1px solid var(--border);
-      border-top: 0;
-      background-color: var(--background);
-    }
-
-    // Something sits between the title and the shell, so the cell is the header's height and
-    // closes on its own bottom border
-    &--closed {
-      height: var(--header-height);
     }
   }
 

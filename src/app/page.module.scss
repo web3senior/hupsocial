@@ -63,13 +63,8 @@
       min-height: var(--header-height);
       display: flex;
       align-items: center;
-      // The feed column's bordered top cell, like the header's page titles elsewhere: sides carry
-      // the feed card's up to the viewport's top, and the bottom border lies over the card's top
-      // edge (the -1px), so the two read as one column with a single rule between them
+      // Inset to the feed card's own content edge; borderless, the card below is rounded
       padding-inline: 1.25rem;
-      border: 1px solid var(--border);
-      border-top: 0;
-      margin-bottom: -1px;
     }
   }
 

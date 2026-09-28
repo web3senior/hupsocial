@@ -12,9 +12,6 @@ import clsx from 'clsx'
 import styles from './Header.module.scss'
 
 const DESKTOP_QUERY = '(min-width: 768px)'
-// A container starting further below the header than this has something above it (tabs, a
-// banner), so the title cell closes itself off instead of stretching down to meet it
-const CELL_JOIN_SLACK = 8
 
 // The page's bordered shell: the first wide container in <main> that draws a side border
 const findPageShell = (main) =>
@@ -24,9 +21,9 @@ const findPageShell = (main) =>
   })
 
 /**
- * Where the title's bordered cell sits: over the page's own shell, so its side borders carry the
- * column's up to the top of the viewport and its bottom border meets the shell's top edge. Pages
- * never say how wide they are (PageTitle's containerWidth goes unused), so the shell is measured.
+ * Where the title bar sits: over the page's own shell, so the title centres on the card and the
+ * back arrow starts at its edge. Pages never say how wide they are (PageTitle's containerWidth
+ * goes unused), so the shell is measured.
  * Null on phones, where shells go borderless, and while no shell is on the page.
  */
 const useTitleCell = (isActive, pathname) => {
@@ -47,12 +44,8 @@ const useTitleCell = (isActive, pathname) => {
       }
 
       const rect = shell.getBoundingClientRect()
-      const top = Math.round(rect.top + window.scrollY)
-      const headerHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 0
-      const next = { left: Math.round(rect.left), width: Math.round(rect.width), top, joined: top > 0 && top <= headerHeight + CELL_JOIN_SLACK }
-      setCell((prev) =>
-        prev && prev.left === next.left && prev.width === next.width && prev.top === next.top && prev.joined === next.joined ? prev : next
-      )
+      const next = { left: Math.round(rect.left), width: Math.round(rect.width) }
+      setCell((prev) => (prev && prev.left === next.left && prev.width === next.width ? prev : next))
     }
 
     measure()
@@ -84,14 +77,10 @@ export default function Header() {
   const hasTitle = Boolean(title || back)
   const cell = useTitleCell(hasTitle, pathname)
 
-  // Reaching down to the shell's top edge (plus the 1px that lays this bottom border over the
-  // shell's top one), unless something sits between them
   const cellStyle = cell && {
     '--title-cell-left': `${cell.left}px`,
     '--title-cell-width': `${cell.width}px`,
-    '--title-cell-height': `${cell.top + 1}px`,
   }
-  const isJoined = Boolean(cell?.joined)
 
   return (
     <header className={clsx(styles.header, isBare && styles['header--bare'])}>
@@ -110,12 +99,9 @@ export default function Header() {
 
       {hasTitle && (
         // Full-width layer so the container inside centres against the same box as the page's
-        // own containers, clearing the aside the same way. With a measured shell it becomes the
-        // column's bordered top cell instead.
-        <div
-          className={clsx(styles.header__bar, cell && styles['header__bar--cell'], cell && !isJoined && styles['header__bar--closed'])}
-          style={cellStyle || undefined}
-        >
+        // own containers, clearing the aside the same way. With a measured shell it sits over
+        // that shell instead.
+        <div className={clsx(styles.header__bar, cell && styles['header__bar--cell'])} style={cellStyle || undefined}>
           <div className={clsx('__container', styles.header__inner)} data-width={cell ? undefined : width || undefined}>
             {back && (
               <Link href={back.href} className={styles.back} aria-label={back.label} title={back.label}>
