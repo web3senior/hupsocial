@@ -340,7 +340,7 @@ export default function TokenTradeCard({ trade, author }) {
         connectSolana?.(solanaWallets[0].name)?.catch?.(() => {})
         return
       }
-      if (!openConnect()) toast(onSolana ? 'Connect a Solana wallet to trade' : 'Connect your wallet to trade', 'error')
+      if (!openConnect({ chooser: onSolana })) toast(onSolana ? 'Connect a Solana wallet to trade' : 'Connect your wallet to trade', 'error')
       return
     }
     if (isWrongChain) {

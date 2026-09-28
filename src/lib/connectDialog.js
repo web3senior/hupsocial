@@ -18,9 +18,13 @@ export const setConnectHandler = (next) => {
   }
 }
 
-/** True when a chooser was mounted and opened; false leaves the fallback to the caller. */
-export const openConnect = () => {
+/**
+ * True when a chooser was mounted and opened; false leaves the fallback to the caller.
+ * `chooser: true` skips the Grid's direct connect, for asks only another wallet can meet.
+ * @param {{chooser?: boolean}} [options]
+ */
+export const openConnect = (options) => {
   if (!handler) return false
-  handler()
+  handler(options)
   return true
 }

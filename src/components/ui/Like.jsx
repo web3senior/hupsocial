@@ -380,7 +380,7 @@ export const Like = ({ post, onUpdate }) => {
     e.stopPropagation()
 
     if (!actorConnected) {
-      if (!openConnect()) toast(isSolanaPost ? 'Connect your Solana wallet' : 'Please connect wallet', 'error')
+      if (!openConnect({ chooser: isSolanaPost })) toast(isSolanaPost ? 'Connect your Solana wallet' : 'Please connect wallet', 'error')
       return
     }
 

@@ -1,11 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import useSWRImmutable from 'swr/immutable'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useConnect, useConnection, useConnectors } from 'wagmi'
-import { switchConnection } from 'wagmi/actions'
+import { connect as connectTo, switchConnection } from 'wagmi/actions'
 import { EMAIL_CONNECTOR_ID, openEmailLogin } from '@/lib/embeddedWallet/connector'
 import { heldConnection } from '@/lib/heldConnection'
 import { setConnectHandler } from '@/lib/connectDialog'
@@ -56,6 +56,72 @@ const ConnectTrigger = forwardRef(function ConnectTrigger(props, ref) {
     </button>
   )
 })
+
+/**
+ * Inside the LUKSO Grid the host is the wallet: a Universal Profile it has granted connects with
+ * no list in between — by itself once wagmi settles, or on Connect. The chooser is the fallback:
+ * nothing granted yet, a failure, or an ask only a Solana wallet can meet.
+ */
+function useGridConnect(openChooser) {
+  const connectors = useConnectors()
+  const { status } = useConnection()
+  const { chain: activeChain } = useActiveChain()
+  const pendingRef = useRef(false)
+  const autoTriedRef = useRef(null)
+
+  const connector = useMemo(
+    () => (isFramedByGridHost() ? (connectors.find((item) => item.id === UP_PROVIDER_RDNS) ?? null) : null),
+    [connectors]
+  )
+
+  // Resolves false when the host has granted no one, and on any failure
+  const connectGranted = useCallback(async () => {
+    if (!connector || pendingRef.current) return false
+
+    pendingRef.current = true
+    try {
+      const accounts = await connector.getAccounts()
+      if (!accounts.length) return false
+
+      // connect() throws for a wallet wagmi already holds
+      if (heldConnection(connector)) await switchConnection(config, { connector })
+      else await connectTo(config, { connector })
+      return true
+    } catch {
+      return false
+    } finally {
+      pendingRef.current = false
+    }
+  }, [connector])
+
+  // wagmi drops the host's grant when it lands mid-reconnect, which is every returning visit.
+  // Once per connector: a connect that keeps failing must not loop on its own status change.
+  useEffect(() => {
+    if (status !== 'disconnected' || !connector || autoTriedRef.current === connector.uid) return
+
+    let isStale = false
+    connector
+      .getAccounts()
+      .then((accounts) => {
+        if (isStale || !accounts.length || autoTriedRef.current === connector.uid) return
+        autoTriedRef.current = connector.uid
+        connectGranted()
+      })
+      .catch(() => {})
+
+    return () => {
+      isStale = true
+    }
+  }, [status, connector, connectGranted])
+
+  const canQuickConnect = Boolean(connector) && !activeChain?.isSolana
+
+  const connectOrOpen = async ({ chooser = false } = {}) => {
+    if (chooser || !canQuickConnect || !(await connectGranted())) openChooser()
+  }
+
+  return { canQuickConnect, connectOrOpen }
+}
 
 const memberCount = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
@@ -143,7 +209,7 @@ export const ConnectWallet = () => {
       {!isConnected &&
         (isCompact ? (
           <>
-            <ConnectTrigger onClick={() => dialogRef.current?.open()} />
+            <ConnectTrigger onClick={() => dialogRef.current?.connect()} />
             <WalletConnectDialog ref={dialogRef} />
           </>
         ) : (
@@ -163,18 +229,35 @@ export function WalletConnectPanel() {
   // (no stale "connection rejected" error on the next open).
   const [session, setSession] = useState(0)
   const popoverRef = useRef(null)
+  const isOpenRef = useRef(false)
+  const { canQuickConnect, connectOrOpen } = useGridConnect(() => popoverRef.current?.open())
 
   // Stable identity: NativePopover re-subscribes its listeners whenever this changes
   const handleToggle = useCallback((event) => {
+    isOpenRef.current = event.newState === 'open'
     if (event.newState === 'closed') setSession((s) => s + 1)
   }, [])
 
   // The wide-viewport twin of the dialog's registration — this is the surface a signed-out
   // desktop visitor gets, so without it openConnect() would only work on a phone
-  useEffect(() => setConnectHandler(() => popoverRef.current?.open()))
+  useEffect(() => setConnectHandler(connectOrOpen))
+
+  // preventDefault stops the button's popovertarget opening the panel as well; an open panel
+  // keeps its native toggle so the button still closes it
+  const handleTriggerClick = (event) => {
+    if (!canQuickConnect || isOpenRef.current) return
+    event.preventDefault()
+    connectOrOpen()
+  }
 
   return (
-    <NativePopover ref={popoverRef} trigger={<ConnectTrigger />} placement="bottom-end" className={styles.walletPanel} onToggle={handleToggle}>
+    <NativePopover
+      ref={popoverRef}
+      trigger={<ConnectTrigger onClick={handleTriggerClick} />}
+      placement="bottom-end"
+      className={styles.walletPanel}
+      onToggle={handleToggle}
+    >
       {({ close }) => <WalletPanelContent session={session} onConnected={close} />}
     </NativePopover>
   )
@@ -187,18 +270,17 @@ export function WalletConnectPanel() {
 export const WalletConnectDialog = forwardRef(function WalletConnectDialog(_, ref) {
   const dialogRef = useRef(null)
   const [session, setSession] = useState(0)
+  const { connectOrOpen } = useGridConnect(() => dialogRef.current?.open())
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      open: () => dialogRef.current?.open(),
-      close: () => dialogRef.current?.close(),
-    }),
-    []
-  )
+  // No deps: connectOrOpen closes over the connector found this render
+  useImperativeHandle(ref, () => ({
+    open: () => dialogRef.current?.open(),
+    close: () => dialogRef.current?.close(),
+    connect: connectOrOpen,
+  }))
 
   // Lets a like, a composer button or a trade card open the chooser instead of only saying no
-  useEffect(() => setConnectHandler(() => dialogRef.current?.open()))
+  useEffect(() => setConnectHandler(connectOrOpen))
 
   const close = () => dialogRef.current?.close()
 

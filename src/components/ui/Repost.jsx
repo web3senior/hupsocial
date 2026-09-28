@@ -334,7 +334,7 @@ export const Repost = ({ post, onQuote }) => {
               e.stopPropagation()
               close()
               if (!actorConnected) {
-                if (!openConnect()) toast(isSolanaPost ? `Connect your Solana wallet` : `Please connect wallet`, `error`)
+                if (!openConnect({ chooser: isSolanaPost })) toast(isSolanaPost ? `Connect your Solana wallet` : `Please connect wallet`, `error`)
                 return
               }
               isReposted ? removeRepost() : repost(post.id)
@@ -349,7 +349,7 @@ export const Repost = ({ post, onQuote }) => {
               e.stopPropagation()
               close()
               if (!actorConnected) {
-                if (!openConnect()) toast(isSolanaPost ? `Connect your Solana wallet` : `Please connect wallet`, `error`)
+                if (!openConnect({ chooser: isSolanaPost })) toast(isSolanaPost ? `Connect your Solana wallet` : `Please connect wallet`, `error`)
                 return
               }
               onQuote?.()
