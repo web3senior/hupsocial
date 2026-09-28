@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { ArrowLeftIcon } from '@phosphor-icons/react'
 import { ConnectWallet } from '@/components/ConnectWallet'
+import { useCanGoBack } from '@/hooks/useCanGoBack'
 import { usePageTitleStore } from '@/stores/usePageTitleStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { Menu } from './Icons'
@@ -65,6 +66,8 @@ const useTitleCell = (isActive, pathname) => {
 
 export default function Header() {
   const pathname = usePathname()
+  const router = useRouter()
+  const canGoBack = useCanGoBack(pathname)
   const title = usePageTitleStore((state) => state.title)
   const subtitle = usePageTitleStore((state) => state.subtitle)
   const back = usePageTitleStore((state) => state.back)
@@ -80,6 +83,15 @@ export default function Header() {
   const cellStyle = cell && {
     '--title-cell-left': `${cell.left}px`,
     '--title-cell-width': `${cell.width}px`,
+  }
+
+  // Back returns to the page the reader came from; the href is only for a first page of the
+  // visit, and for a new-tab click.
+  const backLabel = canGoBack ? 'Back' : back?.label
+  const handleBack = (event) => {
+    if (!canGoBack || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    router.back()
   }
 
   return (
@@ -102,7 +114,7 @@ export default function Header() {
         <div className={clsx(styles.header__bar, cell && styles['header__bar--cell'])} style={cellStyle || undefined}>
           <div className={clsx('__container', styles.header__inner)} data-width={cell ? undefined : width || undefined}>
             {back && (
-              <Link href={back.href} className={styles.back} aria-label={back.label} title={back.label}>
+              <Link href={back.href} className={styles.back} aria-label={backLabel} title={backLabel} onClick={handleBack}>
                 <ArrowLeftIcon size={20} aria-hidden="true" />
               </Link>
             )}
