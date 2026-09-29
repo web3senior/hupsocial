@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useConnection, useConnectors } from 'wagmi'
-import { useWidgetVersion } from '@/components/chat/useEmbedBridge'
+import { useWidgetInfo } from '@/components/chat/useEmbedBridge'
 import { LUKSO_CONNECTOR_ID } from '@/lib/luksoConnector'
-import { UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
+import { UP_PROVIDER_RDNS, walletOffer } from '@/lib/upProviderClient'
 import styles from './ConnectDiagnostics.module.scss'
 
 // Bump with every change to how wallets are found: it tells a cached page from the current one
-const CONNECT_VERSION = '1.3.0'
+const CONNECT_VERSION = '1.4.0'
 const REFRESH_MS = 2000
 const ANNOUNCE_WAIT_MS = 400
 const MAX_DEPTH = 10
@@ -46,10 +46,27 @@ const describeEthereum = () => {
   return window.ethereum === window.lukso ? 'yes, same as window.lukso' : 'yes'
 }
 
+const RELAYED_FROM = {
+  grid: 'the Grid',
+  'page client': "the site's Grid client",
+  injected: "the site's own wallet",
+}
+
 const describeGrid = async (connector) => {
   if (!connector) return 'not offered'
   const accounts = await connector.getAccounts().catch(() => [])
-  return accounts.length ? `granted ${shortAddress(accounts[0])}` : 'offered, no profile granted'
+  const from = RELAYED_FROM[walletOffer()?.source] || 'the Grid'
+  return accounts.length ? `${shortAddress(accounts[0])} from ${from}` : `offered by ${from}, nothing granted`
+}
+
+const describeHost = (host) => {
+  if (!host) return { page: 'unknown', lukso: 'unknown', ethereum: 'unknown', wallets: 'unknown' }
+  return {
+    page: host.framed ? 'framed' : 'top level',
+    lukso: host.lukso ? 'yes' : 'no',
+    ethereum: host.ethereum ? 'yes' : 'no',
+    wallets: host.announced.length ? host.announced.join(', ') : 'none',
+  }
 }
 
 /**
@@ -62,7 +79,8 @@ export default function ConnectDiagnostics() {
   const [isShown, setIsShown] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [facts, setFacts] = useState(null)
-  const widgetVersion = useWidgetVersion(isShown)
+  const [refresh, setRefresh] = useState(0)
+  const widget = useWidgetInfo(isShown, refresh)
 
   useEffect(() => {
     setIsShown(window.parent !== window || Boolean(window.lukso))
@@ -90,8 +108,13 @@ export default function ConnectDiagnostics() {
       })
     }
 
-    read()
-    const timer = setInterval(read, REFRESH_MS)
+    const tick = () => {
+      read()
+      setRefresh((count) => count + 1)
+    }
+
+    tick()
+    const timer = setInterval(tick, REFRESH_MS)
     return () => {
       isStale = true
       clearInterval(timer)
@@ -100,15 +123,27 @@ export default function ConnectDiagnostics() {
 
   if (!isShown) return null
 
+  const host = describeHost(widget.host)
+  // The site that carries the widget is where a wallet app's browser puts its wallet
+  const hostRows = widget.version
+    ? [
+        ['Site page', host.page],
+        ['Site window.lukso', host.lukso],
+        ['Site window.ethereum', host.ethereum],
+        ['Site announced wallets', host.wallets],
+      ]
+    : []
+
   const rows = [
     ['Connect', CONNECT_VERSION],
-    ['Chat widget', widgetVersion ? `v${widgetVersion}` : 'none'],
+    ['Chat widget', widget.version ? `v${widget.version}` : 'none'],
     ['Page', facts?.page],
     ['window.lukso', facts?.lukso],
     ['window.lukso wallet', facts?.luksoConnector],
     ['window.ethereum', facts?.ethereum],
     ['Announced wallets', facts?.wallets],
-    ['Grid wallet', facts?.grid],
+    ...hostRows,
+    ['Relayed wallet', facts?.grid],
     ['Status', status],
     ['Browser', facts?.browser],
   ]

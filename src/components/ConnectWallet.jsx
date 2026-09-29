@@ -10,7 +10,7 @@ import { EMAIL_CONNECTOR_ID, openEmailLogin } from '@/lib/embeddedWallet/connect
 import { heldConnection } from '@/lib/heldConnection'
 import { setConnectHandler } from '@/lib/connectDialog'
 import { LUKSO_CONNECTOR_ID } from '@/lib/luksoConnector'
-import { UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
+import { requestHostAccounts, UP_PROVIDER_RDNS, walletOffer } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
 import Avatar from '@/components/ui/Avatar'
@@ -62,9 +62,9 @@ const ConnectTrigger = forwardRef(function ConnectTrigger(props, ref) {
 /**
  * Where the wallet is already decided there is no list in between. Inside the LUKSO Grid the
  * host is the wallet: a Universal Profile it has granted connects by itself once wagmi settles,
- * or on Connect. In a browser that injects window.lukso, Connect goes to its prompt. The chooser
- * is the fallback: a refusal, a failure, a second tap while a prompt is out, or an ask only a
- * Solana wallet can meet.
+ * or on Connect. In a browser that injects window.lukso, Connect goes to its prompt; in the chat
+ * widget's room, to the prompt of the wallet the page relays. The chooser is the fallback: a
+ * refusal, a failure, a second tap while a prompt is out, or an ask only a Solana wallet can meet.
  */
 function useDirectConnect(openChooser) {
   const connectors = useConnectors()
@@ -77,12 +77,14 @@ function useDirectConnect(openChooser) {
   const connector = useMemo(() => connectors.find((item) => item.id === UP_PROVIDER_RDNS) ?? null, [connectors])
   const injectedLukso = useMemo(() => connectors.find((item) => item.id === LUKSO_CONNECTOR_ID) ?? null, [connectors])
 
-  // Resolves false on any failure, and when `granted` asks for accounts the wallet has not handed over
-  const connectWith = useCallback(async (target, { granted = false } = {}) => {
+  // Resolves false on any failure, and when `granted` asks for accounts the wallet has not handed
+  // over. `ask` has the page's wallet prompt first, where the room was offered one that can.
+  const connectWith = useCallback(async (target, { granted = false, ask = false } = {}) => {
     if (!target || pendingRef.current) return false
 
     pendingRef.current = true
     try {
+      if (ask && !(await requestHostAccounts()).length) return false
       if (granted && !(await target.getAccounts()).length) return false
 
       // connect() throws for a wallet wagmi already holds
@@ -124,7 +126,8 @@ function useDirectConnect(openChooser) {
   const connectOrOpen = async ({ chooser = false } = {}) => {
     if (chooser || !canQuickConnect) return openChooser()
     if (await connectGranted()) return
-    if (!(await connectWith(injectedLukso))) openChooser()
+    if (await connectWith(injectedLukso)) return
+    if (!(await connectWith(connector, { granted: true, ask: true }))) openChooser()
   }
 
   return { canQuickConnect, connectOrOpen }
@@ -330,7 +333,9 @@ function QrGlyph() {
  */
 const CONNECTOR_LABELS = { injected: 'Browser wallet' }
 
-const connectorLabel = (connector) => CONNECTOR_LABELS[connector.id] || connector.name
+// The relayed wallet goes by the name the page gave it, not the Grid client's own "UE Universal Profile"
+const connectorLabel = (connector) =>
+  (connector.id === UP_PROVIDER_RDNS && walletOffer()?.name) || CONNECTOR_LABELS[connector.id] || connector.name
 
 const PHANTOM_URL = 'https://phantom.com/download'
 
@@ -384,6 +389,9 @@ export function WalletOptions({ onConnected }) {
       finishConnect(held.chainId)
       return
     }
+
+    // The relayed wallet hands accounts over only once the page's own wallet has been asked
+    if (connector.id === UP_PROVIDER_RDNS) await requestHostAccounts().catch(() => [])
 
     connect({ connector }, { onSuccess: (data) => finishConnect(data?.chainId) })
 

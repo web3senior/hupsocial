@@ -16,6 +16,9 @@
  * (see src/lib/upProviderBridge.js): from the page's own up-provider client when it has one,
  * from the Grid directly when it does not.
  *
+ * A wallet app's own browser injects its wallet into the page and gives the room's frame none.
+ * There the page's injected wallet is relayed the same way, and only to a room with no wallet.
+ *
  * A site that frames /embed/chat itself adds data-manual, which leaves the frame and its layout
  * to the site, and hands its iframe over for the relay alone: hupChat.attach(iframe).
  *
@@ -27,7 +30,7 @@
   if (window.hupChat) return
 
   // Bump with every change to this file: it is how a cached copy is told from the current one
-  var VERSION = '1.2.0'
+  var VERSION = '1.3.0'
 
   var STATE_MESSAGE = 'hup:chat:state'
   // Must match src/components/chat/useEmbedBridge.js
@@ -107,9 +110,20 @@
   var GRID_SEARCH_DELAY = 1500
   var GRID_SEARCH_TIMEOUT = 3000
   var GRID_SEARCH_ATTEMPTS = 5
+  // Not a wallet method: the room's client answers eth_requestAccounts itself and never asks
+  var REQUEST_ACCOUNTS = 'hup_requestAccounts'
+  // Injection can land after the page's own scripts
+  var INJECTED_CHECKS = 10
+  var NAME_LIMIT = 40
 
-  var wallet = null // { chainId, accounts, contextAccounts, rpcUrls, request }
+  var wallet = null // { source, name, chainId, accounts, contextAccounts, rpcUrls, request }
   var pageProvider = null
+  var injected = null
+  var injectedTimer = null
+  var injectedChecks = 0
+  var announced = []
+  // Until the room says otherwise: a room with its own wallet is never handed the page's
+  var roomHasWallet = true
   var gridPort = null
   var gridPending = {}
   var gridRequestId = 0
@@ -150,7 +164,13 @@
   }
 
   function offerWallet() {
-    if (wallet && frame && frame.contentWindow) frame.contentWindow.postMessage({ type: WALLET_OFFER }, roomOrigin)
+    if (!wallet || !frame || !frame.contentWindow) return
+    frame.contentWindow.postMessage({ type: WALLET_OFFER, source: wallet.source, name: wallet.name || null }, roomOrigin)
+  }
+
+  function dropInjected() {
+    if (injectedTimer) clearInterval(injectedTimer)
+    injectedTimer = injected = null
   }
 
   function readPageProvider() {
@@ -167,7 +187,9 @@
     pageProvider = provider
     if (gridPort) gridPort.close()
     gridPort = null
+    dropInjected()
     wallet = {
+      source: 'page client',
       chainId: 0,
       accounts: [],
       contextAccounts: [],
@@ -185,7 +207,86 @@
   function onAnnounce(event) {
     var detail = event.detail
     if (!detail || !detail.provider || !detail.info) return
-    if (detail.info.rdns === UP_RDNS || detail.provider.isUPClientProvider === true) usePageProvider(detail.provider)
+    if (detail.info.rdns === UP_RDNS || detail.provider.isUPClientProvider === true) return usePageProvider(detail.provider)
+    for (var i = 0; i < announced.length; i++) if (announced[i].provider === detail.provider) return
+    announced.push({ name: String(detail.info.name || detail.info.rdns || 'Wallet').slice(0, NAME_LIMIT), provider: detail.provider })
+  }
+
+  function findInjected() {
+    if (window.lukso) return { provider: window.lukso, name: 'Universal Profile' }
+    for (var i = 0; i < announced.length; i++) {
+      if (announced[i].provider.isUniversalProfileExtension === true) return announced[i]
+    }
+    if (announced.length === 1) return announced[0]
+    if (window.ethereum) return { provider: window.ethereum, name: announced.length ? announced[0].name : 'Site wallet' }
+    return null
+  }
+
+  function readInjected() {
+    var provider = injected
+    if (!provider || !wallet) return
+    Promise.all([provider.request({ method: 'eth_chainId' }), provider.request({ method: 'eth_accounts' })]).then(
+      function (values) {
+        if (injected !== provider || !wallet) return
+        wallet.chainId = Number(values[0]) || 0
+        wallet.accounts = list(values[1])
+        syncRoom(false)
+      },
+      function () {
+        // A wallet that cannot answer yet is asked again on the next read
+      }
+    )
+  }
+
+  // The one request that may prompt: the visitor asked the room to connect
+  function askInjected() {
+    var provider = injected
+    return provider.request({ method: 'eth_requestAccounts' }).then(function (accounts) {
+      if (injected !== provider || !wallet) return []
+      wallet.accounts = list(accounts)
+      syncRoom(false)
+      readInjected()
+      return wallet.accounts
+    })
+  }
+
+  function useInjected(found) {
+    injected = found.provider
+    wallet = {
+      source: 'injected',
+      name: found.name,
+      chainId: 0,
+      accounts: [],
+      contextAccounts: [],
+      rpcUrls: [],
+      request: function (method, params) {
+        if (method === REQUEST_ACCOUNTS) return askInjected()
+        return found.provider.request({ method: method, params: params })
+      },
+    }
+    if (typeof found.provider.on === 'function') {
+      found.provider.on('accountsChanged', readInjected)
+      found.provider.on('chainChanged', readInjected)
+    }
+    if (injectedTimer) clearInterval(injectedTimer)
+    injectedTimer = setInterval(readInjected, POLL_MS * 3)
+    readInjected()
+    offerWallet()
+  }
+
+  // Last in line: a Grid above the page, or the page's own client, is the wallet when there is one
+  function considerInjected() {
+    if (wallet || roomHasWallet || !frame) return
+    var found = findInjected()
+    if (found) useInjected(found)
+  }
+
+  function watchInjected() {
+    var timer = setInterval(function () {
+      injectedChecks += 1
+      if (wallet || injectedChecks > INJECTED_CHECKS) return clearInterval(timer)
+      considerInjected()
+    }, POLL_MS)
   }
 
   function onGridMessage(event) {
@@ -210,7 +311,9 @@
 
   function useGrid(init, port) {
     gridPort = port
+    dropInjected()
     wallet = {
+      source: 'grid',
       chainId: Number(init.chainId) || 0,
       accounts: list(init.allowedAccounts),
       contextAccounts: list(init.contextAccounts),
@@ -237,12 +340,12 @@
 
   // The Grid answers once its own wallet is ready, which can be after the first ask
   function searchGrid(attempt) {
-    if (wallet || !frame || window.parent === window) return
+    if ((wallet && wallet.source !== 'injected') || !frame || window.parent === window) return
 
     function onInit(event) {
       if (event.source !== window.parent || !event.data || event.data.type !== UP_INIT) return
       window.removeEventListener('message', onInit)
-      if (wallet || !event.ports || !event.ports[0]) return
+      if ((wallet && wallet.source !== 'injected') || !event.ports || !event.ports[0]) return
       useGrid(event.data, event.ports[0])
     }
 
@@ -271,6 +374,9 @@
 
     Promise.resolve()
       .then(function () {
+        if (data.method === REQUEST_ACCOUNTS && wallet.source !== 'injected') {
+          throw { code: 4200, message: 'This wallet is connected from the page that frames it' }
+        }
         return wallet.request(data.method, Array.isArray(data.params) ? data.params : [])
       })
       .then(
@@ -310,8 +416,21 @@
     )
   }
 
+  function hostFacts() {
+    var names = []
+    for (var i = 0; i < announced.length && i < 5; i++) names.push(announced[i].name)
+    return {
+      framed: window.parent !== window,
+      lukso: Boolean(window.lukso),
+      ethereum: Boolean(window.ethereum),
+      announced: names,
+      wallet: wallet ? wallet.source : 'none',
+    }
+  }
+
   function tellVersion() {
-    if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: WIDGET_INFO, version: VERSION }, roomOrigin)
+    if (!frame || !frame.contentWindow) return
+    frame.contentWindow.postMessage({ type: WIDGET_INFO, version: VERSION, host: hostFacts() }, roomOrigin)
   }
 
   function startRelay() {
@@ -322,11 +441,13 @@
     setTimeout(function () {
       searchGrid(1)
     }, GRID_SEARCH_DELAY)
+    watchInjected()
   }
 
   function stopRelay() {
     relayStarted = false
     window.removeEventListener('eip6963:announceProvider', onAnnounce)
+    dropInjected()
     if (pollTimer) clearInterval(pollTimer)
     if (roomPort) roomPort.close()
     if (gridPort) gridPort.close()
@@ -339,7 +460,11 @@
     var data = event.data
     if (UP_HANDSHAKES.indexOf(data) !== -1) return serveRoom()
     if (!data) return
-    if (data.type === WALLET_QUERY) return offerWallet()
+    if (data.type === WALLET_QUERY) {
+      roomHasWallet = data.own !== false
+      considerInjected()
+      return offerWallet()
+    }
     if (data.type === WIDGET_QUERY) return tellVersion()
     if (manual || data.type !== STATE_MESSAGE) return
     state = { mode: data.mode, width: Number(data.width) || 0, height: Number(data.height) || 0 }
@@ -408,7 +533,8 @@
         script: ORIGIN,
         room: roomOrigin,
         framed: window.parent !== window,
-        wallet: !wallet ? 'none' : pageProvider ? 'page client' : 'grid',
+        wallet: wallet ? wallet.source : 'none',
+        host: hostFacts(),
         accounts: wallet ? list(wallet.accounts) : [],
         roomConnected: roomReady,
       }

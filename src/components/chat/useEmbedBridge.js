@@ -8,27 +8,48 @@ const WIDGET_QUERY = 'hup:chat:widget?'
 const WIDGET_INFO = 'hup:chat:widget'
 const VERSION_SHAPE = /^[0-9]{1,3}([.][0-9]{1,3}){1,2}$/
 
+const HOST_WALLETS = new Set(['none', 'grid', 'page client', 'injected'])
+const NAME_LIMIT = 40
+const NAMES_LIMIT = 5
+
+// The host's word, shown as text: held to the shapes expected so nothing else can be put there
+const readHost = (host) => {
+  if (!host || typeof host !== 'object') return null
+  return {
+    framed: host.framed === true,
+    lukso: host.lukso === true,
+    ethereum: host.ethereum === true,
+    announced: Array.isArray(host.announced) ? host.announced.slice(0, NAMES_LIMIT).map((name) => String(name).slice(0, NAME_LIMIT)) : [],
+    wallet: HOST_WALLETS.has(host.wallet) ? host.wallet : 'none',
+  }
+}
+
 /**
- * Which public/chat-widget.js the page framing this one runs.
- * @returns {string|null} null when it runs none, or one too old to say
+ * What the page framing this one says of itself: which public/chat-widget.js it runs, and which
+ * wallets it has. Asked again on `refresh`, since a wallet can arrive after the first answer.
+ * @returns {{version: string|null, host: object|null}} nulls when it runs no script, or one too old to say
  */
-export function useWidgetVersion(enabled = true) {
-  const [widgetVersion, setWidgetVersion] = useState(null)
+export function useWidgetInfo(enabled = true, refresh = 0) {
+  const [info, setInfo] = useState({ version: null, host: null })
 
   useEffect(() => {
     if (!enabled || window.parent === window) return undefined
-    // The host's word, shown as text: held to a version's shape so nothing else can be put there
     const onMessage = (event) => {
       if (event.source !== window.parent || event.data?.type !== WIDGET_INFO) return
       const version = String(event.data.version ?? '')
-      if (VERSION_SHAPE.test(version)) setWidgetVersion(version)
+      if (VERSION_SHAPE.test(version)) setInfo({ version, host: readHost(event.data.host) })
     }
     window.addEventListener('message', onMessage)
     window.parent.postMessage({ type: WIDGET_QUERY }, '*')
     return () => window.removeEventListener('message', onMessage)
-  }, [enabled])
+  }, [enabled, refresh])
 
-  return widgetVersion
+  return info
+}
+
+/** @returns {string|null} null when the page framing this one runs no widget script, or an old one */
+export function useWidgetVersion(enabled = true) {
+  return useWidgetInfo(enabled).version
 }
 
 /**

@@ -38,8 +38,12 @@ export const UP_PROVIDER_RDNS = 'dev.lukso.auth'
 // Must match public/chat-widget.js
 const WALLET_OFFER = 'hup:chat:wallet'
 const WALLET_QUERY = 'hup:chat:wallet?'
+const REQUEST_ACCOUNTS = 'hup_requestAccounts'
+const OFFER_SOURCES = new Set(['grid', 'page client', 'injected'])
+const NAME_LIMIT = 40
 
 let isAwaitingOffer = false
+let offer = null
 
 const isFramedEmbed = () => window.location.pathname.startsWith('/embed/') && window.parent !== window
 
@@ -61,15 +65,35 @@ const awaitWalletOffer = () => {
   if (isAwaitingOffer) return
   isAwaitingOffer = true
 
+  // Kept listening: a Grid that answers late takes over from the page's injected wallet
   const handleMessage = (event) => {
     if (event.source !== window.parent || event.data?.type !== WALLET_OFFER) return
-    window.removeEventListener('message', handleMessage)
+    const { source, name } = event.data
+    offer = {
+      source: OFFER_SOURCES.has(source) ? source : 'grid',
+      name: typeof name === 'string' && name.trim() ? name.trim().slice(0, NAME_LIMIT) : null,
+    }
     createProvider()
   }
 
   window.addEventListener('message', handleMessage)
-  // Nothing private, and the host's origin is not known
-  window.parent.postMessage({ type: WALLET_QUERY }, '*')
+  // Nothing private, and the host's origin is not known. `own` keeps the page's injected wallet
+  // away from a room that has one itself.
+  window.parent.postMessage({ type: WALLET_QUERY, own: Boolean(window.ethereum || window.lukso) }, '*')
+}
+
+/** What the page framing the room offered: where its wallet comes from, and what to call it. */
+export const walletOffer = () => offer
+
+/**
+ * Asks the page's own wallet to connect, which is the one step that may prompt. Only a wallet
+ * relayed from the page can be asked; a Grid grants from its own connect button.
+ * @returns {Promise<string[]>} the accounts handed over, empty when there is nobody to ask
+ */
+export async function requestHostAccounts() {
+  if (offer?.source !== 'injected' || !provider) return []
+  const accounts = await provider.request({ method: REQUEST_ACCOUNTS, params: [] })
+  return Array.isArray(accounts) ? accounts : []
 }
 
 /**
