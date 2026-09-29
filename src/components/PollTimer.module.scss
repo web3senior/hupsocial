@@ -1,0 +1,4 @@
+/* Equal-width digits, so the phrase holds still while the seconds turn over */
+.pollTimer {
+  font-variant-numeric: tabular-nums;
+}

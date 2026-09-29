@@ -60,7 +60,7 @@ export default function FundCountdown({ closesAt, big = false, closedLabel = 'En
 
   if (!big) {
     const phrase = parts.days > 0 ? `${parts.days}d ${parts.hours}h ${parts.minutes}m ${parts.seconds}s` : `${parts.hours}h ${parts.minutes}m ${parts.seconds}s`
-    return <span className={className}>Ends in {phrase}</span>
+    return <span className={clsx(styles.countdown__inline, className)}>Ends in {phrase}</span>
   }
 
   const cells = [

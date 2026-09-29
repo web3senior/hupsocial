@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import styles from './PollTimer.module.scss'
 
 /**
  * @file components/PollTimer.jsx
@@ -69,8 +70,8 @@ export default function PollTimer({ opensAt, closesAt, onPhaseChange }) {
   const remaining = (upcoming ? opens : closes) - now
 
   return (
-    <>
+    <span className={styles.pollTimer}>
       {upcoming ? 'Opens in' : 'Ends in'} {countdown(remaining)}
-    </>
+    </span>
   )
 }

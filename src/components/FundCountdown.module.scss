@@ -43,6 +43,11 @@
     color: var(--text-muted, #888);
   }
 
+  /* Equal-width digits, so the phrase holds still while the seconds turn over */
+  &__inline {
+    font-variant-numeric: tabular-nums;
+  }
+
   &__ended {
     margin: 0;
     text-align: center;
