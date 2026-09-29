@@ -1,0 +1,40 @@
+.diagnostics {
+  flex-shrink: 0;
+  padding: 0 var(--dialog-padding, 1.25rem) 1rem;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+
+  &__summary {
+    width: fit-content;
+    margin-inline: auto;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  &__list {
+    margin: 0.5rem 0 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-12);
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.125rem;
+  }
+
+  &__label {
+    flex-shrink: 0;
+    font-weight: 600;
+  }
+
+  &__value {
+    margin: 0;
+    text-align: end;
+    overflow-wrap: anywhere;
+  }
+}

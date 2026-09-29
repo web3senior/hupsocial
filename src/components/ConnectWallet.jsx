@@ -9,11 +9,13 @@ import { connect as connectTo, switchConnection } from 'wagmi/actions'
 import { EMAIL_CONNECTOR_ID, openEmailLogin } from '@/lib/embeddedWallet/connector'
 import { heldConnection } from '@/lib/heldConnection'
 import { setConnectHandler } from '@/lib/connectDialog'
+import { LUKSO_CONNECTOR_ID } from '@/lib/luksoConnector'
 import { UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
 import Avatar from '@/components/ui/Avatar'
 import DialogSheet from '@/components/ui/DialogSheet'
+import ConnectDiagnostics from '@/components/ConnectDiagnostics'
 import NativePopover from '@/components/ui/NativePopover'
 import { setActiveChainId, useActiveChain } from '@/hooks/useActiveChain'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
@@ -58,11 +60,13 @@ const ConnectTrigger = forwardRef(function ConnectTrigger(props, ref) {
 })
 
 /**
- * Inside the LUKSO Grid the host is the wallet: a Universal Profile it has granted connects with
- * no list in between — by itself once wagmi settles, or on Connect. The chooser is the fallback:
- * nothing granted yet, a failure, or an ask only a Solana wallet can meet.
+ * Where the wallet is already decided there is no list in between. Inside the LUKSO Grid the
+ * host is the wallet: a Universal Profile it has granted connects by itself once wagmi settles,
+ * or on Connect. In a browser that injects window.lukso, Connect goes to its prompt. The chooser
+ * is the fallback: a refusal, a failure, a second tap while a prompt is out, or an ask only a
+ * Solana wallet can meet.
  */
-function useGridConnect(openChooser) {
+function useDirectConnect(openChooser) {
   const connectors = useConnectors()
   const { status } = useConnection()
   const { chain: activeChain } = useActiveChain()
@@ -71,26 +75,29 @@ function useGridConnect(openChooser) {
 
   // Only announced where a Grid wallet is reachable: framed by the Grid, or relayed by the chat widget
   const connector = useMemo(() => connectors.find((item) => item.id === UP_PROVIDER_RDNS) ?? null, [connectors])
+  const injectedLukso = useMemo(() => connectors.find((item) => item.id === LUKSO_CONNECTOR_ID) ?? null, [connectors])
 
-  // Resolves false when the host has granted no one, and on any failure
-  const connectGranted = useCallback(async () => {
-    if (!connector || pendingRef.current) return false
+  // Resolves false on any failure, and when `granted` asks for accounts the wallet has not handed over
+  const connectWith = useCallback(async (target, { granted = false } = {}) => {
+    if (!target || pendingRef.current) return false
 
     pendingRef.current = true
     try {
-      const accounts = await connector.getAccounts()
-      if (!accounts.length) return false
+      if (granted && !(await target.getAccounts()).length) return false
 
       // connect() throws for a wallet wagmi already holds
-      if (heldConnection(connector)) await switchConnection(config, { connector })
-      else await connectTo(config, { connector })
+      if (heldConnection(target)) await switchConnection(config, { connector: target })
+      else await connectTo(config, { connector: target })
       return true
     } catch {
       return false
     } finally {
       pendingRef.current = false
     }
-  }, [connector])
+  }, [])
+
+  // The Grid never prompts, so it only connects what the host has already granted
+  const connectGranted = useCallback(() => connectWith(connector, { granted: true }), [connectWith, connector])
 
   // wagmi drops the host's grant when it lands mid-reconnect, which is every returning visit.
   // Once per connector: a connect that keeps failing must not loop on its own status change.
@@ -112,10 +119,12 @@ function useGridConnect(openChooser) {
     }
   }, [status, connector, connectGranted])
 
-  const canQuickConnect = Boolean(connector) && !activeChain?.isSolana
+  const canQuickConnect = Boolean(connector || injectedLukso) && !activeChain?.isSolana
 
   const connectOrOpen = async ({ chooser = false } = {}) => {
-    if (chooser || !canQuickConnect || !(await connectGranted())) openChooser()
+    if (chooser || !canQuickConnect) return openChooser()
+    if (await connectGranted()) return
+    if (!(await connectWith(injectedLukso))) openChooser()
   }
 
   return { canQuickConnect, connectOrOpen }
@@ -163,6 +172,8 @@ function WalletPanelContent({ onConnected, onClose, session }) {
       <DialogSheet.Footer>
         By connecting a wallet, you consent to Hup&rsquo;s <Link href="/privacy-policy">Privacy Policy</Link>.
       </DialogSheet.Footer>
+
+      <ConnectDiagnostics />
     </>
   )
 }
@@ -228,7 +239,7 @@ export function WalletConnectPanel() {
   const [session, setSession] = useState(0)
   const popoverRef = useRef(null)
   const isOpenRef = useRef(false)
-  const { canQuickConnect, connectOrOpen } = useGridConnect(() => popoverRef.current?.open())
+  const { canQuickConnect, connectOrOpen } = useDirectConnect(() => popoverRef.current?.open())
 
   // Stable identity: NativePopover re-subscribes its listeners whenever this changes
   const handleToggle = useCallback((event) => {
@@ -268,7 +279,7 @@ export function WalletConnectPanel() {
 export const WalletConnectDialog = forwardRef(function WalletConnectDialog(_, ref) {
   const dialogRef = useRef(null)
   const [session, setSession] = useState(0)
-  const { connectOrOpen } = useGridConnect(() => dialogRef.current?.open())
+  const { connectOrOpen } = useDirectConnect(() => dialogRef.current?.open())
 
   // No deps: connectOrOpen closes over the connector found this render
   useImperativeHandle(ref, () => ({
@@ -336,11 +347,12 @@ export function WalletOptions({ onConnected }) {
   // List order: Email leads (the no-extension path), then wallets provably
   // installed (EIP-6963 announced — Universal Profile, MetaMask, ...), then the
   // generic rest. The Grid's Universal Profile only exists inside a LUKSO Grid
-  // frame or a chat widget it relays to, where it is the connector that actually
-  // works (extensions don't inject into cross-origin iframes), so it outranks
-  // everything. Array.sort is stable, so ties keep their registration order.
+  // frame or a chat widget it relays to, and the window.lukso one only in a
+  // browser that is itself the wallet; there they are the connectors that
+  // actually work, so they outrank everything. Array.sort is stable, so ties
+  // keep their registration order.
   const rank = (connector) => {
-    if (connector.id === UP_PROVIDER_RDNS) return 0
+    if (connector.id === UP_PROVIDER_RDNS || connector.id === LUKSO_CONNECTOR_ID) return 0
     if (connector.id === EMAIL_CONNECTOR_ID) return 1
     if (connector.type === 'injected' && connector.id !== 'injected') return 2
     return 3

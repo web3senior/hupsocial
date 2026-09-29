@@ -9,13 +9,10 @@ const WIDGET_INFO = 'hup:chat:widget'
 const VERSION_SHAPE = /^[0-9]{1,3}([.][0-9]{1,3}){1,2}$/
 
 /**
- * The framed dock's side of public/chat-widget.js. The host page owns the frame's size, so the
- * dock reports its mode, and while minimized the pill's own size, for the loader to fit the
- * frame to. Links leave the frame for a new tab: the app itself refuses to be framed by the host.
- * @param {{enabled: boolean, dockRef: React.RefObject<HTMLElement>, mode: string}} options
- * @returns {{widgetVersion: string|null}} null when the host page runs no widget script, or an old one
+ * Which public/chat-widget.js the page framing this one runs.
+ * @returns {string|null} null when it runs none, or one too old to say
  */
-export function useEmbedBridge({ enabled, dockRef, mode }) {
+export function useWidgetVersion(enabled = true) {
   const [widgetVersion, setWidgetVersion] = useState(null)
 
   useEffect(() => {
@@ -30,6 +27,19 @@ export function useEmbedBridge({ enabled, dockRef, mode }) {
     window.parent.postMessage({ type: WIDGET_QUERY }, '*')
     return () => window.removeEventListener('message', onMessage)
   }, [enabled])
+
+  return widgetVersion
+}
+
+/**
+ * The framed dock's side of public/chat-widget.js. The host page owns the frame's size, so the
+ * dock reports its mode, and while minimized the pill's own size, for the loader to fit the
+ * frame to. Links leave the frame for a new tab: the app itself refuses to be framed by the host.
+ * @param {{enabled: boolean, dockRef: React.RefObject<HTMLElement>, mode: string}} options
+ * @returns {{widgetVersion: string|null}}
+ */
+export function useEmbedBridge({ enabled, dockRef, mode }) {
+  const widgetVersion = useWidgetVersion(enabled)
 
   useEffect(() => {
     if (!enabled || window.parent === window) return undefined
