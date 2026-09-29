@@ -6,10 +6,10 @@ export const SECTIONS = {
   // Things other people put up for sale: listed posts, the NFT market grid, new mints.
   bazaar: {
     id: 'bazaar',
-    name: 'Bazaar',
+    name: 'Marketplace',
     tabs: [
       { id: 'nfts', label: 'NFTs', path: '/nfts' },
-      // "Posts", not "Bazaar" — a Bazaar tab inside a Bazaar section reads as a loop
+      // "Posts", not "Marketplace" — a Marketplace tab inside a Marketplace section reads as a loop
       { id: 'posts', label: 'Posts', path: '/bazaar' },
       { id: 'drops', label: 'Drops', path: '/drops' },
     ],

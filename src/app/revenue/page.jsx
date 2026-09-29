@@ -18,7 +18,7 @@ const PAGE_SIZE = 20
 const compactFormatter = new Intl.NumberFormat(undefined, { notation: 'compact' })
 
 const TABS = [
-  { key: 'bazaar', label: 'Bazaar' },
+  { key: 'bazaar', label: 'Posts' },
   { key: 'nfts', label: 'NFTs' },
   { key: 'tips', label: 'Tips' },
 ]
@@ -30,7 +30,7 @@ const EMPTY_TABS = {
     body: (
       <>
         When someone buys one of your listed items, every sale lands here.{' '}
-        <Link href="/bazaar">Browse the Bazaar</Link> to see what selling looks like.
+        <Link href="/bazaar">Browse the Marketplace</Link> to see what selling looks like.
       </>
     ),
   },
@@ -114,7 +114,7 @@ export default function RevenuePage() {
               <h3>No money yet</h3>
               <p>
                 Sales, NFT trades, and tips all land here.{' '}
-                <Link href="/bazaar">Browse the Bazaar</Link> to see what selling looks like.
+                <Link href="/bazaar">Browse the Marketplace</Link> to see what selling looks like.
               </p>
             </div>
           ) : (
