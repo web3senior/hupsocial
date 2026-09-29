@@ -59,63 +59,23 @@ figure.pfp {
   }
 }
 
-// The anchored panel above sm. Doubled class on purpose: this and NativePopover's own .panel
-// land on the same element at equal specificity, so bundle order would otherwise decide who
-// wins on padding, radius and background.
-.walletPanel.walletPanel {
-  --dialog-padding: 1rem;
+// The sheet, header and connector rows all come from DialogSheet — only the pieces with no
+// equivalent there remain.
 
-  // No display here: NativePopover sets `display: block !important` on the open panel, and
-  // block layout is what these children want anyway.
-  width: 360px;
-  max-height: calc(100dvh - 5rem);
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-24);
-  background: var(--surface);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.24);
-  // x hidden so rows run edge to edge inside the rounded outline; y auto so a long connector
-  // list scrolls instead of pushing the footnote off the bottom of the panel
-  overflow: hidden auto;
-
-  // A 2px settle downward under the fade — nothing else. No scale out of the button, no
-  // diagonal: at this size the movement is felt rather than watched, which is the point.
-  //
-  // Written as the independent `translate` property, not `transform`: NativePopover writes
-  // `style.transform` inline while anchoring, and would wipe a transform-based version.
-  opacity: 0;
-  translate: 0 -2px;
-  transition:
-    opacity 0.14s ease-out,
-    translate 0.14s ease-out,
-    overlay 0.14s ease allow-discrete,
-    display 0.14s ease allow-discrete;
-
-  &:global(:popover-open) {
-    opacity: 1;
-    translate: none;
-  }
+// Doubled to beat DialogSheet's `.row__icon svg`, which stretches artwork to fill the tile
+.glyph.glyph {
+  width: 20px;
+  height: 20px;
 }
 
-@supports (transition-behavior: allow-discrete) {
-  @starting-style {
-    .walletPanel.walletPanel:global(:popover-open) {
-      opacity: 0;
-      translate: 0 -2px;
-    }
-  }
-}
+.footnote {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
 
-// The sheet, header and connector rows all come from DialogSheet now — only the two pieces
-// with no equivalent there remain.
-.spinner {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border, var(--gray-200));
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: connect-spin 0.8s linear infinite;
+  // Doubled to beat DialogSheet's `.footer a`
+  &__link.footnote__link {
+    color: var(--blue-500, #0095ff);
+  }
 }
 
 .error {
@@ -128,13 +88,8 @@ figure.pfp {
   overflow-wrap: anywhere;
 }
 
-@keyframes connect-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-// Social proof strip between the title and the connector list — shared by the sheet and the
-// anchored panel, so it inherits each surface's --dialog-padding for gutter alignment.
+// Social proof strip between the title and the connector list; it inherits the sheet's
+// --dialog-padding for gutter alignment.
 .proof {
   flex-shrink: 0;
   gap: 0.6rem;

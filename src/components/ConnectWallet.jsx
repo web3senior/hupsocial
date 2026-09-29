@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { CaretRightIcon, QrCodeIcon, WalletIcon } from '@phosphor-icons/react'
 import useSWRImmutable from 'swr/immutable'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useConnect, useConnection, useConnectors } from 'wagmi'
@@ -16,7 +17,7 @@ import { useProfile } from '@/hooks/useProfile'
 import Avatar from '@/components/ui/Avatar'
 import DialogSheet from '@/components/ui/DialogSheet'
 import ConnectDiagnostics from '@/components/ConnectDiagnostics'
-import NativePopover from '@/components/ui/NativePopover'
+import { Spinner } from '@/components/Loading'
 import { setActiveChainId, useActiveChain } from '@/hooks/useActiveChain'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useSolanaWallet } from '@/hooks/useSolanaWallet'
@@ -26,38 +27,13 @@ import { profilePath } from '@/lib/username'
 import { markFirstConnect } from '@/lib/firstConnect'
 import styles from './ConnectWallet.module.scss'
 
-// Matches the sm breakpoint in styles/components/_responsive.scss
-const COMPACT_QUERY = '(max-width: 639px)'
-
-/**
- * Below sm the wallet list is a bottom sheet — a modal, since it covers the page. At wider
- * widths it hangs off the Connect button as a panel that leaves the page live behind it,
- * which per AGENTS.md makes it a popover rather than a dialog.
- */
-function useCompactViewport() {
-  const [isCompact, setIsCompact] = useState(false)
-
-  useEffect(() => {
-    const mql = window.matchMedia(COMPACT_QUERY)
-    setIsCompact(mql.matches)
-
-    const handleChange = (event) => setIsCompact(event.matches)
-    mql.addEventListener('change', handleChange)
-
-    return () => mql.removeEventListener('change', handleChange)
-  }, [])
-
-  return isCompact
-}
-
-/** Shared between both surfaces; NativePopover clones it to attach its popovertarget. */
-const ConnectTrigger = forwardRef(function ConnectTrigger(props, ref) {
+function ConnectTrigger(props) {
   return (
-    <button ref={ref} type="button" className={`${styles.btnConnect} flex align-items-center gap-025 `} {...props}>
+    <button type="button" className={`${styles.btnConnect} flex align-items-center gap-025 `} {...props}>
       Connect
     </button>
   )
-})
+}
 
 /**
  * Where the wallet is already decided there is no list in between. Inside the LUKSO Grid the
@@ -130,7 +106,7 @@ function useDirectConnect(openChooser) {
     if (!(await connectWith(connector, { granted: true, ask: true }))) openChooser()
   }
 
-  return { canQuickConnect, connectOrOpen }
+  return { connectOrOpen }
 }
 
 const memberCount = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
@@ -139,8 +115,8 @@ const fetchJson = (url) => fetch(url).then((response) => response.json())
 
 /**
  * Social proof under the title: three random member faces and the live users count. Renders
- * nothing until the numbers exist — an empty claim is worse than none — and since both popup
- * surfaces mount their content eagerly, the data is warm before the popup ever opens.
+ * nothing until the numbers exist — an empty claim is worse than none — and since the dialog
+ * mounts its content eagerly, the data is warm before it ever opens.
  */
 function CommunityProof() {
   const { data } = useSWRImmutable('/api/v1/users/community', fetchJson)
@@ -162,29 +138,9 @@ function CommunityProof() {
   )
 }
 
-/** Title, connector list and footnote — identical in the sheet and the anchored panel. */
-function WalletPanelContent({ onConnected, onClose, session }) {
-  return (
-    <>
-      <DialogSheet.Header title="Connect a wallet" onClose={onClose} />
-
-      <CommunityProof />
-
-      <WalletOptions key={session} onConnected={onConnected} />
-
-      <DialogSheet.Footer>
-        By connecting a wallet, you consent to Hup&rsquo;s <Link href="/privacy-policy">Privacy Policy</Link>.
-      </DialogSheet.Footer>
-
-      <ConnectDiagnostics />
-    </>
-  )
-}
-
 export const ConnectWallet = () => {
   const dialogRef = useRef(null)
   const mounted = useClientMounted()
-  const isCompact = useCompactViewport()
 
   const { address: evmAddress, isConnected: isEvmConnected } = useConnection()
   // What the header shows follows the active network: the Solana wallet on a Solana cluster,
@@ -218,69 +174,21 @@ export const ConnectWallet = () => {
     <>
       {isConnected && <Profile addr={address} />}
 
-      {!isConnected &&
-        (isCompact ? (
-          <>
-            <ConnectTrigger onClick={() => dialogRef.current?.connect()} />
-            <WalletConnectDialog ref={dialogRef} />
-          </>
-        ) : (
-          <WalletConnectPanel />
-        ))}
+      {!isConnected && (
+        <>
+          <ConnectTrigger onClick={() => dialogRef.current?.connect()} />
+          <WalletConnectDialog ref={dialogRef} />
+        </>
+      )}
     </>
   )
 }
 
-/**
- * Wide-viewport surface: a panel hanging off the Connect button, with the page still visible
- * and usable behind it. No close button — popover=auto light-dismisses on an outside click
- * or Esc, and a dismiss affordance on unblocking UI is just clutter.
- */
-export function WalletConnectPanel() {
-  // Bumped on every close so WalletOptions remounts with fresh mutation state
-  // (no stale "connection rejected" error on the next open).
-  const [session, setSession] = useState(0)
-  const popoverRef = useRef(null)
-  const isOpenRef = useRef(false)
-  const { canQuickConnect, connectOrOpen } = useDirectConnect(() => popoverRef.current?.open())
-
-  // Stable identity: NativePopover re-subscribes its listeners whenever this changes
-  const handleToggle = useCallback((event) => {
-    isOpenRef.current = event.newState === 'open'
-    if (event.newState === 'closed') setSession((s) => s + 1)
-  }, [])
-
-  // The wide-viewport twin of the dialog's registration — this is the surface a signed-out
-  // desktop visitor gets, so without it openConnect() would only work on a phone
-  useEffect(() => setConnectHandler(connectOrOpen))
-
-  // preventDefault stops the button's popovertarget opening the panel as well; an open panel
-  // keeps its native toggle so the button still closes it
-  const handleTriggerClick = (event) => {
-    if (!canQuickConnect || isOpenRef.current) return
-    event.preventDefault()
-    connectOrOpen()
-  }
-
-  return (
-    <NativePopover
-      ref={popoverRef}
-      trigger={<ConnectTrigger onClick={handleTriggerClick} />}
-      placement="bottom-end"
-      className={styles.walletPanel}
-      onToggle={handleToggle}
-    >
-      {({ close }) => <WalletPanelContent session={session} onConnected={close} />}
-    </NativePopover>
-  )
-}
-
-/**
- * Compact-viewport surface: the bottom sheet. Modal, because it covers the page — so it keeps
- * the backdrop, the scroll lock and a close button.
- */
+/** Centered from sm up, a bottom sheet below it: DialogSheet owns the breakpoint. */
 export const WalletConnectDialog = forwardRef(function WalletConnectDialog(_, ref) {
   const dialogRef = useRef(null)
+  // Bumped on every close so WalletOptions remounts with fresh mutation state
+  // (no stale "connection rejected" error on the next open).
   const [session, setSession] = useState(0)
   const { connectOrOpen } = useDirectConnect(() => dialogRef.current?.open())
 
@@ -298,31 +206,26 @@ export const WalletConnectDialog = forwardRef(function WalletConnectDialog(_, re
 
   return (
     <DialogSheet ref={dialogRef} lightDismiss aria-label="Connect wallet" onClose={() => setSession((s) => s + 1)}>
-      <WalletPanelContent session={session} onConnected={close} onClose={close} />
+      <DialogSheet.Header title="Connect a wallet" onClose={close} />
+
+      <CommunityProof />
+
+      <WalletOptions key={session} onConnected={close} />
+
+      <DialogSheet.Footer>
+        <p className={styles.footnote}>
+          New to wallets?{' '}
+          <a className={styles.footnote__link} href={WALLET_HELP_URL} target="_blank" rel="noopener noreferrer">
+            Find a wallet
+          </a>
+        </p>
+        By connecting a wallet, you consent to Hup&rsquo;s <Link href="/privacy-policy">Privacy Policy</Link>.
+      </DialogSheet.Footer>
+
+      <ConnectDiagnostics />
     </DialogSheet>
   )
 })
-
-/** Scannable-code glyph for connectors that pair by QR rather than by an installed provider. */
-function QrGlyph() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <path d="M14 14h3.5v3.5H14zM19.5 19.5H21V21h-1.5z" fill="currentColor" stroke="none" />
-    </svg>
-  )
-}
 
 /**
  * Labels for connectors whose own name is a term of art rather than something a user would
@@ -337,7 +240,13 @@ const CONNECTOR_LABELS = { injected: 'Browser wallet' }
 const connectorLabel = (connector) =>
   (connector.id === UP_PROVIDER_RDNS && walletOffer()?.name) || CONNECTOR_LABELS[connector.id] || connector.name
 
+// Keyed by connector type; a type without an entry shows its name alone
+const CONNECTOR_HINTS = { walletConnect: 'Any phone wallet, by link or QR code' }
+
 const PHANTOM_URL = 'https://phantom.com/download'
+const WALLET_HELP_URL = 'https://ethereum.org/wallets/find-wallet'
+
+const connecting = <Spinner size={16} label="Connecting" />
 
 export function WalletOptions({ onConnected }) {
   const connectors = useConnectors()
@@ -436,7 +345,7 @@ export function WalletOptions({ onConnected }) {
             key={wallet.name}
             icon={<img src={wallet.icon} alt="" />}
             name={`${wallet.name} (Solana)`}
-            meta={solanaPending === wallet.name ? <span className={styles.spinner} aria-label="Connecting" /> : 'Detected'}
+            meta={solanaPending === wallet.name ? connecting : 'Detected'}
             onClick={() => handleConnectSolana(wallet.name)}
             disabled={isPending || solanaPending !== null}
           />
@@ -458,20 +367,18 @@ export function WalletOptions({ onConnected }) {
           return (
             <DialogSheet.Row
               key={connector.uid}
-              // A string icon falls back to the connector's initial in a tinted tile
-              icon={connector.icon ? <img src={connector.icon} alt="" /> : connectorLabel(connector)}
+              icon={connector.icon ? <img src={connector.icon} alt="" /> : <WalletIcon className={styles.glyph} aria-hidden="true" />}
               name={connectorLabel(connector)}
+              description={CONNECTOR_HINTS[connector.type]}
               meta={
                 isConnectingThis ? (
-                  <span className={styles.spinner} aria-label="Connecting" />
+                  connecting
                 ) : isDetected ? (
                   'Detected'
                 ) : connector.type === 'walletConnect' ? (
-                  <QrGlyph />
+                  <QrCodeIcon size={18} aria-hidden="true" />
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="currentColor">
-                    <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z" />
-                  </svg>
+                  <CaretRightIcon size={16} aria-hidden="true" />
                 )
               }
               onClick={() => handleConnect(connector)}

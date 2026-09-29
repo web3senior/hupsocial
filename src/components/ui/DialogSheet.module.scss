@@ -77,10 +77,9 @@
   }
 }
 
-// Header / Body / Group / Row / Footer are usable on their own, outside .sheet — the connect
-// panel renders them inside a NativePopover, and /connect renders the group straight onto the
-// page. Hence the fallback on every --dialog-padding read: without one the whole shorthand is
-// invalid wherever .sheet isn't the ancestor setting the token.
+// Header / Body / Group / Row / Footer are usable on their own, outside .sheet — /connect
+// renders the group straight onto the page. Hence the fallback on every --dialog-padding read:
+// without one the whole shorthand is invalid wherever .sheet isn't the ancestor setting the token.
 .header {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
