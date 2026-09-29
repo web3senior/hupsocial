@@ -236,6 +236,12 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
     }
   }
 
+  // Draggable in a host page's frame: a touch that starts on it moves it, never the page
+  &--framed {
+    touch-action: none;
+    user-select: none;
+  }
+
   &__icon {
     position: relative;
     display: inline-flex;

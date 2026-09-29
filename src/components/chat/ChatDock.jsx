@@ -379,7 +379,7 @@ export default function ChatDock({ embedded = false }) {
   }, [])
 
   const { dockRef, dragProps, isDragging, dragStyle } = useDraggableCard({ enabled: isOpen && !embedded, offset, setOffset })
-  const { widgetVersion } = useEmbedBridge({ enabled: embedded && !hidden, dockRef, mode })
+  const { widgetVersion, drag: embedDrag } = useEmbedBridge({ enabled: embedded && !hidden, dockRef, mode })
 
   if (hidden) return null
 
@@ -399,13 +399,19 @@ export default function ChatDock({ embedded = false }) {
   return (
     <section
       ref={dockRef}
-      className={clsx(styles.dock, styles[`dock--${mode}`], embedded && styles['dock--embed'], isDragging && styles['dock--dragging'])}
+      className={clsx(
+        styles.dock,
+        styles[`dock--${mode}`],
+        embedded && styles['dock--embed'],
+        (isDragging || embedDrag.isDragging) && styles['dock--dragging']
+      )}
       style={dragStyle}
       aria-label="Chat"
     >
       {isOpen ? (
         <>
-          <header className={styles.dock__bar} {...dragProps}>
+          {/* Framed, the card fills a frame the host page moves, so the bar reports the drag to it */}
+          <header className={styles.dock__bar} {...(embedded ? embedDrag.barProps : dragProps)}>
             <div className={styles.dock__title}>
               <span>Chat</span>
               {badge}
@@ -434,7 +440,14 @@ export default function ChatDock({ embedded = false }) {
           {roomPending && <RoomSkeleton />}
         </>
       ) : (
-        <button type="button" className={styles.pill} onClick={open} aria-label="Maximize chat" title="Open chat">
+        <button
+          type="button"
+          className={clsx(styles.pill, embedded && styles['pill--framed'])}
+          onClick={() => !embedDrag.consumeClick() && open()}
+          aria-label="Maximize chat"
+          title="Open chat"
+          {...embedDrag.pillProps}
+        >
           <span className={styles.pill__icon}>
             <PaperPlaneTiltIcon size={22} />
             {badge}

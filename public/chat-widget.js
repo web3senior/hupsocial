@@ -9,7 +9,8 @@
  * src/config/chatEmbed.mjs may frame the room; anywhere else the browser refuses the frame.
  *
  * The room runs in a frame of /embed/chat, which reports its mode (minimized, open, expanded)
- * and, while minimized, its pill's size; this script fits the frame to that.
+ * and, while minimized, its pill's size; this script fits the frame to that. The visitor can
+ * drag it off whatever it covers, by the pill or the open card's bar, and it stays where it was put.
  *
  * On a page opened inside the LUKSO Grid the room is one frame too deep to be handed the
  * visitor's Universal Profile, so this script relays it over the up-provider wire protocol
@@ -30,12 +31,15 @@
   if (window.hupChat) return
 
   // Bump with every change to this file: it is how a cached copy is told from the current one
-  var VERSION = '1.3.0'
+  var VERSION = '1.4.0'
 
   var STATE_MESSAGE = 'hup:chat:state'
   // Must match src/components/chat/useEmbedBridge.js
   var WIDGET_QUERY = 'hup:chat:widget?'
   var WIDGET_INFO = 'hup:chat:widget'
+  var DRAG_MESSAGE = 'hup:chat:drag'
+  var OFFSET_KEY = 'hup:chat:offset'
+  var DRAG_MARGIN = 8
   var EDGE = 16
   var COMPACT_WIDTH = 768
   var CARD = { width: 360, height: 640 }
@@ -62,9 +66,46 @@
   var manual = Boolean(self && self.hasAttribute('data-manual'))
   var state = { mode: 'minimized', width: 0, height: 0 }
   var frame = null
+  // The shift from the corner seat, as the visitor left it
+  var offset = readOffset()
+  var applied = { x: 0, y: 0 }
+  var dragOrigin = null
 
   function px(value) {
     return Math.max(0, Math.round(value)) + 'px'
+  }
+
+  function readOffset() {
+    try {
+      var stored = JSON.parse(window.localStorage.getItem(OFFSET_KEY))
+      if (stored && isFinite(stored.x) && isFinite(stored.y)) return { x: Number(stored.x), y: Number(stored.y) }
+    } catch (err) {
+      // Blocked storage only costs the position its memory
+    }
+    return { x: 0, y: 0 }
+  }
+
+  function saveOffset() {
+    try {
+      window.localStorage.setItem(OFFSET_KEY, JSON.stringify(offset))
+    } catch (err) {
+      // Blocked storage only costs the position its memory
+    }
+  }
+
+  function within(value, a, b) {
+    return Math.min(Math.max(value, Math.min(a, b)), Math.max(a, b))
+  }
+
+  // Seated at the corner and shifted, never past the viewport's edge
+  function seat(style, width, height) {
+    applied = {
+      x: within(offset.x, EDGE - (window.innerWidth - width - DRAG_MARGIN), EDGE - DRAG_MARGIN),
+      y: within(offset.y, EDGE - (window.innerHeight - height - DRAG_MARGIN), EDGE - DRAG_MARGIN),
+    }
+    style.inset = 'auto ' + px(EDGE - applied.x) + ' ' + px(EDGE - applied.y) + ' auto'
+    style.width = px(width)
+    style.height = px(height)
   }
 
   function layout() {
@@ -75,9 +116,7 @@
 
     if (state.mode === 'minimized') {
       if (!state.width || !state.height) return
-      style.inset = 'auto ' + px(EDGE) + ' ' + px(EDGE) + ' auto'
-      style.width = px(state.width)
-      style.height = px(state.height)
+      seat(style, state.width, state.height)
       style.borderRadius = '999px'
     } else if (vw < COMPACT_WIDTH) {
       // Phones get the room edge to edge, as the app does
@@ -88,12 +127,30 @@
     } else {
       var width = state.mode === 'expanded' ? EXPANDED_WIDTH : CARD.width
       var height = state.mode === 'expanded' ? vh - EDGE * 2 : Math.min(CARD.height, vh - EDGE * 2)
-      style.inset = 'auto ' + px(EDGE) + ' ' + px(EDGE) + ' auto'
-      style.width = px(Math.min(width, vw - EDGE * 2))
-      style.height = px(height)
+      seat(style, Math.min(width, vw - EDGE * 2), height)
       style.borderRadius = '20px'
     }
     style.visibility = 'visible'
+  }
+
+  // The room reads the gesture, since the pointer is over its frame; the frame is this page's to move
+  function onDrag(data) {
+    var isEdgeToEdge = state.mode !== 'minimized' && window.innerWidth < COMPACT_WIDTH
+    if (manual || isEdgeToEdge) return
+
+    if (data.phase === 'end') {
+      if (!dragOrigin) return
+      dragOrigin = null
+      offset = applied
+      return saveOffset()
+    }
+
+    var x = Number(data.x)
+    var y = Number(data.y)
+    if (!isFinite(x) || !isFinite(y)) return
+    if (!dragOrigin) dragOrigin = applied
+    offset = { x: dragOrigin.x + x, y: dragOrigin.y + y }
+    layout()
   }
 
   // --- Universal Profile relay ---
@@ -430,7 +487,7 @@
 
   function tellVersion() {
     if (!frame || !frame.contentWindow) return
-    frame.contentWindow.postMessage({ type: WIDGET_INFO, version: VERSION, host: hostFacts() }, roomOrigin)
+    frame.contentWindow.postMessage({ type: WIDGET_INFO, version: VERSION, host: hostFacts(), drag: !manual }, roomOrigin)
   }
 
   function startRelay() {
@@ -466,6 +523,7 @@
       return offerWallet()
     }
     if (data.type === WIDGET_QUERY) return tellVersion()
+    if (data.type === DRAG_MESSAGE) return onDrag(data)
     if (manual || data.type !== STATE_MESSAGE) return
     state = { mode: data.mode, width: Number(data.width) || 0, height: Number(data.height) || 0 }
     layout()
