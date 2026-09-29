@@ -15,13 +15,24 @@
  * visitor's Universal Profile, so this script relays it over the up-provider wire protocol
  * (see src/lib/upProviderBridge.js): from the page's own up-provider client when it has one,
  * from the Grid directly when it does not.
+ *
+ * A site that frames /embed/chat itself adds data-manual, which leaves the frame and its layout
+ * to the site, and hands its iframe over for the relay alone: hupChat.attach(iframe).
+ *
+ * hupChat.version, and the small label in the room's title bar, say which script a page is running.
  */
 ;(function () {
   'use strict'
 
   if (window.hupChat) return
 
+  // Bump with every change to this file: it is how a cached copy is told from the current one
+  var VERSION = '1.2.0'
+
   var STATE_MESSAGE = 'hup:chat:state'
+  // Must match src/components/chat/useEmbedBridge.js
+  var WIDGET_QUERY = 'hup:chat:widget?'
+  var WIDGET_INFO = 'hup:chat:widget'
   var EDGE = 16
   var COMPACT_WIDTH = 768
   var CARD = { width: 360, height: 640 }
@@ -45,6 +56,7 @@
   var roomOrigin = ORIGIN
 
   var theme = (self && self.getAttribute('data-theme')) || 'auto'
+  var manual = Boolean(self && self.hasAttribute('data-manual'))
   var state = { mode: 'minimized', width: 0, height: 0 }
   var frame = null
 
@@ -105,6 +117,7 @@
   var roomReady = false
   var sent = { chainId: 0, accounts: [], contextAccounts: [] }
   var pollTimer = null
+  var relayStarted = false
 
   function list(value) {
     return Array.isArray(value) ? value.filter(Boolean) : []
@@ -297,7 +310,22 @@
     )
   }
 
+  function tellVersion() {
+    if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: WIDGET_INFO, version: VERSION }, roomOrigin)
+  }
+
+  function startRelay() {
+    if (relayStarted) return
+    relayStarted = true
+    window.addEventListener('eip6963:announceProvider', onAnnounce)
+    window.dispatchEvent(new Event('eip6963:requestProvider'))
+    setTimeout(function () {
+      searchGrid(1)
+    }, GRID_SEARCH_DELAY)
+  }
+
   function stopRelay() {
+    relayStarted = false
     window.removeEventListener('eip6963:announceProvider', onAnnounce)
     if (pollTimer) clearInterval(pollTimer)
     if (roomPort) roomPort.close()
@@ -312,7 +340,8 @@
     if (UP_HANDSHAKES.indexOf(data) !== -1) return serveRoom()
     if (!data) return
     if (data.type === WALLET_QUERY) return offerWallet()
-    if (data.type !== STATE_MESSAGE) return
+    if (data.type === WIDGET_QUERY) return tellVersion()
+    if (manual || data.type !== STATE_MESSAGE) return
     state = { mode: data.mode, width: Number(data.width) || 0, height: Number(data.height) || 0 }
     layout()
   }
@@ -326,6 +355,7 @@
     frame.src = src
     frame.title = 'Hup chat'
     frame.setAttribute('allow', 'clipboard-write')
+    frame.setAttribute('data-hup-chat-version', VERSION)
     // Hidden, but wide enough to lay the pill out, until the room reports its first size
     frame.style.cssText =
       'position:fixed;right:' +
@@ -336,24 +366,45 @@
       'z-index:2147483000;color-scheme:normal;background:transparent;overflow:hidden;' +
       'box-shadow:0 8px 32px rgba(0,0,0,0.18);'
     document.body.appendChild(frame)
+    startRelay()
+  }
 
-    window.addEventListener('eip6963:announceProvider', onAnnounce)
-    window.dispatchEvent(new Event('eip6963:requestProvider'))
-    setTimeout(function () {
-      searchGrid(1)
-    }, GRID_SEARCH_DELAY)
+  // The site's own frame of /embed/chat; a frame it remounts is attached again
+  function attach(element) {
+    if (!manual || !element || element === frame) return
+    frame = element
+    frame.setAttribute('data-hup-chat-version', VERSION)
+    if (roomPort) roomPort.close()
+    roomPort = null
+    roomReady = false
+    try {
+      var origin = new URL(element.src, window.location.href).origin
+      if (ROOM_ORIGINS.indexOf(origin) !== -1) roomOrigin = origin
+    } catch (err) {
+      // Left at the script's own origin until the room speaks
+    }
+    startRelay()
+    // A room that loaded before it was attached asked while nobody was listening
+    tellVersion()
+    offerWallet()
   }
 
   window.addEventListener('message', onMessage)
-  window.addEventListener('resize', layout)
 
-  if (document.body) mount()
-  else document.addEventListener('DOMContentLoaded', mount)
+  if (!manual) {
+    window.addEventListener('resize', layout)
+    if (document.body) mount()
+    else document.addEventListener('DOMContentLoaded', mount)
+  }
 
   window.hupChat = {
+    version: VERSION,
+    attach: attach,
     /** Where the relay stands, for a site owner's console: hupChat.status() */
     status: function () {
       return {
+        version: VERSION,
+        manual: manual,
         script: ORIGIN,
         room: roomOrigin,
         framed: window.parent !== window,
@@ -366,7 +417,7 @@
       window.removeEventListener('message', onMessage)
       window.removeEventListener('resize', layout)
       stopRelay()
-      if (frame && frame.parentNode) frame.parentNode.removeChild(frame)
+      if (!manual && frame && frame.parentNode) frame.parentNode.removeChild(frame)
       frame = null
       window.hupChat = undefined
     },

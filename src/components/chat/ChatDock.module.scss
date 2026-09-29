@@ -163,6 +163,14 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
     font-size: var(--font-size-17);
   }
 
+  // Which widget script the host page runs; only a framed room has one to show
+  &__version {
+    font-weight: 500;
+    font-size: var(--font-size-10);
+    font-variant-numeric: tabular-nums;
+    color: var(--dock-text-muted);
+  }
+
   &__actions {
     display: flex;
     align-items: center;

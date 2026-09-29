@@ -379,7 +379,7 @@ export default function ChatDock({ embedded = false }) {
   }, [])
 
   const { dockRef, dragProps, isDragging, dragStyle } = useDraggableCard({ enabled: isOpen && !embedded, offset, setOffset })
-  useEmbedBridge({ enabled: embedded && !hidden, dockRef, mode })
+  const { widgetVersion } = useEmbedBridge({ enabled: embedded && !hidden, dockRef, mode })
 
   if (hidden) return null
 
@@ -410,6 +410,11 @@ export default function ChatDock({ embedded = false }) {
               <span>Chat</span>
               {badge}
               {presence.count > 0 && <OnlineChip presence={presence} />}
+              {widgetVersion && (
+                <span className={styles.dock__version} title="Chat widget version">
+                  v{widgetVersion}
+                </span>
+              )}
             </div>
             <div className={styles.dock__actions}>
               <button
