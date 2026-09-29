@@ -36,6 +36,14 @@
     }
   })()
 
+  // The apex redirects to www, so the room's origin is not always the one this script came from
+  var ROOM_ORIGINS = (function () {
+    var url = new URL(ORIGIN)
+    var twin = url.hostname.indexOf('www.') === 0 ? url.hostname.slice(4) : 'www.' + url.hostname
+    return [ORIGIN, url.protocol + '//' + twin + (url.port ? ':' + url.port : '')]
+  })()
+  var roomOrigin = ORIGIN
+
   var theme = (self && self.getAttribute('data-theme')) || 'auto'
   var state = { mode: 'minimized', width: 0, height: 0 }
   var frame = null
@@ -86,6 +94,7 @@
   // Long enough for the page's own client to announce itself before the Grid is asked directly
   var GRID_SEARCH_DELAY = 1500
   var GRID_SEARCH_TIMEOUT = 3000
+  var GRID_SEARCH_ATTEMPTS = 5
 
   var wallet = null // { chainId, accounts, contextAccounts, rpcUrls, request }
   var pageProvider = null
@@ -128,7 +137,7 @@
   }
 
   function offerWallet() {
-    if (wallet && frame && frame.contentWindow) frame.contentWindow.postMessage({ type: WALLET_OFFER }, ORIGIN)
+    if (wallet && frame && frame.contentWindow) frame.contentWindow.postMessage({ type: WALLET_OFFER }, roomOrigin)
   }
 
   function readPageProvider() {
@@ -213,7 +222,8 @@
     offerWallet()
   }
 
-  function searchGrid() {
+  // The Grid answers once its own wallet is ready, which can be after the first ask
+  function searchGrid(attempt) {
     if (wallet || !frame || window.parent === window) return
 
     function onInit(event) {
@@ -225,8 +235,10 @@
 
     window.addEventListener('message', onInit)
     window.parent.postMessage(UP_HANDSHAKES[0], '*')
+    // Listening only while an ask is out: an init meant for the page's own client is not ours to take
     setTimeout(function () {
       window.removeEventListener('message', onInit)
+      if (attempt < GRID_SEARCH_ATTEMPTS) searchGrid(attempt + 1)
     }, GRID_SEARCH_TIMEOUT)
   }
 
@@ -280,7 +292,7 @@
         contextAccounts: list(wallet.contextAccounts),
         rpcUrls: list(wallet.rpcUrls),
       },
-      ORIGIN,
+      roomOrigin,
       [channel.port2]
     )
   }
@@ -294,7 +306,8 @@
   }
 
   function onMessage(event) {
-    if (!frame || event.source !== frame.contentWindow || event.origin !== ORIGIN) return
+    if (!frame || event.source !== frame.contentWindow || ROOM_ORIGINS.indexOf(event.origin) === -1) return
+    roomOrigin = event.origin
     var data = event.data
     if (UP_HANDSHAKES.indexOf(data) !== -1) return serveRoom()
     if (!data) return
@@ -326,7 +339,9 @@
 
     window.addEventListener('eip6963:announceProvider', onAnnounce)
     window.dispatchEvent(new Event('eip6963:requestProvider'))
-    setTimeout(searchGrid, GRID_SEARCH_DELAY)
+    setTimeout(function () {
+      searchGrid(1)
+    }, GRID_SEARCH_DELAY)
   }
 
   window.addEventListener('message', onMessage)
@@ -336,6 +351,17 @@
   else document.addEventListener('DOMContentLoaded', mount)
 
   window.hupChat = {
+    /** Where the relay stands, for a site owner's console: hupChat.status() */
+    status: function () {
+      return {
+        script: ORIGIN,
+        room: roomOrigin,
+        framed: window.parent !== window,
+        wallet: !wallet ? 'none' : pageProvider ? 'page client' : 'grid',
+        accounts: wallet ? list(wallet.accounts) : [],
+        roomConnected: roomReady,
+      }
+    },
     remove: function () {
       window.removeEventListener('message', onMessage)
       window.removeEventListener('resize', layout)
