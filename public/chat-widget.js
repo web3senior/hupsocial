@@ -10,6 +10,11 @@
  *
  * The room runs in a frame of /embed/chat, which reports its mode (minimized, open, expanded)
  * and, while minimized, its pill's size; this script fits the frame to that.
+ *
+ * On a page opened inside the LUKSO Grid the room is one frame too deep to be handed the
+ * visitor's Universal Profile, so this script relays it over the up-provider wire protocol
+ * (see src/lib/upProviderBridge.js): from the page's own up-provider client when it has one,
+ * from the Grid directly when it does not.
  */
 ;(function () {
   'use strict'
@@ -68,10 +73,233 @@
     style.visibility = 'visible'
   }
 
+  // --- Universal Profile relay ---
+
+  // Must match src/lib/upProviderClient.js
+  var WALLET_OFFER = 'hup:chat:wallet'
+  var WALLET_QUERY = 'hup:chat:wallet?'
+  var UP_RDNS = 'dev.lukso.auth'
+  var UP_HANDSHAKES = ['upProvider:hasProvider', 'upProvider:requestIframeProvider']
+  var UP_INIT = 'upProvider:windowInitialize'
+  var UP_READY = 'upProvider:windowInitialized'
+  var POLL_MS = 1000
+  // Long enough for the page's own client to announce itself before the Grid is asked directly
+  var GRID_SEARCH_DELAY = 1500
+  var GRID_SEARCH_TIMEOUT = 3000
+
+  var wallet = null // { chainId, accounts, contextAccounts, rpcUrls, request }
+  var pageProvider = null
+  var gridPort = null
+  var gridPending = {}
+  var gridRequestId = 0
+  var roomPort = null
+  var roomReady = false
+  var sent = { chainId: 0, accounts: [], contextAccounts: [] }
+  var pollTimer = null
+
+  function list(value) {
+    return Array.isArray(value) ? value.filter(Boolean) : []
+  }
+
+  function sameList(a, b) {
+    if (a.length !== b.length) return false
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+    return true
+  }
+
+  function notifyRoom(method, params) {
+    if (roomPort && roomReady) roomPort.postMessage({ jsonrpc: '2.0', method: method, params: params })
+  }
+
+  // The room's client only re-emits what changes, so everything reaches it as a notification
+  function syncRoom(force) {
+    if (!wallet || !roomReady) return
+    var accounts = list(wallet.accounts)
+    var contextAccounts = list(wallet.contextAccounts)
+    var chainId = Number(wallet.chainId) || 0
+    var wasConnected = sent.accounts.length > 0
+
+    if (force || chainId !== sent.chainId) notifyRoom('chainChanged', [chainId])
+    if (force || !sameList(contextAccounts, sent.contextAccounts)) notifyRoom('contextAccountsChanged', contextAccounts)
+    if (force || !sameList(accounts, sent.accounts)) notifyRoom('accountsChanged', accounts)
+    if ((force || !wasConnected) && accounts.length > 0) notifyRoom('connect', [{ chainId: '0x' + chainId.toString(16) }])
+
+    sent = { chainId: chainId, accounts: accounts, contextAccounts: contextAccounts }
+  }
+
+  function offerWallet() {
+    if (wallet && frame && frame.contentWindow) frame.contentWindow.postMessage({ type: WALLET_OFFER }, ORIGIN)
+  }
+
+  function readPageProvider() {
+    if (!pageProvider || !wallet) return
+    wallet.chainId = Number(pageProvider.chainId) || 0
+    wallet.accounts = list(pageProvider.accounts)
+    wallet.contextAccounts = list(pageProvider.contextAccounts)
+    syncRoom(false)
+  }
+
+  function usePageProvider(provider) {
+    // A top-level page has no Grid above it to grant anyone
+    if (pageProvider === provider || window.parent === window) return
+    pageProvider = provider
+    if (gridPort) gridPort.close()
+    gridPort = null
+    wallet = {
+      chainId: 0,
+      accounts: [],
+      contextAccounts: [],
+      rpcUrls: [],
+      request: function (method, params) {
+        return provider.request(method, params)
+      },
+    }
+    // Polled, never subscribed: subscribing resumes the client's buffered events, the page's call to make
+    if (!pollTimer) pollTimer = setInterval(readPageProvider, POLL_MS)
+    readPageProvider()
+    offerWallet()
+  }
+
+  function onAnnounce(event) {
+    var detail = event.detail
+    if (!detail || !detail.provider || !detail.info) return
+    if (detail.info.rdns === UP_RDNS || detail.provider.isUPClientProvider === true) usePageProvider(detail.provider)
+  }
+
+  function onGridMessage(event) {
+    var data = event.data
+    if (!data || !wallet || pageProvider) return
+
+    if (data.method === 'chainChanged') wallet.chainId = Number(data.params && data.params[0]) || 0
+    else if (data.method === 'accountsChanged') wallet.accounts = list(data.params)
+    else if (data.method === 'contextAccountsChanged') wallet.contextAccounts = list(data.params)
+    else if (data.method === 'rpcUrlsChanged') wallet.rpcUrls = list(data.params)
+    else if (data.method === 'disconnect') wallet.accounts = []
+    else if (data.method !== 'connect' && data.method !== 'showPopup') {
+      var pending = gridPending[data.id]
+      if (!pending) return
+      delete gridPending[data.id]
+      if (data.error) pending.reject(data.error)
+      else pending.resolve(data.result)
+      return
+    }
+    syncRoom(false)
+  }
+
+  function useGrid(init, port) {
+    gridPort = port
+    wallet = {
+      chainId: Number(init.chainId) || 0,
+      accounts: list(init.allowedAccounts),
+      contextAccounts: list(init.contextAccounts),
+      rpcUrls: list(init.rpcUrls),
+      request: function (method, params) {
+        return new Promise(function (resolve, reject) {
+          var id = ++gridRequestId
+          gridPending[id] = { resolve: resolve, reject: reject }
+          port.postMessage({ jsonrpc: '2.0', id: id, method: method, params: params || [] })
+        })
+      },
+    }
+    port.onmessage = onGridMessage
+    port.postMessage({
+      type: UP_READY,
+      chainId: init.chainId,
+      allowedAccounts: init.allowedAccounts,
+      contextAccounts: init.contextAccounts,
+      rpcUrls: init.rpcUrls,
+    })
+    syncRoom(false)
+    offerWallet()
+  }
+
+  function searchGrid() {
+    if (wallet || !frame || window.parent === window) return
+
+    function onInit(event) {
+      if (event.source !== window.parent || !event.data || event.data.type !== UP_INIT) return
+      window.removeEventListener('message', onInit)
+      if (wallet || !event.ports || !event.ports[0]) return
+      useGrid(event.data, event.ports[0])
+    }
+
+    window.addEventListener('message', onInit)
+    window.parent.postMessage(UP_HANDSHAKES[0], '*')
+    setTimeout(function () {
+      window.removeEventListener('message', onInit)
+    }, GRID_SEARCH_TIMEOUT)
+  }
+
+  function onRoomMessage(event) {
+    var data = event.data
+    if (!data || typeof data !== 'object' || !wallet) return
+
+    if (data.type === UP_READY) {
+      roomReady = true
+      syncRoom(true)
+      return
+    }
+
+    var id = data.id
+    var port = roomPort
+    if (typeof data.method !== 'string' || (typeof id !== 'number' && typeof id !== 'string')) return
+
+    Promise.resolve()
+      .then(function () {
+        return wallet.request(data.method, Array.isArray(data.params) ? data.params : [])
+      })
+      .then(
+        function (result) {
+          // Structured clone drops undefined, and the client only settles on a present result
+          port.postMessage({ jsonrpc: '2.0', id: id, result: result === undefined ? null : result })
+        },
+        function (err) {
+          port.postMessage({
+            jsonrpc: '2.0',
+            id: id,
+            error: { code: err && typeof err.code === 'number' ? err.code : -32603, message: (err && err.message) || 'Internal error' },
+          })
+        }
+      )
+  }
+
+  function serveRoom() {
+    if (!wallet) return
+    // A room that reloads handshakes again: the new channel replaces the old one
+    if (roomPort) roomPort.close()
+    var channel = new MessageChannel()
+    roomPort = channel.port1
+    roomReady = false
+    sent = { chainId: 0, accounts: [], contextAccounts: [] }
+    roomPort.onmessage = onRoomMessage
+    frame.contentWindow.postMessage(
+      {
+        type: UP_INIT,
+        chainId: Number(wallet.chainId) || 0,
+        allowedAccounts: [],
+        contextAccounts: list(wallet.contextAccounts),
+        rpcUrls: list(wallet.rpcUrls),
+      },
+      ORIGIN,
+      [channel.port2]
+    )
+  }
+
+  function stopRelay() {
+    window.removeEventListener('eip6963:announceProvider', onAnnounce)
+    if (pollTimer) clearInterval(pollTimer)
+    if (roomPort) roomPort.close()
+    if (gridPort) gridPort.close()
+    pollTimer = roomPort = gridPort = wallet = pageProvider = null
+  }
+
   function onMessage(event) {
     if (!frame || event.source !== frame.contentWindow || event.origin !== ORIGIN) return
     var data = event.data
-    if (!data || data.type !== STATE_MESSAGE) return
+    if (UP_HANDSHAKES.indexOf(data) !== -1) return serveRoom()
+    if (!data) return
+    if (data.type === WALLET_QUERY) return offerWallet()
+    if (data.type !== STATE_MESSAGE) return
     state = { mode: data.mode, width: Number(data.width) || 0, height: Number(data.height) || 0 }
     layout()
   }
@@ -95,6 +323,10 @@
       'z-index:2147483000;color-scheme:normal;background:transparent;overflow:hidden;' +
       'box-shadow:0 8px 32px rgba(0,0,0,0.18);'
     document.body.appendChild(frame)
+
+    window.addEventListener('eip6963:announceProvider', onAnnounce)
+    window.dispatchEvent(new Event('eip6963:requestProvider'))
+    setTimeout(searchGrid, GRID_SEARCH_DELAY)
   }
 
   window.addEventListener('message', onMessage)
@@ -107,6 +339,7 @@
     remove: function () {
       window.removeEventListener('message', onMessage)
       window.removeEventListener('resize', layout)
+      stopRelay()
       if (frame && frame.parentNode) frame.parentNode.removeChild(frame)
       frame = null
       window.hupChat = undefined

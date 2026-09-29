@@ -9,7 +9,7 @@ import { connect as connectTo, switchConnection } from 'wagmi/actions'
 import { EMAIL_CONNECTOR_ID, openEmailLogin } from '@/lib/embeddedWallet/connector'
 import { heldConnection } from '@/lib/heldConnection'
 import { setConnectHandler } from '@/lib/connectDialog'
-import { isFramedByGridHost, UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
+import { UP_PROVIDER_RDNS } from '@/lib/upProviderClient'
 import { ensureProfile } from '@/lib/api'
 import { useProfile } from '@/hooks/useProfile'
 import Avatar from '@/components/ui/Avatar'
@@ -69,10 +69,8 @@ function useGridConnect(openChooser) {
   const pendingRef = useRef(false)
   const autoTriedRef = useRef(null)
 
-  const connector = useMemo(
-    () => (isFramedByGridHost() ? (connectors.find((item) => item.id === UP_PROVIDER_RDNS) ?? null) : null),
-    [connectors]
-  )
+  // Only announced where a Grid wallet is reachable: framed by the Grid, or relayed by the chat widget
+  const connector = useMemo(() => connectors.find((item) => item.id === UP_PROVIDER_RDNS) ?? null, [connectors])
 
   // Resolves false when the host has granted no one, and on any failure
   const connectGranted = useCallback(async () => {
@@ -337,13 +335,12 @@ export function WalletOptions({ onConnected }) {
 
   // List order: Email leads (the no-extension path), then wallets provably
   // installed (EIP-6963 announced — Universal Profile, MetaMask, ...), then the
-  // generic rest. Inside a LUKSO Grid frame the host's Universal Profile is the
-  // connector that actually works (extensions don't inject into cross-origin
-  // iframes), so it outranks everything there. Array.sort is stable, so ties
-  // keep their registration order.
-  const inGridFrame = isFramedByGridHost()
+  // generic rest. The Grid's Universal Profile only exists inside a LUKSO Grid
+  // frame or a chat widget it relays to, where it is the connector that actually
+  // works (extensions don't inject into cross-origin iframes), so it outranks
+  // everything. Array.sort is stable, so ties keep their registration order.
   const rank = (connector) => {
-    if (inGridFrame && connector.id === UP_PROVIDER_RDNS) return 0
+    if (connector.id === UP_PROVIDER_RDNS) return 0
     if (connector.id === EMAIL_CONNECTOR_ID) return 1
     if (connector.type === 'injected' && connector.id !== 'injected') return 2
     return 3
