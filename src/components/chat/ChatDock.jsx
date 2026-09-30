@@ -12,12 +12,14 @@ import {
   ChatCircleIcon,
   CheckIcon,
   DotsThreeIcon,
+  DownloadSimpleIcon,
   EyeIcon,
   FileIcon,
   GifIcon,
   PaperclipIcon,
   PaperPlaneRightIcon,
   PaperPlaneTiltIcon,
+  PlayIcon,
   ShieldCheckIcon,
   XIcon,
 } from '@phosphor-icons/react'
@@ -61,7 +63,7 @@ import {
 import { REACTIONS } from '@/lib/chatRows'
 import { CHAT_FILE_ACCEPT, chatFileUrl } from '@/lib/chatFiles'
 import { formatBytes } from '@/lib/nftInspect'
-import { resolveIPFSImageUrl } from '@/lib/storageHelper'
+import { resolveIPFSImageUrl, resolveIPFSStreamUrls } from '@/lib/storageHelper'
 import { useChatDockStore } from '@/stores/useChatDockStore'
 import ImageViewer from './ImageViewer'
 import { useChatAttachments } from './useChatAttachments'
@@ -98,6 +100,9 @@ const imageBoxStyle = (file) => {
   const scale = Math.min(1, IMAGE_BOX.width / file.width, IMAGE_BOX.height / file.height)
   return { width: Math.max(1, Math.round(file.width * scale)), aspectRatio: `${file.width} / ${file.height}` }
 }
+
+// A video's size is only known once it starts loading; until then it holds a widescreen box
+const VIDEO_BOX_PENDING = { width: IMAGE_BOX.width, aspectRatio: '16 / 9' }
 
 // A line still sending shows the copy on this device; a sent one comes through the proxy
 const imageThumbUrl = (file) => file.localUrl ?? resolveIPFSImageUrl(file.cid, { width: IMAGE_THUMB_WIDTH })
@@ -1515,12 +1520,65 @@ function ChatLine({
   )
 }
 
-// A file as a bubble: its name and size, and a tap away from the download once it is pinned
+// A video opened in its bubble. It stops when nobody can see it: the room stays mounted while minimized
+function ChatVideo({ file, onFail }) {
+  const videoRef = useRef(null)
+  const [box, setBox] = useState(VIDEO_BOX_PENDING)
+  const sources = resolveIPFSStreamUrls(`ipfs://${file.cid}`)
+  // A dead last source and the player's own error can both report the one failure
+  const failedRef = useRef(false)
+  const fail = () => {
+    if (failedRef.current) return
+    failedRef.current = true
+    onFail()
+  }
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return undefined
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting && !document.fullscreenElement) video.pause()
+    })
+    observer.observe(video)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <video
+      ref={videoRef}
+      className={styles.file__video}
+      style={box}
+      controls
+      autoPlay
+      playsInline
+      aria-label={file.name}
+      onError={fail}
+      onLoadedMetadata={(event) => {
+        const { videoWidth: width, videoHeight: height } = event.currentTarget
+        // Sound and no picture is a codec this browser lacks, as Chrome with an iPhone's HEVC
+        if (!width || !height) fail()
+        else setBox(imageBoxStyle({ width, height }))
+      }}
+    >
+      {/* The browser moves on to the next <source> when one fails to load */}
+      {sources.map((source, index) => (
+        <source key={source} src={source} onError={index === sources.length - 1 ? fail : undefined} />
+      ))}
+    </video>
+  )
+}
+
+// A file as a bubble: its name and size, and a tap away from the download once it is pinned.
+// A video plays in the bubble first: a browser that cannot show its format as a page only
+// downloads it, and a framed room may get no tab at all
 function FileChip({ file, meta, title }) {
+  const [player, setPlayer] = useState('idle')
+  const canPlay = Boolean(file.cid) && file.mime?.startsWith('video/') && player !== 'failed'
+  const Icon = canPlay ? (player === 'open' ? DownloadSimpleIcon : PlayIcon) : FileIcon
   const body = (
     <>
       <span className={styles.file__icon}>
-        <FileIcon size={22} />
+        <Icon size={22} weight={Icon === PlayIcon ? 'fill' : 'regular'} />
       </span>
       <span className={styles.file__text}>
         <span className={styles.file__name}>{file.name}</span>
@@ -1528,9 +1586,23 @@ function FileChip({ file, meta, title }) {
       </span>
     </>
   )
+  const fail = () => {
+    setPlayer('failed')
+    toast(`${file.name} can't be played in this browser. Tap it to download`, 'error')
+  }
   return (
     <div className={clsx(styles.bubble, styles.file)} title={title}>
-      {file.cid ? (
+      {canPlay && player === 'open' && <ChatVideo file={file} onFail={fail} />}
+      {canPlay && player === 'idle' ? (
+        <button
+          type="button"
+          className={clsx(styles.file__link, styles['file__link--play'])}
+          onClick={() => setPlayer('open')}
+          aria-label={`Play ${file.name}`}
+        >
+          {body}
+        </button>
+      ) : file.cid ? (
         <a
           className={styles.file__link}
           href={chatFileUrl(file.cid, file.name)}
