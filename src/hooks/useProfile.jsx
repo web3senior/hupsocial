@@ -1,11 +1,13 @@
 'use client'
 
+import { useCallback } from 'react'
 import useSWR from 'swr'
 import { getProfile } from '@/lib/api'
 import { isEvmAddress } from '@/lib/address'
 import { AVATAR_MAX_SIZE, resolveAvatarImageUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 
 const DEFAULT_USERNAME = 'new-user'
+const PROFILE_DEDUPE_MS = 5 * 60_000
 const DEFAULT_PFP = resolveIPFSImageUrl(process.env.NEXT_PUBLIC_DEFAULT_PFP_CID, { width: 512 })
 
 /**
@@ -37,13 +39,14 @@ export const profileFallbackFromRow = (row) => {
  * @param {Object} [fallback] The identity already on screen for this address. A failed or empty
  *   fetch hands it back rather than the anonymous default, so a hiccup cannot rename a byline
  *   that was painted from the post row — SWR caches whatever resolves here, over the fallback.
+ * @param {{ fresh?: boolean }} [options] `fresh` reads past the CDN's copy (getProfile).
  */
-export const profileFetcher = async (address, fallback) => {
+export const profileFetcher = async (address, fallback, { fresh = false } = {}) => {
   if (!address) return null
 
   try {
     // Attempt Universal Profile (LUKSO) mapping first
-    const rawProfile = await getProfile(address)
+    const rawProfile = await getProfile(address, { fresh })
     const profile = rawProfile?.data ? rawProfile?.data : null
     // console.log('Fetched profile data from LUKSO endpoint:', profile)
 
@@ -77,12 +80,23 @@ export function useProfile(address, fallback) {
   const { data, error, isLoading, mutate } = useSWR(address ? `profile-${address}` : null, () => profileFetcher(address, fallback), {
     revalidateOnFocus: false,
     fallbackData: fallback,
+    // Every byline mounting asked again once the last answer was two seconds old, so a feed of one
+    // author's posts read the same profile once per card. One read per profile per few minutes
+    // now; a save still reads at once, through mutate below.
+    dedupingInterval: PROFILE_DEDUPE_MS,
   })
+
+  // A save calls mutate() with nothing: the read that follows asks past the CDN's copy, or the
+  // profile would show what it was before the save for up to half a minute
+  const refresh = useCallback(
+    (...args) => (args.length ? mutate(...args) : mutate(profileFetcher(address, fallback, { fresh: true }), { revalidate: false })),
+    [mutate, address, fallback],
+  )
 
   return {
     profile: data,
     isLoading,
     isError: error,
-    mutate,
+    mutate: refresh,
   }
 }

@@ -2,17 +2,23 @@ import { getViewerId } from './viewer'
 import { normalizeAddress } from './address'
 import { profileUpdateMessage } from './profileSignature'
 
-export const getProfile= async (address) => {
+/**
+ * @param {string} address
+ * @param {{ fresh?: boolean }} [options] `fresh` reads past the CDN's copy (the route keeps one for
+ *   half a minute): the owner's own read right after a save, which must show what was just saved.
+ */
+export const getProfile = async (address, { fresh = false } = {}) => {
   // Determine the base URL based on the environment
   const isServer = typeof window === 'undefined'
   // The env value may carry a trailing slash; joined as-is that made every server-side self-fetch
   // a `//api/…` URL and a 308 round trip before the real one
   const baseUrl = isServer ? (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '') : ''
-  const url = `${baseUrl}/api/v1/users/profile/${normalizeAddress(address)}`
+  // The CDN keys its copy by the whole URL, so a one-off query string is a read of its own
+  const url = `${baseUrl}/api/v1/users/profile/${normalizeAddress(address)}${fresh ? `?fresh=${Date.now()}` : ''}`
 
   // Server-side (generateMetadata) hits the Next data cache so repeat navigations
   // to the same profile skip the DB + LUKSO round-trip; browsers ignore `next`.
-  const response = await fetch(url, { next: { revalidate: 60 } })
+  const response = await fetch(url, fresh ? { cache: 'no-store' } : { next: { revalidate: 60 } })
   if (response.status === 404) return null
   if (!response.ok) throw new Error('Profile fetch failed')
   const data = await response.json()

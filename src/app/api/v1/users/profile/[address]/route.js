@@ -310,6 +310,14 @@ function shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) {
    the platform default would cut that short and answer with a bare 504. */
 export const maxDuration = 60
 
+/* A profile is public and the same for every reader, and every byline in a feed asks for its
+   author's: the CDN answers for half a minute, so a busy author costs one function run per half
+   minute instead of one per card. Browsers keep no copy, so a reload after a save waits on the CDN
+   alone, and the owner's own read right after a save asks past it (getProfile's `fresh`). A miss
+   (404) is never kept: a new wallet's row lands moments later. */
+const PUBLIC_CACHE_CONTROL = 'public, max-age=0, s-maxage=30, stale-while-revalidate=600'
+const publicProfile = (body) => NextResponse.json(body, { headers: { 'Cache-Control': PUBLIC_CACHE_CONTROL } })
+
 export async function GET(request, { params }) {
   try {
     const { address: identifier } = await params
@@ -383,13 +391,13 @@ export async function GET(request, { params }) {
       scheduleChainRecheck(address, row)
 
       if (row.is_universal_profile) {
-        return NextResponse.json({
+        return publicProfile({
           source: 'universal_profile',
           data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin, premium, erc8004 }),
         })
       }
 
-      return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) })
+      return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) })
     }
 
     const { answered, profile: live } = await readUniversalProfile(address)
@@ -406,7 +414,7 @@ export async function GET(request, { params }) {
     }
 
     if (isUP) {
-      return NextResponse.json({
+      return publicProfile({
         source: 'universal_profile',
         data: shapeUniversalProfile(live, row, address, { badge, origin, premium, erc8004 }),
       })
@@ -418,7 +426,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) })
+    return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) })
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

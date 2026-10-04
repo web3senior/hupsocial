@@ -11,6 +11,12 @@ import { attachSalesUsdTotals } from '@/lib/salesTotals'
 
 export const runtime = 'nodejs'
 
+/* A read with no viewer is the same for everyone, and feeds and the activity stream ask for the
+   same few posts many times a second: the CDN answers them for half a minute and the browser for
+   a few seconds, so a function runs once per post per half minute instead of once per card.
+   A read for a viewer carries that viewer's likes and unlocked content, and is never shared. */
+const PUBLIC_CACHE_CONTROL = 'public, max-age=15, s-maxage=30, stale-while-revalidate=300'
+
 export async function GET(request, { params }) {
   try {
     // Extract both dynamic route tokens directly from the incoming parameters object
@@ -36,7 +42,10 @@ export async function GET(request, { params }) {
       })(),
     ])
 
-    return NextResponse.json({ success: true, data: shapePostRow(post) })
+    return NextResponse.json(
+      { success: true, data: shapePostRow(post) },
+      viewerAddress ? undefined : { headers: { 'Cache-Control': PUBLIC_CACHE_CONTROL } },
+    )
   } catch (error) {
     console.error('[GET_POST_BY_ID_ERROR]:', error.message)
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })

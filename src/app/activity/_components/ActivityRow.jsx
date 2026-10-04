@@ -17,6 +17,8 @@ import styles from './ActivityRow.module.scss'
 
 // No viewer address is passed on purpose: the post endpoint keeps gated and encrypted content
 // locked without one, so a paid post can never leak its body into a public feed.
+const PREVIEW_DEDUPE_MS = 5 * 60_000
+
 const postFetcher = ([, networkId, postId]) =>
   getPostById(networkId, postId).then((response) => (Array.isArray(response?.data) ? response.data[0] : response?.data) || null)
 
@@ -36,8 +38,10 @@ export default function ActivityRow({ row }) {
   const { data: post } = useSWR(
     previewPostId && row.network_id ? ['activity-post', row.network_id, previewPostId] : null,
     postFetcher,
-    // Deleted posts answer 404 forever — retrying them would burn requests for no preview.
-    { revalidateOnFocus: false, shouldRetryOnError: false, keepPreviousData: true },
+    // Deleted posts answer 404 forever — retrying them would burn requests for no preview. A
+    // preview's text doesn't change, so a row mounting again (each poll merges rows in) reuses the
+    // last answer for a few minutes instead of asking once more.
+    { revalidateOnFocus: false, shouldRetryOnError: false, keepPreviousData: true, dedupingInterval: PREVIEW_DEDUPE_MS },
   )
 
   const nft = useNftMetadata({
