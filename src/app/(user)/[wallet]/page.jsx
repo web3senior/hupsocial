@@ -78,7 +78,11 @@ export async function generateMetadata({ params }, parent) {
          rather than merged — the llms.txt pointer beside it would otherwise drop the canonical. */
       alternates: {
         canonical,
-        types: { 'text/plain': `${canonical}/llms.txt` },
+        types: {
+          'text/plain': `${canonical}/llms.txt`,
+          // How a reader given only the profile URL finds the feed
+          'application/rss+xml': `${canonical}/rss.xml`,
+        },
       },
 
       openGraph: {

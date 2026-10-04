@@ -53,7 +53,7 @@ import FollowListDialog from './FollowListDialog'
 import ProfileLinks from './ProfileLinks'
 import PremiumNudge from './PremiumNudge'
 import BirthdayConfetti from '@/components/ui/BirthdayConfetti'
-import { CakeIcon, CameraIcon, ImageIcon, MapPinIcon, RobotIcon } from '@phosphor-icons/react'
+import { CakeIcon, CameraIcon, ImageIcon, MapPinIcon, RobotIcon, RssSimpleIcon } from '@phosphor-icons/react'
 import styles from './UserProfile.module.scss'
 
 // Compares month/day only — the stored year is irrelevant to "is it their birthday today".
@@ -846,7 +846,7 @@ const Profile = ({ addr }) => {
                 <ProfileQRCode profileUrl={`https://hup.social/${profile.username ? `@${profile.username}` : addr}`} styles={styles} />
 
                 <a
-                  className={styles.profile__llmsLink}
+                  className={styles.profile__iconLink}
                   href={`${profile.username ? `/@${profile.username}` : `/${addr}`}/llms.txt`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -854,6 +854,17 @@ const Profile = ({ addr }) => {
                   aria-label="llms.txt"
                 >
                   <RobotIcon size={14} />
+                </a>
+
+                <a
+                  className={styles.profile__iconLink}
+                  href={`${profile.username ? `/@${profile.username}` : `/${addr}`}/rss.xml`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Follow these posts in an RSS reader"
+                  aria-label="RSS feed"
+                >
+                  <RssSimpleIcon size={14} />
                 </a>
               </div>
             </li>
