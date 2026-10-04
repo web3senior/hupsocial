@@ -31,7 +31,7 @@
   if (window.hupChat) return
 
   // Bump with every change to this file: it is how a cached copy is told from the current one
-  var VERSION = '1.4.1'
+  var VERSION = '1.5.0'
 
   var STATE_MESSAGE = 'hup:chat:state'
   // Must match src/components/chat/useEmbedBridge.js
@@ -537,8 +537,8 @@
     frame = document.createElement('iframe')
     frame.src = src
     frame.title = 'Hup chat'
-    // fullscreen is for a video played in the room
-    frame.setAttribute('allow', 'clipboard-write; fullscreen')
+    // fullscreen is for a video played in the room, microphone for a voice message recorded in it
+    frame.setAttribute('allow', 'clipboard-write; fullscreen; microphone')
     frame.setAttribute('data-hup-chat-version', VERSION)
     // Hidden, but wide enough to lay the pill out, until the room reports its first size
     frame.style.cssText =

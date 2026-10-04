@@ -40,6 +40,10 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, error: 'This message is too old to edit' }, { status: 400 })
     }
 
+    if (found.row.kind === 'voice') {
+      return NextResponse.json({ success: false, error: "A voice message can't be edited" }, { status: 400 })
+    }
+
     const text = typeof body?.body === 'string' ? body.body.trim() : ''
     if (!text) return NextResponse.json({ success: false, error: 'Write something first' }, { status: 400 })
     if (text.length > BODY_MAX_CHARS) {

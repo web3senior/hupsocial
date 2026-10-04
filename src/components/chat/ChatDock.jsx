@@ -9,15 +9,14 @@ import {
   ArrowDownIcon,
   ArrowsInSimpleIcon,
   ArrowsOutSimpleIcon,
+  ArrowUpIcon,
   ChatCircleIcon,
-  CheckIcon,
   DotsThreeIcon,
   DownloadSimpleIcon,
-  EyeIcon,
   FileIcon,
   GifIcon,
+  MicrophoneIcon,
   PaperclipIcon,
-  PaperPlaneRightIcon,
   PaperPlaneTiltIcon,
   PlayIcon,
   ShieldCheckIcon,
@@ -64,7 +63,13 @@ import { REACTIONS } from '@/lib/chatRows'
 import { CHAT_FILE_ACCEPT, chatFileUrl } from '@/lib/chatFiles'
 import { formatBytes } from '@/lib/nftInspect'
 import { resolveIPFSImageUrl, resolveIPFSStreamUrls } from '@/lib/storageHelper'
+import { playCue } from '@/lib/uiSounds'
+import { formatVoiceDuration } from '@/lib/voiceMessage'
+import { canRecordVoice } from '@/hooks/useVoiceRecorder'
+import useVisualViewport from '@/hooks/useVisualViewport'
 import { useChatDockStore } from '@/stores/useChatDockStore'
+import VoiceMessage from '@/components/voice/VoiceMessage'
+import VoiceRecorder from '@/components/voice/VoiceRecorder'
 import ImageViewer from './ImageViewer'
 import { useChatAttachments } from './useChatAttachments'
 import { useEmbedBridge } from './useEmbedBridge'
@@ -108,11 +113,42 @@ const VIDEO_BOX_PENDING = { width: IMAGE_BOX.width, aspectRatio: '16 / 9' }
 const imageThumbUrl = (file) => file.localUrl ?? resolveIPFSImageUrl(file.cid, { width: IMAGE_THUMB_WIDTH })
 const imageFullUrl = (file) => (file.cid ? resolveIPFSImageUrl(file.cid) : file.localUrl)
 
+// Where a voice line plays from: the copy on this device while it has one, else the gateways in order
+const voiceSources = (file) => (file.localUrl ? [file.localUrl] : resolveIPFSStreamUrls(`ipfs://${file.cid}`))
+
 const compactCount = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 0 })
 const viewCount = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 const stampDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-const lineTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
 const uploadPercent = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 0 })
+
+// "1m" under a line moves on with this one clock, shared by every line that shows one
+const CLOCK_TICK_MS = 30_000
+const JUST_NOW_MS = 60_000
+const clock = { now: 0, timer: 0, listeners: new Set() }
+
+const subscribeClock = (onTick) => {
+  if (!clock.timer) {
+    clock.now = Date.now()
+    clock.timer = window.setInterval(() => {
+      clock.now = Date.now()
+      clock.listeners.forEach((listener) => listener())
+    }, CLOCK_TICK_MS)
+  }
+  clock.listeners.add(onTick)
+  return () => {
+    clock.listeners.delete(onTick)
+    if (clock.listeners.size) return
+    window.clearInterval(clock.timer)
+    clock.timer = 0
+  }
+}
+
+const useClock = () =>
+  useSyncExternalStore(
+    subscribeClock,
+    () => clock.now,
+    () => 0
+  )
 
 const noopSubscribe = () => () => {}
 
@@ -383,8 +419,10 @@ export default function ChatDock({ embedded = false }) {
     setMentionAlert({ count: 0, firstId: 0 })
   }, [])
 
-  const { dockRef, dragProps, isDragging, dragStyle } = useDraggableCard({ enabled: isOpen && !embedded, offset, setOffset })
+  const { dockRef, dragProps, isDragging, dragStyle, isMobile } = useDraggableCard({ enabled: isOpen && !embedded, offset, setOffset })
   const { widgetVersion, drag: embedDrag } = useEmbedBridge({ enabled: embedded && !hidden, dockRef, mode })
+  // On a phone the open room fills the screen; it follows the visual viewport so the keyboard never covers the composer
+  useVisualViewport(isOpen && isMobile && !embedded)
 
   if (hidden) return null
 
@@ -587,6 +625,7 @@ function useDraggableCard({ enabled, offset, setOffset }) {
     dockRef,
     isDragging,
     dragStyle,
+    isMobile,
     dragProps: isMobile || !enabled ? {} : { onPointerDown, onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag },
   }
 }
@@ -738,6 +777,7 @@ function Room({
     const list = listRef.current
     if (!list) return
     if (dividerRef.current) {
+      stickRef.current = false
       list.scrollTop = Math.max(0, dividerRef.current.offsetTop - 48)
     } else {
       list.scrollTop = list.scrollHeight
@@ -833,8 +873,8 @@ function Room({
     if (list && active && stickRef.current && initialScrollDone) list.scrollTop = list.scrollHeight
   }, [maxId, active, initialScrollDone])
 
-  // A GIF or a face that finishes loading grows the content under the reader; while they sit
-  // at the bottom the view stays pinned there, so nothing ever jumps
+  // A GIF or a face that finishes loading grows the content under the reader, and a draft that
+  // grows a line shrinks the room over it; while they sit at the bottom the view stays pinned there
   useEffect(() => {
     const list = listRef.current
     const content = contentRef.current
@@ -843,6 +883,7 @@ function Room({
       if (stickRef.current) list.scrollTop = list.scrollHeight
     })
     observer.observe(content)
+    observer.observe(list)
     return () => observer.disconnect()
   }, [active, isLoaded])
 
@@ -917,11 +958,16 @@ function Room({
     const list = listRef.current
     if (!list) return
     if (!active) return
+    // Only the reader moving up lets go of the bottom: a line landing under them, or a pin whose
+    // scroll event arrives after more content did, leaves the view short of it without moving it up
+    const movedUp = list.scrollTop < savedScrollRef.current
     savedScrollRef.current = list.scrollTop
     const fromBottom = list.scrollHeight - list.scrollTop - list.clientHeight
     const bottom = fromBottom < 40
-    stickRef.current = bottom && !hasNewer
-    setAtBottom(bottom)
+    if (bottom) stickRef.current = !hasNewer
+    else if (movedUp) stickRef.current = false
+    // Still following, the content observer pins it again before the next paint
+    setAtBottom(bottom || stickRef.current)
     if (list.scrollTop < EDGE_PX) loadOlder()
     if (fromBottom < EDGE_PX) loadNewer()
   }
@@ -974,10 +1020,12 @@ function Room({
           sender: replyTarget.sender,
           body: replyTarget.body,
           gif: replyTarget.gif ?? null,
-          file: replyTarget.file ? { name: replyTarget.file.name, image: replyTarget.file.image } : null,
+          file: replyTarget.file ? { name: replyTarget.file.name, image: replyTarget.file.image, voice: replyTarget.file.voice } : null,
           deleted: false,
         }
       : null
+    const isVoice = attachment?.kind === 'voice'
+    const voiceMeta = isVoice ? { durationMs: attachment.durationMs, waveform: attachment.waveform } : null
     const staged = attachment
       ? {
           cid: null,
@@ -988,6 +1036,8 @@ function Room({
           width: attachment.width,
           height: attachment.height,
           image: attachment.kind === 'image',
+          voice: isVoice,
+          ...voiceMeta,
         }
       : null
     const pending = {
@@ -1007,9 +1057,19 @@ function Room({
     try {
       const uploaded = attachment ? await attachment.ready : null
       const file = uploaded
-        ? { cid: uploaded.cid, name: attachment.name, mime: attachment.mime, size: attachment.size, width: uploaded.width, height: uploaded.height }
+        ? {
+            kind: attachment.kind,
+            cid: uploaded.cid,
+            name: attachment.name,
+            mime: attachment.mime,
+            size: attachment.size,
+            width: uploaded.width,
+            height: uploaded.height,
+            ...voiceMeta,
+          }
         : null
       const data = await sendRoomMessage(token, { body, gif, file, replyTo: quoted?.id ?? null })
+      // A sent recording keeps playing from this device's copy, so the sender never waits on a gateway
       const local = staged?.localUrl && data.message.file ? { file: { ...data.message.file, localUrl: staged.localUrl } } : null
       // The sent line keeps the pending line's key, so its clock turns into the check in place
       setMessages((current) => {
@@ -1018,7 +1078,7 @@ function Room({
           ? rest.map((message) => (message.id === data.message.id ? { ...message, ...local, clientKey: tempId } : message))
           : mergeSorted(rest, [{ ...data.message, ...local, clientKey: tempId }])
       })
-      if (local) settlePreview(data.message.id, data.message.file, staged.localUrl)
+      if (local && staged.image) settlePreview(data.message.id, data.message.file, staged.localUrl)
       return true
     } catch (error) {
       setMessages((current) => (current ?? []).filter((message) => message.id !== tempId))
@@ -1276,10 +1336,11 @@ function ChatRun({
               )}
             </div>
           )}
-          {run.messages.map((message) => (
+          {run.messages.map((message, index) => (
             <ChatLine
               key={message.clientKey ?? message.id}
               message={message}
+              last={index === run.messages.length - 1}
               mine={mine}
               me={me}
               chatMe={chatMe}
@@ -1305,6 +1366,7 @@ function ChatRun({
 
 function ChatLine({
   message,
+  last,
   mine,
   me,
   chatMe,
@@ -1323,40 +1385,19 @@ function ChatLine({
 }) {
   const settled = !message.pending && typeof message.id === 'number'
   const picture = message.file?.image ? message.file : null
-  const attached = message.file && !message.file.image ? message.file : null
+  const voice = message.file?.voice ? message.file : null
+  const attached = message.file && !picture && !voice ? message.file : null
   const isMedia = Boolean(message.gif || picture)
   const canOwn = mine && settled
   const canModerateLine = Boolean(chatMe?.canModerate) && !mine && settled
-  const when = message.pending ? 'Sending…' : toRelativeTime(message.createdAt)
+  const when = message.pending ? 'Sending…' : stampDate.format(new Date(parseTime(message.createdAt)))
   // Only a line typed here rises in; history and polled lines are already in place
   const [arrived] = useState(Boolean(message.pending))
   const Root = arrived ? Rise : 'div'
-  const sentAt = new Date(parseTime(message.createdAt))
-  // Edited, time and the clock-then-check, tucked into the bubble's bottom-right as Telegram does
-  const meta = (
-    <span className={styles.meta}>
-      {settled && message.views > 0 && (
-        <span className={styles.meta__views} title={`${message.views} ${message.views === 1 ? 'view' : 'views'}`}>
-          <EyeIcon size={12} aria-hidden />
-          {viewCount.format(message.views)}
-        </span>
-      )}
-      {message.editedAt && <span>edited</span>}
-      <time dateTime={sentAt.toISOString()}>{lineTime.format(sentAt)}</time>
-      {mine && (
-        <Morph
-          className={styles.meta__status}
-          active={!message.pending}
-          off={<MessageLoader />}
-          on={<CheckIcon size={12} weight="bold" aria-label="Sent" />}
-        />
-      )}
-    </span>
-  )
 
   const items = []
   if (onReply && settled) items.push({ label: 'Reply', run: () => onReply(message) })
-  if (canOwn) items.push({ label: 'Edit', run: () => onEdit(message.id) })
+  if (canOwn && !voice) items.push({ label: 'Edit', run: () => onEdit(message.id) })
   if (canOwn) items.push({ label: 'Delete', run: () => onDeleteOwn(message.id) })
   if (canModerateLine) {
     items.push({ label: 'Remove message', run: () => onModerate({ action: 'delete', messageId: message.id }, () => onRemoved(message.id)) })
@@ -1399,7 +1440,6 @@ function ChatLine({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className={styles.line__gif} src={message.gif} alt="GIF" loading="lazy" title={when} />
               </button>
-              {!message.body && <span className={styles.line__mediaMeta}>{meta}</span>}
             </span>
           )}
           {picture && (
@@ -1426,12 +1466,16 @@ function ChatLine({
                   style={imageBoxStyle(picture)}
                 />
               </button>
-              {!message.body && <span className={styles.line__mediaMeta}>{meta}</span>}
             </span>
           )}
-          {attached && <FileChip file={attached} meta={message.body ? null : meta} title={when} />}
+          {voice && (
+            <div className={clsx(styles.bubble, styles['bubble--voice'])} title={when}>
+              <VoiceMessage src={voiceSources(voice)} duration={voice.durationMs / 1000} waveform={voice.waveform} />
+            </div>
+          )}
+          {attached && <FileChip file={attached} title={when} />}
           {message.body && (
-            <p className={clsx(styles.bubble, (isMedia || attached) && styles['bubble--caption'])} title={when}>
+            <p className={clsx(styles.bubble, (isMedia || attached || voice) && styles['bubble--caption'])} title={when}>
               {splitChatText(message.body).map((part, index) =>
                 part.type === 'link' ? (
                   <a key={index} href={part.value} target="_blank" rel="nofollow noopener noreferrer" className={styles.bubble__link}>
@@ -1450,7 +1494,6 @@ function ChatLine({
                   <span key={index}>{part.value}</span>
                 )
               )}
-              {meta}
             </p>
           )}
           {message.reactions?.length > 0 && (
@@ -1464,6 +1507,7 @@ function ChatLine({
               ))}
             </div>
           )}
+          {(last || message.editedAt) && <LineStatus message={message} mine={mine} last={last} />}
         </div>
       )}
       {(items.length > 0 || (onReact && settled)) && !editing && (
@@ -1520,6 +1564,47 @@ function ChatLine({
   )
 }
 
+/**
+ * Under a run's last bubble: who has seen it and how long ago. The sender never counts as a
+ * viewer, so "Not seen yet" means nobody else has. An edited line says so wherever it sits.
+ */
+function LineStatus({ message, mine, last }) {
+  const now = useClock()
+  const sentAt = parseTime(message.createdAt)
+  const seen = message.views > 0 ? `Seen by ${viewCount.format(message.views)}` : mine ? 'Not seen yet' : null
+  const ago = now - sentAt < JUST_NOW_MS ? 'now' : toRelativeTime(message.createdAt)
+  const label = (
+    <span className={styles.status__parts}>
+      {message.editedAt && <span className={styles.status__part}>Edited</span>}
+      {last && seen && <span className={styles.status__part}>{seen}</span>}
+      {last && (
+        <time className={styles.status__part} dateTime={new Date(sentAt).toISOString()} title={stampDate.format(new Date(sentAt))}>
+          {ago}
+        </time>
+      )}
+    </span>
+  )
+
+  return (
+    <div className={styles.status}>
+      {mine ? (
+        <Morph
+          active={!message.pending}
+          off={
+            <span className={styles.status__parts}>
+              <MessageLoader />
+              Sending…
+            </span>
+          }
+          on={label}
+        />
+      ) : (
+        label
+      )}
+    </div>
+  )
+}
+
 // A video opened in its bubble. It stops when nobody can see it: the room stays mounted while minimized
 function ChatVideo({ file, onFail }) {
   const videoRef = useRef(null)
@@ -1571,7 +1656,7 @@ function ChatVideo({ file, onFail }) {
 // A file as a bubble: its name and size, and a tap away from the download once it is pinned.
 // A video plays in the bubble first: a browser that cannot show its format as a page only
 // downloads it, and a framed room may get no tab at all
-function FileChip({ file, meta, title }) {
+function FileChip({ file, title }) {
   const [player, setPlayer] = useState('idle')
   const canPlay = Boolean(file.cid) && file.mime?.startsWith('video/') && player !== 'failed'
   const Icon = canPlay ? (player === 'open' ? DownloadSimpleIcon : PlayIcon) : FileIcon
@@ -1616,7 +1701,6 @@ function FileChip({ file, meta, title }) {
       ) : (
         <span className={styles.file__link}>{body}</span>
       )}
-      {meta}
     </div>
   )
 }
@@ -1789,7 +1873,7 @@ const quoteText = (reply) => {
   const { text } = toEditable(reply?.body || '')
   if (text) return text
   if (reply?.gif) return 'GIF'
-  if (reply?.file) return reply.file.image ? 'Photo' : reply.file.name
+  if (reply?.file) return reply.file.voice ? 'Voice message' : reply.file.image ? 'Photo' : reply.file.name
   return ''
 }
 
@@ -1921,6 +2005,7 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
     const text = draft.trim()
     const hasAttachments = attachments.items.length > 0
     if ((!text && !gif && !hasAttachments) || isSending) return
+    playCue('send')
     setIsSending(true)
     setDraft('')
     setMention(null)
@@ -1947,6 +2032,23 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
       input.focus()
       input.setSelectionRange(start + glyph.length, start + glyph.length)
     })
+  }
+
+  // The recorder takes the box's place while it is open; the draft waits for it underneath
+  const [canRecord] = useState(canRecordVoice)
+  const [isRecording, setIsRecording] = useState(false)
+  const closeRecorder = useCallback(() => {
+    setIsRecording(false)
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }, [])
+
+  // A recording goes out on its own the moment it is sent; if the send fails it waits in the tray
+  const sendVoice = async (voice) => {
+    const attachment = attachments.prepareVoice(voice)
+    if (!attachment) return
+    playCue('send')
+    const sent = await onSend({ attachment })
+    if (!sent) attachments.restore([attachment])
   }
 
   const canSend = draft.trim().length > 0 || Boolean(gif) || attachments.items.length > 0
@@ -1991,11 +2093,16 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
       {attachments.items.length > 0 && (
         <div className={styles.tray}>
           {attachments.items.map((item) => (
-            <div key={item.key} className={clsx(styles.tray__tile, item.kind === 'file' && styles['tray__tile--file'])} title={item.name}>
-              {item.previewUrl ? (
+            <div key={item.key} className={clsx(styles.tray__tile, item.kind !== 'image' && styles['tray__tile--file'])} title={item.name}>
+              {item.kind === 'image' ? (
                 // The copy on this device, shown while it uploads
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className={styles.tray__image} src={item.previewUrl} alt={item.name} />
+              ) : item.kind === 'voice' ? (
+                <>
+                  <MicrophoneIcon size={20} />
+                  <span className={styles.tray__name}>Voice {formatVoiceDuration(item.durationMs / 1000)}</span>
+                </>
               ) : (
                 <>
                   <FileIcon size={20} />
@@ -2019,85 +2126,112 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
           ))}
         </div>
       )}
-      <div className={styles.composer__pill}>
-        <div className={styles.composer__tool}>
-          <EmojiPicker onSelect={insertEmoji} />
+      {/* The frame is drawn behind the content and sized from it with anchor-size(), so a draft
+          that grows a line, or the recorder taking its place, eases the box instead of snapping it */}
+      <div className={styles.composer__box}>
+        <div className={styles.composer__content}>
+          {isRecording ? (
+            <VoiceRecorder
+              className={styles.composer__recorder}
+              onSend={sendVoice}
+              onClose={closeRecorder}
+              onError={(message) => toast(message, 'error')}
+            />
+          ) : (
+            <>
+              <textarea
+                ref={inputRef}
+                className={styles.composer__input}
+                value={draft}
+                onChange={(event) => {
+                  setDraft(event.target.value)
+                  reportWriting(event.target.value.trim().length > 0)
+                  syncMention(event.target.value, event.target.selectionStart ?? event.target.value.length)
+                }}
+                onKeyUp={(event) => {
+                  if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') {
+                    syncMention(event.target.value, event.target.selectionStart ?? event.target.value.length)
+                  }
+                }}
+                onBlur={() => setMention(null)}
+                onPaste={(event) => {
+                  const files = Array.from(event.clipboardData?.files ?? [])
+                  // Text copied from a document arrives with a picture of itself beside it; the text wins
+                  if (!files.length || event.clipboardData.getData('text/plain')) return
+                  event.preventDefault()
+                  attach(files)
+                }}
+                onKeyDown={(event) => {
+                  if (mentionPickerRef.current?.handleKeyDown(event)) return
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    submit()
+                  }
+                }}
+                placeholder="Message…"
+                rows={1}
+                maxLength={BODY_MAX_CHARS}
+                aria-label="Message"
+              />
+              <div className={styles.composer__tools}>
+                <button
+                  type="button"
+                  className={styles.composer__tool}
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach"
+                  aria-label="Attach an image or a file"
+                >
+                  <PaperclipIcon size={20} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={CHAT_FILE_ACCEPT}
+                  multiple
+                  hidden
+                  onChange={(event) => {
+                    attach(event.target.files)
+                    // The same file picked twice in a row still has to fire a change
+                    event.target.value = ''
+                  }}
+                />
+                <div className={styles.composer__tool}>
+                  <EmojiPicker onSelect={insertEmoji} />
+                </div>
+                <button
+                  type="button"
+                  className={styles.composer__tool}
+                  onClick={() => gifPickerRef.current?.open()}
+                  title="GIF"
+                  aria-label="Send a GIF"
+                >
+                  <GifIcon size={20} />
+                </button>
+                {canRecord && (
+                  <button
+                    type="button"
+                    className={styles.composer__tool}
+                    onClick={() => setIsRecording(true)}
+                    title="Voice message"
+                    aria-label="Record a voice message"
+                  >
+                    <MicrophoneIcon size={20} />
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className={clsx(styles.composer__send, canSend && styles['composer__send--ready'])}
+                  disabled={!canSend || isSending}
+                  aria-label="Send"
+                  title="Send"
+                >
+                  <ArrowUpIcon size={18} weight="bold" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
-        <button
-          type="button"
-          className={styles.composer__tool}
-          onClick={() => fileInputRef.current?.click()}
-          title="Attach"
-          aria-label="Attach an image or a file"
-        >
-          <PaperclipIcon size={22} />
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={CHAT_FILE_ACCEPT}
-          multiple
-          hidden
-          onChange={(event) => {
-            attach(event.target.files)
-            // The same file picked twice in a row still has to fire a change
-            event.target.value = ''
-          }}
-        />
-        <textarea
-          ref={inputRef}
-          className={styles.composer__input}
-          value={draft}
-          onChange={(event) => {
-            setDraft(event.target.value)
-            reportWriting(event.target.value.trim().length > 0)
-            syncMention(event.target.value, event.target.selectionStart ?? event.target.value.length)
-          }}
-          onKeyUp={(event) => {
-            if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') {
-              syncMention(event.target.value, event.target.selectionStart ?? event.target.value.length)
-            }
-          }}
-          onBlur={() => setMention(null)}
-          onPaste={(event) => {
-            const files = Array.from(event.clipboardData?.files ?? [])
-            // Text copied from a document arrives with a picture of itself beside it; the text wins
-            if (!files.length || event.clipboardData.getData('text/plain')) return
-            event.preventDefault()
-            attach(files)
-          }}
-          onKeyDown={(event) => {
-            if (mentionPickerRef.current?.handleKeyDown(event)) return
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault()
-              submit()
-            }
-          }}
-          placeholder="Message…"
-          rows={1}
-          maxLength={BODY_MAX_CHARS}
-          aria-label="Message"
-        />
-        {canSend ? (
-          <button
-            type="submit"
-            className={clsx(styles.composer__tool, styles['composer__tool--send'])}
-            disabled={isSending}
-            aria-label="Send"
-          >
-            <PaperPlaneRightIcon size={20} weight="fill" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className={styles.composer__tool}
-            onClick={() => gifPickerRef.current?.open()}
-            title="GIF"
-            aria-label="Send a GIF"
-          >
-            <GifIcon size={22} />
-          </button>
-        )}
+        <span className={styles.composer__frame} aria-hidden />
       </div>
       <MentionPicker
         ref={mentionPickerRef}

@@ -6,9 +6,14 @@
  */
 
 import { gatewayUrl } from '@/lib/ipfsGateways'
+import { baseMimeType, cleanWaveform, MAX_VOICE_SECONDS, MIN_VOICE_SECONDS, VOICE_MIME_TYPES } from '@/lib/voiceMessage'
 
 export const CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 export const CHAT_FILE_MAX_BYTES = 25 * 1024 * 1024
+// The longest recording at the recorder's bitrate, with room for container overhead
+export const CHAT_VOICE_MAX_BYTES = 4 * 1024 * 1024
+// The recorder's own clock runs a moment past the limit before it stops itself
+const VOICE_DURATION_SLACK_MS = 5_000
 export const CHAT_ATTACHMENTS_MAX = 4
 export const CHAT_FILE_NAME_MAX = 120
 
@@ -61,16 +66,25 @@ export const cleanFileName = (raw) => {
 }
 
 /**
- * Whether the room takes this file, and as what.
+ * Whether the room takes this file, and as what. A voice message is only ever one the sender
+ * recorded, so it is declared as one rather than guessed from its type.
  * @param {{name?: string, type?: string, mime?: string, size?: number}} file a File, or what a line declares
- * @returns {{kind: 'image'|'file', name: string, mime: string, size: number}|{error: string}}
+ * @param {{voice?: boolean}} [options]
+ * @returns {{kind: 'image'|'file'|'voice', name: string, mime: string, size: number}|{error: string}}
  */
-export const classifyChatFile = (file) => {
+export const classifyChatFile = (file, { voice = false } = {}) => {
   const name = cleanFileName(file?.name)
   const mime = String(file?.type ?? file?.mime ?? '').toLowerCase()
   const size = Number(file?.size)
   if (!name) return { error: 'That file has no name' }
   if (!Number.isInteger(size) || size <= 0) return { error: `${name} is empty` }
+
+  if (voice) {
+    const type = baseMimeType(mime)
+    if (!VOICE_MIME_TYPES.includes(type)) return { error: 'That recording is in a format the chat does not take' }
+    if (size > CHAT_VOICE_MAX_BYTES) return { error: `Voice messages are capped at ${megabytes(CHAT_VOICE_MAX_BYTES)} MB` }
+    return { kind: 'voice', name, mime: type, size }
+  }
 
   if (CHAT_IMAGE_TYPES.includes(mime)) {
     if (size > CHAT_IMAGE_MAX_BYTES) return { error: `Images are capped at ${megabytes(CHAT_IMAGE_MAX_BYTES)} MB` }
@@ -82,6 +96,20 @@ export const classifyChatFile = (file) => {
   if (size > CHAT_FILE_MAX_BYTES) return { error: `Files are capped at ${megabytes(CHAT_FILE_MAX_BYTES)} MB` }
   // The extension decides: browsers report an empty or generic type for half of these
   return { kind: 'file', name, mime: known, size }
+}
+
+/**
+ * The length and waveform a voice line declares. Both come from the sender, so the length is
+ * bounded and the waveform only ever sets the height of a bar.
+ * @returns {{durationMs: number, waveform: number[]}|{error: string}}
+ */
+export const voiceMetaFrom = (raw) => {
+  const durationMs = Number(raw?.durationMs)
+  const longest = MAX_VOICE_SECONDS * 1000 + VOICE_DURATION_SLACK_MS
+  if (!Number.isInteger(durationMs) || durationMs < MIN_VOICE_SECONDS * 1000 || durationMs > longest) {
+    return { error: 'That recording is too short or too long' }
+  }
+  return { durationMs, waveform: cleanWaveform(raw?.waveform) ?? [] }
 }
 
 const CID_PATTERN = /^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{58,100})$/

@@ -6,7 +6,8 @@
  */
 
 import { isEvmAddress, normalizeAddress } from '@/lib/address'
-import { chatCidFrom, classifyChatFile } from '@/lib/chatFiles'
+import { chatCidFrom, classifyChatFile, voiceMetaFrom } from '@/lib/chatFiles'
+import { cleanWaveform } from '@/lib/voiceMessage'
 
 export const BODY_MAX_CHARS = 1000
 
@@ -189,15 +190,20 @@ const sideFrom = (raw) => {
 }
 
 /**
- * The picture or file a line declares, checked against the same rules the browser applied.
+ * The picture, file or voice message a line declares, checked against the same rules the browser applied.
  * @param {unknown} raw what the request sent as `file`
- * @returns {{file: {cid, kind, name, mime, size, width, height}}|{error: string}}
+ * @returns {{file: {cid, kind, name, mime, size, width, height, durationMs?, waveform?}}|{error: string}}
  */
 export const chatFileFrom = (raw) => {
   const cid = chatCidFrom(raw?.cid)
   if (!cid) return { error: 'That upload did not finish' }
-  const checked = classifyChatFile({ name: raw?.name, mime: raw?.mime, size: raw?.size })
+  const checked = classifyChatFile({ name: raw?.name, mime: raw?.mime, size: raw?.size }, { voice: raw?.kind === 'voice' })
   if (checked.error) return { error: checked.error }
+  if (checked.kind === 'voice') {
+    const meta = voiceMetaFrom(raw)
+    if (meta.error) return { error: meta.error }
+    return { file: { cid, ...checked, width: null, height: null, ...meta } }
+  }
   const isImage = checked.kind === 'image'
   const width = isImage ? sideFrom(raw?.width) : null
   const height = isImage ? sideFrom(raw?.height) : null
@@ -210,9 +216,16 @@ export const viewerAddress = (raw) => {
   return isEvmAddress(address) ? address : null
 }
 
-/** Live lines of a room, with their sender and the line they answer. Append conditions and ORDER BY. */
-export const LIVE_LINES = `SELECT m.id, m.kind, m.body, m.gif_url, m.reply_to, m.views, m.created_at, m.edited_at,
-                                  m.file_cid, m.file_name, m.file_mime, m.file_size, m.file_width, m.file_height,
+/** A voice line's waveform as its column holds it, and back. */
+export const waveformToColumn = (waveform) => (waveform?.length ? waveform.join(',') : null)
+const waveformFromColumn = (value) => (typeof value === 'string' && value ? cleanWaveform(value.split(',').map(Number)) : undefined)
+
+/**
+ * Live lines of a room, with their sender and the line they answer. Append conditions and ORDER BY.
+ * m.* rather than a column list: a column the install has not added yet reads as absent instead
+ * of failing the whole room.
+ */
+export const LIVE_LINES = `SELECT m.*,
                                   u.wallet AS sender, u.role AS sender_role,
                                   r.body AS reply_body, r.kind AS reply_kind, r.gif_url AS reply_gif, r.deleted_at AS reply_deleted,
                                   r.file_name AS reply_file_name,
@@ -332,6 +345,9 @@ export const serializeLine = (row) => ({
         width: Number(row.file_width) || null,
         height: Number(row.file_height) || null,
         image: row.kind === 'image',
+        voice: row.kind === 'voice',
+        durationMs: Number(row.file_duration_ms) || null,
+        waveform: waveformFromColumn(row.file_waveform) ?? null,
       }
     : null,
   createdAt: row.created_at,
@@ -343,7 +359,10 @@ export const serializeLine = (row) => ({
         sender: row.reply_sender || null,
         body: row.reply_deleted ? '' : row.reply_body || '',
         gif: row.reply_deleted ? null : row.reply_gif || null,
-        file: !row.reply_deleted && row.reply_file_name ? { name: row.reply_file_name, image: row.reply_kind === 'image' } : null,
+        file:
+          !row.reply_deleted && row.reply_file_name
+            ? { name: row.reply_file_name, image: row.reply_kind === 'image', voice: row.reply_kind === 'voice' }
+            : null,
         deleted: Boolean(row.reply_deleted) || !row.reply_sender,
       }
     : null,

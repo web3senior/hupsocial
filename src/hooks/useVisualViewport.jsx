@@ -14,13 +14,19 @@
  * Publishes, for as long as the hook is active:
  *   --visual-viewport-height  visible height, shrinking as the keyboard slides in
  *   --visual-viewport-top     how far the visual viewport sits down the layout viewport
+ *   --visual-viewport-bottom  how much of the layout viewport's foot is covered, the keyboard
  *
- * Both are cleared on unmount, so every consumer must carry its own fallback
- * (`var(--visual-viewport-height, 100dvh)`) for the unmounted, pre-paint, and
+ * All are cleared once the last active consumer unmounts, so every consumer must carry its own
+ * fallback (`var(--visual-viewport-height, 100dvh)`) for the unmounted, pre-paint, and
  * no-visualViewport cases.
  */
 
 import { useEffect } from 'react'
+
+const PROPERTIES = ['--visual-viewport-height', '--visual-viewport-top', '--visual-viewport-bottom']
+
+// Every consumer writes the same values, so one unmounting must not wipe them from under another
+let consumers = 0
 
 export default function useVisualViewport(active = true) {
   useEffect(() => {
@@ -29,14 +35,17 @@ export default function useVisualViewport(active = true) {
 
     const root = document.documentElement
     let frame = 0
+    consumers += 1
 
     const sync = () => {
       // iOS fires resize and scroll on every frame of the keyboard's slide-in animation;
       // coalescing to one rAF keeps the sheet from re-laying out a few dozen times
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
+        const covered = Math.max(0, root.clientHeight - viewport.offsetTop - viewport.height)
         root.style.setProperty('--visual-viewport-height', `${viewport.height}px`)
         root.style.setProperty('--visual-viewport-top', `${viewport.offsetTop}px`)
+        root.style.setProperty('--visual-viewport-bottom', `${covered}px`)
       })
     }
 
@@ -49,8 +58,8 @@ export default function useVisualViewport(active = true) {
       cancelAnimationFrame(frame)
       viewport.removeEventListener('resize', sync)
       viewport.removeEventListener('scroll', sync)
-      root.style.removeProperty('--visual-viewport-height')
-      root.style.removeProperty('--visual-viewport-top')
+      consumers -= 1
+      if (!consumers) PROPERTIES.forEach((property) => root.style.removeProperty(property))
     }
   }, [active])
 }

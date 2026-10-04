@@ -1,0 +1,136 @@
+// A holder recolours it by setting --voice-accent, --voice-accent-text, --voice-muted and --voice-danger
+.recorder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  min-height: 2.25rem;
+
+  &__button {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    color: var(--voice-muted, var(--text-muted));
+    background: none;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: color 0.15s ease;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      color: inherit;
+    }
+
+    &--discard:hover:not(:disabled),
+    &--discard:focus-visible {
+      color: var(--voice-danger, var(--status-error));
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.4;
+    }
+  }
+
+  &__time {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 3.25rem;
+    font-size: var(--font-size-14);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    user-select: none;
+  }
+
+  &__dot {
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background-color: var(--voice-muted, var(--text-muted));
+
+    &--live {
+      background-color: var(--voice-danger, var(--status-error));
+      animation: recorder-live 1.2s ease-in-out infinite;
+    }
+  }
+
+  &__levels {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    min-width: 0;
+    height: 1.5rem;
+    overflow: hidden;
+    // New sound enters on the right whatever direction the page reads in
+    direction: ltr;
+  }
+
+  &__level {
+    flex: 1;
+    min-width: 1px;
+    max-width: 3px;
+    border-radius: 999px;
+    background-color: var(--voice-accent, var(--text));
+    transition: height 0.1s linear;
+  }
+
+  &__send {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-inline-start: 0.25rem;
+    padding: 0;
+    color: var(--voice-accent-text, var(--background));
+    background-color: var(--voice-accent, var(--text));
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.12s ease;
+
+    &:active:not(:disabled) {
+      transform: scale(0.9);
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.4;
+    }
+  }
+
+  &__status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@keyframes recorder-live {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recorder__dot--live {
+    animation: none;
+  }
+}

@@ -24,6 +24,7 @@ import {
   pruneOldLines,
   serializeLine,
   touchPresence,
+  waveformToColumn,
 } from '@/lib/chatRows'
 
 export const runtime = 'nodejs'
@@ -168,7 +169,7 @@ export async function POST(request) {
     const room = chatRoomFrom(body?.room)
     if (!room) return NextResponse.json({ success: false, error: 'Unknown room' }, { status: 404 })
 
-    // A line is text, or a GIF, a picture or a file with the text as its caption; a reply
+    // A line is text, or a GIF, a picture, a file or a voice message with the text as its caption; a reply
     // points at a live line of the room
     const text = typeof body?.body === 'string' ? body.body.trim() : ''
     const gif = typeof body?.gif === 'string' && body.gif ? body.gif.trim() : null
@@ -215,23 +216,29 @@ export async function POST(request) {
       }
     }
 
+    const fields = {
+      room,
+      sender_id: me.id,
+      kind,
+      body: text,
+      gif_url: gif,
+      file_cid: file?.cid ?? null,
+      file_name: file?.name ?? null,
+      file_mime: file?.mime ?? null,
+      file_size: file?.size ?? null,
+      file_width: file?.width ?? null,
+      file_height: file?.height ?? null,
+      reply_to: replyTo,
+    }
+    // Only a voice line names the voice columns, so every other line still sends on an install without them
+    if (kind === 'voice') {
+      fields.file_duration_ms = file.durationMs
+      fields.file_waveform = waveformToColumn(file.waveform)
+    }
+    const columns = Object.keys(fields)
     const [result] = await pool.execute(
-      `INSERT INTO chat_messages (room, sender_id, kind, body, gif_url, file_cid, file_name, file_mime, file_size, file_width, file_height, reply_to)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        room,
-        me.id,
-        kind,
-        text,
-        gif,
-        file?.cid ?? null,
-        file?.name ?? null,
-        file?.mime ?? null,
-        file?.size ?? null,
-        file?.width ?? null,
-        file?.height ?? null,
-        replyTo,
-      ]
+      `INSERT INTO chat_messages (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+      Object.values(fields)
     )
     const [[row]] = await pool.execute(`${LIVE} AND m.id = ?`, [room, result.insertId])
     await pruneOldLines(pool)
