@@ -5,6 +5,11 @@
 // "+" keeps its corner and the chat sits beside it
 $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
 
+// More of the screen than this covered means the keyboard is up
+$keyboard-threshold: 150px;
+// The Universal Profile app's toolbar above the keyboard, with its gap
+$app-toolbar-clearance: 5.25rem;
+
 // A messenger card in the bottom-right corner
 .dock {
   --dock-width: 360px;
@@ -85,6 +90,17 @@ $floating-column: calc(1rem + clamp(70px, 9vw, 100px) + 0.75rem);
       overscroll-behavior: contain;
       // Every frame of the keyboard's slide resizes the room; a transition would trail behind it
       transition: none;
+    }
+
+    // An iOS app's own browser floats its toolbar over the page just above the keyboard, and no
+    // viewport API reports it, so the room keeps clear of it while the keys are up. The clamp is a
+    // step: a keyboard covers far more than the threshold, the strip iOS 26 can leave behind less
+    &--overlaid.dock--open,
+    &--overlaid.dock--expanded {
+      padding-bottom: calc(
+        max(0px, env(safe-area-inset-bottom, 0px) - var(--visual-viewport-bottom, 0px)) +
+          clamp(0px, (var(--visual-viewport-bottom, 0px) - #{$keyboard-threshold}) * 100, #{$app-toolbar-clearance})
+      );
     }
   }
 

@@ -67,6 +67,7 @@ import { playCue } from '@/lib/uiSounds'
 import { formatVoiceDuration } from '@/lib/voiceMessage'
 import { canRecordVoice } from '@/hooks/useVoiceRecorder'
 import useVisualViewport from '@/hooks/useVisualViewport'
+import { isIosAppWebView } from '@/lib/inAppBrowser'
 import { useChatDockStore } from '@/stores/useChatDockStore'
 import VoiceMessage from '@/components/voice/VoiceMessage'
 import VoiceRecorder from '@/components/voice/VoiceRecorder'
@@ -423,6 +424,8 @@ export default function ChatDock({ embedded = false }) {
   const { widgetVersion, drag: embedDrag } = useEmbedBridge({ enabled: embedded && !hidden, dockRef, mode })
   // On a phone the open room fills the screen; it follows the visual viewport so the keyboard never covers the composer
   useVisualViewport(isOpen && isMobile && !embedded)
+  // An iOS app's browser can float its toolbar over the page above the keyboard; the room keeps clear of it
+  const [isAppWebView] = useState(isIosAppWebView)
 
   if (hidden) return null
 
@@ -446,6 +449,7 @@ export default function ChatDock({ embedded = false }) {
         styles.dock,
         styles[`dock--${mode}`],
         embedded && styles['dock--embed'],
+        isAppWebView && !embedded && styles['dock--overlaid'],
         (isDragging || embedDrag.isDragging) && styles['dock--dragging']
       )}
       style={dragStyle}
