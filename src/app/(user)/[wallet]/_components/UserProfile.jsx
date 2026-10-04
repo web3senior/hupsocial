@@ -25,6 +25,7 @@ import { getActiveChain } from '@/lib/communication'
 import { CommunityBadge } from '@/components/Profile'
 import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, usePublicClient, useReadContract, useSignMessage, useWriteContract } from 'wagmi'
 import { lukso } from 'wagmi/chains'
+import { getAddress } from 'viem'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
 import { InfoIcon, ThreeDotIcon } from '@/components/Icons'
@@ -890,9 +891,22 @@ const Profile = ({ addr }) => {
             )}
 
             {isConnected && address.toString().toLowerCase() !== targetWallet.toString().toLowerCase() && (
-              <li className="w-100 grid grid--fit gap-1" style={{ '--data-width': '200px' }}>
+              <li className="w-100 flex align-items-center gap-1">
+                {/* Tunnel only takes EVM wallets; lowercased first so a miscased URL can't throw. */}
+                {isEvmAddress(targetWallet) && (
+                  <a
+                    className={clsx(styles.profile__btnMessage, 'flex-1')}
+                    href={`https://www.tunnelapp.chat/chat?add=${getAddress(targetWallet.toLowerCase())}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Message on Tunnel"
+                  >
+                    <img alt="" src="/tunnel.svg" width={20} height={20} />
+                    Message
+                  </a>
+                )}
                 <button
-                  className={`${styles.profile__btnFollow} w-100`}
+                  className={`${styles.profile__btnFollow} flex-1`}
                   type="button"
                   onClick={follow}
                   disabled={isSigning || isConfirming || isFollowStateLoading}

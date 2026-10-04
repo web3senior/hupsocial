@@ -670,6 +670,31 @@
     }
   }
 
+  &__btnMessage {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--global-border-radius);
+    // Inset so the outline doesn't make it taller than Follow beside it
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 25%, transparent);
+    color: var(--foreground);
+    text-decoration: none;
+    will-change: transform;
+    transition: transform 0.2s ease;
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    img {
+      flex: 0 0 auto;
+      border-radius: 1000px;
+    }
+  }
+
   &__btnDisconnect {
     width: 100%;
     padding: 0.5rem 1rem;
