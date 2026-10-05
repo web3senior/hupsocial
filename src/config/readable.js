@@ -1,6 +1,7 @@
 /**
- * Readable (readable.name): onchain numbers like `+0 4242 1230` that a wallet holds and chooses
- * as its primary name. A profile shows the one its wallet chose, read from readable.name's API.
+ * Readable (readable.name): onchain numbers like `+0 42421230` that a wallet holds and chooses
+ * as its primary name. A profile shows the one its wallet chose, read from readable.name's API,
+ * which reads its registry on Robinhood Chain.
  */
 export const readable = {
   // Without a trailing slash; NEXT_PUBLIC_ values are inlined only when referenced literally

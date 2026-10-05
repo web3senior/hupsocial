@@ -12,8 +12,8 @@ const fetchName = async (address) => {
   return typeof name === 'string' && name ? name : null
 }
 
-// The page of a name on readable.name: `+0 4242` is /names/+0-4242
-const pageOf = (name) => `${readable.api}/names/${encodeURIComponent(name.startsWith('+') ? name.replaceAll(' ', '-') : name)}`
+// The page of a name on readable.name, as it links it: `+0 42421230` is /names/+042421230
+const pageOf = (name) => `${readable.api}/names/${encodeURIComponent(name.replaceAll(' ', '')).replace(/^%2B/, '+')}`
 
 /**
  * The Readable number a wallet chose as its primary name, as a link to its page. Nothing while it
