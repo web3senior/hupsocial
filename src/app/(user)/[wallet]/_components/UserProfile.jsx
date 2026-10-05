@@ -31,6 +31,7 @@ import moment from 'moment'
 import { InfoIcon, ThreeDotIcon } from '@/components/Icons'
 import { SealCheckIcon } from '@phosphor-icons/react'
 import ProfileInsights from '@/components/ProfileInsights'
+import ReadableNumber from '@/components/ReadableNumber'
 import UPlogo from '@/../public/up.png'
 import { uploadFileToIPFS } from '@/lib/ipfs'
 import { isUniversalProfile, linksToRows, normalizeIpfsUri, readImageSize, readLsp3Profile } from '@/lib/lsp3'
@@ -742,6 +743,9 @@ const Profile = ({ addr }) => {
             {/* The handle leads and the address follows it: one is how people refer to this
                 account, the other is what it actually is. */}
             {profile.username && <span className={styles.profile__handle}>{`@${profile.username}`}</span>}
+
+            {/* The Readable number the wallet chose, when it has one: another way to reach it. */}
+            <ReadableNumber address={targetWallet} />
 
             <code className={styles.profile__wallet}>
               <Link href={walletExplorerUrl} target="_blank" rel="noopener noreferrer">
