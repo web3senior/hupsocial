@@ -13,6 +13,7 @@ import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelectio
 import { readHandleSegment } from '@/lib/username'
 import { normalizeInterests } from '@/config/interestOptions'
 import { parseTunnelAddress } from '@/lib/tunnel'
+import { readableServerRegistry, readStoredReadableNumber } from '@/lib/readableServer'
 import { hasColumn } from '@/lib/schema'
 import { verifyWalletSignature } from '@/lib/walletSignature'
 import { PROFILE_SIGNATURE_MAX_AGE_MS, profileUpdateMessage } from '@/lib/profileSignature'
@@ -237,6 +238,8 @@ function shapeUniversalProfile(profile, row, address, { badge, origin, premium, 
   profile.interests = normalizeInterests(row?.interests)
   // And for the Tunnel account Message opens: set on Hup, never in LSP3.
   profile.tunnelAddress = parseTunnelAddress(row?.tunnel_address)
+  // And for the Readable number the owner typed, shown in place of the wallet's primary name.
+  profile.readableNumber = readStoredReadableNumber(row?.readable_number)
   // Same for the community badge: a UP describes a person, not their Hup memberships.
   profile.badge = badge
   // And the same again for premium: a paid subscription is a Hup fact, never an LSP3 one.
@@ -305,6 +308,10 @@ function shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) {
   const tunnelAddress = parseTunnelAddress(dbProfile.tunnel_address)
   delete dbProfile.tunnel_address
   dbProfile.tunnelAddress = tunnelAddress
+
+  const readableNumber = readStoredReadableNumber(dbProfile.readable_number)
+  delete dbProfile.readable_number
+  dbProfile.readableNumber = readableNumber
 
   /* Same mark, same rule, off the cached copy of the same two fields — the resolver takes the
      JSON-string form of `tags` this branch carries as readily as the array the branch above has. */
@@ -454,6 +461,7 @@ const OPTIONAL_COLUMNS = {
   profileHeader: 'cidex/scripts/add-profile-header.sql',
   interests: 'cidex/scripts/add-profile-interests.sql',
   tunnel_address: 'cidex/scripts/add-profile-tunnel-address.sql',
+  readable_number: 'cidex/scripts/add-profile-readable-number.sql',
 }
 
 /**
@@ -490,6 +498,7 @@ export async function PUT(request, { params }) {
     const origin = parseOriginSelection(formData.get('origin'))
     const accent = parseAccentSelection(formData.get('accent'))
     const tunnelAddress = formData.get('tunnelAddress')
+    const readableNumber = formData.get('readableNumber')
     /* `username` is deliberately absent: a handle is a global namespace with its own cooldown and
        release rules. Claims go through POST /api/v1/users/username. */
     const syncStamp = formData.get('syncStamp')
@@ -684,6 +693,29 @@ export async function PUT(request, { params }) {
       if (await canWrite('tunnel_address')) {
         updateFields.push('`tunnel_address` = ?')
         queryValues.push(parsedTunnel)
+      }
+    }
+
+    /* The Readable number shown on the profile, stored as the registry writes it. Absent leaves
+       it alone, empty clears it. */
+    if (typeof readableNumber === 'string') {
+      let storedNumber = null
+      if (readableNumber.trim() !== '') {
+        let registered
+        try {
+          registered = await readableServerRegistry.getProfile(readableNumber.trim())
+        } catch (error) {
+          console.error('[PROFILE_READABLE_NUMBER]:', error.message)
+          return NextResponse.json({ error: 'The Readable registry could not be read. Try again in a moment.' }, { status: 503 })
+        }
+        if (!registered) {
+          return NextResponse.json({ error: 'That Readable number is not registered' }, { status: 400 })
+        }
+        storedNumber = registered.name
+      }
+      if (await canWrite('readable_number')) {
+        updateFields.push('`readable_number` = ?')
+        queryValues.push(storedNumber)
       }
     }
 

@@ -751,8 +751,8 @@ const Profile = ({ addr }) => {
                 account, the other is what it actually is. */}
             {profile.username && <span className={styles.profile__handle}>{`@${profile.username}`}</span>}
 
-            {/* The Readable number the wallet chose, when it has one: another way to reach it. */}
-            <ReadableNumber address={targetWallet} />
+            {/* The Readable number set in Edit profile, else the one the wallet chose: another way to reach it. */}
+            <ReadableNumber address={targetWallet} name={profile.readableNumber} />
 
             <code className={styles.profile__wallet}>
               <Link href={walletExplorerUrl} target="_blank" rel="noopener noreferrer">
@@ -1333,6 +1333,8 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   // Controlled so a Readable number can be looked up as it is typed
   const [tunnelInput, setTunnelInput] = useState(profile?.tunnelAddress ?? '')
   const [tunnelQuery, setTunnelQuery] = useState(null)
+  const [numberInput, setNumberInput] = useState(profile?.readableNumber ?? '')
+  const [numberQuery, setNumberQuery] = useState(null)
   const { isPremium } = usePremium()
   // The country half of the origin picker, from the same table the save validates against. The
   // onchain half ships with the build, so the picker is usable the instant the modal opens and
@@ -1366,6 +1368,19 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   })
   // Only the lookup of what is in the field now counts
   const showTunnelLookup = Boolean(tunnelQuery) && tunnelQuery === tunnelLookupText(tunnelInput)
+
+  // The profile's own Readable number, checked against the registry the same way as it is typed
+  useEffect(() => {
+    const timer = setTimeout(() => setNumberQuery(numberInput.trim() || null), 400)
+    return () => clearTimeout(timer)
+  }, [numberInput])
+  const numberLookup = useQuery({
+    queryKey: ['readable-profile', numberQuery],
+    queryFn: () => readableRegistry.getProfile(numberQuery),
+    enabled: Boolean(numberQuery),
+    retry: false,
+  })
+  const showNumberLookup = Boolean(numberQuery) && numberQuery === numberInput.trim()
   /* `isUP` says only that the LUKSO indexer answered for this wallet, and it answers for nobody
      when it is unreachable or rate limiting us. The chain is asked separately, and it is the one
      that decides whether saving here also writes LSP3Profile. */
@@ -1542,6 +1557,24 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
       return
     }
     formData.set('tunnelAddress', tunnelAddress ?? '')
+
+    // The save checks it again; asking here keeps a typo from costing a signature
+    let readableNumber = null
+    if (numberInput.trim() !== '') {
+      try {
+        readableNumber = (await readableRegistry.getProfile(numberInput.trim()))?.name ?? null
+      } catch {
+        setError('The Readable registry could not be read. Try again in a moment.')
+        setIsPending(false)
+        return
+      }
+      if (!readableNumber) {
+        setError(`${formatName(numberInput.trim())} isn’t a registered Readable number. Check it on readable.name and try again.`)
+        setIsPending(false)
+        return
+      }
+    }
+    formData.set('readableNumber', readableNumber ?? '')
 
     const file = formData.get('profileImage')
     const hasNewImage = file instanceof File && file.size > 0
@@ -2242,6 +2275,50 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Readable — Hup-native like the origin: the number shown under the name. */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label} htmlFor="pm-readable">
+                Readable number
+              </label>
+              <input
+                id="pm-readable"
+                name="readableNumber"
+                type="text"
+                inputMode="tel"
+                className={styles.profileModal__input}
+                value={numberInput}
+                onChange={(e) => setNumberInput(e.target.value)}
+                placeholder="+0 4242"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {showNumberLookup && (
+                <small className={styles.profileModal__badgeHint} role="status">
+                  {numberLookup.isPending && `Looking up ${formatName(numberQuery)}…`}
+                  {numberLookup.isError && 'The Readable registry could not be read. Try again in a moment.'}
+                  {numberLookup.isSuccess &&
+                    (numberLookup.data ? (
+                      <>
+                        <strong>{numberLookup.data.name}</strong>
+                        {numberLookup.data.address ? (
+                          <>
+                            {' '}
+                            points to <code>{shortAddress(numberLookup.data.address)}</code>.
+                          </>
+                        ) : (
+                          ' is registered.'
+                        )}
+                      </>
+                    ) : (
+                      `${formatName(numberQuery)} isn’t a registered Readable number.`
+                    ))}
+                </small>
+              )}
+              <small className={styles.profileModal__badgeHint}>
+                Shown under your name, linked to its page on readable.name. Leave it empty to show the primary name this wallet chose there.
+              </small>
             </div>
 
             {/* Tunnel — Hup-native like the origin: the account Message on this profile opens. */}

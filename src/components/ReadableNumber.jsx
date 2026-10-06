@@ -9,23 +9,34 @@ import styles from './ReadableNumber.module.scss'
 const pageOf = (name) => `${readable.api}/names/${encodeURIComponent(name.replaceAll(' ', '')).replace(/^%2B/, '+')}`
 
 /**
- * The Readable number a wallet chose as its primary name, as a link to its page. Nothing while it
- * loads, for a wallet with none, or when the registry can't be read: the profile reads the same
- * as before for everyone without a number.
+ * The Readable number on a profile, as a link to its page: the one its owner set in Edit profile,
+ * else the primary name the wallet chose. Nothing while it loads, for a wallet with none, for a set
+ * number that has since expired, or when the registry can't be read: the profile reads the same as
+ * before for everyone without a number.
  *
  * @param {string} props.address The profile's wallet.
+ * @param {string|null} [props.name] The number set in Edit profile.
  */
-export default function ReadableNumber({ address }) {
+export default function ReadableNumber({ address, name: chosen }) {
   const evm = isEvmAddress(address)
-  const { data: name } = useQuery({
+  const { data: primary } = useQuery({
     queryKey: ['readable-name', address?.toLowerCase()],
     // Lowercased first so a miscased URL can't fail the checksum
     queryFn: () => readableRegistry.getName(address.toLowerCase()),
-    enabled: evm,
+    enabled: evm && !chosen,
     staleTime: readable.staleMs,
     retry: false,
   })
-  if (!evm || !name) return null
+  // A number can run out after it was set; it is shown only while it is still live
+  const { data: live } = useQuery({
+    queryKey: ['readable-live', chosen],
+    queryFn: async () => (await readableRegistry.getRecords(chosen)) !== null,
+    enabled: Boolean(chosen),
+    staleTime: readable.staleMs,
+    retry: false,
+  })
+  const name = chosen ? live && chosen : evm && primary
+  if (!name) return null
 
   return (
     <a className={styles.number} href={pageOf(name)} target="_blank" rel="noopener noreferrer" title={`${name} on readable.name`}>
