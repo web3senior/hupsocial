@@ -108,6 +108,21 @@ export const toast = (message = `Default message`, type, options) => {
   close.setAttribute(`aria-label`, `Dismiss`)
   div.appendChild(close)
 
+  const footer = document.createElement(`span`)
+  footer.className = styles['toast__footer']
+
+  // Muted strip under a hairline divider; null/empty removes it.
+  const applyFooter = (nextFooter) => {
+    if (nextFooter) {
+      footer.textContent = nextFooter
+      if (!footer.isConnected) div.appendChild(footer)
+    } else if (footer.isConnected) {
+      footer.remove()
+    }
+  }
+
+  applyFooter(opts.footer)
+
   container.appendChild(div)
   restack(container)
 
@@ -150,6 +165,7 @@ export const toast = (message = `Default message`, type, options) => {
     duration = resolveDuration(nextOpts, TYPE_ALIASES[nextType] ?? nextType)
     if (nextMessage != null) text.textContent = nextMessage
     applyType(nextType)
+    if (nextOpts.footer !== undefined) applyFooter(nextOpts.footer)
     restack(container)
     pause()
     // Matches the hover-pause behavior: never restart the countdown under the reader's cursor

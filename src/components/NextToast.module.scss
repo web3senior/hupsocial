@@ -53,8 +53,9 @@
   padding: 0.9rem 1.15rem;
 
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.65rem;
+  column-gap: 0.65rem;
 
   background: var(--surface, #fff);
   color: var(--text, #1a1a1a);
@@ -93,6 +94,23 @@
   flex: 1;
   text-align: left;
   word-break: break-word;
+}
+
+// Bleeds through the card padding to the edges; the card stays overflow:
+// visible for the hover bridge, so the footer rounds its own bottom corners.
+.toast__footer {
+  flex: 0 0 calc(100% + 2.3rem);
+  margin: 0.9rem -1.15rem -0.9rem;
+  padding: 0.7rem 1.15rem;
+
+  background: var(--surface-muted, #f7f7f8);
+  color: var(--text-muted, #666666);
+  font-size: 0.875rem;
+  text-align: left;
+  word-break: break-word;
+
+  border-top: 1px solid var(--border, rgba(0, 0, 0, 0.05));
+  border-radius: 0 0 calc(1rem - 1px) calc(1rem - 1px);
 }
 
 .toast__close {
