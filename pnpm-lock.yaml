@@ -149,6 +149,9 @@ importers:
       react-dom:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
+      readable-sdk:
+        specifier: ^1.0.0
+        version: 1.0.0(viem@2.53.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.4.3))
       recharts:
         specifier: ^3.9.2
         version: 3.9.2(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)
@@ -378,6 +381,9 @@ packages:
 
   '@emnapi/wasi-threads@1.2.1':
     resolution: {integrity: sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w==}
+
+  '@ensdomains/address-encoder@1.1.4':
+    resolution: {integrity: sha512-hBY6VxVw9A1cMPOKDIvPB2nlmgaw2dvrrj/p/9tkGWmD+qdfKYZTdZuSdFcUGxhhzEB4HeLG/a98ytlTq84KcA==}
 
   '@eslint-community/eslint-utils@4.9.1':
     resolution: {integrity: sha512-phrYmNiYppR7znFEdqgfWHXR6NCkZEK7hwWDHZUjit/2/U0r6XvkDl0SYnoM51Hq7FhCGdLDT6zxCCOY1hexsQ==}
@@ -3930,6 +3936,12 @@ packages:
     resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
     engines: {node: '>=0.10.0'}
 
+  readable-sdk@1.0.0:
+    resolution: {integrity: sha512-FnVI3z+siqeIdjtm8CbAWJ7ccdgRMnM608tGrFaKJTHBImVW0Y5aMrFvn6SO5m+Rr2atlp/nFfOWGyanLD2yrA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      viem: ^2.0.0
+
   readable-stream@2.3.8:
     resolution: {integrity: sha512-8p0AUk4XODgIewSi0l8Epjs+EVnWiK7NoDIEGU0HhE7+ZyY8D1IMY7odu5lRrFXGg71L15KG8QrPmum45RTtdA==}
 
@@ -5171,6 +5183,12 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@ensdomains/address-encoder@1.1.4':
+    dependencies:
+      '@noble/curves': 1.9.7
+      '@noble/hashes': 1.8.0
+      '@scure/base': 1.2.6
 
   '@eslint-community/eslint-utils@4.9.1(eslint@9.39.4(supports-color@7.2.0))':
     dependencies:
@@ -9638,6 +9656,11 @@ snapshots:
       redux: 5.0.1
 
   react@19.2.8: {}
+
+  readable-sdk@1.0.0(viem@2.53.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.4.3)):
+    dependencies:
+      '@ensdomains/address-encoder': 1.1.4
+      viem: 2.53.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.4.3)
 
   readable-stream@2.3.8:
     dependencies:

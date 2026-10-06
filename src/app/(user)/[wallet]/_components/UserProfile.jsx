@@ -13,7 +13,10 @@ import { INTEREST_OPTIONS, MAX_INTERESTS, normalizeInterests } from '@/config/in
 import InterestIcon from '@/components/ui/InterestIcon'
 import ProfileInterests from './ProfileInterests'
 import { isCountryCode } from '@/lib/origin'
-import { parseTunnelAddress, tunnelChatUrl } from '@/lib/tunnel'
+import { parseTunnelAddress, tunnelChatUrl, tunnelLookupText } from '@/lib/tunnel'
+import { formatName } from 'readable-sdk'
+import { useQuery } from '@tanstack/react-query'
+import { readableRegistry } from '@/config/readable'
 import { usePremium } from '@/hooks/usePremium'
 import { initHupContract, initStatusContract, getStatus, getMaxLength } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
@@ -1327,6 +1330,9 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   // The profile's own accent, a premium perk. Empty string means "no accent", which is what
   // the save sends to clear one — the colour input itself cannot express absence.
   const [accent, setAccent] = useState(profile?.accent ?? '')
+  // Controlled so a Readable number can be looked up as it is typed
+  const [tunnelInput, setTunnelInput] = useState(profile?.tunnelAddress ?? '')
+  const [tunnelQuery, setTunnelQuery] = useState(null)
   const { isPremium } = usePremium()
   // The country half of the origin picker, from the same table the save validates against. The
   // onchain half ships with the build, so the picker is usable the instant the modal opens and
@@ -1346,6 +1352,20 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   const { address, isConnected } = useConnection()
   const { signMessageAsync } = useSignMessage()
   const luksoClient = usePublicClient({ chainId: lukso.id })
+
+  // A Readable name is looked up once the typing pauses, so the wallet behind it shows before saving
+  useEffect(() => {
+    const timer = setTimeout(() => setTunnelQuery(tunnelLookupText(tunnelInput)), 400)
+    return () => clearTimeout(timer)
+  }, [tunnelInput])
+  const tunnelLookup = useQuery({
+    queryKey: ['readable-address', tunnelQuery],
+    queryFn: () => readableRegistry.getAddress(tunnelQuery, 'eth'),
+    enabled: Boolean(tunnelQuery),
+    retry: false,
+  })
+  // Only the lookup of what is in the field now counts
+  const showTunnelLookup = Boolean(tunnelQuery) && tunnelQuery === tunnelLookupText(tunnelInput)
   /* `isUP` says only that the LUKSO indexer answered for this wallet, and it answers for nobody
      when it is unreachable or rate limiting us. The chain is asked separately, and it is the one
      that decides whether saving here also writes LSP3Profile. */
@@ -1499,10 +1519,25 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     const formData = new FormData(e.target)
 
     // Checked before anything is uploaded or signed, so a typo costs nothing to fix
-    const tunnelInput = String(formData.get('tunnelAddress') ?? '').trim()
-    const tunnelAddress = parseTunnelAddress(tunnelInput)
-    if (tunnelInput !== '' && !tunnelAddress) {
-      setError('That is not a Tunnel address. Paste the 0x… address, or the link from My QR code in Tunnel.')
+    let tunnelAddress = parseTunnelAddress(tunnelInput)
+    const tunnelName = tunnelAddress ? null : tunnelLookupText(tunnelInput)
+    if (tunnelName) {
+      // Looked up again at save: a number can change hands after it was typed
+      try {
+        tunnelAddress = parseTunnelAddress(await readableRegistry.getAddress(tunnelName, 'eth'))
+      } catch {
+        setError('The Readable registry could not be read. Try again in a moment.')
+        setIsPending(false)
+        return
+      }
+      if (!tunnelAddress) {
+        setError(`${formatName(tunnelName)} doesn’t point to a wallet. Check it and try again.`)
+        setIsPending(false)
+        return
+      }
+    }
+    if (tunnelInput.trim() !== '' && !tunnelAddress) {
+      setError('That is not a Tunnel address or Readable number. Paste the 0x… address, a number like +0 4242, or the link from My QR code in Tunnel.')
       setIsPending(false)
       return
     }
@@ -2219,13 +2254,29 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                 name="tunnelAddress"
                 type="text"
                 className={styles.profileModal__input}
-                defaultValue={profile?.tunnelAddress || ''}
-                placeholder="0x… or your Tunnel invite link"
+                value={tunnelInput}
+                onChange={(e) => setTunnelInput(e.target.value)}
+                placeholder="0x…, +0 4242 or your Tunnel invite link"
                 autoComplete="off"
                 spellCheck={false}
               />
+              {/* Where a Readable number points now, which is the wallet that will be saved */}
+              {showTunnelLookup && (
+                <small className={styles.profileModal__badgeHint} role="status">
+                  {tunnelLookup.isPending && `Looking up ${formatName(tunnelQuery)}…`}
+                  {tunnelLookup.isError && 'The Readable registry could not be read. Try again in a moment.'}
+                  {tunnelLookup.isSuccess &&
+                    (tunnelLookup.data ? (
+                      <>
+                        <strong>{formatName(tunnelQuery)}</strong> points to <code>{shortAddress(tunnelLookup.data)}</code>. That wallet is what gets saved.
+                      </>
+                    ) : (
+                      `${formatName(tunnelQuery)} doesn’t point to a wallet.`
+                    ))}
+                </small>
+              )}
               <small className={styles.profileModal__badgeHint}>
-                Message on your profile opens a Tunnel chat with this account. In Tunnel, open My QR code, tap Copy link and paste it here. Leave it empty to use this wallet.
+                Message on your profile opens a Tunnel chat with this account. Paste its address, its Readable number, or the link from My QR code in Tunnel. Leave it empty to use this wallet.
               </small>
             </div>
 
