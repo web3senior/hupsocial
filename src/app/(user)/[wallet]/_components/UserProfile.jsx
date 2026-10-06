@@ -13,6 +13,7 @@ import { INTEREST_OPTIONS, MAX_INTERESTS, normalizeInterests } from '@/config/in
 import InterestIcon from '@/components/ui/InterestIcon'
 import ProfileInterests from './ProfileInterests'
 import { isCountryCode } from '@/lib/origin'
+import { parseTunnelAddress, tunnelChatUrl } from '@/lib/tunnel'
 import { usePremium } from '@/hooks/usePremium'
 import { initHupContract, initStatusContract, getStatus, getMaxLength } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
@@ -683,6 +684,9 @@ const Profile = ({ addr }) => {
   const birthdayLabel = formatBirthday(profile.birthday)
   const isCelebratingBirthday = isBirthdayToday(profile.birthday)
   const cover = coverFailed ? null : profile.profileHeader
+  /* The Tunnel account the owner set in Edit profile, else the wallet itself, which is a Tunnel
+     account only when it was linked there. Tunnel only takes EVM addresses. */
+  const tunnelTarget = profile.tunnelAddress ?? (isEvmAddress(targetWallet) ? getAddress(targetWallet.toLowerCase()) : null)
 
   return (
     <>
@@ -907,11 +911,10 @@ const Profile = ({ addr }) => {
 
             {isConnected && address.toString().toLowerCase() !== targetWallet.toString().toLowerCase() && (
               <li className="w-100 flex align-items-center gap-1">
-                {/* Tunnel only takes EVM wallets; lowercased first so a miscased URL can't throw. */}
-                {isEvmAddress(targetWallet) && (
+                {tunnelTarget && (
                   <a
                     className={clsx(styles.profile__btnMessage, 'flex-1')}
-                    href={`https://www.tunnelapp.chat/chat?add=${getAddress(targetWallet.toLowerCase())}`}
+                    href={tunnelChatUrl(tunnelTarget)}
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Message on Tunnel"
@@ -1494,6 +1497,17 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     setError(null)
 
     const formData = new FormData(e.target)
+
+    // Checked before anything is uploaded or signed, so a typo costs nothing to fix
+    const tunnelInput = String(formData.get('tunnelAddress') ?? '').trim()
+    const tunnelAddress = parseTunnelAddress(tunnelInput)
+    if (tunnelInput !== '' && !tunnelAddress) {
+      setError('That is not a Tunnel address. Paste the 0x… address, or the link from My QR code in Tunnel.')
+      setIsPending(false)
+      return
+    }
+    formData.set('tunnelAddress', tunnelAddress ?? '')
+
     const file = formData.get('profileImage')
     const hasNewImage = file instanceof File && file.size > 0
 
@@ -2193,6 +2207,26 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Tunnel — Hup-native like the origin: the account Message on this profile opens. */}
+            <div className={styles.profileModal__field}>
+              <label className={styles.profileModal__label} htmlFor="pm-tunnel">
+                Tunnel address
+              </label>
+              <input
+                id="pm-tunnel"
+                name="tunnelAddress"
+                type="text"
+                className={styles.profileModal__input}
+                defaultValue={profile?.tunnelAddress || ''}
+                placeholder="0x… or your Tunnel invite link"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <small className={styles.profileModal__badgeHint}>
+                Message on your profile opens a Tunnel chat with this account. In Tunnel, open My QR code, tap Copy link and paste it here. Leave it empty to use this wallet.
+              </small>
             </div>
 
             {error && <p className={styles.profileModal__error}>{error}</p>}

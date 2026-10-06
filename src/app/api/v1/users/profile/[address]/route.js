@@ -12,6 +12,7 @@ import { isAccentColor, parseAccentSelection } from '@/lib/premium'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
 import { readHandleSegment } from '@/lib/username'
 import { normalizeInterests } from '@/config/interestOptions'
+import { parseTunnelAddress } from '@/lib/tunnel'
 import { hasColumn } from '@/lib/schema'
 import { verifyWalletSignature } from '@/lib/walletSignature'
 import { PROFILE_SIGNATURE_MAX_AGE_MS, profileUpdateMessage } from '@/lib/profileSignature'
@@ -234,6 +235,8 @@ function shapeUniversalProfile(profile, row, address, { badge, origin, premium, 
   profile.birthday = row?.birthday ?? null
   // And the same for interests: a Hup catalogue, with no LSP3 equivalent to read instead.
   profile.interests = normalizeInterests(row?.interests)
+  // And for the Tunnel account Message opens: set on Hup, never in LSP3.
+  profile.tunnelAddress = parseTunnelAddress(row?.tunnel_address)
   // Same for the community badge: a UP describes a person, not their Hup memberships.
   profile.badge = badge
   // And the same again for premium: a paid subscription is a Hup fact, never an LSP3 one.
@@ -297,6 +300,11 @@ function shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) {
   /* Slugs, never the raw column: a value this build has no card for is dropped here rather than
      left for the page to render as a blank tile. */
   dbProfile.interests = normalizeInterests(dbProfile.interests)
+
+  // Re-validated on read, like the accent: the raw column never leaves the server.
+  const tunnelAddress = parseTunnelAddress(dbProfile.tunnel_address)
+  delete dbProfile.tunnel_address
+  dbProfile.tunnelAddress = tunnelAddress
 
   /* Same mark, same rule, off the cached copy of the same two fields — the resolver takes the
      JSON-string form of `tags` this branch carries as readily as the array the branch above has. */
@@ -445,6 +453,7 @@ const OPTIONAL_COLUMNS = {
   profile_sync_stamp: 'cidex/scripts/add-profile-sync-stamp.sql',
   profileHeader: 'cidex/scripts/add-profile-header.sql',
   interests: 'cidex/scripts/add-profile-interests.sql',
+  tunnel_address: 'cidex/scripts/add-profile-tunnel-address.sql',
 }
 
 /**
@@ -480,6 +489,7 @@ export async function PUT(request, { params }) {
     const badge = parseBadgeSelection(formData.get('badge'))
     const origin = parseOriginSelection(formData.get('origin'))
     const accent = parseAccentSelection(formData.get('accent'))
+    const tunnelAddress = formData.get('tunnelAddress')
     /* `username` is deliberately absent: a handle is a global namespace with its own cooldown and
        release rules. Claims go through POST /api/v1/users/username. */
     const syncStamp = formData.get('syncStamp')
@@ -663,6 +673,18 @@ export async function PUT(request, { params }) {
       }
       updateFields.push('`accent_color` = ?')
       queryValues.push(accent.color)
+    }
+
+    /* The Tunnel account Message opens. Absent leaves it alone, empty clears it. */
+    if (typeof tunnelAddress === 'string') {
+      const parsedTunnel = parseTunnelAddress(tunnelAddress)
+      if (tunnelAddress.trim() !== '' && !parsedTunnel) {
+        return NextResponse.json({ error: 'That is not a Tunnel address' }, { status: 400 })
+      }
+      if (await canWrite('tunnel_address')) {
+        updateFields.push('`tunnel_address` = ?')
+        queryValues.push(parsedTunnel)
+      }
     }
 
     /* Sent only by the owner's editor, and only for a Universal Profile: it carries the onchain
