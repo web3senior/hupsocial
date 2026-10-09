@@ -59,7 +59,8 @@ export default function ClientLayout({ children }) {
         <Aside />
         <main className={styles.main}>{children}</main>
         <Footer />
-        <InstallAppDialog />
+        {/* Removed because it appeas in Universal profile app too. TODO: add a condition later */}
+        {/* <InstallAppDialog /> */}
         {/* A connected wallet with no handle is asked for one here — required on a first
             connect, an ask with a Later for the accounts that predate handles */}
         <UsernameGate />
