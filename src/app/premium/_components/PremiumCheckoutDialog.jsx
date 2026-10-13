@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { erc20Abi } from 'viem'
 import { useConnection, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { getPublicClient } from 'wagmi/actions'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { GiftIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import { resolveChain } from '@/lib/chains'
@@ -125,7 +126,7 @@ const PremiumCheckoutDialog = forwardRef(function PremiumCheckoutDialog(
   /** Grants this contract the right to take the price, unless it already has it. */
   const ensureApproval = async () => {
     const amount = toWei(option.price)
-    const publicClient = config.getClient({ chainId })
+    const publicClient = getPublicClient(config, { chainId })
 
     const existing = await publicClient
       .readContract({ address: option.token, ...allowanceCall(option, address, premiumAddress) })
