@@ -1,7 +1,7 @@
 /**
  * @file app/api/v1/chat/room/route.js
  * @description The public chat room. GET pages the room for anyone, in either direction from a
- * cursor, and can instead count what is newer than a cursor; POST appends a message for a wallet
+ * cursor, and can instead count what is newer than a cursor or search it by text; POST appends a message for a wallet
  * with a chat session that is not banned.
  */
 
@@ -36,6 +36,9 @@ const RATE_WINDOW_S = 60
 const RATE_LIMIT = 20
 const UNREAD_CAP = 99
 const RECENT_FACES = 3
+const SEARCH_MIN_CHARS = 2
+const SEARCH_MAX_CHARS = 100
+const SEARCH_LIMIT = 30
 
 const serialize = serializeLine
 const LIVE = LIVE_LINES
@@ -47,6 +50,23 @@ export async function GET(request) {
     if (!room) return NextResponse.json({ success: false, error: 'Unknown room' }, { status: 404 })
 
     const headers = { 'Cache-Control': 'no-store' }
+
+    // A search: the newest live lines whose text or file name holds the query. The room keeps at
+    // most RETENTION_LINES, so a scan stays cheap
+    if (searchParams.has('q')) {
+      const q = String(searchParams.get('q') ?? '').trim().slice(0, SEARCH_MAX_CHARS)
+      if (q.length < SEARCH_MIN_CHARS) return NextResponse.json({ success: true, messages: [], hasMore: false }, { headers })
+      const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`
+      const [rows] = await pool.execute(
+        `${LIVE} AND (m.body LIKE ? OR m.file_name LIKE ?) ORDER BY m.id DESC LIMIT ${SEARCH_LIMIT + 1}`,
+        [room, pattern, pattern]
+      )
+      return NextResponse.json(
+        { success: true, messages: rows.slice(0, SEARCH_LIMIT).map(serialize), hasMore: rows.length > SEARCH_LIMIT },
+        { headers }
+      )
+    }
+
     const countAfter = Number(searchParams.get('countAfter'))
     if (Number.isFinite(countAfter) && searchParams.has('countAfter')) {
       // The minimized poll is the one call that keeps coming while nobody writes

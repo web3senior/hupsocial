@@ -15,6 +15,7 @@ import {
   DownloadSimpleIcon,
   FileIcon,
   GifIcon,
+  MagnifyingGlassIcon,
   MicrophoneIcon,
   PaperclipIcon,
   PaperPlaneTiltIcon,
@@ -30,7 +31,7 @@ import { useProfile } from '@/hooks/useProfile'
 import EmojiPicker from '@/components/EmojiPicker'
 import GifPicker from '@/components/GifPicker'
 import EmptyState from '@/components/ui/EmptyState'
-import { MessageLoader } from '@/components/Loading'
+import { ContentSpinner, MessageLoader } from '@/components/Loading'
 import NativePopover from '@/components/ui/NativePopover'
 import { toast } from '@/components/NextToast'
 import { openConnect } from '@/lib/connectDialog'
@@ -54,6 +55,7 @@ import {
   readChatToken,
   recordLineViews,
   saveReadCursor,
+  searchRoomMessages,
   sendRoomMessage,
   setTyping as reportTyping,
   subscribeChatToken,
@@ -99,6 +101,15 @@ const MENTION_QUERY_PATTERN = /(^|\s)@([^\s@]{0,48})$/
 // The box a picture is laid out in, and the width it is encoded at for it
 const IMAGE_BOX = { width: 240, height: 280 }
 const IMAGE_THUMB_WIDTH = 480
+// A query waits this long after the last keystroke, and needs this many characters
+const SEARCH_DEBOUNCE_MS = 300
+const SEARCH_MIN_CHARS = 2
+// How much of a hit's text shows on each side of the match
+const SNIPPET_LEAD = 24
+const SNIPPET_LENGTH = 120
+// How long a line picked from search or a quote stays lit
+const FOUND_FLASH_MS = 1_800
+const IDLE_REVEAL = { id: 0, state: 'idle' }
 
 /** A picture's laid-out size, known before it loads so the lines under it never move. */
 const imageBoxStyle = (file) => {
@@ -415,6 +426,10 @@ export default function ChatDock({ embedded = false }) {
     return () => window.removeEventListener('pagehide', onPageHide)
   }, [isOpen, hidden, token])
 
+  // The search panel stands in for the room's lines while it is up
+  const [searching, setSearching] = useState(false)
+  const closeSearch = useCallback(() => setSearching(false), [])
+
   const onSeen = useCallback(() => {
     setUnread(0)
     setMentionAlert({ count: 0, firstId: 0 })
@@ -470,6 +485,18 @@ export default function ChatDock({ embedded = false }) {
               )}
             </div>
             <div className={styles.dock__actions}>
+              {!roomPending && (
+                <button
+                  type="button"
+                  className={clsx(styles.dock__iconButton, searching && styles['dock__iconButton--active'])}
+                  onClick={() => setSearching((on) => !on)}
+                  aria-label={searching ? 'Close search' : 'Search chat'}
+                  aria-pressed={searching}
+                  title="Search"
+                >
+                  <MagnifyingGlassIcon size={18} weight="bold" />
+                </button>
+              )}
               <button
                 type="button"
                 className={clsx(styles.dock__iconButton, styles['dock__iconButton--expand'])}
@@ -516,6 +543,8 @@ export default function ChatDock({ embedded = false }) {
         <div className={styles.dock__room} hidden={!isOpen}>
           <Room
             active={isOpen}
+            searching={searching}
+            onCloseSearch={closeSearch}
             focusId={mentionAlert.firstId}
             me={me}
             token={token}
@@ -658,6 +687,8 @@ function PillFace({ wallet }) {
 
 function Room({
   active,
+  searching = false,
+  onCloseSearch,
   focusId = 0,
   me,
   token,
@@ -701,6 +732,8 @@ function Room({
   // Where the reader was, tracked on every scroll: a hidden element reads 0, so it cannot be
   // asked at the moment the card closes
   const savedScrollRef = useRef(0)
+  // Whether the view follows the newest line: true while the reader sits at the bottom
+  const stickRef = useRef(true)
 
   const isLoaded = messages !== null
   const minId = messages?.length ? numericId(messages[0]) : 0
@@ -871,7 +904,6 @@ function Room({
   )
 
   // Following the newest line while the reader sits at the bottom
-  const stickRef = useRef(true)
   useEffect(() => {
     const list = listRef.current
     if (list && active && stickRef.current && initialScrollDone) list.scrollTop = list.scrollHeight
@@ -961,7 +993,8 @@ function Room({
   const onScroll = () => {
     const list = listRef.current
     if (!list) return
-    if (!active) return
+    // Hidden behind search, the list reads 0 and must not count as the reader scrolling up
+    if (!active || searching) return
     // Only the reader moving up lets go of the bottom: a line landing under them, or a pin whose
     // scroll event arrives after more content did, leaves the view short of it without moving it up
     const movedUp = list.scrollTop < savedScrollRef.current
@@ -1140,17 +1173,67 @@ function Room({
     }
   }
 
-  // A quote is a link back to its line, when that line is in the loaded window
+  // A line picked from a quote or from search is scrolled to and lit. One outside the loaded
+  // window brings the page around it first, the way the room opens on the last line read
+  const [foundId, setFoundId] = useState(0)
+  const revealRef = useRef(IDLE_REVEAL)
+  const [revealTick, setRevealTick] = useState(0)
   const jumpToLine = (id) => {
+    revealRef.current = { id, state: 'idle' }
+    setRevealTick((tick) => tick + 1)
+  }
+
+  // Closing search without picking a line puts the reader back where they were. Declared before
+  // the reveal below, so a picked line is still pending when this runs and wins over it
+  useEffect(() => {
+    if (searching || !initialScrollDone || revealRef.current.id) return
     const list = listRef.current
-    const target = list?.querySelector(`[data-line-id="${id}"]`)
-    if (!list || !target) {
-      toast('That message is further up than what is loaded')
+    if (list) list.scrollTop = stickRef.current ? list.scrollHeight : savedScrollRef.current
+  }, [searching, initialScrollDone])
+
+  useEffect(() => {
+    const pending = revealRef.current
+    const list = listRef.current
+    if (!pending.id || pending.state === 'loading' || searching || !list) return
+    const target = list.querySelector(`[data-line-id="${pending.id}"]`)
+    if (target) {
+      revealRef.current = IDLE_REVEAL
+      stickRef.current = false
+      list.scrollTop = Math.max(0, target.offsetTop - list.offsetTop - 48)
+      savedScrollRef.current = list.scrollTop
+      setFoundId(pending.id)
       return
     }
-    stickRef.current = false
-    list.scrollTop = Math.max(0, target.offsetTop - list.offsetTop - 48)
-  }
+    if (pending.state === 'loaded') {
+      revealRef.current = IDLE_REVEAL
+      toast('That message is no longer in the chat')
+      return
+    }
+    pending.state = 'loading'
+    Promise.all([
+      fetchRoomMessages({ token: tokenRef.current, before: pending.id + 1 }),
+      fetchRoomMessages({ token: tokenRef.current, after: pending.id }),
+    ])
+      .then(([olderPage, newerPage]) => {
+        if (revealRef.current !== pending) return
+        pending.state = 'loaded'
+        serverTimeRef.current = newerPage.serverTime
+        stickRef.current = false
+        setMessages(mergeSorted(olderPage.messages, newerPage.messages))
+        setHasOlder(olderPage.hasMore)
+        setHasNewer(newerPage.hasMore)
+      })
+      .catch(() => {
+        if (revealRef.current !== pending) return
+        revealRef.current = IDLE_REVEAL
+        toast('Could not load that message', 'error')
+      })
+  }, [messages, searching, revealTick])
+  useEffect(() => {
+    if (!foundId) return undefined
+    const timer = setTimeout(() => setFoundId(0), FOUND_FLASH_MS)
+    return () => clearTimeout(timer)
+  }, [foundId])
 
   // A line of the reader's own: rewritten in place, or taken back
   const [editingId, setEditingId] = useState(null)
@@ -1184,11 +1267,21 @@ function Room({
     }
   }
 
-  const showJump = hasNewer || !atBottom
+  const showJump = (hasNewer || !atBottom) && !searching
 
   return (
     <>
-      <div className={styles.room} ref={listRef} onScroll={onScroll}>
+      {searching && (
+        <ChatSearch
+          onClose={onCloseSearch}
+          onPick={(id) => {
+            jumpToLine(id)
+            onCloseSearch()
+          }}
+        />
+      )}
+      {/* Hidden rather than unmounted behind search, so the loaded window and its place survive */}
+      <div className={styles.room} ref={listRef} onScroll={onScroll} hidden={searching}>
         <div className={styles.room__content} ref={contentRef}>
           {messages === null ? (
             <div className={styles.room__notice}>Loading…</div>
@@ -1209,6 +1302,7 @@ function Room({
                   me={me}
                   chatMe={chatMe}
                   dividerRef={run.divider ? dividerRef : null}
+                  foundId={foundId}
                   onModerate={moderate}
                   onRemoved={(id) => applyRemoved([id])}
                   editingId={editingId}
@@ -1230,7 +1324,7 @@ function Room({
         </div>
       </div>
 
-      {typists.length > 0 && (
+      {typists.length > 0 && !searching && (
         <div className={styles.typing}>
           <span className={styles.typing__faces}>
             {typists.map((wallet) => (
@@ -1289,6 +1383,7 @@ function ChatRun({
   me,
   chatMe,
   dividerRef,
+  foundId,
   onModerate,
   onRemoved,
   editingId,
@@ -1345,6 +1440,7 @@ function ChatRun({
               key={message.clientKey ?? message.id}
               message={message}
               last={index === run.messages.length - 1}
+              found={foundId === message.id}
               mine={mine}
               me={me}
               chatMe={chatMe}
@@ -1371,6 +1467,7 @@ function ChatRun({
 function ChatLine({
   message,
   last,
+  found = false,
   mine,
   me,
   chatMe,
@@ -1426,7 +1523,7 @@ function ChatLine({
   }
 
   return (
-    <Root className={clsx(styles.line, isMedia && styles['line--media'])} data-line-id={message.id}>
+    <Root className={clsx(styles.line, isMedia && styles['line--media'], found && styles['line--found'])} data-line-id={message.id}>
       {editing ? (
         <LineEditor body={message.body} onSave={(text) => onSaveEdit(message.id, text)} onCancel={onCancelEdit} />
       ) : (
@@ -1914,6 +2011,149 @@ function Quote({ reply, onJump }) {
       />
       <span className={styles.quote__text}>{quoteText(reply)}</span>
     </div>
+  )
+}
+
+/**
+ * The part of a hit around its first match, split so the match can be marked. A hit on a file
+ * name with a caption shows the name, since the caption is not what matched.
+ */
+const searchSnippet = (message, query) => {
+  const { text: body } = toEditable(message.body || '')
+  const name = message.file?.name ?? ''
+  const needle = query.toLocaleLowerCase()
+  const text = !body.toLocaleLowerCase().includes(needle) && name.toLocaleLowerCase().includes(needle) ? name : body || quoteText(message)
+  const at = text.toLocaleLowerCase().indexOf(needle)
+  // The server's collation also folds accents, so a hit can have no exact match to mark
+  if (at < 0) return { before: text.slice(0, SNIPPET_LENGTH), match: '', after: '' }
+  const start = Math.max(0, at - SNIPPET_LEAD)
+  const end = Math.min(text.length, start + SNIPPET_LENGTH)
+  return {
+    before: `${start > 0 ? '…' : ''}${text.slice(start, at)}`,
+    match: text.slice(at, at + needle.length),
+    after: `${text.slice(at + needle.length, end)}${end < text.length ? '…' : ''}`,
+  }
+}
+
+/**
+ * Search over the room, in place of its lines while it is up. Results are the newest matching
+ * lines; picking one closes the panel and scrolls the room to it. Escape closes it.
+ */
+function ChatSearch({ onPick, onClose }) {
+  const [query, setQuery] = useState('')
+  const [result, setResult] = useState({ query: '', messages: [], hasMore: false, failed: false })
+  const inputRef = useRef(null)
+  const trimmed = query.trim()
+  const ready = trimmed.length >= SEARCH_MIN_CHARS
+  const isLoading = ready && result.query !== trimmed
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    if (!ready) return undefined
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      searchRoomMessages({ q: trimmed, signal: controller.signal })
+        .then((data) => setResult({ query: trimmed, messages: data.messages ?? [], hasMore: Boolean(data.hasMore), failed: false }))
+        .catch((error) => {
+          if (error?.name !== 'AbortError') setResult({ query: trimmed, messages: [], hasMore: false, failed: true })
+        })
+    }, SEARCH_DEBOUNCE_MS)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [trimmed, ready])
+
+  return (
+    <div className={styles.search} role="search">
+      <div className={styles.search__field}>
+        <MagnifyingGlassIcon size={16} weight="bold" className={styles.search__icon} aria-hidden="true" />
+        <input
+          ref={inputRef}
+          type="search"
+          className={styles.search__input}
+          value={query}
+          placeholder="Search messages"
+          aria-label="Search messages"
+          maxLength={100}
+          enterKeyHint="search"
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              onClose()
+            }
+          }}
+        />
+      </div>
+      <div className={styles.search__results} aria-live="polite" aria-busy={isLoading}>
+        {!ready ? (
+          <p className={styles.search__notice}>Find a message by its words or a file&apos;s name</p>
+        ) : isLoading ? (
+          <ContentSpinner className={styles.search__notice} />
+        ) : result.failed ? (
+          <p className={styles.search__notice}>Search failed. Try again in a moment</p>
+        ) : result.messages.length === 0 ? (
+          <EmptyState icon={MagnifyingGlassIcon} align="center" size="sm" className={styles.search__empty}>
+            No messages match “{trimmed}”
+          </EmptyState>
+        ) : (
+          <>
+            <ul className={styles.search__list}>
+              {result.messages.map((message) => (
+                <SearchHit key={message.id} message={message} query={trimmed} onPick={onPick} />
+              ))}
+            </ul>
+            {result.hasMore && <p className={styles.search__notice}>Showing the newest {result.messages.length} matches</p>}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// One result. A div, not a button: the name inside is a link
+function SearchHit({ message, query, onPick }) {
+  const snippet = searchSnippet(message, query)
+  const sentAt = parseTime(message.createdAt)
+  const pick = () => onPick(message.id)
+  return (
+    <li>
+      <div
+        className={styles.search__hit}
+        role="button"
+        tabIndex={0}
+        onClick={pick}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            pick()
+          }
+        }}
+      >
+        <span className={styles.search__meta}>
+          <Profile
+            creator={message.sender}
+            variant="fullWithoutTime"
+            size={16}
+            hoverCard={false}
+            fingerprint={false}
+            className={clsx(styles.run__profile, styles.search__name)}
+          />
+          <time className={styles.search__time} dateTime={new Date(sentAt).toISOString()} title={stampDate.format(new Date(sentAt))}>
+            {toRelativeTime(message.createdAt)}
+          </time>
+        </span>
+        <span className={styles.search__text}>
+          {snippet.before}
+          {snippet.match && <mark className={styles.search__match}>{snippet.match}</mark>}
+          {snippet.after}
+        </span>
+      </div>
+    </li>
   )
 }
 

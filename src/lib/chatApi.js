@@ -117,6 +117,10 @@ export const fetchRoomMessages = ({ room = 'global', after, before, deletedSince
   return call(token, `/api/v1/chat/room?${params}`)
 }
 
+/** The newest live lines whose text or file name holds `q`, newest first; reading needs no token. */
+export const searchRoomMessages = ({ q, room = 'global', signal } = {}) =>
+  call(null, `/api/v1/chat/room?${new URLSearchParams({ room, q })}`, { signal })
+
 /** Toggles one emoji on a line; the reply carries the line's reactions as they now stand. */
 export const toggleReaction = (token, messageId, emoji) =>
   call(token, '/api/v1/chat/reaction', { method: 'POST', body: JSON.stringify({ messageId, emoji }) })

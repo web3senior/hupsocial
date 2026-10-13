@@ -218,6 +218,11 @@ $app-toolbar-clearance: 5.25rem;
       }
     }
 
+    // A toggle that is on, such as search while its panel is up
+    &--active {
+      background-color: var(--dock-raised);
+    }
+
     // Phones show the room edge to edge; there is no bigger card to expand into
     &--expand {
       @include md-down() {
@@ -331,6 +336,11 @@ $app-toolbar-clearance: 5.25rem;
   overflow-y: auto;
   overscroll-behavior: contain;
 
+  // Kept mounted behind search; the attribute must win over any display
+  &[hidden] {
+    display: none;
+  }
+
   // The observed box: its height is what a landing image changes
   &__content {
     display: flex;
@@ -341,6 +351,141 @@ $app-toolbar-clearance: 5.25rem;
 
   &__notice {
     padding: 0.5rem 0;
+    text-align: center;
+    color: var(--dock-text-muted);
+    font-size: var(--font-size-12);
+  }
+
+  &__empty {
+    margin: auto;
+  }
+}
+
+// Search over the room, in place of its lines while it is up; the composer stays below it
+.search {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+
+  &__field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin: 0.75rem 0.875rem 0.5rem;
+  }
+
+  &__icon {
+    position: absolute;
+    left: 0.75rem;
+    color: var(--dock-text-muted);
+    pointer-events: none;
+  }
+
+  &__input {
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 2.125rem;
+    font: inherit;
+    font-size: var(--font-size-15);
+    color: var(--dock-text);
+    background-color: var(--dock-raised);
+    border: 1px solid var(--dock-border-strong);
+    border-radius: 999px;
+
+    // iOS zooms into any field under 16px the moment it is focused
+    @media (pointer: coarse) {
+      font-size: 16px;
+    }
+
+    &:focus {
+      outline: none;
+    }
+
+    &::placeholder {
+      color: var(--dock-text-muted);
+    }
+  }
+
+  &__results {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0 0.5rem 0.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__hit {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.75rem;
+    cursor: pointer;
+
+    @media (hover: hover) {
+      &:hover {
+        background-color: var(--dock-raised);
+      }
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--dock-border-strong);
+      outline-offset: -2px;
+    }
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+    font-size: var(--font-size-12);
+  }
+
+  &__name {
+    min-width: 0;
+    font-weight: 700;
+  }
+
+  &__time {
+    flex-shrink: 0;
+    color: var(--dock-text-muted);
+  }
+
+  &__text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    font-size: var(--font-size-14);
+    line-height: 1.35;
+    color: var(--dock-text);
+  }
+
+  &__match {
+    padding-inline: 1px;
+    color: inherit;
+    background-color: color-mix(in srgb, var(--bubble-mine) 28%, transparent);
+    border-radius: 0.25rem;
+  }
+
+  &__notice {
+    margin: 0;
+    padding: 1rem 0;
     text-align: center;
     color: var(--dock-text-muted);
     font-size: var(--font-size-12);
@@ -560,6 +705,21 @@ $app-toolbar-clearance: 5.25rem;
     &:hover .line__menuButton,
     .line__menuButton:focus-visible {
       opacity: 1;
+    }
+  }
+
+  // A line picked from search or a quote is ringed for a moment, and the ring fades as it goes
+  .bubble,
+  .line__image,
+  .line__gif {
+    transition: box-shadow 0.4s ease;
+  }
+
+  &--found {
+    .bubble,
+    .line__image,
+    .line__gif {
+      box-shadow: 0 0 0 2px var(--bubble-mine);
     }
   }
 
