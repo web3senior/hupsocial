@@ -14,10 +14,20 @@ import styles from './NativeDialog.module.scss'
  * through the usual React <dialog> props. `lightDismiss` closes the
  * dialog when the backdrop is clicked. Opening also locks the page
  * scroller — showModal() makes the document inert but leaves it free
- * to scroll behind the backdrop.
+ * to scroll behind the backdrop. `appear` picks the motion: 'rise'
+ * (default, fade + 2px lift) or 'zoom' (soft scale-in, scale-out on close).
+ * `onExited` fires once the closing animation has finished — unmount
+ * from there, not from onClose, or the exit never plays.
  */
-const NativeDialog = forwardRef(function NativeDialog({ children, className, lightDismiss = false, onClick, ...rest }, ref) {
+const NativeDialog = forwardRef(function NativeDialog(
+  { children, className, lightDismiss = false, appear = 'rise', onExited, onClick, ...rest },
+  ref
+) {
   const dialogRef = useRef(null)
+  const onExitedRef = useRef(onExited)
+  useEffect(() => {
+    onExitedRef.current = onExited
+  })
 
   // This instance's claim on the page-scroll lock. Acquire/release are idempotent per
   // instance, so it never matters which of the release paths below wins the race — the
@@ -57,6 +67,7 @@ const NativeDialog = forwardRef(function NativeDialog({ children, className, lig
         acquireLock()
       },
       close: () => dialogRef.current?.close(),
+      isOpen: () => Boolean(dialogRef.current?.open),
     }),
     []
   )
@@ -79,15 +90,29 @@ const NativeDialog = forwardRef(function NativeDialog({ children, className, lig
     // and the replayed open() early-returns on el.open — re-acquire here or a dialog that
     // mounts open (the composer) sits open with the page scroller unlocked in dev.
     if (el.open) acquireLock()
-    el.addEventListener('close', releaseLock)
+
+    // onExited waits out the exit transition (opacity/transform plus the backdrop's
+    // overlay hold), so a consumer that unmounts on close can do it from onExited and
+    // still play the closing animation. getAnimations() flushes style, so the transitions
+    // the close just triggered are already in the list; none (reduced support) = at once.
+    let alive = true
+    const handleNativeClose = () => {
+      releaseLock()
+      Promise.allSettled(el.getAnimations().map((animation) => animation.finished)).then(() => {
+        if (alive && !el.open) onExitedRef.current?.()
+      })
+    }
+
+    el.addEventListener('close', handleNativeClose)
     return () => {
-      el.removeEventListener('close', releaseLock)
+      alive = false
+      el.removeEventListener('close', handleNativeClose)
       releaseLock()
     }
   }, [])
 
   return (
-    <dialog ref={dialogRef} className={clsx(styles.dialog, className)} onClick={handleClick} {...rest}>
+    <dialog ref={dialogRef} className={clsx(styles.dialog, appear === 'zoom' && styles['dialog--zoom'], className)} onClick={handleClick} {...rest}>
       {children}
     </dialog>
   )

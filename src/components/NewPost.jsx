@@ -793,13 +793,21 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     }
   }, [])
 
+  // Callers unmount the composer on close, so tell them only once the zoom-out has played
+  // (NativeDialog's onExited). A dialog that never opened (the wallet gate) has no exit
+  // animation and hands back at once.
+  const finishClose = useCallback(() => {
+    close?.()
+    onClose?.()
+  }, [close, onClose])
+
   const handleClose = useCallback(
     (e) => {
       if (e) e.stopPropagation()
-      close?.()
-      onClose?.()
+      if (dialogRef.current?.isOpen()) dialogRef.current.close()
+      else finishClose()
     },
-    [close, onClose]
+    [finishClose]
   )
 
   // Publishing takes a signature, so a composer opened without a wallet is a dead end — the
@@ -2002,13 +2010,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     <NativeDialog
       ref={dialogRef}
       className={styles.newPost}
+      appear="zoom"
       aria-label={isComment ? 'Reply composer' : isQuote ? 'Quote composer' : 'New thread composer'}
       onClick={(e) => e.stopPropagation()}
       onCancel={(e) => {
         // Esc must not discard the composer while media uploads or the transaction is in flight
         if (isBusy || hasPendingUploads) e.preventDefault()
       }}
-      onClose={handleClose}
+      /* Synthetic close bubbles to any dialog this composer is nested in */
+      onClose={(e) => e.stopPropagation()}
+      onExited={finishClose}
     >
       <header className={styles.header}>
         <button type="button" className={styles.header__close} onClick={handleClose} aria-label="Close composer">

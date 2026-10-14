@@ -28,29 +28,38 @@
     transform: none;
   }
 
-  // Dim + blur. This once carried dim only: a filtered backdrop used to be clipped to its
-  // Backdrop Root, and every page in the app renders inside a `.page__container` carrying
-  // `isolation: isolate`, so both the blur and the dim landed on that card alone. Chromium
-  // no longer walks past the top layer for a backdrop root — re-probed on 149 with the
-  // isolated + overflow-hidden + transformed ancestor chain, and the effect now covers the
-  // viewport from whatever depth the dialog is opened. Engines without backdrop-filter
-  // support simply keep the dim. No `-webkit-backdrop-filter` twin: declaring the legacy
-  // property makes lightningcss drop both.
-  //
-  // blur(0px), not `none` — `none` is not interpolable, so the blur would snap in.
+  // Flat dim, no blur: a backdrop-filter re-blurs the whole viewport on every repaint
+  // behind it (videos, GIFs, the open animation itself), which made modals feel slow.
   &::backdrop {
-    background: rgba(0, 0, 0, 0);
-    backdrop-filter: blur(0px);
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
     transition:
-      background 0.13s ease,
-      backdrop-filter 0.13s ease,
+      opacity 0.13s ease,
       overlay 0.13s ease allow-discrete,
       display 0.13s ease allow-discrete;
   }
 
   &[open]::backdrop {
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(10px);
+    opacity: 1;
+  }
+
+  // appear="zoom": a quick, soft scale from 96% on a strong ease-out, in on open and back
+  // out on close (pair with onExited if the consumer unmounts). The backdrop fades on the
+  // same clock so the two arrive and leave together.
+  &--zoom {
+    transform: scale(0.96);
+    transition:
+      opacity 0.18s cubic-bezier(0.2, 0, 0, 1),
+      transform 0.18s cubic-bezier(0.2, 0, 0, 1),
+      overlay 0.18s ease allow-discrete,
+      display 0.18s ease allow-discrete;
+
+    &::backdrop {
+      transition:
+        opacity 0.18s ease,
+        overlay 0.18s ease allow-discrete,
+        display 0.18s ease allow-discrete;
+    }
   }
 }
 
@@ -61,9 +70,12 @@
       transform: translateY(2px);
     }
 
+    .dialog--zoom[open] {
+      transform: scale(0.96);
+    }
+
     .dialog[open]::backdrop {
-      background: rgba(0, 0, 0, 0);
-      backdrop-filter: blur(0px);
+      opacity: 0;
     }
   }
 }

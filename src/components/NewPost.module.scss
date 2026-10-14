@@ -1,7 +1,7 @@
 /* The composer root is a native <dialog> (NativeDialog) — UA styles place it in the top
    layer; max-width/max-height: none lift the UA's viewport clamps so the sizes below
-   govern. Element-qualified so the margin and ::backdrop overrides outrank NativeDialog's
-   .dialog rules whatever order the modules land in the bundle. */
+   govern. Element-qualified so the margin override outranks NativeDialog's .dialog rules
+   whatever order the modules land in the bundle. The backdrop is NativeDialog's. */
 dialog.newPost {
   width: min(600px, calc(100vw - 24px));
   max-width: none;
@@ -22,21 +22,6 @@ dialog.newPost {
      UA's `display: none` on the closed dialog and flash it before showModal() runs */
   &[open] {
     display: flex;
-  }
-
-  /* Flat dim, no blur — the feed behind must stay legible under the overlay */
-  &::backdrop {
-    background: rgba(91, 112, 131, 0);
-    backdrop-filter: none;
-    transition:
-      background 0.13s ease,
-      overlay 0.13s ease allow-discrete,
-      display 0.13s ease allow-discrete;
-  }
-
-  &[open]::backdrop {
-    background: rgba(91, 112, 131, 0.4);
-    backdrop-filter: none;
   }
 
   button,
