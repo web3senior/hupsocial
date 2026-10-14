@@ -1246,6 +1246,18 @@ $app-toolbar-clearance: 5.25rem;
     border-radius: 50%;
     background-color: var(--status-success);
   }
+
+  // Hints that the count opens the list of who is here
+  &__caret {
+    flex-shrink: 0;
+    margin-left: -0.0625rem;
+    opacity: 0.7;
+    transition: transform 0.15s ease;
+
+    &--open {
+      transform: rotate(180deg);
+    }
+  }
 }
 
 // The chip's hover target. A span, so the chip's own click stays the reaction (ChatDock.jsx)
@@ -1396,6 +1408,11 @@ $app-toolbar-clearance: 5.25rem;
   padding: 0.75rem 0.875rem;
   border-top: 1px solid var(--dock-border);
   background-color: var(--dock-surface);
+
+  // Just the button, no line beside it
+  &--solo {
+    justify-content: center;
+  }
 
   &__text {
     flex: 1;

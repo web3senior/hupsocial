@@ -10,6 +10,7 @@ import {
   ArrowsInSimpleIcon,
   ArrowsOutSimpleIcon,
   ArrowUpIcon,
+  CaretDownIcon,
   ChatCircleIcon,
   DotsThreeIcon,
   DownloadSimpleIcon,
@@ -1350,8 +1351,7 @@ function Room({
           </button>
         </div>
       ) : !token ? (
-        <div className={styles.gate}>
-          <span className={styles.gate__text}>One signature lets you post for a week</span>
+        <div className={clsx(styles.gate, styles['gate--solo'])}>
           <button type="button" className={styles.gate__button} onClick={onSignIn} disabled={isSigningIn}>
             {isSigningIn ? 'Waiting for your wallet…' : 'Sign in to chat'}
           </button>
@@ -1876,6 +1876,7 @@ function LineEditor({ body, onSave, onCancel }) {
  */
 function OnlineChip({ presence }) {
   const [opened, setOpened] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
   const extra = presence.count - presence.wallets.length
 
   return (
@@ -1884,12 +1885,19 @@ function OnlineChip({ presence }) {
       placement="bottom-start"
       className={styles.who}
       onToggle={(event) => {
+        setIsOpen(event.newState === 'open')
         if (event.newState === 'open') setOpened(true)
       }}
       trigger={
-        <button type="button" className={styles.online} aria-label={`${presence.count} in the room`}>
+        <button type="button" className={styles.online} aria-label={`${presence.count} in the room, show who`}>
           <span className={styles.online__dot} aria-hidden="true" />
           {compactCount.format(presence.count)}
+          <CaretDownIcon
+            size={10}
+            weight="bold"
+            className={clsx(styles.online__caret, isOpen && styles['online__caret--open'])}
+            aria-hidden="true"
+          />
         </button>
       }
     >
