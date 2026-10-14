@@ -180,7 +180,10 @@ export default function BuyButton({ item }) {
   // Once purchased, keep showing the reveal action even if the listing later goes
   // inactive (e.g. sold out) — access shouldn't disappear just because stock ran out.
   if (!sellAddress || !hasListing) return null
-  const isInactive = !hasPurchased && !listing.isActive
+  // The contract never deactivates a sold-out listing — stock just reaches 0 and buy reverts
+  // with OutOfStock — so empty stock closes it here too
+  const isSoldOut = listing.quantity === 0n
+  const isInactive = !hasPurchased && (!listing.isActive || isSoldOut)
 
   const needsApproval = isTokenListing && allowance !== undefined && allowance < listing.price
 
@@ -303,7 +306,8 @@ export default function BuyButton({ item }) {
         </span>
 
         {hasPurchased ? null : isInactive ? (
-          <span className={styles.inactiveLabel}>Sold out / not for sale right now</span>
+          // Stock left on an inactive listing means the seller paused it, not that it sold out
+          <span className={styles.inactiveLabel}>{isSoldOut ? 'Sold out' : 'Paused by the seller'}</span>
         ) : needsApproval ? (
           <button type="button" onClick={handleApprove} disabled={isBusy} className={styles.buyButton}>
             {isBusy ? 'Confirming...' : `Approve ${priceLabel}`}
@@ -315,17 +319,18 @@ export default function BuyButton({ item }) {
         )}
       </div>
 
-      {(listing.totalSold > 0n || listing.quantity > 0n) && (
+      {(listing.totalSold > 0n || (listing.quantity > 0n && !isInactive)) && (
         <div className={styles.salesStat}>
           <TrendUpIcon size={13} />
           <span>
             {hasEarned && <span className={styles.earned}>{formatEarned(earnedUsd)} earned</span>}
             {hasEarned && listing.totalSold > 0n && ' · '}
             {listing.totalSold > 0n && `${compact(listing.totalSold)} sold`}
-            {listing.totalSold > 0n && listing.quantity > 0n && ' · '}
+            {listing.totalSold > 0n && listing.quantity > 0n && !isInactive && ' · '}
             {/* Remaining slots, not units: one purchase per buyer, so this is how many more
-                people can buy. Scarcity is the thing a buyer actually wants to see. */}
-            {listing.quantity > 0n && (
+                people can buy. Scarcity is the thing a buyer actually wants to see. A paused
+                listing hides it: "42 left" next to a closed listing reads as buyable. */}
+            {listing.quantity > 0n && !isInactive && (
               <span className={listing.quantity <= 5n ? styles.lowStock : undefined}>{compact(listing.quantity)} left</span>
             )}
           </span>
