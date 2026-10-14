@@ -1,0 +1,173 @@
+// Hupi's live face. Every motion is a loop or a hover reaction on one part of the drawing, so
+// it is CSS keyframes and transitions; cube-motion owns entrances and exits, not idle life.
+// Units below are the drawing's own (viewBox 62×56), so the motion scales with the face.
+
+$curve: cubic-bezier(0.2, 0, 0, 1);
+
+.face {
+  // Outlines take the text colour; fills take the surface behind the face, so a dark theme
+  // flips the drawing the way an invert would, without filtering the whole image
+  --face-ink: currentColor;
+  --face-paper: var(--surface);
+
+  display: block;
+  flex: none;
+  overflow: visible;
+
+  &__ink {
+    fill: var(--face-ink);
+  }
+
+  &__paper {
+    fill: var(--face-paper);
+  }
+
+  &__shell {
+    fill: var(--face-paper);
+    stroke: var(--face-ink);
+  }
+
+  &__smile {
+    stroke: var(--face-ink);
+    stroke-width: 2.3;
+    stroke-linecap: round;
+  }
+
+  // Every moving part turns and scales around its own centre
+  &__head,
+  &__spike,
+  &__look,
+  &__blink {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  // Spikes pivot at their base, where they meet the head
+  &__spike {
+    transform-origin: 50% 100%;
+    transition: transform 0.32s $curve;
+
+    &--center {
+      transition-delay: 0.06s;
+    }
+
+    &--right {
+      transition-delay: 0.12s;
+    }
+  }
+
+  &__look {
+    transition: transform 0.32s $curve;
+  }
+
+  // --- Idle: breathing and blinking ---
+
+  &__head {
+    animation: hupi-breathe 3.2s ease-in-out infinite alternate;
+  }
+
+  &__blink {
+    animation: hupi-blink 5.6s linear infinite;
+  }
+
+  // --- Hover: the crown perks up left to right, and the eyes glance toward the panel ---
+
+  @media (hover: hover) {
+    :hover > &--interactive &__spike {
+      transform: translateY(-1.6px) scale(1.06);
+    }
+
+    :hover > &--interactive &__spike--left {
+      transform: translateY(-1.2px) rotate(-6deg) scale(1.06);
+    }
+
+    :hover > &--interactive &__spike--right {
+      transform: translateY(-1.2px) rotate(6deg) scale(1.06);
+    }
+
+    :hover > &--interactive &__look {
+      transform: translateX(-1.6px);
+    }
+  }
+
+  // --- Thinking: the crown works in sequence and the eyes search side to side ---
+
+  &--thinking &__spike {
+    animation: hupi-work 0.9s ease-in-out infinite;
+  }
+
+  &--thinking &__spike--center {
+    animation-delay: 0.15s;
+  }
+
+  &--thinking &__spike--right {
+    animation-delay: 0.3s;
+  }
+
+  &--thinking &__look {
+    animation: hupi-search 1.6s ease-in-out infinite;
+  }
+
+  // Motion is decoration here: with reduced motion asked for, the face simply sits still
+  @media (prefers-reduced-motion: reduce) {
+    &__head,
+    &__spike,
+    &__look,
+    &__blink {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+}
+
+@keyframes hupi-breathe {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-1.2px);
+  }
+}
+
+// One blink, then a quick double blink later in the cycle, so the rhythm doesn't read as a timer
+@keyframes hupi-blink {
+  0%,
+  44%,
+  48%,
+  88%,
+  91%,
+  94%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  46%,
+  89.5%,
+  92.5% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes hupi-work {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  30% {
+    transform: translateY(-2px) scale(1.08);
+  }
+}
+
+@keyframes hupi-search {
+  0%,
+  100% {
+    transform: translateX(-1.6px);
+  }
+
+  50% {
+    transform: translateX(1.6px);
+  }
+}

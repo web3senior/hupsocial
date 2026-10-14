@@ -1,0 +1,284 @@
+@use '@/styles/components/responsive' as *;
+@use '../chat/theme' as chat;
+
+// Hupi's panel: a chat card hung to the left of the floating action column. Colours come from
+// the chat theme so the assistant and the dock read as one family.
+.hupi {
+  --hupi-accent: #{chat.$chat-accent};
+  --hupi-accent-text: #{chat.$chat-accent-text};
+  // The popover base pads through this; the frame owns its own spacing
+  --native-popover-padding: 0;
+
+  // The floating column turns pointer events off for its box, and this panel is its DOM child
+  pointer-events: auto;
+  width: min(380px, calc(100vw - 2rem));
+  height: min(560px, calc(100dvh - var(--header-height, 64px) - 2rem));
+  overflow: hidden;
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-md);
+
+  // A sheet above the bottom bar on small screens; JS anchoring is overridden here
+  @include md-down() {
+    position: fixed !important;
+    inset: auto 0.5rem calc(var(--bottom-nav-space, 0px) + 0.5rem) 0.5rem !important;
+    width: auto;
+    height: min(70dvh, 560px);
+  }
+
+  &__frame {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    color: var(--text);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.75rem 0.75rem 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  &__titles {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    line-height: 1.2;
+  }
+
+  &__title {
+    font-size: 0.95rem;
+  }
+
+  &__subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  &__iconButton {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    border-radius: 50%;
+    color: var(--text-muted);
+    background: none;
+
+    @media (hover: hover) {
+      &:hover {
+        color: var(--text);
+        background-color: var(--hover);
+      }
+    }
+
+    svg {
+      width: 1.125rem;
+      height: 1.125rem;
+    }
+  }
+
+  &__center {
+    display: grid;
+    place-items: center;
+    flex: 1;
+    padding: 1.5rem;
+    text-align: center;
+  }
+
+  &__cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.25rem;
+    padding: 0 1rem;
+    border: none;
+    border-radius: 9999px;
+    font-weight: 600;
+    color: var(--hupi-accent-text);
+    background-color: var(--hupi-accent);
+
+    &:disabled {
+      opacity: 0.6;
+    }
+  }
+
+  &__messages {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 1rem;
+  }
+
+  &__welcome {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: auto;
+  }
+
+  &__greeting {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  &__suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+
+    // After a reply: the next questions, a little apart from the bubble and its cards
+    &--followUps {
+      margin-top: 0.25rem;
+    }
+  }
+
+  &__suggestion {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    text-align: start;
+
+    @media (hover: hover) {
+      &:hover {
+        border-color: var(--hupi-accent);
+        background-color: var(--hover);
+      }
+    }
+  }
+
+  &__bubble {
+    max-width: 88%;
+    padding: 0.625rem 0.875rem;
+    border-radius: 1rem;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+
+    &--user {
+      align-self: flex-end;
+      white-space: pre-wrap;
+      color: var(--hupi-accent-text);
+      background-color: var(--hupi-accent);
+      border-bottom-right-radius: 0.25rem;
+    }
+
+    &--hupi {
+      align-self: flex-start;
+      background-color: var(--hover);
+      border-bottom-left-radius: 0.25rem;
+    }
+
+    &--thinking {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-muted);
+    }
+  }
+
+  &__orb {
+    flex: none;
+  }
+
+  // Rendered Markdown from the model: compact spacing for a bubble, not an article
+  &__markdown {
+    :global(p),
+    :global(ul),
+    :global(ol) {
+      margin: 0 0 0.5rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    // The global reset strips list markers; a reply's bullets need theirs back
+    :global(ul),
+    :global(ol) {
+      padding-inline-start: 1.25rem;
+    }
+
+    :global(ul) {
+      list-style: disc;
+    }
+
+    :global(ol) {
+      list-style: decimal;
+    }
+
+    :global(li) + :global(li) {
+      margin-top: 0.25rem;
+    }
+
+    :global(a) {
+      color: var(--hupi-accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+  }
+
+  &__composer {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
+  &__input {
+    flex: 1;
+    min-height: 2.5rem;
+    max-height: 8rem;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+    resize: none;
+    font: inherit;
+    font-size: 0.9rem;
+    color: var(--text);
+    background-color: var(--background);
+    field-sizing: content;
+
+    &:focus {
+      outline: none;
+      border-color: var(--hupi-accent);
+    }
+  }
+
+  &__send {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: none;
+    border-radius: 50%;
+    color: var(--hupi-accent-text);
+    background-color: var(--hupi-accent);
+
+    &:disabled {
+      opacity: 0.4;
+    }
+
+    svg {
+      width: 1.125rem;
+      height: 1.125rem;
+    }
+  }
+}
+
+// The live face on the launcher, sized off the floating column's own icon token and a touch
+// larger: the crown needs the room. Tag-qualified (0,1,2) to outrank the column's `button svg`
+// sizing (0,1,1, Aside.module.scss) without !important; the launcher sits outside the panel.
+button > svg.hupi__launcherFace {
+  width: calc(var(--icon-size) * 1.5);
+  height: auto;
+}

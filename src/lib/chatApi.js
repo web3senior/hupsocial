@@ -58,7 +58,7 @@ export const clearChatToken = (address) => {
  * @param {string} address
  * @param {(args: {message: string}) => Promise<string>} signMessageAsync
  * @param {number} [chainId]
- * @param {'chat'|'live'} [purpose] what the wallet is told it is signing in to
+ * @param {'chat'|'live'|'hupi'} [purpose] what the wallet is told it is signing in to
  * @returns {Promise<string>} bearer token
  */
 export const ensureChatSession = async (address, signMessageAsync, chainId, purpose = 'chat') => {

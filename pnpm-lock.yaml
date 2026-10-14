@@ -65,6 +65,9 @@ importers:
       '@walletconnect/ethereum-provider':
         specifier: ^2.23.9
         version: 2.23.9(@types/react@19.2.17)(bufferutil@4.1.0)(debug@4.4.3(supports-color@7.2.0))(immer@11.1.11)(react@19.2.8)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.8))(utf-8-validate@6.0.6)(zod@4.4.3)
+      '@yogesharc/thinking-orbs':
+        specifier: ^0.1.1
+        version: 0.1.1(react@19.2.8)
       bs58:
         specifier: ^6.0.0
         version: 6.0.0
@@ -1892,6 +1895,14 @@ packages:
 
   '@walletconnect/window-metadata@1.0.1':
     resolution: {integrity: sha512-9koTqyGrM2cqFRW517BPY/iEtUDx2r1+Pwwu5m7sJ7ka79wi3EyqhqcICk/yDmv6jAS1rjKgTKXlEhanYjijcA==}
+
+  '@yogesharc/thinking-orbs@0.1.1':
+    resolution: {integrity: sha512-tJsz/Zp53Bi35XnV0lEnUDbg7X2qnHnLzyovAD4yr9NzdD0aI4Jj3m4VgXeYDdwk1ncmHO6rTcuU5FEj/moLSA==}
+    peerDependencies:
+      react: '>=18'
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   abitype@0.7.1:
     resolution: {integrity: sha512-VBkRHTDZf9Myaek/dO3yMmOzB/y2s3Zo6nVU7yaw1G+TvCHAjwaJzNGN9yo4K5D8bU/VZXKP1EJpRhFr862PlQ==}
@@ -7393,6 +7404,10 @@ snapshots:
     dependencies:
       '@walletconnect/window-getters': 1.0.1
       tslib: 1.14.1
+
+  '@yogesharc/thinking-orbs@0.1.1(react@19.2.8)':
+    optionalDependencies:
+      react: 19.2.8
 
   abitype@0.7.1(typescript@5.9.3)(zod@4.4.3):
     dependencies:

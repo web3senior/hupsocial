@@ -22,6 +22,7 @@ import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import { openConnect } from '@/lib/connectDialog'
 import BatchLikeTrigger from './BatchLikeTrigger'
+import Hupi from './hupi/Hupi'
 import NativePopover from './ui/NativePopover'
 import Tooltip from './ui/Tooltip'
 import NavBadge from './ui/NavBadge'
@@ -588,6 +589,8 @@ export default function Aside() {
       </div>
 
       <div className={styles.floatingActions}>
+        <Hupi className={styles.floatingActions__button} />
+
         <BatchLikeTrigger className={styles.floatingActions__button} badgeClassName={styles.floatingActions__badge} />
 
         <button
