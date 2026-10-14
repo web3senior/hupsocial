@@ -14,7 +14,9 @@ export const USDC = {
   8453: { address: '', eip3009: true }, // native Circle USDC
   42220: { address: '', eip3009: true }, // native Circle USDC
   56: { address: '', eip3009: false }, // Binance-Peg USDC — 18 decimals, no EIP-3009
-  // 143 (monad), 10143 (monad-testnet): no canonical USDC configured yet
+  // Native Circle USDC — verified onchain 2026-10-14 (symbol USDC, 6 decimals, exposes the EIP-3009 typehash)
+  143: { address: '0x754704Bc059F8C67012fEd69BC8A327a5aafb603', eip3009: true },
+  // 10143 (monad-testnet): no canonical USDC configured yet
 }
 
 // x402 network identifiers per chainId (the `network` field in payment requirements)
