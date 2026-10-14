@@ -1,5 +1,6 @@
 @use '@/styles/components/responsive' as *;
 @use '@/styles/components/shimmer' as *;
+@use './theme' as chat;
 
 // Left of the floating action column in Aside.module.scss (1rem in, one button wide), so the
 // "+" keeps its corner and the chat sits beside it
@@ -25,12 +26,14 @@ $app-toolbar-clearance: 5.25rem;
   --dock-text-muted: var(--text-muted);
   --dock-glint: var(--foreground);
   --dock-badge: var(--status-error);
+  --dock-accent: #{chat.$chat-accent};
+  --dock-accent-text: #{chat.$chat-accent-text};
+  --dock-online: #{chat.$chat-online};
   --dock-jump: var(--text);
   --dock-jump-text: var(--background);
   --bubble-theirs: var(--hover);
-  --bubble-mine: #3d5afe;
-  --bubble-mine-text: #fff;
-
+  --bubble-mine: var(--dock-accent);
+  --bubble-mine-text: var(--dock-accent-text);
 
   position: fixed;
   right: $floating-column;
@@ -1244,7 +1247,7 @@ $app-toolbar-clearance: 5.25rem;
     height: 7px;
     flex-shrink: 0;
     border-radius: 50%;
-    background-color: var(--status-success);
+    background-color: var(--dock-online);
   }
 
   // Hints that the count opens the list of who is here
@@ -1485,11 +1488,14 @@ $app-toolbar-clearance: 5.25rem;
     border: 1px solid var(--dock-border);
     border-radius: inherit;
     pointer-events: none;
-    transition: border-color 0.15s ease;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
 
-    // Not --dock-border-strong: the light theme declares --border-strong with a dark theme's value
+    // Warm accent edge plus a flat, translucent ring outside it (no blur) while typing
     .composer__box:focus-within & {
-      border-color: var(--dock-text-muted);
+      border-color: var(--dock-accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--dock-accent) 25%, transparent);
     }
 
     @supports (anchor-name: --a) {
@@ -1498,10 +1504,13 @@ $app-toolbar-clearance: 5.25rem;
       height: anchor-size(height);
       transition:
         height 0.22s cubic-bezier(0.2, 0, 0, 1),
-        border-color 0.15s ease;
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
 
       @media (prefers-reduced-motion: reduce) {
-        transition: border-color 0.15s ease;
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
       }
     }
   }
@@ -1549,13 +1558,16 @@ $app-toolbar-clearance: 5.25rem;
     color: var(--dock-text-muted);
     background: none;
     border: 0;
-    border-radius: 999px;
+    border-radius: 0.625rem;
     cursor: pointer;
-    transition: color 0.15s ease;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease;
 
     @media (hover: hover) {
       &:hover {
         color: var(--dock-text);
+        background-color: var(--dock-raised);
       }
     }
 
@@ -1569,7 +1581,7 @@ $app-toolbar-clearance: 5.25rem;
       color: inherit;
       background: none;
       border: 0;
-      border-radius: 999px;
+      border-radius: 0.625rem;
       cursor: pointer;
     }
   }

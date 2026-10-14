@@ -1,0 +1,11 @@
+// Chat theme: the only place the dock's own colours are chosen. Everything here points at
+// the app palette, so light/dark still follow the theme; ChatDock.module.scss maps these
+// onto its --dock-* custom properties and never names a colour itself.
+
+// Accent: the focused field's border, the send button, your own message bubbles, and the
+// tints derived from them (replies, mentions, selected states)
+$chat-accent: var(--blue-600);
+$chat-accent-text: var(--white);
+
+// Presence dot next to the online count
+$chat-online: var(--green-400);
