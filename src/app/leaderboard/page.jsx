@@ -16,11 +16,14 @@ import {
   InfinityIcon,
   PackageIcon,
   RepeatIcon,
+  SealCheckIcon,
   SortAscendingIcon,
   StackIcon,
+  TrendUpIcon,
   TrophyIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
+import clsx from 'clsx'
 import { config } from '@/config/wagmi'
 import { SOLANA_CHAINS } from '@/config/solana'
 import PageTitle from '@/components/PageTitle'
@@ -61,6 +64,10 @@ const compactFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 1,
 })
+// "+9,575": the sign rides on every non-zero change so a quiet day reads as a plain 0
+const deltaFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'exceptZero' })
+// The networks card shows this many chain icons, then a "+N" chip for the rest
+const NETWORK_ICON_LIMIT = 5
 
 const EMPTY_STATS = {
   users: 0,
@@ -69,6 +76,7 @@ const EMPTY_STATS = {
   likes: 0,
   views: 0,
   tips: 0,
+  premium: 0,
 }
 
 const fetcher = async (url) => {
@@ -112,6 +120,7 @@ export default function LeaderboardPage() {
   const leaders = useMemo(() => data?.flatMap((pageData) => pageData.data || []) || [], [data])
   const meta = data?.[data.length - 1]?.meta || data?.[0]?.meta || { stats: EMPTY_STATS, networks: [] }
   const stats = meta?.stats || EMPTY_STATS
+  const dayStats = meta?.stats_24h || EMPTY_STATS
   const networks = meta?.networks || []
   const topLeaders = useMemo(() => leaders.slice(0, 3), [leaders])
   // Ids travel as strings so the 'all' sentinel and a chain id compare the same way
@@ -167,13 +176,15 @@ export default function LeaderboardPage() {
             </div>
           </header>
 
-          <section className={styles.summaryGrid} aria-label="Leaderboard summary">
-            <StatCard icon={UsersIcon} label={period === 'all' ? 'Users' : 'New users'} value={stats.users} />
-            <StatCard icon={FlameIcon} label="Posts" value={stats.root_posts} />
-            <StatCard icon={ChatCircleIcon} label="Comments" value={stats.comments} />
-            <StatCard icon={HeartIcon} label="Likes" value={stats.likes} />
-            <StatCard icon={EyeIcon} label="Views" value={stats.views} />
-            <StatCard icon={HandCoinsIcon} label="Tips" value={stats.tips} />
+          <section className={styles.summary} aria-label="Leaderboard summary">
+            <StatCard icon={UsersIcon} label={period === 'all' ? 'Users' : 'New users'} value={stats.users} delta={dayStats.users} />
+            <StatCard icon={FlameIcon} label="Posts" value={stats.root_posts} delta={dayStats.root_posts} />
+            <StatCard icon={ChatCircleIcon} label="Comments" value={stats.comments} delta={dayStats.comments} />
+            <StatCard icon={HeartIcon} label="Likes" value={stats.likes} delta={dayStats.likes} />
+            <StatCard icon={EyeIcon} label="Views" value={stats.views} delta={dayStats.views} />
+            <StatCard icon={HandCoinsIcon} label="Tips" value={stats.tips} delta={dayStats.tips} />
+            <StatCard icon={SealCheckIcon} label="Premium" value={stats.premium} delta={dayStats.premium} />
+            <NetworksCard networks={networks} />
           </section>
 
           {error && <p className={styles.errorState}>{error.message}</p>}
@@ -267,12 +278,50 @@ export default function LeaderboardPage() {
   )
 }
 
-function StatCard({ icon: Icon, label, value }) {
+function StatCard({ icon: Icon, label, value, delta }) {
+  const isUp = delta > 0
+
   return (
     <div className={styles.statCard}>
-      <Icon size={16} />
-      <span>{label}</span>
-      <strong>{compactFormatter.format(value)}</strong>
+      <span className={styles.statCard__label}>
+        <Icon size={18} />
+        {label}
+      </span>
+      <strong className={styles.statCard__value}>{numberFormatter.format(value)}</strong>
+      <span className={styles.statCard__delta}>
+        {isUp && <TrendUpIcon size={16} />}
+        <span className={clsx(styles.statCard__change, isUp && styles['statCard__change--up'])}>
+          {deltaFormatter.format(delta)}
+        </span>
+        in 24h
+      </span>
+    </div>
+  )
+}
+
+/* Every chain the board ranks, drawn with the same art the network filter uses */
+function NetworksCard({ networks }) {
+  const shown = networks.slice(0, NETWORK_ICON_LIMIT)
+  const hidden = networks.length - shown.length
+
+  return (
+    <div className={styles.statCard}>
+      <span className={styles.statCard__label}>
+        <StackIcon size={18} />
+        Networks
+      </span>
+      <strong className={styles.statCard__value}>{numberFormatter.format(networks.length)}</strong>
+      <ul className={styles.chainStack} aria-label="Ranked networks">
+        {shown.map((network) => {
+          const art = CHAIN_ART.get(String(network.id))
+          return (
+            <li key={network.id} className={styles.chainStack__item} title={network.name}>
+              {art ? <img src={art} alt={network.name} /> : <span className={styles.chainInitial}>{network.name.charAt(0)}</span>}
+            </li>
+          )
+        })}
+        {hidden > 0 && <li className={clsx(styles.chainStack__item, styles['chainStack__item--more'])}>+{hidden}</li>}
+      </ul>
     </div>
   )
 }

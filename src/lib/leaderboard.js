@@ -6,6 +6,7 @@
 import pool from '@/lib/db'
 import { MEMBER_ROW_SQL } from '@/lib/members'
 import { hasColumn } from '@/lib/schema'
+import { readPremiumCounts } from '@/lib/premiumServer'
 
 export const PERIODS = {
   all: null,
@@ -281,11 +282,18 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
 
   const [rows] = await pool.execute(fullListQuery, params)
   const [statsRows] = await pool.execute(buildStatsQuery(networkId, since), buildStatsParams(networkId, since))
+  /* The summary's "+N in 24h" line: the same counts under the same network, bounded to the last day */
+  const daySince = getSinceDate('24h')
+  const [dayRows] = await pool.execute(buildStatsQuery(networkId, daySince), buildStatsParams(networkId, daySince))
   const [networks] = await pool.execute('SELECT id, name FROM networks ORDER BY name ASC')
+  /* Premium is held across every chain, so neither the network nor the period narrows it:
+     the card is who holds it now, and the delta is who first bought it in the last day */
+  const premium = await readPremiumCounts(toUnixSeconds(daySince))
 
   return {
     rows,
-    stats: serializeStats(statsRows[0]),
+    stats: { ...serializeStats(statsRows[0]), premium: premium.total },
+    stats_24h: { ...serializeStats(dayRows[0]), premium: premium.recent },
     networks,
   }
 }
@@ -370,8 +378,11 @@ export function normalizeNetworkId(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
+// Not a selectable period: only the summary's 24h deltas ask for it
+const DELTA_PERIODS = { '24h': 1 }
+
 export function getSinceDate(period) {
-  const days = PERIODS[period]
+  const days = PERIODS[period] || DELTA_PERIODS[period]
   if (!days) return null
 
   const date = new Date(Date.now() - days * 24 * 60 * 60 * 1000)

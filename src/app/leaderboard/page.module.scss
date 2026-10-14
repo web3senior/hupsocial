@@ -126,46 +126,123 @@
 }
 
 
-.summaryGrid {
+// One bordered strip: the 1px gap over a border-coloured background draws the dividers, so they
+// stay right at every column count. Eight cards fill 4×2 on desktop and 2×4 on a phone.
+.summary {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.5rem;
-  padding: 1rem 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background-color: var(--border);
+  overflow: hidden;
 
   @media (max-width: 820px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  @media (max-width: 420px) {
+  @media (max-width: 340px) {
     grid-template-columns: 1fr;
   }
 }
 
 .statCard {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 0.25rem 0.45rem;
-  min-height: 72px;
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background-color: var(--surface-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 1.1rem 1.25rem;
+  background-color: var(--surface);
   color: var(--text);
 
-  svg {
-    color: var(--leaderboard-accent);
+  @media (max-width: 600px) {
+    padding: 0.85rem 0.9rem;
   }
 
-  span {
+  &__label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
     color: var(--text-muted);
-    font-size: var(--system-12-font-size);
+    font-size: var(--system-14-font-size, 0.875rem);
+
+    svg {
+      flex-shrink: 0;
+    }
   }
 
-  strong {
-    grid-column: 1 / -1;
-    font-size: var(--system-22-font-size);
-    line-height: var(--system-22-line-height);
+  &__value {
+    overflow: hidden;
+    font-family: var(--ff-mono);
+    font-size: 1.85rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    // Two cards share a phone's width, so a seven-digit count still fits its half
+    @media (max-width: 600px) {
+      font-size: 1.4rem;
+    }
+  }
+
+  &__delta {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-muted);
+    font-size: var(--system-13-font-size, 0.8125rem);
+
+    svg {
+      color: var(--status-success);
+    }
+  }
+
+  &__change {
+    font-family: var(--ff-mono);
+    font-variant-numeric: tabular-nums;
+
+    &--up {
+      color: var(--status-success);
+    }
+  }
+}
+
+// Overlapping chain icons, each ringed in the card colour so the overlap reads as a stack
+.chainStack {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 0 0 0.25rem;
+  list-style: none;
+
+  &__item {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-left: -0.25rem;
+    border: 2px solid var(--surface);
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &--more {
+      width: auto;
+      padding: 0 0.3rem;
+      color: var(--text-muted);
+      font-size: 0.65rem;
+      font-weight: 700;
+    }
   }
 }
 

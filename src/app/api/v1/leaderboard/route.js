@@ -62,6 +62,7 @@ export async function GET(request) {
           sort,
           network_id: networkId,
           stats: snapshot.stats,
+          stats_24h: snapshot.stats_24h,
           networks: snapshot.networks,
         },
       })
@@ -82,6 +83,7 @@ export async function GET(request) {
         sort,
         network_id: networkId,
         stats: snapshot.stats,
+        stats_24h: snapshot.stats_24h,
         networks: snapshot.networks,
       },
     })

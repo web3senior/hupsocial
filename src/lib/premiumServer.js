@@ -132,6 +132,41 @@ export const readPremiumMany = async (addresses) => {
 }
 
 /**
+ * How many accounts hold premium right now, and how many of those first subscribed since
+ * `sinceSeconds` — the leaderboard summary's count and its "+N in 24h". Counted per account,
+ * not per row, since one wallet can hold a term on several chains.
+ * @param {number} sinceSeconds Unix second the "new" window opens at.
+ * @returns {Promise<{total: number, recent: number}>}
+ */
+export const readPremiumCounts = async (sinceSeconds) => {
+  const pin = deploymentPin(premiumDeployments())
+  if (!pin) return { total: 0, recent: 0 }
+
+  const nowSeconds = Math.floor(Date.now() / 1000)
+
+  try {
+    /* A comp's first_subscribed_at stays 0, so NULLIF keeps it out of "recent" rather than
+       letting MIN() land on it */
+    const [rows] = await pool.execute(
+      `SELECT COUNT(*) AS total, COALESCE(SUM(first_at >= ?), 0) AS recent
+         FROM (
+           SELECT account, MIN(NULLIF(first_subscribed_at, 0)) AS first_at
+             FROM premium_subscriptions
+            WHERE ${pin.sql}
+            GROUP BY account
+           HAVING MAX(complimentary) = 1 OR MAX(expires_at) > ?
+         ) active`,
+      [sinceSeconds, ...pin.params, nowSeconds],
+    )
+
+    return { total: Number(rows[0]?.total || 0), recent: Number(rows[0]?.recent || 0) }
+  } catch (error) {
+    console.warn('[premium] count read failed:', error.message)
+    return { total: 0, recent: 0 }
+  }
+}
+
+/**
  * One current subscriber to name in the "get Premium like @…" nudge — the most recent buyer
  * who has a handle, so the card can point at a real account. Never the viewer themself.
  * @param {string|null} exclude The viewer's wallet.
