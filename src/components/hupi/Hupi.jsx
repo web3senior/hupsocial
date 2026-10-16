@@ -1,17 +1,15 @@
 'use client'
 
 import { Fragment, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import clsx from 'clsx'
 import { Rise } from 'cube-motion/react'
 import { useChainId, useConnection, useSignMessage } from 'wagmi'
-import { ArrowClockwiseIcon, ArrowUpIcon, CrownSimpleIcon, WalletIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArrowUpIcon, WalletIcon, XIcon } from '@phosphor-icons/react'
 import NativePopover from '@/components/ui/NativePopover'
 import EmptyState from '@/components/ui/EmptyState'
 import { ContentSpinner, ThinkingOrb } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
-import { usePremium } from '@/hooks/usePremium'
 import { useChatToken } from '@/hooks/useChatToken'
 import { clearChatToken, ensureChatSession } from '@/lib/chatApi'
 import { openConnect } from '@/lib/connectDialog'
@@ -24,7 +22,7 @@ import styles from './Hupi.module.scss'
 
 /**
  * @file components/hupi/Hupi.jsx
- * @description Hupi, the premium assistant: a launcher for the floating action column and the
+ * @description Hupi, the assistant: a launcher for the floating action column and the
  * panel it opens. The panel is a manual popover rather than a dialog — it is a chat, so the
  * page behind it stays usable and only the close button or Esc puts it away.
  */
@@ -59,7 +57,7 @@ const writeConversation = (wallet, messages) => {
 
 /**
  * Ask Hupi and read the answer as it streams: NDJSON lines of status, delta, cards, followups, done
- * or error (see api/v1/hupi). A refusal before streaming (auth, premium, quota) is a JSON error
+ * or error (see api/v1/hupi). A refusal before streaming (auth, quota) is a JSON error
  * with a status. `page` is the path the member has open, so "this post" can mean something.
  */
 const streamHupi = async (token, messages, page, { onStatus, onDelta, onCards, onFollowUps }) => {
@@ -114,7 +112,6 @@ export default function Hupi({ className }) {
   const chainId = useChainId()
   const me = isConnected && address ? address.toLowerCase() : null
 
-  const { isPremium, isLoading: isPremiumLoading } = usePremium(me)
   const token = useChatToken(me)
   // Lifted from the conversation so the faces on the launcher and header work while it answers
   const [isBusy, setIsBusy] = useState(false)
@@ -139,7 +136,7 @@ export default function Hupi({ className }) {
               <strong className={styles.hupi__title}>Hupi</strong>
               <span className={styles.hupi__subtitle}>Ask me anything about Hup</span>
             </div>
-            {me && isPremium && token && <ResetButton wallet={me} />}
+            {me && token &&<ResetButton wallet={me} />}
             <button type="button" className={styles.hupi__iconButton} onClick={close} aria-label="Close Hupi">
               <XIcon />
             </button>
@@ -153,20 +150,6 @@ export default function Hupi({ className }) {
                 <button type="button" className={styles.hupi__cta} onClick={() => openConnect()}>
                   Connect wallet
                 </button>
-              }
-            />
-          ) : isPremiumLoading ? (
-            <div className={styles.hupi__center}>
-              <ContentSpinner />
-            </div>
-          ) : !isPremium ? (
-            <Gate
-              icon={CrownSimpleIcon}
-              text="Hupi is a Premium perk. Ask what you missed, who joined today and what's trending."
-              action={
-                <Link href="/premium" className={styles.hupi__cta} onClick={close}>
-                  Get Premium
-                </Link>
               }
             />
           ) : !token ? (

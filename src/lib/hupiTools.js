@@ -1,6 +1,6 @@
 /**
  * @file lib/hupiTools.js
- * @description The read-only tools Hupi, the premium assistant, can call. Server-only.
+ * @description The read-only tools Hupi, the assistant, can call. Server-only.
  *
  * Every tool answers from data the app already shows somewhere — notifications, the leaderboard
  * snapshot, the trending ranking — so Hupi never knows more than the asking wallet could see by
