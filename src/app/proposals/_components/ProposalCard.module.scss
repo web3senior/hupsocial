@@ -1,0 +1,105 @@
+.card {
+  position: relative; /* Anchors the stretched title link over the whole card */
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  padding: 0.85rem 1rem;
+  background: var(--background);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--dao-accent, #7c3aed) 45%, var(--border));
+    box-shadow: var(--card-elevation, 0 2px 10px rgba(15, 23, 42, 0.06));
+  }
+
+  &:focus-within {
+    border-color: var(--dao-accent, #7c3aed);
+  }
+
+  &__item {
+    display: block;
+  }
+
+  &__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  &__badge {
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+
+    &--pending {
+      background: rgba(42, 120, 214, 0.14);
+      color: #2a78d6;
+    }
+
+    &--active {
+      background: color-mix(in srgb, var(--dao-accent, #7c3aed) 14%, transparent);
+      color: var(--dao-accent, #7c3aed);
+    }
+
+    &--succeeded {
+      background: rgba(21, 128, 61, 0.14);
+      color: var(--status-success, #15803d);
+    }
+
+    &--defeated {
+      background: rgba(220, 38, 38, 0.12);
+      color: var(--status-error, #dc2626);
+    }
+
+    &--canceled {
+      background: rgba(100, 116, 139, 0.14);
+      color: var(--text-muted, #64748b);
+    }
+  }
+
+  &__number {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-16, 1rem);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  &__link {
+    color: inherit;
+    text-decoration: none;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--dao-accent, #7c3aed);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+}

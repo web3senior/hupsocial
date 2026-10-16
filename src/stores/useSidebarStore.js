@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import {
   ArticleIcon,
+  BankIcon,
   BellIcon,
   BroadcastIcon,
   BookmarkSimpleIcon,
@@ -63,6 +64,8 @@ export const NAV_ITEMS_SCHEMA = [
   // an opinion. A checklist, not a bar chart — Insights owns ChartBar here, and the sideways
   // variant just reads as a chart someone knocked over.
   { id: 'polls', name: 'Polls', path: '/polls', icon: ListChecksIcon },
+  // Under polls: the same ask-and-count shape, with weight, delegation and a quorum behind it
+  { id: 'proposals', name: 'Proposals', path: '/proposals', icon: BankIcon },
   // Beside polls, not in Trade: a bet here is parimutuel and judge-resolved, with no way out before it settles
   { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
   // Beside polls for the same reason: asking people for something, in public, on the record.

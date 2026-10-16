@@ -1,0 +1,303 @@
+/* Chrome shared by every DAO dialog. NativeDialog only supplies centering, motion and modality. */
+.daoDialog {
+  padding: var(--native-popover-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &[open] {
+    display: flex;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    /* The native dialog caps itself at calc(100% - 6px - 2em); subtract that plus the dialog's
+       border and padding so the body never forces horizontal scroll on a phone */
+    width: min(460px, calc(100vw - 6px - 2em - 2px - 2 * var(--native-popover-padding, 1rem)));
+    max-height: 84svh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+  }
+
+  &__close {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    padding: 0.25rem;
+    border-radius: 50%;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__intro {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+    line-height: 1.5;
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+    font-size: var(--font-size-12);
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--background);
+      color: inherit;
+      padding: 0.5rem 0.65rem;
+      font: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+
+      &:focus {
+        outline: none;
+        border-color: var(--dao-accent, #7c3aed);
+      }
+
+      &:disabled {
+        opacity: 0.6;
+      }
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 5rem;
+    }
+  }
+
+  &__label {
+    font-weight: 600;
+  }
+
+  &__hint {
+    color: var(--text-muted, #888);
+    line-height: 1.45;
+
+    &--error {
+      color: var(--status-error, #dc2626);
+    }
+
+    &--ok {
+      color: var(--status-success, #15803d);
+    }
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+
+    @media (max-width: 420px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__modes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    border: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__mode {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.6rem 0.75rem;
+    cursor: pointer;
+    font-size: var(--font-size-12);
+    transition: border-color 0.15s ease;
+
+    input {
+      margin-top: 0.15rem;
+      accent-color: var(--dao-accent, #7c3aed);
+    }
+
+    &--selected {
+      border-color: var(--dao-accent, #7c3aed);
+      background: color-mix(in srgb, var(--dao-accent, #7c3aed) 6%, transparent);
+    }
+  }
+
+  &__modeText {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+
+    strong {
+      font-size: var(--font-size-14, 0.875rem);
+    }
+
+    span {
+      color: var(--text-muted, #888);
+      line-height: 1.45;
+    }
+  }
+
+  &__check {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: var(--font-size-12);
+    cursor: pointer;
+
+    input {
+      accent-color: var(--dao-accent, #7c3aed);
+    }
+  }
+
+  &__options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  &__optionRow {
+    display: flex;
+    gap: 0.4rem;
+
+    input {
+      flex: 1;
+    }
+  }
+
+  &__iconButton {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 0 0.45rem;
+    border-radius: var(--global-border-radius);
+    color: var(--text-muted, #888);
+
+    &:hover:not(:disabled) {
+      background: var(--surface-muted);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  &__linkButton {
+    all: unset;
+    cursor: pointer;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--dao-accent, #7c3aed);
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    // Irreversible actions read as such
+    &--danger {
+      color: var(--status-error, #dc2626);
+    }
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  &__tab {
+    all: unset;
+    cursor: pointer;
+    flex: 1;
+    text-align: center;
+    padding: 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+
+    &--active {
+      border-color: var(--dao-accent, #7c3aed);
+      color: var(--dao-accent, #7c3aed);
+      background: color-mix(in srgb, var(--dao-accent, #7c3aed) 8%, transparent);
+    }
+  }
+
+  &__summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+    padding: 0.6rem 0.75rem;
+    font-size: var(--font-size-12);
+
+    div {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    span {
+      color: var(--text-muted, #888);
+    }
+  }
+
+  &__submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border: none;
+    border-radius: 999px;
+    padding: 0.6rem 1rem;
+    background: var(--dao-accent, #7c3aed);
+    color: #fff;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}

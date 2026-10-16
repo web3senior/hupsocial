@@ -215,3 +215,47 @@ Hup admin wallet calls `setTrustedForwarder`). Scheduling goes live on that chai
 No cidex rows: scheduled posts are ordinary `create` calls, indexed like any other post.
 
 Deployed 2026-09-22: Base Sepolia (block 47162184), LUKSO. Trusted by Hup on neither yet.
+
+## HupDao
+
+Standalone DAOs behind the app's **Proposals** section (`src/contracts/v2/Extensions/HupDao.sol`):
+groups vote with locked tokens, an ERC20Votes/LSP7Votes token, or one vote per member, with
+delegation and signalling proposals. Suite: `forge test --match-path forge-test/evm/HupDao.t.sol`
+from `src/contracts`.
+
+Built with **solc 0.8.36, optimizer 200, viaIR, cancun** from one standard-JSON input, by
+`node build-hupdao.js <repoRoot> <@openzeppelin/contracts 5.6.1 dir> <solc 0.8.36 binary>`. That
+script writes `artifacts/HupDao.json`, `../../abis/HupDao.json`, and the identical input to
+`v2/for-verification/{monad,lukso}-mainnet/HupDao.json` — so the verify buttons recompile exactly
+the bytes that were deployed. Rerun it after any edit to the `.sol`. Runtime is 22,018 bytes.
+
+**Salt: `hup-dao`**:
+
+    0x6d4300f468ccf3f78a39e97f1fe2c4970edcb9ba9d7f1c35d789f68a4f4482a6
+
+Constructor: the chain's forwarder (`forwarder` in `src/config/contracts.js`) and the admin. No Hup
+core. `CTOR_DEFAULTS.HupDao` carries both per chain. The admin is an argument rather than
+`msg.sender` because through the factory `msg.sender` is the factory. Predicted addresses with
+those defaults and this salt:
+
+| Chain | Address |
+| --- | --- |
+| Ethereum (1) | `0x69369b47d0fe94Ebe43ff25D57A33cfFd13C05cA` |
+| LUKSO (42) | `0x33a0bA5Ea52597311FE8e34B08d30F6f696F3880` |
+| BNB (56) / Arc (5042) | `0x4F8cda9717984d94A13e125EB2Ac02310f41Fe79` |
+| Monad (143) | `0x4023C1941aFcF7f7483dDef1E7d1D341AE80188E` |
+| Robinhood (4663) | `0x46Eeb587A594dC2E1aD5dC208d708516506F9557` |
+| Base (8453) | `0x52dd3258E814775275D4Ee60121Dddc3084f2c7c` |
+| Arbitrum (42161) | `0xa313cA9c148A5262FDc5B110104927f336D13840` |
+| Celo (42220) | `0xa891478b3dcBD5e71fEDB175d37Af81Baa867211` |
+| Base Sepolia (84532) | `0x1164e61B92126BBf471a2cFd3F788E420e41bAB8` |
+
+A rebuild changes the bytecode and so every address above. Confirm the page's prediction before
+sending.
+
+After deploying: fill `chain<id>.dao` in `src/config/contracts.js` — the Proposals section turns
+on for that chain at that moment. No cidex rows: the pages read the contract directly. Optionally
+grant `MODERATOR_ROLE` to whoever should be able to hide spam groups or proposals.
+
+Deployed 2026-10-16: LUKSO `0x33a0bA5Ea52597311FE8e34B08d30F6f696F3880` (sent as a legacy tx — the
+wallet's LUKSO entry had EIP-1559 off; `deploy.html` now falls back to `gasPrice` on its own).

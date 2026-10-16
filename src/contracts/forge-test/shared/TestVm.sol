@@ -9,6 +9,9 @@ interface Vm {
   function stopPrank() external;
   function deal(address who, uint256 amount) external;
   function warp(uint256 timestamp) external;
+  function roll(uint256 blockNumber) external;
+  function addr(uint256 privateKey) external pure returns (address);
+  function sign(uint256 privateKey, bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
   function expectRevert() external;
   function expectRevert(bytes4 selector) external;
   function expectRevert(bytes calldata data) external;
