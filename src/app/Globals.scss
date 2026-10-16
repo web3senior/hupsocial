@@ -339,6 +339,9 @@ html {
   // A no-op while unlocked, since `overflow: hidden scroll` already shows the scrollbar.
   scrollbar-gutter: stable;
   min-height: 100%;
+  // No double-tap zoom, so quick taps on buttons and links don't magnify the page. Effective
+  // touch-action intersects down the tree, so rails' pan-x and the viewers' none still apply.
+  touch-action: manipulation;
 }
 
 // Every scroller inside the page — dialog bodies, card lists, tables — carries a thin bar that

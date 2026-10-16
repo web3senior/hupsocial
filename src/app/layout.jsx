@@ -108,6 +108,11 @@ export const viewport = {
   ],
   width: 'device-width',
   initialScale: 1,
+  // Locked like a native app: iOS zooms into any focused field under 16px and never zooms back
+  // out, so the page sat magnified after the keyboard closed. The media viewers run their own
+  // pinch zoom (useMediaZoom), which this doesn't touch.
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({ children }) {
