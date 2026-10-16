@@ -63,6 +63,30 @@ function isInternalHref(href) {
 }
 
 /**
+ * The in-app path a link points at, or null when it leaves Hup. An absolute link to any Hup
+ * host (https://www.hup.social/proposals) resolves to its path, so the client router can open
+ * it on the current deployment instead of reloading the page.
+ * @param {string} href
+ * @returns {string|null}
+ */
+export function internalPathOf(href) {
+  const value = String(href || '').trim()
+  if (!value || !isInternalHref(value)) return null
+
+  let parsed
+  try {
+    parsed = new URL(value, typeof window !== 'undefined' ? window.location.href : 'https://hup.social')
+  } catch {
+    return null
+  }
+
+  // mailto:, tel: and ipfs: count as "internal" for the target rule but are not routes
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`
+}
+
+/**
  * Render a post body. One renderer on both sides, so the post page (rendered on the server,
  * where DOMPurify cannot run) and the feed (rendered in the browser) show a post identically;
  * the browser pass keeps DOMPurify as a second line of defence over output that is already safe

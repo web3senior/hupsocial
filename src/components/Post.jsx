@@ -41,6 +41,7 @@ import { CONTRACTS, config } from '@/config/wagmi'
 import { isSessionActive } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { renderMarkdown } from '@/lib/markdown'
+import { routeInternalLinkClick } from '@/lib/internalLinks'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { postToMarkdown, getPostMarkdownUrl } from '@/lib/postMarkdown'
 import { AI_TARGETS, buildPostAiUrl } from '@/lib/aiTargets'
@@ -1192,17 +1193,14 @@ const translationFetcher = async ([text, targetLang, address]) => {
 
 // ■■■ Sub-Component Definition ■■■
 
-// A mention is injected HTML with no Link behind it, so a plain click is routed by hand to
-// skip a full page load; modified clicks keep the browser's new-tab behavior
+// Mentions and internal links are injected HTML with no Link behind them, so a plain click is
+// routed by hand to skip a full page load; modified clicks keep the browser's new-tab behavior.
+// Propagation stops here (the card would open post details), so the global router never sees it.
 function handleBodyLinkClick(event, router) {
   const anchor = event.target.closest('a')
   if (!anchor) return
   event.stopPropagation()
-
-  const mention = anchor.getAttribute('data-mention')
-  if (!mention || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-  event.preventDefault()
-  router.push(`/${mention}`)
+  routeInternalLinkClick(event, router)
 }
 
 export function PostText({ sourceText, postId, styles, renderMarkdown, isCollapsible = false, baseClassName }) {

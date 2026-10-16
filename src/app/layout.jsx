@@ -1,6 +1,7 @@
 import { Geist_Mono, Inter } from 'next/font/google'
 import ClientLayout from '../components/ClientLayout'
 import ServiceWorkerRegistry from '../components/ServiceWorkerRegistry'
+import InternalLinkRouter from '../components/InternalLinkRouter'
 import './Globals.scss'
 import './../styles/Global.scss'
 
@@ -120,6 +121,7 @@ export default function RootLayout({ children }) {
     <html lang="en" className={`${inter.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <body>
         <ServiceWorkerRegistry />
+        <InternalLinkRouter />
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
