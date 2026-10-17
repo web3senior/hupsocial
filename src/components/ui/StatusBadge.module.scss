@@ -93,7 +93,7 @@
   }
 }
 
-:global(:is([data-theme='dark'], [data-theme='halloween'])) .badge,
+:global([data-theme='dark']) .badge,
 :global([data-theme='terminal']) .badge {
   --status-pending-bg: #422d16;
   --status-pending-fg: #f58300;

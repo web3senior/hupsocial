@@ -191,7 +191,7 @@
   }
 }
 
-:is([data-theme='dark'], [data-theme='halloween']) .logoWrapper img:first-child,
+[data-theme='dark'] .logoWrapper img:first-child,
 [data-theme='terminal'] .logoWrapper img:first-child {
   filter: invert(1);
 }
@@ -513,24 +513,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-// Unread reads as a lit jack-o'-lantern for the season
-:global([data-theme='halloween']) {
-  .notificationBadgeDot,
-  .notificationBadgeCounter {
-    background-color: #ff8a28;
-    box-shadow: 0 0 8px #ff8a2880;
-  }
-
-  .notificationBadgeCounter {
-    color: #1f0d02;
-  }
-
-  .linkActive {
-    background-color: #ff8a281f;
-    color: #ffb36b;
-  }
 }
 
 .floatingBadgeCount {

@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import clsx from 'clsx'
-import { ArticleIcon, BookIcon, BugIcon, CalendarDotsIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, GhostIcon, HandCoinsIcon, HeadCircuitIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, ReceiptIcon, RobotIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
+import { ArticleIcon, BookIcon, BugIcon, CalendarDotsIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HandCoinsIcon, HeadCircuitIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, ReceiptIcon, RobotIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
 import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
@@ -28,7 +28,6 @@ import Tooltip from './ui/Tooltip'
 import NavBadge from './ui/NavBadge'
 import Avatar from './ui/Avatar'
 import { GitHub } from './Icons'
-import { isSeasonActive } from '@/lib/season'
 import styles from './Aside.module.scss'
 
 // A visible tab revalidates on focus and on every client-side navigation, so its tick only has to
@@ -54,8 +53,6 @@ const themeOptions = [
   { id: 'dark', icon: <MoonIcon size={16} /> },
   { id: 'light', icon: <SunIcon size={16} /> },
   { id: 'terminal', icon: <TerminalWindowIcon size={16} /> },
-  // Seasonal: listed only inside its window (lib/season.js)
-  { id: 'halloween', icon: <GhostIcon size={16} />, seasonal: true },
 ]
 
 const isActivePath = (pathname, path) => {
@@ -487,7 +484,7 @@ export default function Aside() {
                         <span>Theme</span>
                       </div>
                       <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '30px' }}>
-                        {themeOptions.filter((option) => !option.seasonal || isSeasonActive(option.id)).map((option) => (
+                        {themeOptions.map((option) => (
                           <button
                             key={option.id}
                             type="button"

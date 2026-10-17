@@ -172,7 +172,7 @@ $padding: (
       }
 
       // The palette above assumes a white page; both dark themes swap to $alerts-dark
-      :is([data-theme='dark'], [data-theme='halloween']) &,
+      [data-theme='dark'] &,
       [data-theme='terminal'] & {
         color: map.get($alerts-dark, $alert, color);
         background-color: map.get($alerts-dark, $alert, background);
@@ -211,7 +211,7 @@ $padding: (
     color: #000;
     text-shadow: 0 1px 0 #fff;
 
-    :is([data-theme='dark'], [data-theme='halloween']) &,
+    [data-theme='dark'] &,
     [data-theme='terminal'] & {
       color: inherit;
       text-shadow: none;

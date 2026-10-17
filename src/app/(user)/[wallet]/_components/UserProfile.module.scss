@@ -32,7 +32,7 @@
   }
 }
 
-:global(:is([data-theme='dark'], [data-theme='halloween'])) .page {
+:global([data-theme='dark']) .page {
   --tag-bg: #20232a;
 }
 

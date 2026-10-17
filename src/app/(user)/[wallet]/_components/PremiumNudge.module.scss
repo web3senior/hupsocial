@@ -86,7 +86,7 @@
   }
 }
 
-:global(:is([data-theme='dark'], [data-theme='halloween'])) .nudge,
+:global([data-theme='dark']) .nudge,
 :global([data-theme='terminal']) .nudge {
   --nudge-bg: rgba(16, 185, 129, 0.14);
   --nudge-cta-bg: #fff;

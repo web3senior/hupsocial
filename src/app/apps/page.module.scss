@@ -677,7 +677,7 @@
   }
 }
 
-:global(:is([data-theme='dark'], [data-theme='halloween'])) {
+:global([data-theme='dark']) {
   .search {
     --search-bg: #20232a;
   }

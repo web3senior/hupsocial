@@ -196,7 +196,7 @@
   // The dark themes carry a brighter green (#22c55e against #16a34a) over a far darker ground,
   // where the same 20% stops reading as a hint and starts reading as a chart that has already
   // loaded. Half the tint puts it back at the same distance from its surface.
-  :global(:is([data-theme='dark'], [data-theme='halloween'])) &,
+  :global([data-theme='dark']) &,
   :global([data-theme='terminal']) & {
     background-image: linear-gradient(180deg, color-mix(in srgb, var(--chart-up) 11%, transparent) 0%, transparent 100%);
   }

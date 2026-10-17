@@ -103,7 +103,7 @@
   color-scheme: light;
 }
 
-:is([data-theme='dark'], [data-theme='halloween']) {
+[data-theme='dark'] {
   --surface-1: #191919;
   --surface-2: #1f1f1f;
   --surface-3: #2a2a2a;
@@ -178,79 +178,6 @@
   --accent-press: var(--accent-primary);
   accent-color: var(--accent-primary);
   color-scheme: dark;
-}
-
-// Seasonal (lib/season.js). Builds on the dark block above — every dark selector in the app also
-// matches halloween — and repaints the ground in night purple with a pumpkin accent.
-[data-theme='halloween'] {
-  --surface-1: #1a1024;
-  --surface-2: #21142e;
-  --surface-3: #2c1c3c;
-  --border: #c99cff14;
-  --border-strong: #c99cff29;
-  --text-1: #f6edff;
-  --text-2: #f6edffad;
-  --text-3: #f6edff66;
-
-  --bg: #100916;
-  --background: #100916;
-  --foreground: #f1e6fb;
-
-  --dim: #a993c2;
-  --muted: #7d6896;
-
-  --surface: #1a1024;
-  --surface-muted: #2c1c3c;
-  --text: #f6edffb8;
-  --text-muted: #b9a5d1;
-  --hover: #26173a;
-  --tag: #2c1c3c;
-  --shimmer-glint: rgba(255, 138, 40, 0.1);
-  --shimmer-bg: #24162f;
-  // Pumpkin is the accent, so cashtags take the witchy purple to read apart from it
-  --cashtag-color: #c084fc;
-  --chart-line: #ff8a28;
-
-  --scrollbarBG: #1c1128;
-  --thumbBG: #6b4a8f;
-  --thumbBG-hover: #ff8a28;
-  --scrollbar-arrow-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 3L9 7H1z' fill='%236b4a8f'/%3E%3C/svg%3E");
-  --scrollbar-arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 7L9 3H1z' fill='%236b4a8f'/%3E%3C/svg%3E");
-
-  --beta-badge-background: #3b2652;
-  --beta-badge-color: #e9d5ff;
-  --new-badge-background: #ff8a28;
-  --new-badge-color: #1f0d02;
-  --new-orange-badge-background: #ff8a28;
-  --new-orange-badge-color: #1f0d02;
-
-  --footer-link-color: #b9a5d1;
-  --color-icon-muted: #6b5585;
-  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%23b9a5d1' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-
-  // config/wagmi.js paints the connected chain's colours inline on :root; !important lets the
-  // season win there only. Chain-scoped surfaces (lib/networkColors.js) set their own inline
-  // values on a descendant, so a post still wears its own network's colour.
-  --network-color-primary: #ff8a28 !important;
-  --network-color-text: #1f0d02 !important;
-  --accent-primary: #ff8a28;
-  --accent-press: #e5701a;
-  accent-color: #ff8a28;
-  color-scheme: dark;
-
-  // A low moon glow over the night ground; fixed so it stays put while the feed scrolls
-  body {
-    background:
-      radial-gradient(ellipse 80% 45% at 50% -10%, #ff8a281f, transparent 70%),
-      radial-gradient(ellipse 60% 40% at 100% 110%, #8b5cf61a, transparent 70%),
-      var(--background);
-    background-attachment: fixed;
-  }
-
-  ::selection {
-    color: #1f0d02;
-    background-color: #ff8a28;
-  }
 }
 
 [data-theme='terminal'] {
