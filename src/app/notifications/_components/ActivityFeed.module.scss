@@ -1,3 +1,5 @@
+@use '@/styles/components/shimmer' as *;
+
 .feed {
   display: flex;
   flex-direction: column;
@@ -127,7 +129,8 @@
     flex-direction: column;
 
     // The feed's own footer supplies the closing rule.
-    > *:last-child {
+    > :last-child,
+    > section:last-child > :last-child {
       border-bottom: none;
     }
 
@@ -138,6 +141,22 @@
       pointer-events: none;
       transition: opacity 0.15s var(--transition-soft);
     }
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__sectionTitle {
+    margin: 0;
+    padding: 1rem 1.25rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
   }
 
   &__empty {
@@ -156,6 +175,7 @@
   }
 
   &__footer {
+    position: relative;
     display: flex;
     justify-content: center;
     padding: 1rem;
@@ -186,6 +206,14 @@
     }
   }
 
+  // Zero-height trigger for the next page; it sits above the button, so it fires first.
+  &__sentinel {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 1px;
+  }
+
   &__status {
     display: flex;
     align-items: center;
@@ -197,14 +225,29 @@
   }
 
   &__error {
-    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
     padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--border);
     color: var(--red-400);
     font-size: 0.8125rem;
   }
 
-  &__spin {
-    animation: spin 0.9s linear infinite;
+  &__retry {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background: color-mix(in srgb, currentColor 10%, transparent);
+    }
   }
 
   &__skeleton {
@@ -224,10 +267,10 @@
   &__skeletonIcon,
   &__skeletonAvatar,
   &__skeletonLine {
+    @include shimmer;
+
     display: block;
-    background: var(--shimmer-bg);
     border-radius: 999px;
-    animation: pulse 1.2s ease-in-out infinite;
   }
 
   &__skeletonIcon {
@@ -263,22 +306,9 @@
     &__skeleton {
       padding: 0.875rem 1rem;
     }
-  }
-}
 
-@keyframes spin {
-  to {
-    rotate: 360deg;
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.45;
+    &__sectionTitle {
+      padding-inline: 1rem;
+    }
   }
 }

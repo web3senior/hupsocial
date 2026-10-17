@@ -147,6 +147,44 @@ export function buildGroups(notifications) {
   return groups
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+const relativeDay = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1)
+
+// Indexer timestamps arrive as "YYYY-MM-DD HH:MM:SS" as often as ISO, and Safari rejects the space.
+const timeOf = (value) => (value ? new Date(String(value).replace(' ', 'T')).getTime() : Number.NaN)
+
+/** Section a group falls under, counted in calendar days on the viewer's clock. */
+function sectionOf(createdAt, todayStart) {
+  const time = timeOf(createdAt)
+  if (!Number.isFinite(time)) return { id: 'earlier', label: 'Earlier' }
+
+  const daysAgo = Math.max(0, Math.ceil((todayStart - time) / DAY_MS))
+  if (daysAgo <= 1) return { id: `day-${daysAgo}`, label: capitalize(relativeDay.format(-daysAgo, 'day')) }
+  if (daysAgo < 7) return { id: 'week', label: 'This week' }
+  return { id: 'earlier', label: 'Earlier' }
+}
+
+/**
+ * Splits recency-ordered groups into Today / Yesterday / This week / Earlier sections. Groups are
+ * already sorted, so a section only ever opens once and the order never changes.
+ */
+export function buildSections(groups, now = Date.now()) {
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+  const todayStart = today.getTime()
+
+  const sections = []
+  groups.forEach((group) => {
+    const { id, label } = sectionOf(group.createdAt, todayStart)
+    const current = sections[sections.length - 1]
+    if (current?.id === id) current.groups.push(group)
+    else sections.push({ id, label, groups: [group] })
+  })
+
+  return sections
+}
+
 /** Post this group should preview: the reply/quote itself for mentions, otherwise your own post. */
 export function previewPostIdOf(group) {
   if (group.entityType !== 'post') return null

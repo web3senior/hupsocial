@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { mutate as mutateGlobal } from 'swr'
 import clsx from 'clsx'
-import { ArrowsCounterClockwiseIcon, BellIcon, ChecksIcon, SpinnerIcon, UserIcon } from '@phosphor-icons/react'
+import { ArrowsCounterClockwiseIcon, BellIcon, ChecksIcon, UserIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { useConnection, useSignMessage } from 'wagmi'
+import { Spinner } from '@/components/Loading'
+import { openConnect } from '@/lib/connectDialog'
 import NotificationRow from './NotificationRow'
-import { FILTERS, buildGroups } from './notificationModel'
+import { FILTERS, buildGroups, buildSections } from './notificationModel'
 import styles from './ActivityFeed.module.scss'
 
 // Rows collapse into groups, so a page of raw notifications yields far fewer visible rows — 40 keeps
@@ -49,6 +51,10 @@ export default function ActivityFeed() {
 
   const pendingReadIds = useRef(new Set())
   const readBatchTimer = useRef(null)
+  const sentinelRef = useRef(null)
+  // Pages appended past the first. A background refresh only ever fetches page one, so once the
+  // reader has scrolled deeper it would collapse the feed under them — only the counts refresh then.
+  const pagesLoadedRef = useRef(1)
   // Cache key the on-screen rows belong to. During a tab switch the previous
   // tab's rows stay visible until the new data lands, so cache writes must
   // target the key that was applied, not the freshly selected one.
@@ -85,6 +91,7 @@ export default function ActivityFeed() {
 
         setNotifications((current) => (append ? [...current, ...payload.data] : payload.data))
         setNextPage(payload.nextPage)
+        pagesLoadedRef.current = append ? pagesLoadedRef.current + 1 : 1
         setUnreadByFilter(payload.meta?.unread_by_filter || EMPTY_COUNTS)
         appliedKeyRef.current = `${address}|${filter}`
       } catch (err) {
@@ -144,6 +151,41 @@ export default function ActivityFeed() {
     }
   }, [address])
 
+  // Coming back to the tab pulls in whatever arrived meanwhile, silently — the rows already on
+  // screen stay put until the fresh ones replace them.
+  useEffect(() => {
+    if (!isConnected || !address) return
+
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      if (pagesLoadedRef.current > 1) refreshCounts()
+      else loadNotifications({ silent: true })
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [address, isConnected, loadNotifications, refreshCounts])
+
+  // The next page starts loading well before the footer arrives, so scrolling rarely meets the end
+  // of the list. A failed page stops the chain; the footer button stays as the manual retry.
+  const canAutoPage = Boolean(nextPage) && !isPaging && !isLoading && !error
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!canAutoPage || !sentinel) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return
+        observer.disconnect()
+        loadNotifications({ page: nextPage, append: true })
+      },
+      { rootMargin: '600px 0px' },
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [canAutoPage, nextPage, loadNotifications])
+
   // The previous tab's rows stay on screen, dimmed, until the new ones land — clearing first made
   // the feed collapse to skeletons and snap back on every tab press. A cached tab swaps in its
   // rows immediately instead (event handler, so direct setState is fine) and revalidates silently.
@@ -152,6 +194,7 @@ export default function ActivityFeed() {
 
     setFilter(next)
     setNextPage(null)
+    setError(null)
 
     const cached = address ? readSessionCache(`${address}|${next}`) : null
     if (cached) {
@@ -240,15 +283,21 @@ export default function ActivityFeed() {
     return buildGroups(owned)
   }, [address, isConnected, notifications])
 
+  const sections = useMemo(() => buildSections(groups), [groups])
+
   const activeFilter = FILTERS.find((entry) => entry.id === filter) || FILTERS[0]
   const hasGroups = groups.length > 0
+  const retry = () => (nextPage && hasGroups ? loadNotifications({ page: nextPage, append: true }) : loadNotifications())
 
   if (!isConnected) {
     return (
       <div className={styles.feed}>
-        <div className={styles.feed__status}>
-          <UserIcon size={20} />
-          Connect your wallet to see your notifications.
+        <div className={styles.feed__empty}>
+          <UserIcon size={28} />
+          <p>Connect your wallet to see your notifications.</p>
+          <button type="button" className={styles.feed__more} onClick={() => openConnect()}>
+            Connect wallet
+          </button>
         </div>
       </div>
     )
@@ -299,39 +348,69 @@ export default function ActivityFeed() {
             title="Refresh"
             aria-label="Refresh notifications"
           >
-            <ArrowsCounterClockwiseIcon className={clsx(isLoading && styles.feed__spin)} size={18} />
+            {isLoading ? <Spinner size={18} color="currentColor" label="Refreshing" /> : <ArrowsCounterClockwiseIcon size={18} />}
           </button>
         </div>
       </header>
 
-      <div className={clsx(styles.feed__list, isLoading && hasGroups && styles['feed__list--busy'])}>
+      <div
+        className={clsx(styles.feed__list, isLoading && hasGroups && styles['feed__list--busy'])}
+        aria-busy={isLoading || isPaging}
+      >
         {isLoading && !hasGroups && <SkeletonRows />}
 
-        {!isLoading && !hasGroups && (
+        {!isLoading && !hasGroups && error && (
+          <div className={styles.feed__empty} role="alert">
+            <WarningCircleIcon size={28} />
+            <p>{error}</p>
+            <button type="button" className={styles.feed__more} onClick={retry}>
+              Try again
+            </button>
+          </div>
+        )}
+
+        {!isLoading && !hasGroups && !error && (
           <div className={styles.feed__empty}>
             <BellIcon size={28} />
             <p>{activeFilter.empty}</p>
           </div>
         )}
 
-        {groups.map((group) => (
-          <NotificationRow key={group.key} group={group} viewerAddress={address} onRead={markAsRead} />
+        {sections.map((section) => (
+          <section key={section.id} className={styles.feed__section} aria-labelledby={`notifications-${section.id}`}>
+            <h2 id={`notifications-${section.id}`} className={styles.feed__sectionTitle}>
+              {section.label}
+            </h2>
+            {section.groups.map((group) => (
+              <NotificationRow key={group.key} group={group} viewerAddress={address} onRead={markAsRead} />
+            ))}
+          </section>
         ))}
       </div>
 
-      {error && <p className={styles.feed__error}>{error}</p>}
+      {hasGroups && error && (
+        <div className={styles.feed__error} role="alert">
+          <span>{error}</span>
+          <button type="button" className={styles.feed__retry} onClick={retry}>
+            Retry
+          </button>
+        </div>
+      )}
 
       {hasGroups && (
         <footer className={styles.feed__footer}>
           {nextPage ? (
-            <button
-              type="button"
-              className={styles.feed__more}
-              disabled={isPaging}
-              onClick={() => loadNotifications({ page: nextPage, append: true })}
-            >
-              {isPaging ? <SpinnerIcon className={styles.feed__spin} size={16} /> : 'Show more'}
-            </button>
+            <>
+              <span ref={sentinelRef} className={styles.feed__sentinel} aria-hidden="true" />
+              <button
+                type="button"
+                className={styles.feed__more}
+                disabled={isPaging}
+                onClick={() => loadNotifications({ page: nextPage, append: true })}
+              >
+                {isPaging ? <Spinner size={16} color="currentColor" /> : 'Show more'}
+              </button>
+            </>
           ) : (
             <span className={styles.feed__status}>You are all caught up</span>
           )}
@@ -341,7 +420,7 @@ export default function ActivityFeed() {
   )
 }
 
-function SkeletonRows() {
+export function SkeletonRows() {
   return (
     <div aria-busy="true" aria-live="polite">
       {Array.from({ length: 6 }).map((_, index) => (
