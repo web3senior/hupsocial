@@ -1,10 +1,11 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
-import { formatEther } from 'viem'
+import { formatUnits, zeroAddress } from 'viem'
+import { usePaymentToken } from '@/hooks/usePaymentToken'
 import { ArrowRightIcon, CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import { appChains } from '@/config/contracts'
 import { chainIconFor, networkColorStyle } from '@/lib/networkColors'
@@ -45,23 +46,26 @@ const countdownLabel = (unixSeconds) => {
 }
 
 /**
- * The phase the rail speaks for: the one open now, else the next one to open. A drop whose
+ * The phase the rail speaks for: one open now with allocation remaining. A drop whose
  * phases have all ended (or are paused) has nothing to mint and returns null, which takes it
  * out of the rail entirely.
  */
-const railPhase = (row) => {
+const railPhase = (row, now) => {
   const phases = (row.phases ?? []).map((phase) => ({
     startTime: Number(phase.start_time),
     endTime: Number(phase.end_time),
     paused: Boolean(Number(phase.paused)),
     price: BigInt(phase.price ?? 0),
+    token: phase.payment_token,
+    allocation: BigInt(phase.allocation ?? 0),
+    minted: BigInt(phase.minted ?? 0),
   }))
 
-  const live = phases.find((phase) => phaseStatus(phase) === PHASE_STATUS.LIVE)
+  const live = phases.find((phase) => phaseStatus(phase, now) === PHASE_STATUS.LIVE &&
+    (phase.allocation === 0n || phase.minted < phase.allocation))
   if (live) return { phase: live, status: PHASE_STATUS.LIVE }
 
-  const upcoming = phases.filter((phase) => phaseStatus(phase) === PHASE_STATUS.UPCOMING).sort((a, b) => a.startTime - b.startTime)[0]
-  return upcoming ? { phase: upcoming, status: PHASE_STATUS.UPCOMING } : null
+  return null
 }
 
 const STATUS_RANK = { [PHASE_STATUS.LIVE]: 0, [PHASE_STATUS.UPCOMING]: 1 }
@@ -80,6 +84,10 @@ function DropRailCard({ row, phase, status }) {
   const dropId = Number(row.drop_id)
   const chainInfo = appChains.find((chain) => chain.id === chainId)
   const nativeSymbol = chainInfo?.nativeCurrency?.symbol ?? 'ETH'
+  const token = phase?.token && phase.token !== zeroAddress ? phase.token : null
+  const payment = usePaymentToken(chainId, token)
+  const priceDecimals = token ? payment.decimals : chainInfo?.nativeCurrency?.decimals ?? 18
+  const priceSymbol = token ? payment.symbol : nativeSymbol
 
   // LUKSO metadata nests under LSP4Metadata; contractURI JSON is flat
   const { data: metadata } = useSWR(row.metadata_uri || null, metadataFetcher, { revalidateOnFocus: false })
@@ -130,7 +138,9 @@ function DropRailCard({ row, phase, status }) {
           <strong className={styles['drops-rail__name']}>{name}</strong>
 
           <span className={styles['drops-rail__stats']}>
-            <b>{price === 0n ? 'Free' : `${amountFormat.format(Number(formatEther(price)))} ${nativeSymbol}`}</b>
+            <b>{price === 0n ? 'Free' : priceDecimals != null && priceSymbol
+              ? `${amountFormat.format(Number(formatUnits(price, priceDecimals)))} ${priceSymbol}`
+              : 'View mint price'}</b>
             <em>{isOpenEdition ? `${countFormat.format(minted)} minted` : `${countFormat.format(minted)}/${countFormat.format(maxSupply)}`}</em>
           </span>
 
@@ -157,14 +167,19 @@ function DropRailCard({ row, phase, status }) {
  * from the cidex index (/api/v1/drops) — no chain reads — and lead to the drop page, where the
  * mint itself resolves onchain.
  *
- * Ordering is urgency, not recency: paid placements first, then what is open over what is
- * merely scheduled, then whatever closes soonest. A drop that is already unmintable — every
+ * Ordering is urgency, not recency: paid placements first, then whatever closes soonest.
+ * A drop that is already unmintable — every
  * phase ended or paused — is left out rather than shown as a dead card.
  *
  * @param {number|null} [props.networkId] Scopes the rail to one chain, for a network tab.
  */
 export default function DropsRail({ networkId = null, className }) {
-  const query = new URLSearchParams({ status: 'live', limit: String(RAIL_LIMIT) })
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [])
+  const query = new URLSearchParams({ status: 'minting', limit: String(RAIL_LIMIT) })
   if (networkId) query.set('networkId', String(networkId))
 
   const { data } = useSWR(`/api/v1/drops?${query}`, fetcher, { refreshInterval: REFRESH_MS, revalidateOnFocus: false })
@@ -172,7 +187,7 @@ export default function DropsRail({ networkId = null, className }) {
   const drops = useMemo(() => {
     const rows = data?.data ?? []
     return rows
-      .map((row) => ({ row, ...(railPhase(row) ?? {}) }))
+      .map((row) => ({ row, ...(railPhase(row, now) ?? {}) }))
       .filter((entry) => entry.status)
       .sort((a, b) => {
         const featured = Number(b.row.featured ?? 0) - Number(a.row.featured ?? 0)
@@ -184,7 +199,7 @@ export default function DropsRail({ networkId = null, className }) {
         if (aEnd !== bEnd) return aEnd - bEnd
         return remainingRatio(a.row) - remainingRatio(b.row)
       })
-  }, [data])
+  }, [data, now])
 
   const { trackRef, edges, nudge } = useStripScroll(drops.length)
 

@@ -1,0 +1,29 @@
+.mint-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  margin-block: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--new-badge-background);
+  color: var(--text);
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+  }
+
+  &__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+
+    > span {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+  }
+}

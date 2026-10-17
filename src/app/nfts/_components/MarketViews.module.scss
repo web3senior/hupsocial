@@ -145,6 +145,19 @@
     }
   }
 
+  &__drops-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    padding: 2px 5px;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, currentColor 18%, transparent);
+    font-size: 0.72rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
   &__tab {
     display: inline-flex;
     align-items: center;

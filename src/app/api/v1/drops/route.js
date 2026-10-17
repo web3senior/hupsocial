@@ -44,6 +44,20 @@ const isMissingColumn = (error) => error?.code === 'ER_BAD_FIELD_ERROR'
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
+    if (searchParams.get('count') === 'live') {
+      const [rows] = await pool.execute(
+        `SELECT COUNT(*) AS count FROM drops d
+         WHERE d.network_id IN (${LIVE_NETWORK_IDS.map(() => '?').join(',')})
+           AND d.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)
+           AND EXISTS (SELECT 1 FROM drop_phases p
+             WHERE p.network_id = d.network_id AND p.drop_id = d.drop_id
+               AND p.paused = 0 AND p.start_time <= UNIX_TIMESTAMP()
+               AND (p.end_time = 0 OR p.end_time > UNIX_TIMESTAMP())
+               AND (p.allocation = 0 OR p.minted < p.allocation))`,
+        LIVE_NETWORK_IDS,
+      )
+      return NextResponse.json({ success: true, count: Number(rows[0].count) })
+    }
 
     const networkId = parseInt(searchParams.get('networkId')) || null
     const creator = (searchParams.get('creator') || '').toLowerCase() || null
@@ -63,6 +77,14 @@ export async function GET(request) {
     }
     if (searchParams.get('status') === 'live') {
       filters.push('d.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)')
+    }
+    if (searchParams.get('status') === 'minting') {
+      filters.push(`d.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)
+        AND EXISTS (SELECT 1 FROM drop_phases p
+          WHERE p.network_id = d.network_id AND p.drop_id = d.drop_id
+            AND p.paused = 0 AND p.start_time <= UNIX_TIMESTAMP()
+            AND (p.end_time = 0 OR p.end_time > UNIX_TIMESTAMP())
+            AND (p.allocation = 0 OR p.minted < p.allocation))`)
     }
     // The complement of live: minted out, or closed by the creator — the drops that are finished
     if (searchParams.get('status') === 'ended') {

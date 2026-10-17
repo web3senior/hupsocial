@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import useSWR from 'swr'
 import { useSearchParams } from 'next/navigation'
 import clsx from 'clsx'
 import { PaintBrushIcon, RocketLaunchIcon, ShieldCheckIcon, SquaresFourIcon, RankingIcon } from '@phosphor-icons/react'
@@ -15,6 +16,12 @@ import styles from './MarketViews.module.scss'
 // Only chains with HupTrade deployed can have anything on this market, so only those earn a
 // button in the chain strip — the same list the grid validates the URL's networkId against
 const tradeChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id}`]?.trade)
+const countFormat = new Intl.NumberFormat('en')
+const fetchLiveDrops = async (url) => {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('Failed to load live drops')
+  return response.json()
+}
 
 // Same derivation the market cards, rail and table use — wagmi's config stamps iconUrl onto
 // the shared chain objects as a side effect, so don't depend on that module having been
@@ -69,6 +76,8 @@ const CHAIN_SCOPED_PARAMS = ['collection', 'token']
  */
 export default function MarketViews({ shellClassName }) {
   const searchParams = useSearchParams()
+  const { data: liveDrops } = useSWR('/api/v1/drops?count=live', fetchLiveDrops, { refreshInterval: 60_000 })
+  const liveDropCount = liveDrops?.count ?? 0
   const view = searchParams.get('view') === 'collections' ? 'collections' : 'items'
   const networkId = searchParams.get('networkId') || ''
 
@@ -177,7 +186,12 @@ export default function MarketViews({ shellClassName }) {
             this is the way through to new mints from the market */}
         <Link href="/drops" className={styles.views__drops} style={networkColorStyle(selectedChain)}>
           <RocketLaunchIcon size={15} weight="fill" aria-hidden="true" />
-          Drops
+          Live drops
+          {liveDropCount > 0 && (
+            <span className={styles['views__drops-count']}>
+              {countFormat.format(liveDropCount)}
+            </span>
+          )}
         </Link>
 
         {/* Quieter than Drops on purpose: minting is what most people came for, and editing a

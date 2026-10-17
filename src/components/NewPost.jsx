@@ -7,7 +7,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, CalendarDotsIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, ToolboxIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, BankIcon, CalendarDotsIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, ToolboxIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -42,6 +42,9 @@ import AttachPollDialog from '@/components/AttachPollDialog'
 import CreateFundDialog from '@/components/CreateFundDialog'
 import AttachFundDialog from '@/components/AttachFundDialog'
 import AttachTaskDialog from '@/components/AttachTaskDialog'
+import AttachProposalDialog from '@/app/proposals/_components/AttachProposalDialog'
+import ProposalEmbed from '@/components/ProposalEmbed'
+import { daoChains } from '@/lib/dao'
 import { SEALED_PLACEHOLDER, categoryLabel } from '@/lib/task'
 import { sealSubmission } from '@/lib/taskVault'
 import { requestTaskFunding } from '@/lib/taskFundingBus'
@@ -157,7 +160,7 @@ const loadDraftContent = () => {
 // A published payload carries its attachment references alongside the content (see the tail of
 // handleCreatePost), and each of those is restored into its own state. Leaving them on the
 // content object would have getSerializablePostContent spread a second copy into the next one.
-const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'nftDrop', 'miniApp', 'poll', 'hupFund', 'hupTask', 'article', 'tokenTrade']
+const ATTACHMENT_KEYS = ['quoteOf', 'communityId', 'nftListing', 'predictMarket', 'nftDrop', 'miniApp', 'poll', 'hupFund', 'hupTask', 'article', 'tokenTrade', 'proposal']
 
 const stripAttachments = (content) => {
   const bare = { ...content }
@@ -406,7 +409,7 @@ const restoreCaretState = (editor, caret) => {
 
 // ■■■ [Main Component] ■■■
 
-export default function NewPost({ text = '', url = '', seedFiles = null, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed, restoreState = null, article: articleSeed = null }) {
+export default function NewPost({ text = '', url = '', seedFiles = null, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed, restoreState = null, article: articleSeed = null, proposal: proposalSeed = null }) {
   const mounted = useClientMounted()
   // Raises this composer's video ceiling; the presign route enforces the same number.
   const { isPremium } = usePremium()
@@ -526,6 +529,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     restoredContent?.tokenTrade ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.tokenTrade ?? null) : null)
   )
   const attachTokenTradeRef = useRef(null)
+  // A group proposal travels as { chainId, daoId, proposalId }; ProposalEmbed reads the result
+  // live. Seeded by "Share to feed" on a proposal page, which opens this composer with it attached.
+  const [proposal, setProposal] = useState(
+    () => restoredContent?.proposal ?? proposalSeed ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.proposal ?? null) : null)
+  )
+  const attachProposalRef = useRef(null)
   // Every in-flight attachment upload, keyed by uploadId: the File so a failed tile can retry,
   // the AbortController so Remove cancels the transfer, the promise so submit can await it
   const uploadsRef = useRef(new Map())
@@ -651,7 +660,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     Boolean(poll) ||
     Boolean(hupFund) ||
     Boolean(hupTask) ||
-    Boolean(article)
+    Boolean(article) ||
+    Boolean(proposal)
   const isTextOverLimit = postText.length > MAX_POST_LENGTH
 
   // Every submission is pinned to one chain: an edit updates the post where it already lives,
@@ -766,6 +776,15 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       hint: 'Embed an app inside the post',
       attached: Boolean(miniApp),
     },
+    // Ungated by targetChainId like tokens to trade: the reference carries the proposal's own
+    // chain, and voting happens on the proposal page, never in the post's transaction
+    canAttachNft && daoChains().length > 0 && {
+      key: 'proposal',
+      icon: BankIcon,
+      label: 'Proposal',
+      hint: 'Share a group vote with live results',
+      attached: Boolean(proposal),
+    },
     // Ungated by targetChainId: the widget carries its own chain, so a post on a chain with no
     // DEX can still offer a token that lives on one
     canAttachNft && {
@@ -789,6 +808,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       case 'drop': setShowAttachDrop(true); break
       case 'miniapp': attachMiniAppRef.current?.open(); break
       case 'tokentrade': attachTokenTradeRef.current?.open(); break
+      case 'proposal': attachProposalRef.current?.open(); break
       default: break
     }
   }, [])
@@ -1766,6 +1786,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // the post's signed author rather than to anything named in here.
       if (tokenTrade) serializableContent.tokenTrade = tokenTrade
 
+      // Group proposals the same: only the reference — ProposalEmbed reads the tally live
+      if (proposal) serializableContent.proposal = proposal
+
       // Articles the same way — the body is already pinned under its own CID by the editor, and
       // only the card travels here. ArticleCard renders from these fields alone; the reader page
       // is the only thing that ever fetches the body.
@@ -2204,6 +2227,20 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 </div>
               )}
 
+              {proposal && (
+                <div className={styles.dropPreview}>
+                  <div className={styles.nftAttachment}>
+                    <BankIcon size={16} />
+                    <span>Proposal attached (#{proposal.proposalId})</span>
+                    <button type="button" onClick={() => setProposal(null)} aria-label="Detach proposal" disabled={isBusy}>
+                      <XIcon size={14} />
+                    </button>
+                  </div>
+                  {/* The card as the feed will show it, with the live result */}
+                  <ProposalEmbed proposalRef={proposal} preview />
+                </div>
+              )}
+
               {poll && (
                 <div className={styles.nftAttachment}>
                   <ListChecksIcon size={16} />
@@ -2567,6 +2604,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
       {/* Null is a real answer here — the dialog owns "remove from post" as well as the pick */}
       <AttachTokenTradeDialog ref={attachTokenTradeRef} value={tokenTrade} onAttach={(payload) => setTokenTrade(payload)} />
+
+      {/* Null is a real answer here too — the dialog offers "remove from post" */}
+      <AttachProposalDialog ref={attachProposalRef} value={proposal} onAttach={(reference) => setProposal(reference)} />
     </NativeDialog>
   )
 }

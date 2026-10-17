@@ -1,0 +1,119 @@
+.embed {
+  --dao-accent: #7c3aed;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  padding: 0.8rem 0.9rem;
+  background: var(--background);
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+
+  &--link {
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--dao-accent) 45%, var(--border));
+      box-shadow: var(--card-elevation, 0 2px 10px rgba(15, 23, 42, 0.06));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--dao-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  &--loading {
+    pointer-events: none;
+  }
+
+  &__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  &__kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--dao-accent);
+  }
+
+  &__group {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__badge {
+    flex-shrink: 0;
+    font-size: var(--font-size-10, 0.65rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+
+    &--pending {
+      background: rgba(42, 120, 214, 0.14);
+      color: #2a78d6;
+    }
+
+    &--active {
+      background: color-mix(in srgb, var(--dao-accent) 14%, transparent);
+      color: var(--dao-accent);
+    }
+
+    &--succeeded {
+      background: rgba(21, 128, 61, 0.14);
+      color: var(--status-success, #15803d);
+    }
+
+    &--defeated {
+      background: rgba(220, 38, 38, 0.12);
+      color: var(--status-error, #dc2626);
+    }
+
+    &--canceled {
+      background: rgba(100, 116, 139, 0.14);
+      color: var(--text-muted, #64748b);
+    }
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-16, 1rem);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    font-weight: 600;
+    color: var(--dao-accent);
+  }
+}

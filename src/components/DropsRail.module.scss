@@ -29,22 +29,6 @@
   block-size: 6px;
   border-radius: 50%;
   background: #ef4444;
-  box-shadow: 0 0 0 0 #ef444466;
-  animation: drops-rail-pulse 2s ease-out infinite;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-}
-
-@keyframes drops-rail-pulse {
-  70% {
-    box-shadow: 0 0 0 5px #ef444400;
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 #ef444400;
-  }
 }
 
 .drops-rail__all {

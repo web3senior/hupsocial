@@ -109,6 +109,7 @@ function DropPiece({ chainId, collection, tokenId, isLsp8, fallbackUrl, preview 
  */
 const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, preview = false, className }) => {
   const [quantity, setQuantity] = useState(1)
+  const [hasMinted, setHasMinted] = useState(false)
   const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
   const [isChecking, setIsChecking] = useState(false)
@@ -429,6 +430,7 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
           args: [...args, { value: mintValue }],
         })
 
+        setHasMinted(true)
         settleMint('Minted — it now belongs to you', 'success')
         reviewRef.current?.close()
         refetchDrop()
@@ -595,6 +597,9 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
           </>
         )}
 
+        {(hasMinted || (isConfirmed && receipt?.status === 'success')) && !preview && (
+          <Link href="/drops" className={styles.dropCard__view}>Explore more live drops</Link>
+        )}
         {showDetailsLink && preview && <span className={styles.dropCard__view}>View</span>}
         {showDetailsLink && !preview && (
           <Link href={`/drops/${chainId}/${drop.dropId}`} className={styles.dropCard__view}>

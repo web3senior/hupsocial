@@ -183,6 +183,20 @@ export const parseAddressList = (text) => [
   ),
 ]
 
+/** The page a proposal lives on, from a post's { chainId, daoId, proposalId } reference. */
+export const proposalPath = (ref) => `/proposals/${ref.chainId}/${ref.daoId}/${ref.proposalId}`
+
+/**
+ * A pasted proposal link — full URL or bare path, any host — as the reference a post stores.
+ * @param {string} text
+ * @returns {{chainId: number, daoId: string, proposalId: string}|null}
+ */
+export const parseProposalLink = (text) => {
+  const match = String(text || '').trim().match(/\/proposals\/(\d+)\/(\d+)\/(\d+)\/?(?:[?#].*)?$/)
+  if (!match) return null
+  return { chainId: Number(match[1]), daoId: match[2], proposalId: match[3] }
+}
+
 /** Plain-language summary of a DAO's rules, for the settings line on its page. */
 export const describeSettings = (settings, decimals = 0) => {
   if (!settings) return []

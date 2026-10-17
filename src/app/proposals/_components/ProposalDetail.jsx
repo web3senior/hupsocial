@@ -24,7 +24,8 @@ import Profile from '@/components/Profile'
 import CopyButton from '@/components/ui/CopyButton'
 import ProgressBar from '@/components/ui/ProgressBar'
 import { ContentSpinner, Spinner } from '@/components/Loading'
-import { BankIcon, CaretLeftIcon } from '@phosphor-icons/react'
+import NewPost from '@/components/NewPost'
+import { BankIcon, CaretLeftIcon, ShareNetworkIcon } from '@phosphor-icons/react'
 import ResultsBar from './ResultsBar'
 import { useDao, useDaoWrite, useIpfsJson } from './useDao'
 import styles from './ProposalDetail.module.scss'
@@ -45,6 +46,7 @@ export default function ProposalDetail({ networkId, daoId, proposalId }) {
   const { dao, metadata: daoMetadata, decimals } = useDao(chainId, daoId)
   const { send, busy, account } = useDaoWrite(chainId)
   const [choice, setChoice] = useState(null)
+  const [sharing, setSharing] = useState(false)
   const [reason, setReason] = useState('')
   const id = BigInt(proposalId || 0)
 
@@ -152,6 +154,10 @@ export default function ProposalDetail({ networkId, daoId, proposalId }) {
             toastMessage="Proposal link copied"
             size={13}
           />
+          <button type="button" className={styles.proposal__share} onClick={() => setSharing(true)}>
+            <ShareNetworkIcon size={14} aria-hidden="true" />
+            Share to feed
+          </button>
         </div>
         <h2 className={styles.proposal__title}>{metadata?.title || `Proposal #${proposal.id}`}</h2>
         <Profile variant="fullWithoutTime" creator={proposal.proposer} networkId={chainId} className={styles.proposal__proposer} />
@@ -245,6 +251,16 @@ export default function ProposalDetail({ networkId, daoId, proposalId }) {
         <button type="button" className={styles.proposal__cancel} onClick={cancel} disabled={Boolean(busy)}>
           {busy === 'cancel' ? 'Canceling…' : 'Cancel proposal'}
         </button>
+      )}
+
+      {/* An ordinary post carrying the proposal, so the network picker, gasless relay and crash
+          recovery all apply unchanged. The title seeds the text; the author can rewrite it. */}
+      {sharing && (
+        <NewPost
+          proposal={{ chainId, daoId: String(daoId), proposalId: proposal.id.toString() }}
+          text={metadata?.title || ''}
+          onClose={() => setSharing(false)}
+        />
       )}
     </div>
   )

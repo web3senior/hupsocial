@@ -58,6 +58,7 @@ import ArticleCard from './ArticleCard'
 import DropCard from './DropCard'
 import PredictCard from './PredictCard'
 import PollCard from './PollCard'
+import ProposalEmbed from './ProposalEmbed'
 import FundCard from './FundCard'
 import TaskCard from './TaskCard'
 import SealedSubmission from './SealedSubmission'
@@ -174,7 +175,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
       const post = Array.isArray(res?.data) ? res.data[0] : res?.data
       return post ?? null
     },
-    { fallbackData: item.repost_original ?? undefined, revalidateIfStale: false, keepPreviousData: true },
+    { fallbackData: item.repost_original ?? undefined, revalidateIfStale: false, keepPreviousData: true }
   )
 
   const baseDisplayItem = isRepost ? repostedPost : item
@@ -288,6 +289,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         )}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
           <Profile
+            size={38}
             creator={displayItem?.wallet_address}
             createdAt={displayItem?.created_at}
             networkId={displayItem?.network_id}
@@ -364,7 +366,11 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               <LinkPreview text={sourceText} hasMedia={displayItem?.content?.elements?.[1]?.data?.items?.length > 0} />
 
               {displayItem?.content?.quoteOf && (
-                <QuotedPost networkId={displayItem.network_id} quoteId={displayItem.content.quoteOf} quotedBy={displayItem.wallet_address} />
+                <QuotedPost
+                  networkId={displayItem.network_id}
+                  quoteId={displayItem.content.quoteOf}
+                  quotedBy={displayItem.wallet_address}
+                />
               )}
 
               {displayItem?.content?.nftListing && (
@@ -391,6 +397,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               {displayItem?.content?.predictMarket && <PredictCard marketRef={displayItem.content.predictMarket} />}
 
               {displayItem?.content?.poll && <PollCard pollRef={displayItem.content.poll} />}
+              {displayItem?.content?.proposal && <ProposalEmbed proposalRef={displayItem.content.proposal} />}
               {displayItem?.content?.hupFund && <FundCard fundRef={displayItem.content.hupFund} />}
               {displayItem?.content?.hupTask && (
                 <TaskCard
@@ -431,7 +438,9 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
               {/* Nothing loads until the viewer presses launch, so a veiled post never runs
                   third-party code — the inert wrapper blocks the launch button outright */}
-              {displayItem?.content?.miniApp && <MiniAppEmbed reference={displayItem.content.miniApp} contextAddress={displayItem?.wallet_address} />}
+              {displayItem?.content?.miniApp && (
+                <MiniAppEmbed reference={displayItem.content.miniApp} contextAddress={displayItem?.wallet_address} />
+              )}
 
               {/* The creator fee is paid to the row's signed author, never to anything the
                   content JSON names — a post is editable, and its own payload is not authority
@@ -465,7 +474,6 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
             )}
           </div>
         </main>
-        
 
         <footer className={`${styles.post__footer}`}>
           <div
@@ -914,9 +922,7 @@ export function PostCard({ item, actions, chainId, networkName }) {
   // for restored feeds, revalidateIfStale stays off, and keepPreviousData
   // holds the preview through the anonymous → connected key change.
   const lastCommentKey =
-    shouldFetch && item?.id && item?.network_id
-      ? `posts/${item.network_id}/${item.id}/${address || 'anonymous'}/last-comment`
-      : null
+    shouldFetch && item?.id && item?.network_id ? `posts/${item.network_id}/${item.id}/${address || 'anonymous'}/last-comment` : null
   const { data: lastComment, isLoading } = useSWR(
     lastCommentKey,
     async () => {
@@ -928,7 +934,7 @@ export function PostCard({ item, actions, chainId, networkName }) {
       const comment = Array.isArray(body?.data) ? body.data[0] : body?.data
       return comment ?? null
     },
-    { fallbackData: item?.last_comment ?? undefined, revalidateIfStale: false, keepPreviousData: true },
+    { fallbackData: item?.last_comment ?? undefined, revalidateIfStale: false, keepPreviousData: true }
   )
   const isLastCommentLoading = isLoading && !lastComment
 
@@ -954,7 +960,11 @@ export function PostCard({ item, actions, chainId, networkName }) {
             onClick={openLastComment}
             onMouseEnter={() => router.prefetch(`/networks/${lastComment.network_id}/${lastComment.id}`)}
           >
-            <Post item={lastComment} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} chainId={chainId} />
+            <Post
+              item={lastComment}
+              actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']}
+              chainId={chainId}
+            />
           </div>
         ) : null)}
     </>
@@ -1141,6 +1151,7 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
       {/* A quoted poll is votable in place, like the original — the card resolves the same
           onchain tally either way, so nothing is gained by making the reader open the post */}
       {quotedPost?.content?.poll && <PollCard pollRef={quotedPost.content.poll} />}
+      {quotedPost?.content?.proposal && <ProposalEmbed proposalRef={quotedPost.content.proposal} />}
       {quotedPost?.content?.hupFund && <FundCard fundRef={quotedPost.content.hupFund} />}
       {quotedPost?.content?.hupTask && (
         <TaskCard taskRef={quotedPost.content.hupTask} networkId={networkId} postId={quotedPost.id} author={quotedPost.wallet_address} />
@@ -1158,9 +1169,7 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
       {quotedPost?.content?.miniApp && <MiniAppEmbed reference={quotedPost.content.miniApp} contextAddress={quotedPost?.wallet_address} />}
       {/* A quoted widget trades in place, like a quoted poll votes in place — and the fee
           still follows the original author, not whoever quoted them */}
-      {quotedPost?.content?.tokenTrade && (
-        <TokenTradeCard trade={quotedPost.content.tokenTrade} author={quotedPost?.wallet_address} />
-      )}
+      {quotedPost?.content?.tokenTrade && <TokenTradeCard trade={quotedPost.content.tokenTrade} author={quotedPost?.wallet_address} />}
     </div>
   )
 }
@@ -1220,16 +1229,17 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
   // Execute external translation pipeline via cached hooks infrastructure. The target
   // language is part of the SWR key, so switching it in Settings re-translates and caches
   // each language separately instead of serving the previous one.
-  const { data: translatedText, error: translationError, isValidating: isTranslating, mutate: retryTranslation } = useSWR(
-    showTranslation && sourceText ? [sourceText, preferredLanguage, readerAddress ?? null] : null,
-    translationFetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      dedupingInterval: 600000,
-      errorRetryCount: 2,
-    }
-  )
+  const {
+    data: translatedText,
+    error: translationError,
+    isValidating: isTranslating,
+    mutate: retryTranslation,
+  } = useSWR(showTranslation && sourceText ? [sourceText, preferredLanguage, readerAddress ?? null] : null, translationFetcher, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    dedupingInterval: 600000,
+    errorRetryCount: 2,
+  })
 
   // Before paint, or the button lands a frame late and pushes the feed below it down
   useLayoutEffect(() => {

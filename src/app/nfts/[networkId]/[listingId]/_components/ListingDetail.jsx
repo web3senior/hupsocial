@@ -39,6 +39,7 @@ import {
   WarningIcon,
 } from '@phosphor-icons/react'
 import styles from './ListingDetail.module.scss'
+import CollectionMintLink from '@/components/CollectionMintLink'
 
 const fetcher = (url) => fetch(url).then((res) => res.json())
 
@@ -249,6 +250,7 @@ export default function ListingDetail({ networkId, listingId }) {
               }
             />
           </div>
+          <CollectionMintLink chainId={chainId} collection={listing.collection} />
         </aside>
 
         {/* The token itself, exactly as the collection grid's dialog shows it. Ownership, price

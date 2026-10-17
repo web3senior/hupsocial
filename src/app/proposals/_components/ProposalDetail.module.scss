@@ -81,6 +81,27 @@
     }
   }
 
+  &__share {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--background);
+    color: inherit;
+    padding: 0.3rem 0.7rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+
+    &:hover {
+      border-color: var(--dao-accent);
+      color: var(--dao-accent);
+    }
+  }
+
   &__muted {
     font-size: var(--font-size-12);
     color: var(--text-muted, #888);

@@ -39,7 +39,7 @@ export default function useCollectionDrop({ chainId, collection }) {
     functionName: 'getDrop',
     args: [dropId ?? 0n],
     chainId,
-    query: { enabled: Boolean(dropId) },
+    query: { enabled: Boolean(dropId), refetchInterval: 30_000 },
   })
 
   const { data: phases = [] } = useReadContract({
@@ -48,7 +48,7 @@ export default function useCollectionDrop({ chainId, collection }) {
     functionName: 'phasesOf',
     args: [dropId ?? 0n],
     chainId,
-    query: { enabled: Boolean(dropId) },
+    query: { enabled: Boolean(dropId), refetchInterval: 30_000 },
   })
 
   return {
