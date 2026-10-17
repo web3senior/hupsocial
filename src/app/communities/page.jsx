@@ -20,7 +20,7 @@ import NativeDialog from '@/components/ui/NativeDialog'
 import DialogHeader from '@/components/ui/DialogHeader'
 import RecipientField from '@/components/ui/RecipientField'
 import { EMPTY_RECIPIENT } from '@/lib/recipientSearch'
-import { CaretLeftIcon, CaretRightIcon, GearSixIcon, MagnifyingGlassIcon, UsersIcon } from '@phosphor-icons/react'
+import { CaretLeftIcon, CaretRightIcon, GearSixIcon, MagnifyingGlassIcon, UsersIcon, XIcon } from '@phosphor-icons/react'
 import { PostCard } from '@/components/Post'
 import HupCommunityABI from '@/abis/HupCommunity'
 import NewPost from '@/components/NewPost'
@@ -54,6 +54,9 @@ import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
 import BrandingLinksFields from './_components/BrandingLinksFields'
 import ImagePicker from './_components/ImagePicker'
 import CreateCommunityModal from './_components/CreateCommunityModal'
+import CommunityTile, { CommunityTileSkeleton } from './_components/CommunityTile'
+import DropsHero, { HeroChain } from '@/components/DropsHero'
+import { ContentSpinner } from '@/components/Loading'
 import { AssetUnitLabel, TokenRequirementTag, TokenUnitHint } from './_components/TokenAmount'
 import TokenAssetInput from './_components/TokenAssetInput'
 import OptionPicker from '@/components/ui/OptionPicker'
@@ -91,6 +94,7 @@ import styles from './page.module.scss'
 const uploadPostContentToIPFS = uploadObjectToIPFS
 
 const FEED_PAGE_SIZE = 10
+const countFormat = new Intl.NumberFormat()
 
 // Shared identity-vault hook: derives/caches the per-user community identity key (a child of
 // the app-wide security vault — one signature + one security PIN shared with the in-app wallet
@@ -3552,6 +3556,18 @@ export default function CommunitiesPage() {
   const [hasMoreCommunities, setHasMoreCommunities] = useState(false)
   const [isDirectoryLoading, setIsDirectoryLoading] = useState(false)
   const [directoryError, setDirectoryError] = useState('')
+  // Separates "nothing fetched yet" (skeleton tiles) from "fetched, and it came back empty"
+  const [hasLoadedDirectory, setHasLoadedDirectory] = useState(false)
+  const searchInputRef = useRef(null)
+
+  // A search arrives through ?q= too, so a results page can be shared or bookmarked. Read after
+  // mount rather than in the initializer: the server render has no query string to agree with.
+  useEffect(() => {
+    const initialQuery = new URLSearchParams(window.location.search).get('q')?.trim()
+    if (!initialQuery) return
+    setSearchInput(initialQuery)
+    setSearchQuery(initialQuery)
+  }, [])
 
   // Debounce keystrokes into the actual query — same 400ms rhythm as the app's search page.
   // Trimmed so a trailing space can't sneak into the LIKE term and match nothing.
@@ -3559,6 +3575,31 @@ export default function CommunitiesPage() {
     const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 400)
     return () => clearTimeout(timer)
   }, [searchInput])
+
+  // Mirrors the settled query into the address bar without a navigation or a history entry
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (searchQuery) url.searchParams.set('q', searchQuery)
+    else url.searchParams.delete('q')
+    window.history.replaceState(window.history.state, '', url)
+  }, [searchQuery])
+
+  const isSearchSettling = searchInput.trim() !== searchQuery
+  const activeFilterCount = [searchQuery, selectedNetworkId !== 'all', visibilityFilter !== 'all', categoryFilter !== 'all'].filter(Boolean).length
+
+  const clearSearch = () => {
+    setSearchInput('')
+    setSearchQuery('')
+    searchInputRef.current?.focus()
+  }
+
+  const clearAllFilters = () => {
+    setSearchInput('')
+    setSearchQuery('')
+    setSelectedNetworkId('all')
+    setVisibilityFilter('all')
+    setCategoryFilter('all')
+  }
 
   // Monotonic fetch counter: debounced keystrokes can leave several directory requests in
   // flight, and a slow older response must not overwrite the newest query's results
@@ -3596,6 +3637,7 @@ export default function CommunitiesPage() {
       setTotalCommunities(Number(json.meta?.total ?? 0))
       setDirectoryPage(page)
       setDirectoryError('')
+      setHasLoadedDirectory(true)
       // Handed back so a caller waiting on a specific community can tell whether this page
       // already contains it — see waitForCommunityToIndex
       return json.data
@@ -3603,6 +3645,7 @@ export default function CommunitiesPage() {
       if (fetchSeq !== directoryFetchSeqRef.current) return null
       console.error('Failed to load community directory from cidex:', err)
       setDirectoryError(err.message || 'Failed to load communities')
+      setHasLoadedDirectory(true)
       return null
     } finally {
       if (!quiet && fetchSeq === directoryFetchSeqRef.current) setIsDirectoryLoading(false)
@@ -3632,159 +3675,223 @@ export default function CommunitiesPage() {
   return (
     <>
       <PageTitle name="Communities" />
-      
-      <div className={clsx('__container')} data-width="medium">
-        {/* First element of the page, outside the container — same placement as the search page */}
-        <label className={clsx(styles.search, 'rounded-full')}>
-          <MagnifyingGlassIcon size={18} aria-hidden="true" />
-          <input
-            type="search"
-            className={styles.search__input}
-            placeholder="Search communities..."
-            aria-label="Search communities"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-        </label>
-      </div>
 
       <div className={clsx(styles.page, 'animate', 'fade')}>
-        <div className={clsx('__container', styles.page__container)} data-width="medium">
+        <div className={clsx('__container', styles.page__container)} data-width="large">
           <div className={styles.directory}>
-            <div className={styles.directory__header}>
-              <select
-                className={styles.directory__networkSelect}
-                value={selectedNetworkId}
-                onChange={(e) => setSelectedNetworkId(e.target.value)}
-                aria-label="Filter communities by network"
-              >
-                <option value="all">All Networks</option>
-                {communityChains.map((chain) => (
-                  <option key={chain.id} value={chain.id}>
-                    {chain.name}
-                  </option>
-                ))}
-              </select>
-              <div className={styles.directory__visibilityTabs} role="group" aria-label="Filter communities by visibility">
-                {[
-                  ['all', 'All'],
-                  ['public', 'Public'],
-                  ['private', 'Private'],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={clsx(
-                      styles.directory__visibilityTab,
-                      visibilityFilter === value && styles['directory__visibilityTab--active']
-                    )}
-                    aria-pressed={visibilityFilter === value}
-                    onClick={() => setVisibilityFilter(value)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex align-items-center gap-050">
-                {/* "Syncing..." only before the very first response — on later refetches the
-                    previous total stays put so the header row doesn't resize and shift */}
-                <span className={styles.directory__count}>
-                  {isDirectoryLoading && communityRows.length === 0 && totalCommunities === 0 ? 'Syncing...' : `${totalCommunities} Total`}
-                </span>
-                <button type="button" className={styles.createTrigger} onClick={() => createModalRef.current?.open()}>
-                  New Community
+            {/* No heading here — PageTitle already puts "Communities" in the fixed header */}
+            <DropsHero
+              chainId={directoryNetworkId ?? communityChains[0]?.id}
+              title="Find your people, or start a space of your own."
+              action={
+                <button type="button" onClick={() => createModalRef.current?.open()} disabled={communityChains.length === 0}>
+                  <UsersIcon size={16} weight="fill" />
+                  New community
                 </button>
-              </div>
-            </div>
+              }
+            >
+              Live on
+              {communityChains.map((chain) => (
+                <HeroChain key={chain.id} chainId={chain.id} />
+              ))}
+            </DropsHero>
 
-            {/* Category chips: one row that scrolls sideways rather than wrapping into a wall of
-                pills, with arrows once it overflows. 'all' is a chip too so the active state always
-                shows. The list comes from the community_categories table via the hook. */}
-            <div className={styles.directory__categoryRow}>
-              <div
-                ref={categoryRailRef}
-                className={clsx(
-                  styles.directory__categories,
-                  canScrollLeft && styles['directory__categories--moreLeft'],
-                  canScrollRight && styles['directory__categories--moreRight']
-                )}
-                role="group"
-                aria-label="Filter communities by category"
-              >
-                {[{ slug: 'all', label: 'All topics' }, ...categories].map((option) => (
-                  <button
-                    key={option.slug}
-                    type="button"
-                    className={clsx(styles.directory__category, categoryFilter === option.slug && styles['directory__category--active'])}
-                    aria-pressed={categoryFilter === option.slug}
-                    onClick={() => setCategoryFilter(option.slug)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-              {/* Only once the row actually overflows — arrows on a row that fits would promise
-                  more chips than there are */}
-              {categoryRailOverflows && (
-                <div className={styles.directory__categoryArrows}>
-                  <button
-                    type="button"
-                    className={styles.directory__categoryArrow}
-                    aria-label="Scroll categories left"
-                    disabled={!canScrollLeft}
-                    onClick={() => scrollByPage(-1)}
-                  >
-                    <CaretLeftIcon size={14} weight="bold" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.directory__categoryArrow}
-                    aria-label="Scroll categories right"
-                    disabled={!canScrollRight}
-                    onClick={() => scrollByPage(1)}
-                  >
-                    <CaretRightIcon size={14} weight="bold" aria-hidden="true" />
-                  </button>
+            {/* Search + filters as one toolbar: the query and every filter that narrows it sit
+                together, so what the grid below is showing is answered in one place */}
+            <div className={styles.toolbar}>
+              <div className={styles.toolbar__row}>
+                <label className={clsx(styles.search, searchInput && styles['search--filled'])}>
+                  <MagnifyingGlassIcon size={18} aria-hidden="true" className={styles.search__icon} />
+                  <input
+                    ref={searchInputRef}
+                    type="search"
+                    className={styles.search__input}
+                    placeholder="Search by name, tag or description"
+                    aria-label="Search communities"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape' && searchInput) {
+                        e.preventDefault()
+                        clearSearch()
+                      }
+                    }}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  {(isSearchSettling || (isDirectoryLoading && searchQuery)) && <ContentSpinner size={16} className={styles.search__spinner} />}
+                  {searchInput && (
+                    <button type="button" className={styles.search__clear} aria-label="Clear search" onClick={clearSearch}>
+                      <XIcon size={14} weight="bold" aria-hidden="true" />
+                    </button>
+                  )}
+                </label>
+
+                <select
+                  className={styles.toolbar__select}
+                  value={selectedNetworkId}
+                  onChange={(e) => setSelectedNetworkId(e.target.value)}
+                  aria-label="Filter communities by network"
+                >
+                  <option value="all">All networks</option>
+                  {communityChains.map((chain) => (
+                    <option key={chain.id} value={chain.id}>
+                      {chain.name}
+                    </option>
+                  ))}
+                </select>
+
+                <div className={styles.toolbar__segment} role="group" aria-label="Filter communities by visibility">
+                  {[
+                    ['all', 'All'],
+                    ['public', 'Public'],
+                    ['private', 'Private'],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={clsx(styles.toolbar__segmentButton, visibilityFilter === value && styles['toolbar__segmentButton--active'])}
+                      aria-pressed={visibilityFilter === value}
+                      onClick={() => setVisibilityFilter(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
+
+              {/* Category chips: one row that scrolls sideways rather than wrapping into a wall of
+                  pills, with arrows once it overflows. 'all' is a chip too so the active state always
+                  shows. The list comes from the community_categories table via the hook. */}
+              <div className={styles.directory__categoryRow}>
+                <div
+                  ref={categoryRailRef}
+                  className={clsx(
+                    styles.directory__categories,
+                    canScrollLeft && styles['directory__categories--moreLeft'],
+                    canScrollRight && styles['directory__categories--moreRight']
+                  )}
+                  role="group"
+                  aria-label="Filter communities by category"
+                >
+                  {[{ slug: 'all', label: 'All topics' }, ...categories].map((option) => (
+                    <button
+                      key={option.slug}
+                      type="button"
+                      className={clsx(styles.directory__category, categoryFilter === option.slug && styles['directory__category--active'])}
+                      aria-pressed={categoryFilter === option.slug}
+                      onClick={() => setCategoryFilter(option.slug)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {/* Only once the row actually overflows — arrows on a row that fits would promise
+                    more chips than there are */}
+                {categoryRailOverflows && (
+                  <div className={styles.directory__categoryArrows}>
+                    <button
+                      type="button"
+                      className={styles.directory__categoryArrow}
+                      aria-label="Scroll categories left"
+                      disabled={!canScrollLeft}
+                      onClick={() => scrollByPage(-1)}
+                    >
+                      <CaretLeftIcon size={14} weight="bold" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.directory__categoryArrow}
+                      aria-label="Scroll categories right"
+                      disabled={!canScrollRight}
+                      onClick={() => scrollByPage(1)}
+                    >
+                      <CaretRightIcon size={14} weight="bold" aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {directoryError && <div className={styles.manager__error}>Failed to load community directory: {directoryError}</div>}
 
-            <div className={clsx(styles.directory__grid, isDirectoryLoading && styles['directory__grid--loading'])}>
-              {communityRows.length === 0 && !isDirectoryLoading ? (
-                <p className={styles.directory__empty}>
-                  {searchQuery
-                    ? 'No communities match your search.'
-                    : categoryFilter !== 'all'
-                      ? `No ${getCommunityCategory(categoryFilter, categories).label} communities here yet.`
-                      : visibilityFilter !== 'all'
-                        ? `No ${visibilityFilter} communities here yet.`
-                        : 'No communities found. Be the first to create one!'}
-                </p>
+            <section className={styles.directory__section}>
+              {/* What the grid holds, in words — and the way back out of a narrowed view */}
+              <div className={styles.directory__sectionHead}>
+                <h2 aria-live="polite">
+                  {!hasLoadedDirectory
+                    ? 'Communities'
+                    : searchQuery
+                      ? `${countFormat.format(totalCommunities)} ${totalCommunities === 1 ? 'result' : 'results'} for “${searchQuery}”`
+                      : `${countFormat.format(totalCommunities)} ${totalCommunities === 1 ? 'community' : 'communities'}`}
+                </h2>
+                {activeFilterCount > 0 && (
+                  <button type="button" className={styles.directory__reset} onClick={clearAllFilters}>
+                    Clear {activeFilterCount === 1 ? 'filter' : `${activeFilterCount} filters`}
+                  </button>
+                )}
+              </div>
+
+              {!hasLoadedDirectory && isDirectoryLoading ? (
+                <ul className={styles.directory__grid}>
+                  {Array.from({ length: 8 }, (_, index) => (
+                    <CommunityTileSkeleton key={index} />
+                  ))}
+                </ul>
+              ) : communityRows.length === 0 && !isDirectoryLoading ? (
+                <div className={styles.directory__empty}>
+                  <span className={styles.directory__emptyIcon} aria-hidden="true">
+                    {searchQuery ? <MagnifyingGlassIcon size={26} /> : <UsersIcon size={26} />}
+                  </span>
+                  <strong>
+                    {searchQuery
+                      ? `Nothing matches “${searchQuery}”`
+                      : categoryFilter !== 'all'
+                        ? `No ${getCommunityCategory(categoryFilter, categories).label} communities here yet`
+                        : visibilityFilter !== 'all'
+                          ? `No ${visibilityFilter} communities here yet`
+                          : 'No communities yet'}
+                  </strong>
+                  <p>
+                    {activeFilterCount > 0
+                      ? 'Try a shorter search, another topic, or every network.'
+                      : 'Be the first — a community takes a minute to set up.'}
+                  </p>
+                  {activeFilterCount > 0 ? (
+                    <button type="button" className={styles.directory__emptyAction} onClick={clearAllFilters}>
+                      Clear filters
+                    </button>
+                  ) : (
+                    <button type="button" className={styles.directory__emptyAction} onClick={() => createModalRef.current?.open()}>
+                      New community
+                    </button>
+                  )}
+                </div>
               ) : (
-                communityRows.map((row) => (
-                  <CommunityCard
-                    key={`${row.network_id}-${row.id}`}
-                    id={Number(row.id)}
-                    networkId={Number(row.network_id)}
-                    memberCount={Number(row.member_count ?? 0)}
-                    row={row}
-                  />
-                ))
+                <ul className={clsx(styles.directory__grid, isDirectoryLoading && styles['directory__grid--loading'])}>
+                  {communityRows.map((row) => (
+                    <CommunityTile
+                      key={`${row.network_id}-${row.id}`}
+                      row={row}
+                      metadata={metadataFromRow(row)}
+                      categories={categories}
+                      highlight={searchQuery}
+                    />
+                  ))}
+                </ul>
               )}
-            </div>
+            </section>
 
             {hasMoreCommunities && (
-              <div className="flex justify-content-center p-100">
+              <div className={styles.directory__more}>
                 <button
                   type="button"
-                  className={styles.manager__submit}
-                  style={{ width: 'auto', padding: '0.65rem 1.5rem' }}
+                  className={styles.directory__moreButton}
                   onClick={() => fetchDirectory(directoryPage + 1, true)}
                   disabled={isDirectoryLoading}
                 >
-                  {isDirectoryLoading ? 'Loading...' : 'Load More'}
+                  {isDirectoryLoading ? <ContentSpinner size={16} /> : null}
+                  {isDirectoryLoading ? 'Loading' : `Show more · ${countFormat.format(totalCommunities - communityRows.length)} left`}
                 </button>
               </div>
             )}

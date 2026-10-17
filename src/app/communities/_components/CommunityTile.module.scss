@@ -1,0 +1,263 @@
+// Directory tile — the drops grid's tile, shaped for a community: a banner cover instead of
+// square artwork, with the logo straddling its bottom edge
+.tile {
+  position: relative;
+  border-radius: 22px;
+  // The page container is already --surface, so tiles sit on --background to stay legible
+  background: var(--background);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: var(--network-color-primary);
+  }
+
+  &:hover &__cover {
+    transform: scale(1.03);
+  }
+
+  &__link {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  &__media {
+    position: relative;
+    display: block;
+    aspect-ratio: 16 / 9;
+    // Room for the logo hanging below the cover
+    margin-block-end: 1.4rem;
+  }
+
+  // Pinned to the box, not sized by it: an in-flow image's intrinsic height outvotes the
+  // aspect-ratio and a tall cover stretches its tile past the rest of the row
+  &__cover,
+  &__coverFallback {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  &__cover {
+    max-width: none;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+
+  // No cover uploaded: a wash in the community's chain colour rather than a grey slab
+  &__coverFallback {
+    background:
+      radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--network-color-primary, #888) 45%, transparent), transparent 70%),
+      var(--surface-muted);
+  }
+
+  &__logo {
+    position: absolute;
+    inset-block-end: -1.4rem;
+    inset-inline-start: 0.9rem;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    border: 3px solid var(--background);
+    object-fit: cover;
+    background: var(--surface-muted);
+
+    &--placeholder {
+      display: grid;
+      place-items: center;
+      background: var(--network-color-primary, var(--foreground));
+      color: var(--network-color-text, var(--background));
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+  }
+
+  // Rides over the cover, outside the tile's link
+  &__overlay {
+    position: absolute;
+    inset-block-start: 0.6rem;
+    inset-inline: 0.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    pointer-events: none;
+  }
+
+  // Ringed so it reads on any cover; the only piece of the overlay that takes a pointer
+  &__creator {
+    margin-inline-start: auto;
+    display: inline-flex;
+    flex-shrink: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(20, 22, 28, 0.55);
+    pointer-events: auto;
+  }
+
+  &__badges {
+    position: absolute;
+    inset-block-end: 0.6rem;
+    inset-inline-end: 0.6rem;
+    display: flex;
+    gap: 0.3rem;
+  }
+
+  // One height for every chip on the tile — same treatment as the drops tile
+  &__chip {
+    --chip-height: 1.6rem;
+    --chip-icon: calc(var(--chip-height) - 0.7rem);
+
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    height: var(--chip-height);
+    padding: 0 0.6rem;
+    border-radius: 999px;
+    background: rgba(20, 22, 28, 0.62);
+    backdrop-filter: blur(8px);
+    color: #f4f4f5;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+
+    &--age {
+      padding-inline-start: calc((var(--chip-height) - var(--chip-icon)) / 2);
+
+      img {
+        display: block;
+        flex-shrink: 0;
+        width: var(--chip-icon);
+        height: var(--chip-icon);
+        border-radius: 999px;
+      }
+    }
+
+    &--standing {
+      background: var(--network-color-primary);
+      color: var(--network-color-text, #fff);
+    }
+  }
+
+  &__info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem 1.1rem;
+    min-width: 0;
+  }
+
+  &__nameRow {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  &__name {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: var(--font-size-16, 1rem);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__category {
+    flex-shrink: 0;
+    margin-inline-start: auto;
+    max-width: 7rem;
+    border-radius: var(--chip-border-radius);
+    background: color-mix(in srgb, var(--text-muted, #888) 14%, transparent);
+    padding: 0.1rem 0.4rem;
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-10, 0.625rem);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__summary {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: calc(2 * 1.45em);
+    color: var(--text-muted, #888);
+    font-size: var(--font-size-13, 0.8125rem);
+    line-height: 1.45;
+  }
+
+  &__stats {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-block-start: auto;
+    padding-block-start: 0.2rem;
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+
+    b {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      flex-shrink: 0;
+      font-size: var(--font-size-14, 0.875rem);
+      font-weight: 600;
+    }
+
+    em {
+      min-width: 0;
+      margin-inline-start: auto;
+      font-style: normal;
+      font-size: var(--font-size-12);
+      font-weight: 600;
+      // How you get in is the tile's call to action, so it carries the chain colour
+      color: var(--network-color-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__mark {
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--network-color-primary, #f5a524) 30%, transparent);
+    color: inherit;
+  }
+
+  &--skeleton {
+    pointer-events: none;
+  }
+
+  &__skeletonMedia {
+    aspect-ratio: 16 / 9;
+    border-radius: 0;
+  }
+
+  &__skeletonLine {
+    height: 12px;
+    border-radius: 999px;
+
+    &--title {
+      width: 60%;
+      height: 16px;
+    }
+
+    &--short {
+      width: 40%;
+    }
+  }
+}

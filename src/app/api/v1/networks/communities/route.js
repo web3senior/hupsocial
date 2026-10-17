@@ -105,10 +105,13 @@ export async function GET(request) {
       // (via creator_address) can still see theirs regardless of status
       whereClause += ` AND c.is_active = 1`
     }
+    // LIKE's own wildcards are escaped, so a search for "50%" or "dev_ops" means those
+    // characters rather than "anything here"
+    const likeSafe = search ? search.replace(/[\\%_]/g, (char) => `\\${char}`) : ''
     if (search) {
-      whereClause += ` AND (c.name LIKE ? OR c.summary LIKE ? OR c.description LIKE ?)`
-      const searchTerm = `%${search}%`
-      whereParams.push(searchTerm, searchTerm, searchTerm)
+      whereClause += ` AND (c.name LIKE ? OR c.tag LIKE ? OR c.summary LIKE ? OR c.description LIKE ?)`
+      const searchTerm = `%${likeSafe}%`
+      whereParams.push(searchTerm, searchTerm, searchTerm, searchTerm)
     }
 
     const [[{ total }]] = await pool.execute(`SELECT COUNT(*) as total FROM communities c${whereClause}`, whereParams)
@@ -117,11 +120,21 @@ export async function GET(request) {
     // rest of the directory out — viewer_address only affects ordering, unlike creator_address.
     // Ids are only monotonic within one contract, so the cross-network mode sorts by indexed
     // creation time instead.
+    //
+    // A search ranks by relevance ahead of all that: a name that starts with the term, then a
+    // name or tag containing it, then a match found only in the summary or description.
     const orderBy = (alias) => {
       const baseOrder = contractPairs.length > 0 ? `${alias}.created_at DESC, ${alias}.id DESC` : `${alias}.id DESC`
-      return viewerAddress ? `ORDER BY (LOWER(${alias}.creator_address) = ?) DESC, ${baseOrder}` : `ORDER BY ${baseOrder}`
+      const keys = []
+      if (search) keys.push(`CASE WHEN ${alias}.name LIKE ? THEN 0 WHEN ${alias}.name LIKE ? OR ${alias}.tag LIKE ? THEN 1 ELSE 2 END`)
+      if (viewerAddress) keys.push(`(LOWER(${alias}.creator_address) = ?) DESC`)
+      keys.push(baseOrder)
+      return `ORDER BY ${keys.join(', ')}`
     }
-    const orderParams = viewerAddress ? [viewerAddress.toLowerCase()] : []
+    const orderParams = [
+      ...(search ? [`${likeSafe}%`, `%${likeSafe}%`, `%${likeSafe}%`] : []),
+      ...(viewerAddress ? [viewerAddress.toLowerCase()] : []),
+    ]
 
     // The member count is counted over the page, not the whole filtered set: MariaDB evaluates a
     // select-list subquery for every row the WHERE matches, before LIMIT ever applies, so leaving

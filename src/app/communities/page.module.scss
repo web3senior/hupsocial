@@ -134,29 +134,73 @@
   }
 }
 
-// Search box — same pill styling as apps/page.module.scss's .search
+// Search field — same pill styling as apps/page.module.scss's .search, with a clear button and an
+// inline spinner while a query settles
 .search {
-  display: inline-flex;
+  display: flex;
+  flex: 1 1 18rem;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.7rem 1.2rem;
-  margin-bottom: 1rem;
+  min-width: 0;
+  height: 2.75rem;
+  padding: 0 0.5rem 0 1rem;
+  border-radius: 999px;
   background-color: var(--search-bg, var(--surface-muted));
   border: 1px solid var(--border);
   color: var(--text-muted);
-  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:focus-within {
+    border-color: var(--foreground);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--foreground) 10%, transparent);
+  }
+
+  &--filled &__icon,
+  &:focus-within &__icon {
+    color: var(--text);
+  }
+
+  &__icon {
+    flex-shrink: 0;
+    transition: color 0.15s ease;
+  }
 
   &__input {
-    min-width: 220px;
-    width: 100%;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
     border: none;
     outline: none;
     background: transparent;
+    color: var(--text);
+    font-size: var(--font-size-14, 0.875rem);
 
-    color: inherit;
+    // The clear button below replaces the browser's own, which differs in every engine
+    &::-webkit-search-cancel-button {
+      display: none;
+    }
+  }
 
-    @media (max-width: 600px) {
-      min-width: 0;
+  &__spinner {
+    flex-shrink: 0;
+  }
+
+  &__clear {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text-muted, #888) 16%, transparent);
+    color: var(--text);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background: color-mix(in srgb, var(--text-muted, #888) 28%, transparent);
     }
   }
 }
@@ -166,13 +210,13 @@
     --search-bg: var(--gray-050);
     --border: var(--gray-200);
 
-    svg {
+    .search__icon {
       color: var(--gray-400);
     }
   }
 }
 
-:global([data-theme='dark']) {
+:global(:is([data-theme='dark'], [data-theme='halloween'])) {
   .search {
     --search-bg: #20232a;
   }
@@ -184,31 +228,27 @@
   }
 }
 
+// Search, network and visibility on one row (wrapping on narrow screens), categories under it
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 
-// Registry wrapper and grid structural layouts
-.directory {
-  width: 100%;
-
-  &__header {
+  &__row {
     display: flex;
-    // Wrap instead of squeezing: on narrow screens the count + New Community pair drops to
-    // its own line rather than pushing the nowrap button off the right edge
     flex-wrap: wrap;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
-    gap: 0.75rem;
+    gap: 0.6rem;
   }
 
-  &__networkSelect {
-    padding: 0.45rem 2rem 0.45rem 0.75rem;
-    border-radius: 8px;
+  &__select {
+    height: 2.75rem;
+    padding: 0 2rem 0 1rem;
+    border-radius: 999px;
     border: 1px solid var(--border);
     background-color: var(--surface-muted);
     color: var(--text);
-    font-size: 0.9rem;
+    font-size: var(--font-size-14, 0.875rem);
     font-weight: 600;
     cursor: pointer;
 
@@ -218,14 +258,105 @@
     }
   }
 
-  // Category filter — one horizontally scrolling row of chips under the header, with arrows
-  // once it overflows (same hook and edge fade as the NFT collections rail). Scrolls rather
-  // than wraps so fifteen topics never push the grid below the fold on a phone.
+  &__segment {
+    display: inline-flex;
+    gap: 0.2rem;
+    height: 2.75rem;
+    padding: 0.25rem;
+    border-radius: 999px;
+    background: var(--surface-muted);
+  }
+
+  &__segmentButton {
+    border: 0;
+    border-radius: 999px;
+    padding: 0 0.95rem;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      color: var(--text);
+    }
+
+    &--active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+  }
+
+  @media (max-width: 600px) {
+    &__select,
+    &__segment {
+      flex: 1 1 auto;
+    }
+
+    &__segmentButton {
+      flex: 1;
+    }
+  }
+}
+
+// Directory layout — sections, grid and states, after the drops directory
+.directory {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  &__sectionHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+
+    h2 {
+      margin: 0;
+      min-width: 0;
+      font-size: var(--font-size-16, 1rem);
+      font-variant-numeric: tabular-nums;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__reset {
+    flex-shrink: 0;
+    border: 0;
+    padding: 0;
+    background: none;
+    color: var(--text-muted);
+    font-size: var(--font-size-13, 0.8125rem);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  // Category filter — one horizontally scrolling row of chips, with arrows once it overflows
+  // (same hook and edge fade as the NFT collections rail). Scrolls rather than wraps so fifteen
+  // topics never push the grid below the fold on a phone.
   &__categoryRow {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 1rem;
   }
 
   &__categories {
@@ -316,66 +447,29 @@
     }
   }
 
-  // Public/Private visibility filter — segmented pills sitting next to the network select
-  &__visibilityTabs {
-    display: inline-flex;
-    gap: 0.25rem;
-    padding: 0.2rem;
-    background: var(--surface-muted);
-    border-radius: 999px;
-  }
-
-  &__visibilityTab {
-    border: 0;
-    border-radius: 999px;
-    padding: 0.35rem 0.85rem;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: background-color 0.15s ease, color 0.15s ease;
-
-    &--active {
-      background: var(--surface);
-      color: var(--text);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-    }
-  }
-
-  &__title {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--text);
-    margin: 0;
-  }
-
-  &__count {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    background: var(--surface-muted);
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    white-space: nowrap;
-    // Equal-width digits + reserved room up to 4 digits: "0 Total" → "1 Total" (or 9 → 10)
-    // must not resize the pill and nudge the header row
-    font-variant-numeric: tabular-nums;
-    min-width: 6em;
-    text-align: center;
-  }
-
   &__grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    align-items: start;
-    gap: 1rem;
-    margin-top: 1rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.9rem;
     transition: opacity 0.15s ease;
 
-    // Refetch in progress: keep the previous cards in place and dim them instead of
-    // tearing the grid down — filter/tab switches stop shoving the layout around
+    @media (max-width: 1000px) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    @media (max-width: 760px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (max-width: 480px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    // Refetch in progress: keep the previous tiles in place and dim them instead of tearing the
+    // grid down — filter/tab switches stop shoving the layout around
     &--loading {
       opacity: 0.55;
       pointer-events: none;
@@ -383,11 +477,76 @@
   }
 
   &__empty {
-    grid-column: 1 / -1;
-    color: var(--text-muted);
-    font-size: 0.95rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 3rem 1rem;
+    border: 1px dashed var(--border);
+    border-radius: 22px;
     text-align: center;
-    padding: 2rem 0;
+
+    strong {
+      font-size: var(--font-size-16, 1rem);
+      color: var(--text);
+    }
+
+    p {
+      margin: 0;
+      max-width: 36ch;
+      color: var(--text-muted);
+      font-size: var(--font-size-14, 0.875rem);
+    }
+  }
+
+  &__emptyIcon {
+    display: grid;
+    place-items: center;
+    width: 3.25rem;
+    height: 3.25rem;
+    margin-block-end: 0.35rem;
+    border-radius: 999px;
+    background: var(--surface-muted);
+    color: var(--text-muted);
+  }
+
+  &__emptyAction,
+  &__moreButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.6rem 1.25rem;
+    background: var(--background);
+    color: var(--text);
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      border-color: var(--foreground);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  &__emptyAction {
+    margin-block-start: 0.6rem;
+  }
+
+  &__more {
+    display: flex;
+    justify-content: center;
+    padding-block: 0.5rem 1rem;
+  }
+
+  &__moreButton {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -1068,20 +1227,3 @@
   }
 }
 
-.createTrigger {
-  border: 0;
-  border-radius: 999px;
-  padding: 0.5rem 1.1rem;
-  // Filled-button idiom (same as .card__submit): foreground/background flip per theme —
-  // the previous --primary-color token was never defined, leaving this gray-on-gray in dark
-  background: var(--foreground);
-  color: var(--background);
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-
-  &:hover {
-    opacity: 0.9;
-  }
-}
