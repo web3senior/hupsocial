@@ -6,7 +6,8 @@
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--page-border-radius);
-    overflow: hidden;
+    // clip, not hidden: hidden makes this a scroll container and the sticky toolbar would never stick
+    overflow: clip;
     isolation: isolate;
     padding: 2rem;
     @media (max-width: 600px) {
@@ -23,7 +24,6 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.7rem 1.2rem;
-  margin-bottom: 2rem;
   background-color: var(--search-bg, var(--surface-muted));
   border: 1px solid var(--border);
   color: var(--text-muted);
@@ -41,7 +41,7 @@
   }
 }
 
-:global([data-theme='dark']) {
+:global(:is([data-theme='dark'], [data-theme='halloween'])) {
   .search {
     --search-bg: #20232a;
   }
@@ -53,13 +53,39 @@
   }
 }
 
-.postWrapper {
+// Search box and result tabs. Sticks under the app header so the tabs stay a tap away down a
+// long list; the bleed margins pull it to the container's edges so the rule spans the column.
+.toolbar {
+  position: sticky;
+  top: var(--app-header-clearance, calc(1.4rem + 38px));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: -2rem -2rem 1.5rem;
+  padding: 2rem 2rem 1rem;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+
+  @media (max-width: 600px) {
+    margin: -2rem -2rem 1rem;
+    padding: 1rem 2rem 0.75rem;
+  }
+
+  &__tabs {
+    align-self: flex-start;
+  }
 }
 
 .divider {
   border: 0;
   border-top: 1px solid var(--border);
   margin: 1.5rem 0;
+}
+
+.post {
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
 }
 
 .sectionTitle {
@@ -71,16 +97,50 @@
   color: var(--text-muted);
 }
 
+.section {
+  &__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+
+    .sectionTitle {
+      margin-bottom: 0.75rem;
+    }
+  }
+
+  &__action {
+    margin-right: -0.5rem;
+    padding: 0.25rem 0.5rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--primary, var(--foreground));
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+}
+
 .people {
-  margin-bottom: 2rem;
-  padding-bottom: 2rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--border);
+
+  &--full {
+    border-bottom: 0;
+  }
 
   &__list {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    margin: 0;
+    margin: 0 -0.75rem;
     padding: 0;
     list-style: none;
   }
@@ -91,6 +151,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  min-width: 0;
   padding: 0.5rem 0.75rem;
   border-radius: 12px;
   cursor: pointer;
@@ -101,18 +162,106 @@
   }
 
   &__ens {
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 0.75rem;
     color: var(--text-muted);
   }
 }
 
-.pending {
-  margin: 0 0 1rem;
-  color: var(--text-muted);
-  font-size: 0.9rem;
+.personSkeleton {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+
+  &__avatar {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+  }
+
+  &__bar {
+    width: 40%;
+    height: 0.85rem;
+    border-radius: 999px;
+  }
+}
+
+.recent {
+  &__list {
+    display: flex;
+    flex-direction: column;
+    margin: 0 -0.75rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    border-radius: 12px;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__query {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.7rem 0.75rem;
+    border: 0;
+    background: transparent;
+    color: var(--foreground);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    svg {
+      flex: none;
+      color: var(--text-muted);
+    }
+
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__remove {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-right: 0.5rem;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease;
+
+    &:hover {
+      color: var(--foreground);
+      background-color: var(--border);
+    }
+  }
 }
 
 .emptyState {
-  padding: 4rem 0;
+  padding: 4rem 1rem;
 }
