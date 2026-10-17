@@ -35,7 +35,7 @@
 
 .logo {
   // SVG loaded as <img> doesn't inherit CSS color — use filter per theme
-  :global([data-theme='dark']) & {
+  :global(:is([data-theme='dark'], [data-theme='halloween'])) & {
     filter: invert(1);
   }
 
@@ -57,7 +57,7 @@
   text-transform: lowercase;
   color: #63798c;
 
-  :global([data-theme='dark']) & {
+  :global(:is([data-theme='dark'], [data-theme='halloween'])) & {
     color: var(--text-muted, #a1a1aa);
   }
 

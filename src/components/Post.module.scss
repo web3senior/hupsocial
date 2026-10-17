@@ -417,7 +417,7 @@
         background-color: var(--post-button-bg);
       }
 
-      [data-theme='dark'] & {
+      :is([data-theme='dark'], [data-theme='halloween']) & {
         &:before {
           background-color: var(--background);
         }
@@ -597,7 +597,7 @@
   }
 }
 
-:global([data-theme='dark']) .post {
+:global(:is([data-theme='dark'], [data-theme='halloween'])) .post {
   --post-button-bg: #20232a;
 }
 
@@ -831,7 +831,7 @@
 // Solid-black marks (OpenAI, Grok) vanish into a dark panel, at rest and on hover alike, so on
 // dark themes they stay inverted throughout. Multi-colour marks carry their own contrast and
 // are left to the rules above — inverting those would only make them the wrong brand colour.
-[data-theme='dark'],
+:is([data-theme='dark'], [data-theme='halloween']),
 [data-theme='terminal'] {
   .post__menuIcon img[data-ink='mono'] {
     filter: grayscale(1) invert(1);

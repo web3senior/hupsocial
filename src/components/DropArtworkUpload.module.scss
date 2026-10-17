@@ -460,6 +460,6 @@
   }
 }
 
-:global([data-theme='dark']) .upload {
+:global(:is([data-theme='dark'], [data-theme='halloween'])) .upload {
   --upload-hover: rgb(0 0 0 / 25%);
 }

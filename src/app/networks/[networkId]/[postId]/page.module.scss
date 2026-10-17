@@ -39,7 +39,7 @@
   }
 }
 
-:global([data-theme='dark']) .page {
+:global(:is([data-theme='dark'], [data-theme='halloween'])) .page {
   --page-overlay: rgba(0, 0, 0, 0.72);
   --page-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
 }

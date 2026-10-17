@@ -1215,7 +1215,7 @@
   }
 }
 
-:global([data-theme='dark']) .dropForm {
+:global(:is([data-theme='dark'], [data-theme='halloween'])) .dropForm {
   --drop-upload-hover: color-mix(in srgb, #000 35%, var(--surface-muted));
   // The dark knob is near-black, so its tick stays white rather than taking the chain colour
   --toggle-tick: #ffffff;

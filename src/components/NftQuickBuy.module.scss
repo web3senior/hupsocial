@@ -80,6 +80,6 @@
 // next-themes stamps the choice on <html>, so the dark variant keys off the attribute rather
 // than the media query. #007bff is a hair dim against a near-black row; the lighter blue holds
 // the same meaning with the contrast the ink needs.
-:global([data-theme='dark']) .quickBuy--inline {
+:global(:is([data-theme='dark'], [data-theme='halloween'])) .quickBuy--inline {
   --quick-buy-ink: var(--blue-500);
 }

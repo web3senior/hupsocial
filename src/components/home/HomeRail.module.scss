@@ -83,7 +83,7 @@
 }
 
 // --text is translucent white in dark, which reads as a grey pill; the CTA wants a full inversion.
-[data-theme='dark'] {
+:is([data-theme='dark'], [data-theme='halloween']) {
   .upsell__cta {
     background-color: #fff;
     color: #000;

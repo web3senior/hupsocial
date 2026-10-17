@@ -22,7 +22,7 @@ $tick-size: 13px;
   --toggle-tick: #3c7d08;
 }
 
-:global([data-theme='dark']) {
+:global(:is([data-theme='dark'], [data-theme='halloween'])) {
   --toggle-inactive: #2b2d31;
   // 3.1:1 on the dark ground
   --toggle-track-border: #60646c;

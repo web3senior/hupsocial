@@ -55,7 +55,7 @@
   }
 }
 
-:global([data-theme='dark']) .tooltip {
+:global(:is([data-theme='dark'], [data-theme='halloween'])) .tooltip {
   --tooltip-background: #2b2d33;
   --tooltip-color: #ededed;
   --tooltip-border: #3a3d45;
