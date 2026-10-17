@@ -76,6 +76,11 @@
     &:focus {
       outline: none;
     }
+
+    // The component draws its own clear button; the browser's would sit beside it
+    &::-webkit-search-cancel-button {
+      appearance: none;
+    }
   }
 
   button {
@@ -93,23 +98,46 @@
   }
 }
 
+.directory__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* One scrolling row rather than a wrapping block: on a phone thirty tags wrapped into five lines
+   push the first article below the fold. The mask fades the trailing edge to say there is more. */
 .directory__tags {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.35rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .directory__tag {
+  flex: 0 0 auto;
   padding: 0.25rem 0.7rem;
   border: 1px solid var(--border, rgba(128, 128, 128, 0.25));
   border-radius: 999px;
   background: transparent;
   color: var(--text-muted, #6b7280);
+  font-family: inherit;
   font-size: var(--font-size-12, 0.75rem);
+  white-space: nowrap;
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
 
   &:hover {
     background: var(--surface-muted, rgba(128, 128, 128, 0.08));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary, #2a78d6);
+    outline-offset: -2px;
   }
 
   &_active {
@@ -120,10 +148,134 @@
   }
 }
 
-.directory__status {
-  margin: 1.5rem 0;
+.directory__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  font-size: var(--font-size-12, 0.78rem);
   color: var(--text-muted, #6b7280);
-  font-size: var(--font-size-14, 0.875rem);
+
+  strong {
+    color: var(--text, inherit);
+    font-weight: 600;
+  }
+
+  button {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--primary, #2a78d6);
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+
+.directory__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  min-width: 9rem;
+  min-height: 2.25rem;
+  padding: 0.45rem 1.1rem;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text, inherit);
+  font-family: inherit;
+  font-size: var(--font-size-12, 0.75rem);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--surface-muted, rgba(128, 128, 128, 0.08));
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+/* The newest article, given the cover it was written with. Only rendered on the unfiltered
+   front page and only when the piece has art — a lead without an image is just a bigger row. */
+.lead {
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.18));
+}
+
+.lead__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-radius: var(--global-border-radius, 12px);
+  color: inherit;
+  text-decoration: none;
+
+  &:hover .lead__title {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  &:hover .lead__cover img {
+    transform: scale(1.02);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary, #2a78d6);
+    outline-offset: 4px;
+  }
+}
+
+.lead__cover {
+  aspect-ratio: 2 / 1;
+  margin-bottom: 0.5rem;
+  border-radius: var(--global-border-radius, 12px);
+  overflow: hidden;
+  background: var(--surface-muted, rgba(128, 128, 128, 0.08));
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+
+    &[data-broken] {
+      object-fit: contain;
+      padding: 12%;
+    }
+  }
+}
+
+.lead__label {
+  font-size: var(--font-size-12, 0.7rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--network-color-primary, var(--primary, #2a78d6));
+}
+
+.lead__title {
+  margin: 0;
+  font-size: clamp(1.2rem, 3vw, 1.5rem);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.lead__excerpt {
+  margin: 0;
+  font-size: var(--font-size-14, 0.9rem);
+  line-height: 1.55;
+  color: var(--text-muted, #6b7280);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .directory__empty {
@@ -181,8 +333,14 @@
   display: flex;
   align-items: flex-start;
   gap: 1rem;
+  border-radius: 6px;
   color: inherit;
   text-decoration: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--primary, #2a78d6);
+    outline-offset: 4px;
+  }
 
   &:hover .entry__title {
     text-decoration: underline;
@@ -256,6 +414,26 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+}
+
+.entry__tag {
+  border: 0;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-muted, rgba(128, 128, 128, 0.1));
+  color: var(--text-muted, #6b7280);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text, inherit);
+  }
+
+  &_active {
+    color: var(--text, inherit);
+    font-weight: 600;
+  }
 }
 
 /* On a phone the thumbnail costs more width than it earns next to a two-line title */
