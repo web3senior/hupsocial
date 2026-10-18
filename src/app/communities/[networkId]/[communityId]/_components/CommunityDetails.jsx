@@ -16,6 +16,8 @@ import { chainIconFor, networkColorStyle } from '@/lib/networkColors'
 import useCommunityCategories from '@/hooks/useCommunityCategories'
 import { ADMISSION_OPTIONS } from '../../../membershipOptions'
 import { CommunityCard, CreatorName } from '../../../page'
+import CommunityGovernance from '@/app/proposals/_components/CommunityGovernance'
+import SegmentedControl from '@/components/ui/SegmentedControl'
 import styles from './CommunityDetails.module.scss'
 
 // membership_type in the indexed row stores the AdmissionMode enum — short pill wording comes
@@ -36,6 +38,7 @@ export default function CommunityDetails({ networkId, communityId, initialCommun
   // only exists once there is a wallet to ask about, and until then the page renders the seeded
   // row instead of a shimmer.
   const [viewerCommunity, setViewerCommunity] = useState(null)
+  const [section, setSection] = useState('discussion')
 
   // Two communities in a row share this component instance — the App Router re-renders the same
   // segment with new params instead of remounting — so a fetched row is only adopted while it
@@ -181,7 +184,18 @@ export default function CommunityDetails({ networkId, communityId, initialCommun
           </div>
         )}
 
-        <CommunityCard id={Number(resolvedCommunityId)} networkId={Number(resolvedNetworkId)} hideHeader row={community} />
+        <SegmentedControl
+          options={[{ value: 'discussion', label: 'Posts' }, { value: 'governance', label: 'Proposals & treasury' }]}
+          value={section}
+          onChange={setSection}
+          label="Community section"
+          as="tabs"
+        />
+        {section === 'discussion' ? (
+          <CommunityCard id={Number(resolvedCommunityId)} networkId={Number(resolvedNetworkId)} hideHeader row={community} />
+        ) : community && (
+          <CommunityGovernance key={communityKey} networkId={resolvedNetworkId} communityId={resolvedCommunityId} communityName={name} embedded />
+        )}
       </div>
     </div>
   )

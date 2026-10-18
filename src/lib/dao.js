@@ -3,6 +3,7 @@
 
 import { formatUnits } from 'viem'
 import { CONTRACTS, appChains } from '@/config/contracts'
+import { communityProposalPath } from '@/lib/communityGovernance'
 
 // Mirrors HupDao.sol. Enum order is the wire format, so entries may only ever be appended.
 export const VOTING_MODE = { Staked: 0, VotesToken: 1, Members: 2 }
@@ -184,15 +185,20 @@ export const parseAddressList = (text) => [
 ]
 
 /** The page a proposal lives on, from a post's { chainId, daoId, proposalId } reference. */
-export const proposalPath = (ref) => `/proposals/${ref.chainId}/${ref.daoId}/${ref.proposalId}`
+export const proposalPath = (ref) => ref.communityId
+  ? communityProposalPath(ref.chainId, ref.communityId, ref.proposalId)
+  : `/proposals/${ref.chainId}/${ref.daoId}/${ref.proposalId}`
 
 /**
  * A pasted proposal link — full URL or bare path, any host — as the reference a post stores.
  * @param {string} text
- * @returns {{chainId: number, daoId: string, proposalId: string}|null}
+ * @returns {{chainId: number, daoId?: string, communityId?: string, proposalId: string}|null}
  */
 export const parseProposalLink = (text) => {
-  const match = String(text || '').trim().match(/\/proposals\/(\d+)\/(\d+)\/(\d+)\/?(?:[?#].*)?$/)
+  const value = String(text || '').trim()
+  const community = value.match(/\/communities\/(\d+)\/([1-9]\d*)\/proposals\/([1-9]\d*)\/?(?:[?#].*)?$/)
+  if (community) return { chainId: Number(community[1]), communityId: community[2], proposalId: community[3] }
+  const match = value.match(/\/proposals\/(\d+)\/([1-9]\d*)\/([1-9]\d*)\/?(?:[?#].*)?$/)
   if (!match) return null
   return { chainId: Number(match[1]), daoId: match[2], proposalId: match[3] }
 }

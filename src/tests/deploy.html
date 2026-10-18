@@ -345,6 +345,7 @@
       { id: "HupOffers", label: "HupOffers (escrowed offers / OTC)", file: "HupOffers.json" },
       { id: "HupSell", label: "HupSell (gated content sales, escrowed until the key is granted)", file: "HupSell.json" },
       { id: "HupCommunity", label: "HupCommunity", file: "HupCommunity.json" },
+      { id: "HupCommunityGovernance", label: "Community proposals & treasury (uses existing HupCommunity)", file: "HupCommunityGovernance.json" },
       { id: "HupFund", label: "HupFund (fundraising campaigns, escrowed — admin only)", file: "HupFund.json" },
       { id: "HupTasks", label: "HupTasks (micro bounties on posts, escrowed — salt hup-tasks)", file: "HupTasks.json" },
       { id: "HupDao", label: "HupDao (Proposals — groups, votes, delegation — salt hup-dao)", file: "HupDao.json" },
@@ -901,7 +902,11 @@
 
     async function verificationInput() {
       const folder = verifyFolder(currentChainId);
-      const response = await fetch(`${VERIFY_BASE}${folder}/${loadedArtifact.id}.json`);
+      const communityContracts = ["HupCommunityGovernance", "HupCommunityTreasury"];
+      const inputPath = communityContracts.includes(loadedArtifact.id)
+        ? "community-governance.json"
+        : `${folder}/${loadedArtifact.id}.json`;
+      const response = await fetch(`${VERIFY_BASE}${inputPath}`);
       if (!response.ok) throw new Error(`No verification file for ${loadedArtifact.id} under ${folder} — regenerate them from the source tree.`);
       return response.json();
     }

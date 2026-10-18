@@ -76,7 +76,8 @@
       color: var(--dao-accent);
     }
 
-    &--succeeded {
+    &--succeeded,
+    &--executed {
       background: rgba(21, 128, 61, 0.14);
       color: var(--status-success, #15803d);
     }

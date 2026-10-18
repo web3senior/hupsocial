@@ -258,7 +258,7 @@ export default function DaoDetail({ networkId, daoId }) {
               </p>
             )}
             {onToken && sameAddress(delegate ?? zeroAddress, zeroAddress) && (
-              <p className={styles.detail__muted}>Your token votes are off until you turn them on — tap “Who votes for me”.</p>
+              <p className={styles.detail__muted}>Your token votes are off until you turn them on — tap “Delegate voting”.</p>
             )}
 
             <div className={styles.detail__actions}>
@@ -276,7 +276,7 @@ export default function DaoDetail({ networkId, daoId }) {
               )}
               {(mode !== VOTING_MODE.Members || units > 0n) && (
                 <button type="button" className={styles.detail__secondary} onClick={() => delegateRef.current?.open()}>
-                  Who votes for me
+                  Delegate voting
                 </button>
               )}
               {mode === VOTING_MODE.Members && units > 0n && (

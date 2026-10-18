@@ -1,10 +1,10 @@
 import PageTitle from '@/components/PageTitle'
-import DaoDirectory from './_components/DaoDirectory'
+import CommunityProposalDirectory from './_components/CommunityProposalDirectory'
 import styles from './page.module.scss'
 
 export const metadata = {
   title: 'Proposals',
-  description: 'Start a group, put ideas to a vote, and let someone you trust vote for you.',
+  description: 'Create community proposals, vote as a member, and approve treasury payments.',
 }
 
 export default function ProposalsPage() {
@@ -13,7 +13,7 @@ export default function ProposalsPage() {
       <PageTitle name="Proposals" />
       <div className={`${styles.page} animate fade`}>
         <div className={`__container ${styles.page__container}`} data-width="small">
-          <DaoDirectory />
+          <CommunityProposalDirectory />
         </div>
       </div>
     </>

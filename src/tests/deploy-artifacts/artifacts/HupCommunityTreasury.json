@@ -1,0 +1,136 @@
+{
+  "contractName": "HupCommunityTreasury",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "SafeERC20FailedOperation",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "NativeDeposited",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isLsp7",
+          "type": "bool"
+        }
+      ],
+      "name": "PaymentSent",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "communityId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "governance",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "isLsp7",
+          "type": "bool"
+        }
+      ],
+      "name": "pay",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "stateMutability": "payable",
+      "type": "receive"
+    }
+  ],
+  "bytecode": "0x60c034606957601f6104a138819003918201601f19168301916001600160401b03831184841017606d57808492602094604052833981010312606957513360805260a05260405161041f9081610082823960805181818160c40152610144015260a0518160880152f35b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe6080806040526004361015610048575b50361561001a575f80fd5b6040513481527fb5d7700fb0cf415158b8db7cc7c39f0eab16a825c92e221404b4c8bb099b4bbb60203392a2005b5f905f3560e01c908163446a2bb9146100f3575080635aa6e675146100ae57637f50861a0361000f57346100ab57806003193601126100ab5760206040517f00000000000000000000000000000000000000000000000000000000000000008152f35b80fd5b50346100ab57806003193601126100ab576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b9050346102da5760803660031901126102da576004356001600160a01b038116908190036102da576024356001600160a01b038116928382036102da5760443591606435801515928382036102da577f00000000000000000000000000000000000000000000000000000000000000006001600160a01b0316330361035e57508691849186610237575082809281925af13d15610232573d6001600160401b03811161021e57604051906101b1601f8201601f191660200183610392565b81528660203d92013e5b156101e1575f5160206103ca5f395f51905f52916040915b82519182526020820152a380f35b60405162461bcd60e51b815260206004820152601560248201527413985d1a5d99481c185e5b595b9d0819985a5b1959605a1b6044820152606490fd5b634e487b7160e01b87526041600452602487fd5b6101bb565b925050505f146102de57823b156102da57604051633b06cddd60e11b81523060048201528460248201528260448201526001606482015260a060848201525f60a48201525f8160c48183885af180156102cf576102a7575b505f5160206103ca5f395f51905f52916040916101d3565b6040919550916102c55f5f5160206103ca5f395f51905f5294610392565b5f9591509161028f565b6040513d5f823e3d90fd5b5f80fd5b60405163a9059cbb60e01b5f52846004528260245260205f60448180885af19060015f511482161561033d575b6040521561032a575f5160206103ca5f395f51905f52916040916101d3565b82635274afe760e01b5f5260045260245ffd5b90600181151661035557843b15153d1516169061030b565b503d5f823e3d90fd5b62461bcd60e51b815260206004820152600f60248201526e4f6e6c7920676f7665726e616e636560881b6044820152606490fd5b601f909101601f19168101906001600160401b038211908210176103b557604052565b634e487b7160e01b5f52604160045260245ffdfe7e76c5637fdeba83d88ef021338ef8c182e670ccb6fdf3d11d0c7cead5a2523ba26469706673582212200d1f65852864a39b24d047c56fdaaa6717eb7861f7634eb8b6d6b4a01b4fd85464736f6c63430008240033"
+}

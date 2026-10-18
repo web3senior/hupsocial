@@ -3,6 +3,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { chainNameFor, daoAddressFor, parseProposalLink, proposalPath } from '@/lib/dao'
+import { governanceAddressFor } from '@/lib/communityGovernance'
 import NativeDialog from '@/components/ui/NativeDialog'
 import ProposalEmbed from '@/components/ProposalEmbed'
 import { XIcon } from '@phosphor-icons/react'
@@ -30,7 +31,7 @@ const AttachProposalDialog = forwardRef(function AttachProposalDialog({ value, o
   }))
 
   const reference = parseProposalLink(link)
-  const supported = reference && Boolean(daoAddressFor(reference.chainId))
+  const supported = reference && Boolean(reference.communityId ? governanceAddressFor(reference.chainId) : daoAddressFor(reference.chainId))
 
   const attach = () => {
     if (!supported) return
@@ -79,7 +80,7 @@ const AttachProposalDialog = forwardRef(function AttachProposalDialog({ value, o
               type="text"
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              placeholder="https://hup.social/proposals/42/1/1"
+              placeholder="https://hup.social/communities/42/1/proposals/1"
               spellCheck={false}
               autoComplete="off"
             />
