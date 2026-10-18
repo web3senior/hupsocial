@@ -2,12 +2,12 @@
 
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { chainNameFor, daoAddressFor, parseProposalLink, proposalPath } from '@/lib/dao'
+import { chainNameFor, parseProposalLink, proposalPath } from '@/lib/communityProposal'
 import { governanceAddressFor } from '@/lib/communityGovernance'
 import NativeDialog from '@/components/ui/NativeDialog'
 import ProposalEmbed from '@/components/ProposalEmbed'
 import { XIcon } from '@phosphor-icons/react'
-import styles from './DaoDialog.module.scss'
+import styles from './CommunityDialog.module.scss'
 
 /**
  * Attach proposal
@@ -31,7 +31,7 @@ const AttachProposalDialog = forwardRef(function AttachProposalDialog({ value, o
   }))
 
   const reference = parseProposalLink(link)
-  const supported = reference && Boolean(reference.communityId ? governanceAddressFor(reference.chainId) : daoAddressFor(reference.chainId))
+  const supported = reference && Boolean(governanceAddressFor(reference.chainId))
 
   const attach = () => {
     if (!supported) return
@@ -47,35 +47,35 @@ const AttachProposalDialog = forwardRef(function AttachProposalDialog({ value, o
   return (
     <NativeDialog
       ref={dialogRef}
-      className={styles.daoDialog}
+      className={styles.communityDialog}
       aria-label="Attach a proposal"
       onClick={(event) => event.stopPropagation()}
       // React's synthetic close/cancel bubble up to the composer's dialog and would close it too
       onClose={(event) => event.stopPropagation()}
       onCancel={(event) => event.stopPropagation()}
     >
-      <div className={styles.daoDialog__body}>
-        <header className={styles.daoDialog__header}>
+      <div className={styles.communityDialog__body}>
+        <header className={styles.communityDialog__header}>
           <h3>Attach a proposal</h3>
-          <button type="button" onClick={() => dialogRef.current?.close()} aria-label="Close" className={styles.daoDialog__close}>
+          <button type="button" onClick={() => dialogRef.current?.close()} aria-label="Close" className={styles.communityDialog__close}>
             <XIcon size={18} />
           </button>
         </header>
 
-        <p className={styles.daoDialog__intro}>
+        <p className={styles.communityDialog__intro}>
           Paste a proposal&apos;s link. Readers see its live results and can tap through to vote. Tip: “Share to feed” on any proposal does
           this for you.
         </p>
 
         <form
-          className={styles.daoDialog__form}
+          className={styles.communityDialog__form}
           onSubmit={(event) => {
             event.preventDefault()
             attach()
           }}
         >
-          <label className={styles.daoDialog__field}>
-            <span className={styles.daoDialog__label}>Proposal link</span>
+          <label className={styles.communityDialog__field}>
+            <span className={styles.communityDialog__label}>Proposal link</span>
             <input
               type="text"
               value={link}
@@ -85,10 +85,10 @@ const AttachProposalDialog = forwardRef(function AttachProposalDialog({ value, o
               autoComplete="off"
             />
             {link.trim() && !reference && (
-              <span className={clsx(styles.daoDialog__hint, styles['daoDialog__hint--error'])}>That isn&apos;t a proposal link.</span>
+              <span className={clsx(styles.communityDialog__hint, styles['communityDialog__hint--error'])}>That isn&apos;t a proposal link.</span>
             )}
             {reference && !supported && (
-              <span className={clsx(styles.daoDialog__hint, styles['daoDialog__hint--error'])}>
+              <span className={clsx(styles.communityDialog__hint, styles['communityDialog__hint--error'])}>
                 Proposals aren&apos;t available on {chainNameFor(reference.chainId)}.
               </span>
             )}
@@ -97,12 +97,12 @@ const AttachProposalDialog = forwardRef(function AttachProposalDialog({ value, o
           {/* Keyed by the reference so a new link remounts the card instead of flashing the old one */}
           {supported && <ProposalEmbed key={proposalPath(reference)} proposalRef={reference} preview />}
 
-          <button type="submit" className={styles.daoDialog__submit} disabled={!supported}>
+          <button type="submit" className={styles.communityDialog__submit} disabled={!supported}>
             Attach proposal
           </button>
 
           {value && (
-            <button type="button" className={clsx(styles.daoDialog__linkButton, styles['daoDialog__linkButton--danger'])} onClick={remove}>
+            <button type="button" className={clsx(styles.communityDialog__linkButton, styles['communityDialog__linkButton--danger'])} onClick={remove}>
               Remove from post
             </button>
           )}

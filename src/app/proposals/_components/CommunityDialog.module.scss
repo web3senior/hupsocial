@@ -1,5 +1,5 @@
-/* Chrome shared by every DAO dialog. NativeDialog only supplies centering, motion and modality. */
-.daoDialog {
+/* Community dialog chrome. NativeDialog supplies centering, motion and modality. */
+.communityDialog {
   padding: var(--native-popover-padding);
   border: 1px solid var(--border);
   border-radius: var(--global-border-radius);
@@ -83,7 +83,7 @@
 
       &:focus {
         outline: none;
-        border-color: var(--dao-accent, #7c3aed);
+        border-color: var(--proposal-accent, #7c3aed);
       }
 
       &:disabled {
@@ -146,12 +146,12 @@
 
     input {
       margin-top: 0.15rem;
-      accent-color: var(--dao-accent, #7c3aed);
+      accent-color: var(--proposal-accent, #7c3aed);
     }
 
     &--selected {
-      border-color: var(--dao-accent, #7c3aed);
-      background: color-mix(in srgb, var(--dao-accent, #7c3aed) 6%, transparent);
+      border-color: var(--proposal-accent, #7c3aed);
+      background: color-mix(in srgb, var(--proposal-accent, #7c3aed) 6%, transparent);
     }
   }
 
@@ -178,7 +178,7 @@
     cursor: pointer;
 
     input {
-      accent-color: var(--dao-accent, #7c3aed);
+      accent-color: var(--proposal-accent, #7c3aed);
     }
   }
 
@@ -225,7 +225,7 @@
     gap: 0.3rem;
     font-size: var(--font-size-12);
     font-weight: 600;
-    color: var(--dao-accent, #7c3aed);
+    color: var(--proposal-accent, #7c3aed);
 
     &:disabled {
       opacity: 0.5;
@@ -255,9 +255,9 @@
     font-weight: 600;
 
     &--active {
-      border-color: var(--dao-accent, #7c3aed);
-      color: var(--dao-accent, #7c3aed);
-      background: color-mix(in srgb, var(--dao-accent, #7c3aed) 8%, transparent);
+      border-color: var(--proposal-accent, #7c3aed);
+      color: var(--proposal-accent, #7c3aed);
+      background: color-mix(in srgb, var(--proposal-accent, #7c3aed) 8%, transparent);
     }
   }
 
@@ -289,7 +289,7 @@
     border: none;
     border-radius: 999px;
     padding: 0.6rem 1rem;
-    background: var(--dao-accent, #7c3aed);
+    background: var(--proposal-accent, #7c3aed);
     color: #fff;
     font-size: var(--font-size-14, 0.875rem);
     font-weight: 600;

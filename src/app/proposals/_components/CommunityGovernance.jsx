@@ -7,15 +7,16 @@ import { useBalance, useReadContracts } from 'wagmi'
 import { formatUnits, zeroAddress } from 'viem'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import { communityPath, communityProposalPath, formatRulePercent, COMMUNITY_PROPOSAL_STATES } from '@/lib/communityGovernance'
-import { formatRelative, sameAddress } from '@/lib/dao'
+import { formatRelative, sameAddress } from '@/lib/communityProposal'
 import governanceAbi from '@/abis/HupCommunityGovernance.json'
 import communityAbi from '@/abis/HupCommunity.json'
 import { ContentSpinner } from '@/components/Loading'
 import { usePaymentToken } from '@/hooks/usePaymentToken'
 import TokenAssetInput from '@/app/communities/_components/TokenAssetInput'
 import CopyButton from '@/components/ui/CopyButton'
-import { useIpfsJson } from './useDao'
+import { useIpfsJson } from '@/hooks/useIpfsJson'
 import useCommunityGovernance from './useCommunityGovernance'
+import CommunityDelegation from './CommunityDelegation'
 import CommunityVotingDialogs from './CommunityVotingDialogs'
 import styles from './CommunityGovernance.module.scss'
 
@@ -82,6 +83,7 @@ export default function CommunityGovernance({ networkId, communityId, communityN
         </div>
       </header>
       <p className={styles.governance__muted}>Community members can propose and vote. One member, one vote. Only the community owner changes the voting rules.</p>
+      <CommunityDelegation key={`${chainId}:${communityId}`} chainId={chainId} communityId={communityId} />
       {!writer.address ? <p className={styles.governance__muted}>Community voting and treasury are awaiting deployment on {chain?.name || 'this network'}.</p> : isLoading ? <ContentSpinner /> : !ready || error ? (
         <div className={styles.governance__panel}><p>Could not load this community’s voting contract.</p><button type="button" className={styles.governance__button} onClick={() => refetch()}>Try again</button></div>
       ) : (

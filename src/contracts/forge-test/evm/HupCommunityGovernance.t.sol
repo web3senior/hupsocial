@@ -61,6 +61,250 @@ contract HupCommunityGovernanceTest is TestBase {
     return HupCommunityGovernance.Payment(address(0), address(0), 0, false);
   }
 
+  function _one(address account) internal pure returns (address[] memory members) {
+    members = new address[](1);
+    members[0] = account;
+  }
+
+  function testDelegatedVoteCountsForMemberAndCannotBeCountedTwice() public {
+    uint256 id = _propose(_signal());
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 1);
+    assertEq(governance.hasVoted(id, member), true, "member ballot recorded");
+    assertEq(governance.hasVoted(id, owner), false, "delegate own ballot separate");
+    assertEq(governance.getTallies(id)[1], 1, "one delegated vote");
+    vm.expectRevert();
+    vm.prank(member);
+    governance.castVote(id, 0);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 0);
+    vm.prank(owner);
+    governance.castVote(id, 1);
+    assertEq(governance.getProposal(id).voterCount, 2, "turnout counts members");
+  }
+
+  function testMemberCanVoteDirectlyDespiteDelegation() public {
+    uint256 id = _propose(_signal());
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.prank(member);
+    governance.castVote(id, 0);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 1);
+    assertEq(governance.getTallies(id)[0], 1, "direct choice preserved");
+  }
+
+  function testDelegationCanBeChangedAndRevokedDuringActiveProposal() public {
+    uint256 id = _propose(_signal());
+    vm.prank(outsider);
+    community.join(1, 0);
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.prank(member);
+    governance.delegate(1, outsider);
+    (address[] memory oldMembers, uint256 oldTotal) = governance.getDelegators(1, owner, 0, 50);
+    assertEq(oldMembers.length, 0, "removed from old delegate");
+    assertEq(oldTotal, 0, "old count");
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 1);
+    vm.prank(member);
+    governance.delegate(1, address(0));
+    vm.expectRevert();
+    vm.prank(outsider);
+    governance.castVotesFor(id, _one(member), 1);
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.prank(member);
+    governance.delegate(1, member);
+    assertEq(governance.delegates(1, member), address(0), "self revokes");
+    vm.prank(member);
+    governance.castVote(id, 1);
+  }
+
+  function testDelegationRequiresBothCurrentMembersAndDoesNotForward() public {
+    uint256 id = _propose(_signal());
+    vm.expectRevert();
+    vm.prank(member);
+    governance.delegate(1, outsider);
+    vm.expectRevert();
+    vm.prank(outsider);
+    governance.delegate(1, owner);
+    vm.prank(outsider);
+    community.join(1, 0);
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.prank(owner);
+    governance.delegate(1, outsider);
+    vm.expectRevert();
+    vm.prank(outsider);
+    governance.castVotesFor(id, _one(member), 1);
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 1);
+  }
+
+  function testDepartedMembersCannotCastOrReceiveDelegatedBallots() public {
+    uint256 id = _propose(_signal());
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.prank(member);
+    community.leave(1);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 1);
+    // Even a departed member can revoke their appointment.
+    vm.prank(member);
+    governance.delegate(1, address(0));
+    assertEq(governance.delegates(1, member), address(0), "revoked after leaving");
+    vm.prank(member);
+    community.join(1, 0);
+    vm.prank(owner);
+    governance.delegate(1, member);
+    vm.prank(member);
+    community.leave(1);
+    vm.expectRevert();
+    vm.prank(member);
+    governance.castVotesFor(id, _one(owner), 1);
+  }
+
+  function testBatchIsAtomicAndCannotDuplicateOrStealVotes() public {
+    uint256 id = _propose(_signal());
+    vm.prank(member);
+    governance.delegate(1, owner);
+    address[] memory members = new address[](2);
+    members[0] = member;
+    members[1] = member;
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, members, 1);
+    assertEq(governance.getProposal(id).voterCount, 0, "duplicate batch rolled back");
+    vm.expectRevert();
+    vm.prank(member);
+    governance.castVotesFor(id, _one(owner), 1);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, new address[](0), 1);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, new address[](51), 1);
+    members[1] = owner;
+    vm.prank(owner);
+    governance.castVotesFor(id, members, 1);
+    assertEq(governance.getProposal(id).voterCount, 2, "two members counted");
+  }
+
+  function testDelegationIsScopedToCommunityAndPaginationStaysCorrect() public {
+    vm.prank(owner);
+    community.createCommunity(IHupCommunity.AdmissionMode.Open, IHupCommunity.CommunityType.Discussion, CID, "");
+    vm.prank(member);
+    community.join(2, 0);
+    vm.prank(member);
+    governance.delegate(1, owner);
+    assertEq(governance.delegates(2, member), address(0), "community scope");
+    vm.prank(outsider);
+    community.join(1, 0);
+    vm.prank(outsider);
+    governance.delegate(1, owner);
+    (address[] memory first, uint256 total) = governance.getDelegators(1, owner, 0, 1);
+    assertEq(total, 2, "total appointments");
+    assertEq(first[0], member, "first page");
+    vm.prank(member);
+    governance.delegate(1, address(0));
+    (address[] memory remaining, ) = governance.getDelegators(1, owner, 0, 50);
+    assertEq(remaining[0], outsider, "swap removal");
+    vm.prank(outsider);
+    governance.delegate(1, address(0));
+    (address[] memory empty, ) = governance.getDelegators(1, owner, 10, 50);
+    assertEq(empty.length, 0, "past end");
+    vm.expectRevert();
+    governance.getDelegators(1, owner, 0, 51);
+  }
+
+  function testContractWalletCanDelegateAndCastDelegatedBallots() public {
+    CommunityWallet wallet = new CommunityWallet();
+    wallet.execute(address(community), abi.encodeCall(community.join, (1, 0)));
+    uint256 id = _propose(_signal());
+    wallet.execute(address(governance), abi.encodeCall(governance.delegate, (1, owner)));
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(address(wallet)), 1);
+    assertEq(governance.hasVoted(id, address(wallet)), true, "contract member ballot");
+    vm.prank(member);
+    governance.delegate(1, address(wallet));
+    wallet.execute(address(governance), abi.encodeCall(governance.castVotesFor, (id, _one(member), 1)));
+    assertEq(governance.hasVoted(id, member), true, "contract delegate ballot");
+    assertEq(governance.hasVoted(id, owner), false, "EOA not confused with contract");
+  }
+
+  function testDelegatedVotesRespectDeadlinesAndValidOptions() public {
+    uint256 id = _propose(_signal());
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 3);
+    vm.warp(governance.getProposal(id).voteEnd);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 1);
+    assertEq(governance.getProposal(id).voterCount, 0, "closed ballot not counted");
+  }
+
+  function testBannedMemberCannotAppointDelegateOrHaveBallotCast() public {
+    uint256 id = _propose(_signal());
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.prank(owner);
+    community.setBanStatus(1, member, true);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 1);
+    vm.expectRevert();
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.delegate(1, member);
+    vm.prank(member);
+    governance.delegate(1, address(0));
+    assertEq(governance.delegates(1, member), address(0), "banned member can revoke");
+  }
+
+  function testDelegatedVoteCannotBeCastBeforeVotingStartsOrAfterCancel() public {
+    vm.prank(owner);
+    governance.updateRules(1, HupCommunityGovernance.Rules(1 days, 1 hours, 7 days, 1 hours, 1, 5001));
+    uint256 id = _propose(_signal());
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 1);
+    vm.warp(governance.getProposal(id).voteStart);
+    vm.prank(member);
+    governance.cancel(id);
+    vm.expectRevert();
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), 1);
+  }
+
+  function testFuzzDelegatedBallotKeepsOriginalMemberIdentity(uint8 option) public {
+    option = option % 3;
+    uint256 id = _propose(_signal());
+    vm.prank(member);
+    governance.delegate(1, owner);
+    vm.prank(owner);
+    governance.castVotesFor(id, _one(member), option);
+    assertEq(governance.getTallies(id)[option], 1, "selected option counted");
+    assertEq(governance.getProposal(id).voterCount, 1, "one member turnout");
+    vm.prank(member);
+    governance.delegate(1, address(0));
+    assertEq(governance.hasVoted(id, member), true, "revocation keeps recorded ballot");
+    assertEq(governance.hasVoted(id, owner), false, "representative own ballot unused");
+  }
+
   function _propose(HupCommunityGovernance.Payment memory payment) internal returns (uint256) {
     vm.prank(member);
     return governance.propose(1, CID, 0, 3 days, payment);

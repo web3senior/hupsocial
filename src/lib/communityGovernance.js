@@ -1,6 +1,7 @@
-import { CONTRACTS } from '@/config/contracts'
+import { CONTRACTS, appChains } from '@/config/contracts'
 
 export const governanceAddressFor = (chainId) => CONTRACTS[`chain${chainId}`]?.communityGovernance || ''
+export const governanceChains = () => appChains.filter((chain) => governanceAddressFor(chain.id))
 const percentFormat = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 2 })
 export const formatRulePercent = (basisPoints) => percentFormat.format(Number(basisPoints) / 10000)
 export const communityPath = (chainId, id) => `/communities/${chainId}/${id}`

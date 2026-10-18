@@ -44,7 +44,7 @@ import AttachFundDialog from '@/components/AttachFundDialog'
 import AttachTaskDialog from '@/components/AttachTaskDialog'
 import AttachProposalDialog from '@/app/proposals/_components/AttachProposalDialog'
 import ProposalEmbed from '@/components/ProposalEmbed'
-import { daoChains } from '@/lib/dao'
+import { governanceChains } from '@/lib/communityGovernance'
 import { SEALED_PLACEHOLDER, categoryLabel } from '@/lib/task'
 import { sealSubmission } from '@/lib/taskVault'
 import { requestTaskFunding } from '@/lib/taskFundingBus'
@@ -529,7 +529,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     restoredContent?.tokenTrade ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.tokenTrade ?? null) : null)
   )
   const attachTokenTradeRef = useRef(null)
-  // A group proposal travels as { chainId, daoId, proposalId }; ProposalEmbed reads the result
+  // A community proposal travels as { chainId, communityId, proposalId }; ProposalEmbed reads the result
   // live. Seeded by "Share to feed" on a proposal page, which opens this composer with it attached.
   const [proposal, setProposal] = useState(
     () => restoredContent?.proposal ?? proposalSeed ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.proposal ?? null) : null)
@@ -778,7 +778,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     },
     // Ungated by targetChainId like tokens to trade: the reference carries the proposal's own
     // chain, and voting happens on the proposal page, never in the post's transaction
-    canAttachNft && daoChains().length > 0 && {
+    canAttachNft && governanceChains().length > 0 && {
       key: 'proposal',
       icon: BankIcon,
       label: 'Proposal',
@@ -1786,7 +1786,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // the post's signed author rather than to anything named in here.
       if (tokenTrade) serializableContent.tokenTrade = tokenTrade
 
-      // Group proposals the same: only the reference — ProposalEmbed reads the tally live
+      // Community proposals the same: only the reference — ProposalEmbed reads the tally live
       if (proposal) serializableContent.proposal = proposal
 
       // Articles the same way — the body is already pinned under its own CID by the editor, and

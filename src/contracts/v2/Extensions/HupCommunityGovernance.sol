@@ -12,7 +12,7 @@ interface ICommunityVotingSource {
   function registry(uint256 id, address account) external view returns (bool, bool, bool, bool, bool);
 }
 
-/// @notice One member, one vote. Community ids are the voting groups; no group registration.
+/// @notice One member, one vote, directly or through a community member delegate.
 /// @dev Rules and payment instructions are fixed at proposal creation. No admin withdrawal path.
 ///      All callers may be EOAs or Universal Profiles. Eligibility uses current membership.
 contract HupCommunityGovernance is ReentrancyGuard {
@@ -63,6 +63,9 @@ contract HupCommunityGovernance is ReentrancyGuard {
   mapping(uint256 => mapping(uint8 => uint256)) private _tallies;
   mapping(uint256 => mapping(address => bool)) public hasVoted;
   mapping(uint256 => HupCommunityTreasury) public treasuries;
+  mapping(uint256 => mapping(address => address)) public delegates;
+  mapping(uint256 => mapping(address => address[])) private _delegators;
+  mapping(uint256 => mapping(address => uint256)) private _delegatorIndex;
 
   // --- Events ---
 
@@ -71,6 +74,8 @@ contract HupCommunityGovernance is ReentrancyGuard {
   event TreasuryFunded(uint256 indexed communityId, address indexed sender, address indexed asset, uint256 amount, bool isLsp7);
   event ProposalCreated(uint256 indexed proposalId, uint256 indexed communityId, address indexed proposer, string metadata, Payment payment);
   event VoteCast(uint256 indexed proposalId, address indexed voter, uint8 option);
+  event DelegateChanged(uint256 indexed communityId, address indexed member, address indexed delegatee);
+  event DelegatedVoteCast(uint256 indexed proposalId, address indexed member, address indexed delegatee, uint8 option);
   event ProposalCanceled(uint256 indexed proposalId);
   event ProposalExecuted(uint256 indexed proposalId, address indexed executor);
 
@@ -87,6 +92,67 @@ contract HupCommunityGovernance is ReentrancyGuard {
   constructor(address source) {
     require(source.code.length > 0, "Invalid community contract");
     community = ICommunityVotingSource(source);
+  }
+
+  function delegationVersion() external pure returns (uint256) {
+    return 1;
+  }
+
+  /// @notice Appoint a direct representative. Zero address or self revokes delegation.
+  /// @dev Current appointments apply to uncast ballots, including active proposals.
+  ///      Delegation never forwards another member's authority or changes a recorded ballot.
+  function delegate(uint256 id, address delegatee) external {
+    _communityOwner(id);
+    if (delegatee == msg.sender) delegatee = address(0);
+    if (delegatee != address(0)) {
+      _requireMember(id, msg.sender);
+      _requireMember(id, delegatee);
+    }
+    address previous = delegates[id][msg.sender];
+    if (previous == delegatee) return;
+    if (previous != address(0)) {
+      address[] storage members = _delegators[id][previous];
+      uint256 index = _delegatorIndex[id][msg.sender];
+      address last = members[members.length - 1];
+      members[index] = last;
+      _delegatorIndex[id][last] = index;
+      members.pop();
+      delete _delegatorIndex[id][msg.sender];
+    }
+    delegates[id][msg.sender] = delegatee;
+    if (delegatee != address(0)) {
+      _delegatorIndex[id][msg.sender] = _delegators[id][delegatee].length;
+      _delegators[id][delegatee].push(msg.sender);
+    }
+    emit DelegateChanged(id, msg.sender, delegatee);
+  }
+
+  function getDelegators(uint256 id, address delegatee, uint256 offset, uint256 limit) external view returns (address[] memory rows, uint256 total) {
+    require(limit <= 50, "Page too large");
+    address[] storage members = _delegators[id][delegatee];
+    total = members.length;
+    uint256 count = offset >= total ? 0 : Math.min(limit, total - offset);
+    rows = new address[](count);
+    for (uint256 i = 0; i < count; i++) rows[i] = members[offset + i];
+  }
+
+  /// @notice Cast one ballot per named member. A member may always cast their own uncast ballot.
+  function castVotesFor(uint256 proposalId, address[] calldata members, uint8 option) external {
+    Proposal storage proposal = _proposal(proposalId);
+    _requireMember(proposal.communityId, msg.sender);
+    require(members.length > 0 && members.length <= 50, "Invalid batch");
+    for (uint256 i = 0; i < members.length; i++) {
+      address member = members[i];
+      require(member == msg.sender || delegates[proposal.communityId][member] == msg.sender, "Not delegated");
+      _requireMember(proposal.communityId, member);
+      _castVote(proposalId, member, option);
+      if (member != msg.sender) emit DelegatedVoteCast(proposalId, member, msg.sender, option);
+    }
+  }
+
+  function _requireMember(uint256 id, address account) private view {
+    (bool member, , , bool banned, ) = community.registry(id, account);
+    require(member && !banned, "Community members only");
   }
 
   function getRules(uint256 id) public view returns (Rules memory) {
@@ -176,14 +242,18 @@ contract HupCommunityGovernance is ReentrancyGuard {
   }
 
   function castVote(uint256 proposalId, uint8 option) external onlyMember(_proposal(proposalId).communityId) {
+    _castVote(proposalId, msg.sender, option);
+  }
+
+  function _castVote(uint256 proposalId, address voter, uint8 option) private {
     Proposal storage proposal = _proposals[proposalId];
     require(state(proposalId) == State.Active, "Voting closed");
-    require(!hasVoted[proposalId][msg.sender], "Already voted");
+    require(!hasVoted[proposalId][voter], "Already voted");
     require(option < (proposal.optionCount == 0 ? 3 : proposal.optionCount), "Invalid option");
-    hasVoted[proposalId][msg.sender] = true;
+    hasVoted[proposalId][voter] = true;
     _tallies[proposalId][option]++;
     proposal.voterCount++;
-    emit VoteCast(proposalId, msg.sender, option);
+    emit VoteCast(proposalId, voter, option);
   }
 
   function cancel(uint256 proposalId) external {

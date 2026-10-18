@@ -1,5 +1,5 @@
 .proposal {
-  --dao-accent: #7c3aed;
+  --proposal-accent: #7c3aed;
 
   display: flex;
   flex-direction: column;
@@ -61,8 +61,8 @@
     }
 
     &--active {
-      background: color-mix(in srgb, var(--dao-accent) 14%, transparent);
-      color: var(--dao-accent);
+      background: color-mix(in srgb, var(--proposal-accent) 14%, transparent);
+      color: var(--proposal-accent);
     }
 
     &--succeeded,
@@ -98,8 +98,8 @@
     transition: border-color 0.15s ease;
 
     &:hover {
-      border-color: var(--dao-accent);
-      color: var(--dao-accent);
+      border-color: var(--proposal-accent);
+      color: var(--proposal-accent);
     }
   }
 
@@ -191,13 +191,13 @@
     transition: border-color 0.15s ease;
 
     &:hover:not(:disabled) {
-      border-color: var(--dao-accent);
+      border-color: var(--proposal-accent);
     }
 
     &--selected {
-      border-color: var(--dao-accent);
-      background: color-mix(in srgb, var(--dao-accent) 10%, transparent);
-      color: var(--dao-accent);
+      border-color: var(--proposal-accent);
+      background: color-mix(in srgb, var(--proposal-accent) 10%, transparent);
+      color: var(--proposal-accent);
     }
 
     &:disabled {
@@ -227,7 +227,7 @@
 
       &:focus {
         outline: none;
-        border-color: var(--dao-accent);
+        border-color: var(--proposal-accent);
       }
     }
   }
@@ -240,7 +240,7 @@
     border: none;
     border-radius: 999px;
     padding: 0.6rem 1rem;
-    background: var(--dao-accent);
+    background: var(--proposal-accent);
     color: #fff;
     font-size: var(--font-size-14, 0.875rem);
     font-weight: 600;

@@ -6,9 +6,9 @@ import useSWRInfinite from 'swr/infinite'
 import { useConnection } from 'wagmi'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import { communityProposalsPath } from '@/lib/communityGovernance'
-import { chainNameFor } from '@/lib/dao'
+import { chainNameFor } from '@/lib/communityProposal'
 import { ContentSpinner } from '@/components/Loading'
-import styles from './DaoDirectory.module.scss'
+import styles from './CommunityProposalDirectory.module.scss'
 
 const communityContracts = appChains
   .filter((chain) => CONTRACTS[`chain${chain.id}`]?.community)

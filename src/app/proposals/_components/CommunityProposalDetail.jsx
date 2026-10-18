@@ -7,7 +7,7 @@ import { useReadContracts } from 'wagmi'
 import { formatUnits, zeroAddress } from 'viem'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import { communityProposalsPath, communityProposalPath, formatRulePercent, COMMUNITY_PROPOSAL_STATES } from '@/lib/communityGovernance'
-import { formatWhen, optionLabels, sameAddress, tallyRows } from '@/lib/dao'
+import { formatWhen, optionLabels, sameAddress, tallyRows } from '@/lib/communityProposal'
 import { usePaymentToken } from '@/hooks/usePaymentToken'
 import governanceAbi from '@/abis/HupCommunityGovernance.json'
 import communityAbi from '@/abis/HupCommunity.json'
@@ -16,8 +16,9 @@ import CopyButton from '@/components/ui/CopyButton'
 import NewPost from '@/components/NewPost'
 import Profile from '@/components/Profile'
 import ResultsBar from './ResultsBar'
-import { useIpfsJson } from './useDao'
+import { useIpfsJson } from '@/hooks/useIpfsJson'
 import useCommunityGovernance from './useCommunityGovernance'
+import CommunityDelegation, { CommunityDelegatedVotes } from './CommunityDelegation'
 import styles from './ProposalDetail.module.scss'
 
 export default function CommunityProposalDetail({ networkId, communityId, proposalId }) {
@@ -123,6 +124,8 @@ export default function CommunityProposalDetail({ networkId, communityId, propos
           <button type="button" className={styles.proposal__submit} disabled={choice === null || Boolean(writer.busy)} onClick={() => act('vote', { functionName: 'castVote', args: [id, choice] }, 'Vote recorded')}>{writer.busy === 'vote' ? <><Spinner size={16} color="currentColor" /> Voting…</> : choice === null ? 'Choose an option' : `Vote ${labels[choice]}`}</button>
         </>}
       </div>}
+      <CommunityDelegation key={`${chainId}:${communityId}`} chainId={chainId} communityId={communityId} />
+      {status.key === 'active' && <CommunityDelegatedVotes key={`${chainId}:${communityId}:${proposalId}:${writer.account}`} chainId={chainId} communityId={communityId} proposalId={proposalId} labels={labels} onVoted={refetch} />}
       {canCancel && <button type="button" className={styles.proposal__cancel} disabled={Boolean(writer.busy)} onClick={() => act('cancel', { functionName: 'cancel', args: [id] }, 'Proposal canceled')}>{writer.busy === 'cancel' ? 'Canceling…' : 'Cancel proposal'}</button>}
       {sharing && <NewPost proposal={{ chainId, communityId: String(communityId), proposalId: proposal.id.toString() }} text={metadata?.title || ''} onClose={() => setSharing(false)} />}
     </section>

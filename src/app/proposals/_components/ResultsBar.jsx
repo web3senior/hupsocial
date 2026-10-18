@@ -1,7 +1,7 @@
 'use client'
 
 import clsx from 'clsx'
-import { formatPower, formatShare } from '@/lib/dao'
+import { formatPower, formatShare } from '@/lib/communityProposal'
 import { CheckCircleIcon } from '@phosphor-icons/react'
 import styles from './ResultsBar.module.scss'
 

@@ -57,6 +57,7 @@ import CreateCommunityModal from './_components/CreateCommunityModal'
 import CommunityTile, { CommunityTileSkeleton } from './_components/CommunityTile'
 import DropsHero, { HeroChain } from '@/components/DropsHero'
 import { ContentSpinner } from '@/components/Loading'
+import PostSkeletonGrid from '@/components/ui/PostSkeleton'
 import { AssetUnitLabel, TokenRequirementTag, TokenUnitHint } from './_components/TokenAmount'
 import TokenAssetInput from './_components/TokenAssetInput'
 import OptionPicker from '@/components/ui/OptionPicker'
@@ -2764,7 +2765,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             <div className={styles.feed}>
               <h4 className={styles.feed__title}>Recent Updates</h4>
               {isFeedLoading ? (
-                <div className={styles.feed__loading}>Syncing feed events...</div>
+                <PostSkeletonGrid count={14} />
               ) : communityPosts.length === 0 ? (
                 <div className={styles.feed__empty}>No posts published in this space yet.</div>
               ) : (
@@ -2801,7 +2802,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                   ))}
                   {/* Infinite scroll: observed sentinel pulls the next page into view */}
                   <div ref={feedSentinelRef} aria-hidden="true" />
-                  {isFeedLoadingMore && <div className={styles.feed__empty}>Loading more posts...</div>}
+                  {isFeedLoadingMore && <PostSkeletonGrid count={3} />}
                 </div>
               )}
             </div>

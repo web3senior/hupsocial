@@ -345,10 +345,9 @@
       { id: "HupOffers", label: "HupOffers (escrowed offers / OTC)", file: "HupOffers.json" },
       { id: "HupSell", label: "HupSell (gated content sales, escrowed until the key is granted)", file: "HupSell.json" },
       { id: "HupCommunity", label: "HupCommunity", file: "HupCommunity.json" },
-      { id: "HupCommunityGovernance", label: "Community proposals & treasury (uses existing HupCommunity)", file: "HupCommunityGovernance.json" },
+      { id: "HupCommunityGovernance", label: "Community proposals, delegation & treasury (uses existing HupCommunity)", file: "HupCommunityGovernance.json" },
       { id: "HupFund", label: "HupFund (fundraising campaigns, escrowed — admin only)", file: "HupFund.json" },
       { id: "HupTasks", label: "HupTasks (micro bounties on posts, escrowed — salt hup-tasks)", file: "HupTasks.json" },
-      { id: "HupDao", label: "HupDao (Proposals — groups, votes, delegation — salt hup-dao)", file: "HupDao.json" },
       { id: "HupScheduleForwarder", label: "HupScheduleForwarder (scheduled posts, no constructor args — salt hup-schedule-forwarder, same address everywhere)", file: "HupScheduleForwarder.json" },
       { id: "HupTestToken", label: "Test token · ERC20 (faucet, any EVM)", file: "HupTestToken.json", signerArgs: ["owner_"] },
       { id: "HupTestERC721", label: "Test NFT · ERC721 (faucet, any EVM)", file: "HupTestERC721.json", signerArgs: ["owner_"] },
@@ -499,24 +498,14 @@
         42220: ["0xddA507aFA7bE1e70B9dceEB3B34c9B886C98Ff73", "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
         84532: ["0xf6b33ecab0fa561300453c1bb1B520Ce544544ae", "0x8004B663056A597Dffe9eCcC1965A193B7388713", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
       },
-      // HupDao: the chain's forwarder (`forwarder` in contracts.js, for relayed votes later) and
-      // the admin. No Hup core — DAOs are standalone. The admin is explicit because through the
-      // factory `msg.sender` in the constructor is the factory, not the deployer.
-      HupDao: {
-        1: ["0xA8231e213a85BA0FBEB42F319175f10E2D849352", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // Ethereum
-        42: ["0x76d610248ADDd1619c0Bc34F18E5436E38Dc6972", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // LUKSO
-        56: ["0xc407722d150c8a65e890096869f8015D90a89EfD", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // BNB
-        143: ["0x09FAf2fddED624958589aD9ca704Bc4C6C232e72", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // Monad
-        4663: ["0xf5e4d19c9de1323dfF4fd85822Ca7A3582035e76", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // Robinhood
-        5042: ["0xc407722d150c8a65e890096869f8015D90a89EfD", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // Arc
-        8453: ["0xae95e44D2642F568D0e0Fc0d60202B55c8764567", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // Base
-        42161: ["0x41e6D71623FD02633C568342852154D2Cd7DBD0e", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // Arbitrum
-        42220: ["0x46a3dfCb1F4ec29dB7F96C0D3962DF20E6EdB259", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // Celo
-        84532: ["0x18B86518709a6C0942F3adCD0CD528D1716e0A80", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"], // Base Sepolia (dev)
-      },
       // Forwarder = the chain's HupChatForwarder (`forwarder` in contracts.js) — the one every
       // Hup extension trusts (HupApps on 42 confirmed onchain), NOT `hupForwarder`, which only
       // the Hup core itself trusts.
+      HupCommunityGovernance: {
+        42: ["0xB7Af957f4157aeAdA5Cab17D3B55fB1f1315F41A"],
+        8453: ["0x77986dE55d0C746351F3A0797b745306c5Fc072C"],
+        84532: ["0x09E50a68f63dFFF83924c149268923eeDBCF1B7e"],
+      },
       HupCommunity: {
         42: [
           "0x76d610248ADDd1619c0Bc34F18E5436E38Dc6972", // HupChatForwarder (LUKSO mainnet)
@@ -754,7 +743,7 @@
 
     /**
      * Gas for the deploy, estimated here rather than left to the wallet: a large init code
-     * (HupDao is ~24 KB and needs ~5M gas) is where a wallet's own estimate most often fails,
+     * (large contracts may need several million gas) is where a wallet's own estimate most often fails,
      * and it fails as an opaque "could not coalesce error". Null only when every source
      * refuses, so the wallet still gets a try.
      */

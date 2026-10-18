@@ -1,5 +1,5 @@
 .directory {
-  --dao-accent: #7c3aed;
+  --proposal-accent: #7c3aed;
 
   display: flex;
   flex-direction: column;
@@ -45,7 +45,7 @@
     align-items: center;
     gap: 0.3rem;
     border: none;
-    background-color: var(--dao-accent);
+    background-color: var(--proposal-accent);
     color: #fff;
     border-radius: 999px;
     padding: 0.4rem 0.85rem;
@@ -91,12 +91,12 @@
       box-shadow 0.15s ease;
 
     &:hover {
-      border-color: color-mix(in srgb, var(--dao-accent) 45%, var(--border));
+      border-color: color-mix(in srgb, var(--proposal-accent) 45%, var(--border));
       box-shadow: var(--card-elevation, 0 2px 10px rgba(15, 23, 42, 0.06));
     }
 
     &:focus-within {
-      border-color: var(--dao-accent);
+      border-color: var(--proposal-accent);
     }
   }
 
@@ -112,8 +112,8 @@
     height: 44px;
     border-radius: 12px;
     overflow: hidden;
-    background: color-mix(in srgb, var(--dao-accent) 14%, transparent);
-    color: var(--dao-accent);
+    background: color-mix(in srgb, var(--proposal-accent) 14%, transparent);
+    color: var(--proposal-accent);
     font-weight: 700;
     font-size: var(--font-size-18, 1.125rem);
 
@@ -151,7 +151,7 @@
     }
 
     &:focus-visible {
-      outline: 2px solid var(--dao-accent);
+      outline: 2px solid var(--proposal-accent);
       outline-offset: 3px;
       border-radius: 4px;
     }
@@ -184,8 +184,8 @@
     letter-spacing: 0.04em;
     border-radius: 999px;
     padding: 0.12rem 0.5rem;
-    background: color-mix(in srgb, var(--dao-accent) 14%, transparent);
-    color: var(--dao-accent);
+    background: color-mix(in srgb, var(--proposal-accent) 14%, transparent);
+    color: var(--proposal-accent);
   }
 
   &__empty {

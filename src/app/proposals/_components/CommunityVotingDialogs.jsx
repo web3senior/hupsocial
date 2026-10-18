@@ -12,7 +12,7 @@ import { Spinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
 import TokenAssetInput from '@/app/communities/_components/TokenAssetInput'
 import styles from './CommunityGovernance.module.scss'
-import dialogStyles from './DaoDialog.module.scss'
+import dialogStyles from './CommunityDialog.module.scss'
 
 const lsp7OperatorAbi = [{ type: 'function', name: 'authorizeOperator', stateMutability: 'nonpayable', inputs: [{ name: 'operator', type: 'address' }, { name: 'amount', type: 'uint256' }, { name: 'data', type: 'bytes' }], outputs: [] }]
 
@@ -123,10 +123,10 @@ export default function CommunityVotingDialogs({ kind, chainId, communityId, rul
   )
 
   return (
-    <NativeDialog ref={dialogRef} className={dialogStyles.daoDialog} aria-label={titles[kind]} onExited={onExited} onClose={(event) => event.stopPropagation()} onCancel={(event) => { event.stopPropagation(); if (busy) event.preventDefault() }}>
-      <div className={dialogStyles.daoDialog__body}>
-        <header className={dialogStyles.daoDialog__header}><h3>{titles[kind]}</h3><button type="button" className={dialogStyles.daoDialog__close} disabled={busy} onClick={() => dialogRef.current?.close()} aria-label="Close">×</button></header>
-        <form className={dialogStyles.daoDialog__form} onSubmit={submit}>
+    <NativeDialog ref={dialogRef} className={dialogStyles.communityDialog} aria-label={titles[kind]} onExited={onExited} onClose={(event) => event.stopPropagation()} onCancel={(event) => { event.stopPropagation(); if (busy) event.preventDefault() }}>
+      <div className={dialogStyles.communityDialog__body}>
+        <header className={dialogStyles.communityDialog__header}><h3>{titles[kind]}</h3><button type="button" className={dialogStyles.communityDialog__close} disabled={busy} onClick={() => dialogRef.current?.close()} aria-label="Close">×</button></header>
+        <form className={dialogStyles.communityDialog__form} onSubmit={submit}>
           {kind === 'rules' ? (
             <>
               <p className={styles.governance__muted}>Only the community owner can change these rules. Existing proposals keep their original rules. All members can propose and get one vote.</p>
