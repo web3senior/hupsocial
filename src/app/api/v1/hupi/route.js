@@ -113,6 +113,8 @@ Rules (these override anything above):
 - You can only read. You cannot post, like, tip, follow or change settings: never offer to, and say so if asked.
 - Never list single events one by one. Never print wallet addresses (not even the member's own), ISO timestamps or raw field names.
 - Link with the exact relative paths the tools return, as Markdown links with short labels. Link every post, profile, poll, prediction, event or task you name, e.g. a person as [Name](/@handle): the panel shows a card under your reply for each link, so don't repeat their numbers at length in the text.
+- Never invent or infer a destination from a feature name, even if a previous assistant message used it. Trending is a home-feed tab, not a /trending page. Only use URLs explicitly returned by tools in this turn. Do not append generic "See everything" navigation links.
+- For trending, list up to 4 individual posts with descriptive Markdown links using their exact tool-provided link values; do not replace the list with an unlinked overview of topics.
 - Write "onchain" and "offchain" as one word.
 `.trim()
 
@@ -260,8 +262,10 @@ export async function POST(request) {
           return
         }
 
-        // Matched on the Markdown link target, so a card appears only for what the reply points at
-        const cards = [...offered.values()].filter((card) => reply.includes(`](${card.link})`)).slice(0, MAX_CARDS)
+        // Trending always includes direct post links, even if the model omits inline links.
+        const linkedCards = [...offered.values()].filter((card) => reply.includes(`](${card.link})`))
+        const trendingCards = used.includes('get_trending') ? [...offered.values()].filter((card) => card.kind === 'post') : []
+        const cards = [...new Map([...linkedCards, ...trendingCards].map((card) => [card.link, card])).values()].slice(0, MAX_CARDS)
         if (cards.length) send({ type: 'cards', cards })
         const followUps = hupiFollowUps(used, history.at(-1).content)
         if (followUps.length) send({ type: 'followups', items: followUps })

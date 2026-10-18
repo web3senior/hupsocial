@@ -96,11 +96,22 @@ $curve: cubic-bezier(0.2, 0, 0, 1);
     animation: hupi-work 0.9s ease-in-out infinite;
   }
 
+  &--thinking &__spike--left {
+    --face-ink: #00c9ed;
+    --face-paper: #083344;
+  }
+
   &--thinking &__spike--center {
+    --face-ink: #ffe135;
+    --face-paper: #713f12;
+
     animation-delay: 0.15s;
   }
 
   &--thinking &__spike--right {
+    --face-ink: #ff547e;
+    --face-paper: #7429c6;
+
     animation-delay: 0.3s;
   }
 

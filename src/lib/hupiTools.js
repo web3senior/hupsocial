@@ -649,7 +649,7 @@ const TOOLS = {
     run: getTrending,
     status: "Looking at what's trending…",
     followUps: ["What's closing soon?", 'What did I miss?'],
-    description: 'Trending public posts by recent likes and replies, and the most-mentioned cashtags in the window.',
+    description: 'Trending public posts by recent likes and replies, and the most-mentioned cashtags in the window. Present up to 4 posts as separate bullets, each with a descriptive Markdown link using its exact link value. There is no trending page to link to.',
     parameters: { type: 'object', properties: { hours: HOURS_PARAM }, additionalProperties: false },
   },
   get_current_page: {
