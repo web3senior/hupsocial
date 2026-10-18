@@ -816,7 +816,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const { isSuccess: isInviteConfirmed } = useWaitForTransactionReceipt({ hash: inviteHash })
 
   useEffect(() => {
-    if (isInviteConfirmed) setInviteAddress('')
+    if (isInviteConfirmed) setInviteAddress(EMPTY_RECIPIENT)
   }, [isInviteConfirmed])
 
   // The viewer's own outstanding invite (if any) + their accept/decline response. Reverts on
@@ -874,7 +874,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   useEffect(() => {
     if (isWhitelistConfirmed) {
       refetchWhitelist()
-      setNewWhitelistAddress('')
+      setNewWhitelistAddress(EMPTY_RECIPIENT)
       setRemovingWhitelistAddress(null)
     }
   }, [isWhitelistConfirmed])
