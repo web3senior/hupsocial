@@ -330,7 +330,7 @@ function Conversation({ wallet, token, onNavigate, onBusyChange }) {
             ) : (
               <Fragment key={message.id}>
                 <Rise className={clsx(styles.hupi__bubble, styles['hupi__bubble--hupi'])} onClick={handleReplyClick}>
-                  <div className={styles.hupi__markdown} dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }} />
+                  <div className={styles.hupi__markdown} dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content, { linkPostPaths: true }) }} />
                 </Rise>
                 {message.cards?.length > 0 && <HupiCards cards={message.cards} onNavigate={onNavigate} />}
               </Fragment>

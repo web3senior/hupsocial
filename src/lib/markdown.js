@@ -94,8 +94,8 @@ export function internalPathOf(href) {
  * @param {string} markdown
  * @returns {string} Sanitized HTML.
  */
-export function renderMarkdown(markdown) {
-  const html = renderSafeMarkdown(markdown, { breaks: true })
+export function renderMarkdown(markdown, { linkPostPaths = false } = {}) {
+  const html = renderSafeMarkdown(markdown, { breaks: true, linkPostPaths })
   if (typeof window === 'undefined') return html
 
   return DOMPurify.sanitize(html, {
@@ -176,11 +176,12 @@ export const renderArticleMarkdown = (markdown) => renderSafeMarkdown(markdown, 
  *   where every newline is deliberate; false for an article, where it is a wrapped editor line.
  * @returns {string} Sanitized HTML.
  */
-function renderSafeMarkdown(markdown, { breaks = false } = {}) {
+function renderSafeMarkdown(markdown, { breaks = false, linkPostPaths = false } = {}) {
   const source = typeof markdown === 'string' ? markdown.trim() : ''
   if (!source) return ''
 
   const renderer = new marked.Renderer()
+  let linkDepth = 0
 
   /* A `text` token in a list item or heading is a CONTAINER: its own `.text` is the raw source
      ("**No feed cost.** A card…") and the formatting lives in `.tokens`. Reading `.text` on one of
@@ -195,8 +196,13 @@ function renderSafeMarkdown(markdown, { breaks = false } = {}) {
 
     /* Escaped rather than trusted, because the cashtag pass injects real markup and everything
        around it has to be inert. */
-    return escapeHtml(rawText).replace(CASHTAG_PATTERN, (match, prefix, symbol) => {
+    const text = escapeHtml(rawText).replace(CASHTAG_PATTERN, (match, prefix, symbol) => {
       return `${prefix}<span class="ticker-trigger" data-symbol="${symbol.toUpperCase()}">$${symbol}</span>`
+    })
+    if (!linkPostPaths || linkDepth > 0) return text
+
+    return text.replace(/(^|[\s(])(\/networks\/\d+\/\d+\/?)(?=$|[\s).,!?:;])/g, (_match, prefix, path) => {
+      return `${prefix}<a href="${path}">View post</a>`
     })
   }
 
@@ -206,7 +212,9 @@ function renderSafeMarkdown(markdown, { breaks = false } = {}) {
      `[<img src=x onerror=…>](https://example.com)` publish live markup into every reader's page. */
   renderer.link = function (token) {
     const href = safeUrl(token?.href)
+    linkDepth += 1
     const text = token?.tokens?.length ? this.parser.parseInline(token.tokens) : escapeHtml(token?.text || '')
+    linkDepth -= 1
     /* A link that fails the allowlist keeps its words and loses its destination */
     if (!href) return text
 
