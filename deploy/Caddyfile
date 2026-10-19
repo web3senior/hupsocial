@@ -1,0 +1,11 @@
+# Merge into /etc/caddy/Caddyfile alongside the existing sites.
+hup.social {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:3000 {
+    flush_interval -1
+  }
+}
+
+www.hup.social {
+  redir https://hup.social{uri} permanent
+}

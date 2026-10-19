@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import clsx from 'clsx'
-import { ArticleIcon, BookIcon, BugIcon, CalendarDotsIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HandCoinsIcon, HeadCircuitIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, ReceiptIcon, RobotIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
+import { ArticleIcon, BookIcon, BugIcon, CalendarDotsIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HandCoinsIcon, HardDrivesIcon, HeadCircuitIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, ReceiptIcon, RobotIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
 import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
@@ -538,6 +538,12 @@ export default function Aside() {
                     <Link href="/help" onClick={close} className="flex align-items-center gap-050">
                       <BugIcon size={16} />
                       <span>Report a problem</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/status" onClick={close} className={clsx('flex', 'align-items-center', 'gap-050')}>
+                      <HardDrivesIcon size={16} />
+                      <span>System status</span>
                     </Link>
                   </li>
                   <li>

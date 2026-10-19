@@ -1,0 +1,233 @@
+.status {
+  min-height: 85svh;
+  color: var(--text);
+
+  &__container {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.25rem;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--page-border-radius);
+    box-shadow: var(--card-elevation, 0px 0px 8px rgba(0, 0, 0, 0.04));
+    overflow: hidden;
+    isolation: isolate;
+
+    @media (max-width: 600px) {
+      padding: 1rem;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
+  }
+
+  h1,
+  h2 {
+    color: var(--text);
+  }
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    p {
+      margin: 0;
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-size: 0.9375rem;
+    }
+  }
+
+  &__eyebrow {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  &__title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  &__summary {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-muted);
+
+    h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.15rem;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.6;
+      font-size: 0.9rem;
+    }
+
+    &--operational {
+      border-color: var(--status-success);
+    }
+
+    &--disrupted {
+      border-color: var(--status-warning);
+    }
+
+    &--busy,
+    &--heavy {
+      border-color: var(--status-warning);
+    }
+  }
+
+  &__dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #64748b;
+
+    &--operational {
+      background: var(--status-success);
+    }
+
+    &--disrupted {
+      background: var(--status-warning);
+    }
+
+    &--busy {
+      background: var(--status-warning);
+    }
+
+    &--heavy {
+      background: var(--status-error);
+    }
+  }
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 0;
+
+    p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+  }
+
+  &__refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+
+    &:disabled {
+      cursor: wait;
+      opacity: 0.7;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--blue-400, #2e90fa);
+      outline-offset: 3px;
+    }
+  }
+
+  &__services {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  &__service {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1.25rem;
+
+    & + & {
+      border-top: 1px solid var(--border);
+    }
+
+    h2 {
+      margin: 0 0 0.35rem;
+      font-size: 0.95rem;
+    }
+
+    p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      max-width: 460px;
+    }
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+
+    &[tabindex] {
+      cursor: help;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--blue-400, #2e90fa);
+      outline-offset: 4px;
+      border-radius: 4px;
+    }
+  }
+
+  &__note {
+    margin-top: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.7;
+
+    h2 {
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    a {
+      color: var(--blue-400, #2e90fa);
+    }
+  }
+
+  @media (max-width: 600px) {
+    &__service {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 1.1rem;
+    }
+  }
+}
