@@ -206,6 +206,32 @@
     width: 100%;
   }
 
+  // Treasury panel and the All / Posts / Proposals filter, sitting where the feed's title was
+  &__feedHeader {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  &__loadMore {
+    display: block;
+    margin: 1rem auto 0;
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+
   &__metaItem {
     display: inline-flex;
     align-items: center;

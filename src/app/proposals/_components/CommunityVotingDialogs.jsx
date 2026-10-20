@@ -123,7 +123,7 @@ export default function CommunityVotingDialogs({ kind, chainId, communityId, rul
   )
 
   return (
-    <NativeDialog ref={dialogRef} className={dialogStyles.communityDialog} aria-label={titles[kind]} onExited={onExited} onClose={(event) => event.stopPropagation()} onCancel={(event) => { event.stopPropagation(); if (busy) event.preventDefault() }}>
+    <NativeDialog ref={dialogRef} className={dialogStyles.communityDialog} aria-label={titles[kind]} onExited={onExited} onClick={(event) => event.stopPropagation()} onClose={(event) => event.stopPropagation()} onCancel={(event) => { event.stopPropagation(); if (busy) event.preventDefault() }}>
       <div className={dialogStyles.communityDialog__body}>
         <header className={dialogStyles.communityDialog__header}><h3>{titles[kind]}</h3><button type="button" className={dialogStyles.communityDialog__close} disabled={busy} onClick={() => dialogRef.current?.close()} aria-label="Close">×</button></header>
         <form className={dialogStyles.communityDialog__form} onSubmit={submit}>

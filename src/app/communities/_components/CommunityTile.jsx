@@ -10,6 +10,7 @@ import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import Profile from '@/components/Profile'
 import Shimmer from '@/components/ui/Shimmer'
 import { ADMISSION_OPTIONS } from '../membershipOptions'
+import { coverObjectPosition, coverPositionFrom } from '@/lib/coverPosition'
 import styles from './CommunityTile.module.scss'
 
 const memberFormat = new Intl.NumberFormat(undefined, { notation: 'compact' })
@@ -87,7 +88,13 @@ export default function CommunityTile({ row, metadata, categories, highlight = '
       <Link href={`/communities/${chainId}/${id}`} className={styles.tile__link} title={tooltip}>
         <span className={styles.tile__media}>
           {coverUrl ? (
-            <img src={coverUrl} alt="" loading="lazy" className={styles.tile__cover} />
+            <img
+              src={coverUrl}
+              alt=""
+              loading="lazy"
+              className={styles.tile__cover}
+              style={{ objectPosition: coverObjectPosition(coverPositionFrom(metadata)) }}
+            />
           ) : (
             <span className={styles.tile__coverFallback} aria-hidden="true" />
           )}

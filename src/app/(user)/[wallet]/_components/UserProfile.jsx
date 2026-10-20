@@ -58,7 +58,9 @@ import FollowListDialog from './FollowListDialog'
 import ProfileLinks from './ProfileLinks'
 import PremiumNudge from './PremiumNudge'
 import BirthdayConfetti from '@/components/ui/BirthdayConfetti'
-import { CakeIcon, CameraIcon, ImageIcon, MapPinIcon, RobotIcon, RssSimpleIcon } from '@phosphor-icons/react'
+import { CakeIcon, MapPinIcon, RobotIcon, RssSimpleIcon } from '@phosphor-icons/react'
+import BannerEditor from '@/components/ui/BannerEditor'
+import { coverObjectPosition, readCoverPosition } from '@/lib/coverPosition'
 import styles from './UserProfile.module.scss'
 
 // Compares month/day only — the stored year is irrelevant to "is it their birthday today".
@@ -718,7 +720,12 @@ const Profile = ({ addr }) => {
             sitting inside it; only a profile that has one gets the strip at all. */}
         {cover && (
           <div className={styles.profile__cover}>
-            <img src={cover} alt="" onError={() => setCoverFailed(true)} />
+            <img
+              src={cover}
+              alt=""
+              style={{ objectPosition: coverObjectPosition(readCoverPosition(profile.profileHeaderPosition)) }}
+              onError={() => setCoverFailed(true)}
+            />
           </div>
         )}
 
@@ -1340,12 +1347,18 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   // onchain half ships with the build, so the picker is usable the instant the modal opens and
   // this only fills in the rest.
   const [countries, setCountries] = useState([])
-  /* The cover is state rather than a ref-poked <img> like the avatar beside it, because it has an
-     empty state to render and a Remove button that has to change what is on screen. `coverCleared`
+  /* The picked files wait in state until save, when they are pinned (see handleSubmit). `coverCleared`
      is separate from `coverPreview` being null: only the former is an instruction to erase what is
      stored, and a profile that simply never had a cover must not send one. */
   const [coverPreview, setCoverPreview] = useState(profile?.profileHeader || null)
+  const [coverFile, setCoverFile] = useState(null)
   const [coverCleared, setCoverCleared] = useState(false)
+  const [coverPosition, setCoverPosition] = useState(() => readCoverPosition(profile?.profileHeaderPosition))
+  const [avatarPreview, setAvatarPreview] = useState(profile?.profileImage || null)
+  const [avatarFile, setAvatarFile] = useState(null)
+  // Mirrors of the uncontrolled name and bio inputs, so the header preview reads as typed
+  const [previewName, setPreviewName] = useState(PLACEHOLDER_NAMES.has(profile?.name) ? '' : profile?.name || '')
+  const [previewBio, setPreviewBio] = useState(profile?.description || '')
   /* A stored cover whose bytes have died draws the empty state, but it is still a cover as far as
      the save is concerned — a picture nobody can load is not the user asking for it to go. */
   const [coverBroken, setCoverBroken] = useState(false)
@@ -1434,9 +1447,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   }, [address, luksoClient])
 
   // Refs
-  const pfpRef = useRef()
   const previewUrlRef = useRef(null)
-  const coverInputRef = useRef(null)
   const coverUrlRef = useRef(null)
   const nameRef = useRef(null)
   const descriptionRef = useRef(null)
@@ -1470,15 +1481,18 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
       setTags((current) => (current.list.length === 0 && Array.isArray(doc.tags) && doc.tags.length > 0 ? { list: doc.tags } : current))
       setLinks((current) => (current.list.length === 0 && linksToRows(doc.links).length > 0 ? { list: linksToRows(doc.links) } : current))
 
-      for (const [ref, value] of [
-        [nameRef, doc.name],
-        [descriptionRef, doc.description],
+      for (const [ref, value, setPreview] of [
+        [nameRef, doc.name, setPreviewName],
+        [descriptionRef, doc.description, setPreviewBio],
       ]) {
         const input = ref.current
         if (!input || !value) continue
 
         const held = input.value.trim()
-        if (held === '' || PLACEHOLDER_NAMES.has(held)) input.value = value
+        if (held === '' || PLACEHOLDER_NAMES.has(held)) {
+          input.value = value
+          setPreview(value)
+        }
       }
     })
 
@@ -1576,7 +1590,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     }
     formData.set('readableNumber', readableNumber ?? '')
 
-    const file = formData.get('profileImage')
+    const file = avatarFile
     const hasNewImage = file instanceof File && file.size > 0
 
     /* Pinned before the save rather than after it, because both halves need the same reference:
@@ -1610,7 +1624,6 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     }
 
     // The cover, pinned on the same terms and for the same two readers as the picture above
-    const coverFile = formData.get('profileHeader')
     const hasNewCover = coverFile instanceof File && coverFile.size > 0
 
     let coverUri = null
@@ -1672,6 +1685,8 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     formData.set('profileHeader', coverUri ?? '')
     const removesCover = !coverUri && coverCleared
     formData.set('removeProfileHeader', removesCover ? '1' : '')
+    // Hup-only framing; sent whenever there is a cover to frame, and cleared server-side with it
+    formData.set('profileHeaderPosition', coverPreview ? String(coverPosition) : '')
     formData.set('tags', JSON.stringify(tags.list))
     formData.set('interests', JSON.stringify(interests))
     formData.set('links', JSON.stringify(links.list))
@@ -1750,15 +1765,11 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
     toast(`Your profile has been updated.`, 'success')
   }
 
-  const showPFP = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
+  const showPFP = (file) => {
     /* Caught here as well as on submit, so a picture that cannot be used is refused while the
        file picker is still the thing the user is thinking about. */
     if (file.size > MAX_AVATAR_BYTES) {
       setError(`That picture is too large. Profile pictures have to be ${MAX_AVATAR_MB}MB or smaller.`)
-      e.target.value = ''
       return
     }
 
@@ -1770,16 +1781,13 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
        data URL animates too, but only after the whole thing has been read and re-encoded. */
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
     previewUrlRef.current = URL.createObjectURL(file)
-    pfpRef.current.src = previewUrlRef.current
+    setAvatarFile(file)
+    setAvatarPreview(previewUrlRef.current)
   }
 
-  const showCover = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
+  const showCover = (file) => {
     if (file.size > MAX_COVER_BYTES) {
       setError(`That cover is too large. Cover images have to be ${MAX_COVER_MB}MB or smaller.`)
-      e.target.value = ''
       return
     }
 
@@ -1787,20 +1795,21 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
 
     if (coverUrlRef.current) URL.revokeObjectURL(coverUrlRef.current)
     coverUrlRef.current = URL.createObjectURL(file)
+    setCoverFile(file)
     setCoverPreview(coverUrlRef.current)
     // Picking a replacement is not a removal, however the empty state was reached
     setCoverCleared(false)
     setCoverBroken(false)
   }
 
-  /* Emptying the file input is what makes this a removal rather than a re-upload of whatever was
-     picked a moment ago — the submit reads the input, not the preview. */
+  /* Dropping the picked file is what makes this a removal rather than a re-upload of whatever was
+     picked a moment ago — the submit pins coverFile, not the preview. */
   const removeCover = () => {
     if (coverUrlRef.current) {
       URL.revokeObjectURL(coverUrlRef.current)
       coverUrlRef.current = null
     }
-    if (coverInputRef.current) coverInputRef.current.value = ''
+    setCoverFile(null)
     setCoverPreview(null)
     setCoverCleared(true)
     setCoverBroken(false)
@@ -1950,68 +1959,27 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
 
             {/* Cover — first here because it is first on the profile. A Universal Profile's is
                 the LSP3 backgroundImage; everyone else's is Hup's own. */}
-            <div className={styles.profileModal__coverWrap}>
-              <label htmlFor="pm-profileHeader" className={styles.profileModal__coverLabel}>
-                <figure className={clsx(styles.profileModal__cover, !coverArt && styles['profileModal__cover--empty'])}>
-                  {coverArt ? (
-                    <img src={coverPreview} alt="Cover preview" onError={() => setCoverBroken(true)} />
-                  ) : (
-                    <span className={styles.profileModal__coverEmpty}>
-                      <ImageIcon size={20} />
-                      Add a cover
-                    </span>
-                  )}
-                  <div className={styles.profileModal__coverOverlay}>
-                    <CameraIcon size={20} />
-                  </div>
-                </figure>
-              </label>
-              <input
-                ref={coverInputRef}
-                id="pm-profileHeader"
-                type="file"
-                name="profileHeader"
-                accept="image/*"
-                onChange={showCover}
-                className={styles.profileModal__fileInput}
-              />
-              <div className={styles.profileModal__coverActions}>
-                <small className={styles.profileModal__avatarHint}>Runs across the top of your profile</small>
-                {coverPreview && (
-                  <button type="button" className={styles.profileModal__coverRemove} onClick={removeCover}>
-                    Remove
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Avatar */}
-            <div className={styles.profileModal__avatarWrap}>
-              <label htmlFor="pm-profileImage" className={styles.profileModal__avatarLabel}>
-                <figure className={styles.profileModal__avatar}>
-                  {/* Stays a bare img rather than an Avatar: showPFP points this node straight at an
-                      object URL for the picked file, and a controlled component would put the
-                      saved picture back on its next render */}
-                  <img ref={pfpRef} src={profile?.profileImage} alt="Profile preview" onError={handleBrokenAvatar} />
-                  <div className={styles.profileModal__avatarOverlay}>
-                    <svg fill="none" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2">
-                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                      <circle cx="12" cy="13" r="4" />
-                    </svg>
-                  </div>
-                </figure>
-              </label>
-              <input
-                id="pm-profileImage"
-                type="file"
-                name="profileImage"
-                accept="image/*"
-                onChange={showPFP}
-                className={styles.profileModal__fileInput}
-              />
-              <input type="hidden" name="profileImage_hidden" defaultValue={profile?.profileImageName} />
-              <small className={styles.profileModal__avatarHint}>Tap to change photo</small>
-            </div>
+            {/* The picture and cover on a live copy of the profile header, avatar on the right as
+                the page draws it. Files wait in state and are pinned on save. */}
+            <BannerEditor
+              title={previewName}
+              subtitle={previewBio}
+              titlePlaceholder="Your name"
+              subtitlePlaceholder="Your bio shows here"
+              coverSrc={coverArt ? coverPreview : null}
+              avatarSrc={avatarPreview}
+              coverPosition={coverPosition}
+              onCoverPositionChange={setCoverPosition}
+              onCoverPick={showCover}
+              onAvatarPick={showPFP}
+              onCoverRemove={removeCover}
+              onCoverError={() => setCoverBroken(true)}
+              onAvatarError={handleBrokenAvatar}
+              avatarShape="circle"
+              avatarSide="end"
+              labels={{ addCover: 'Add a cover', addCoverHint: 'Runs across the top of your profile' }}
+            />
+            <input type="hidden" name="profileImage_hidden" defaultValue={profile?.profileImageName} />
 
             {/* Username — saves itself, against its own signature, so it sits outside the form's
                 fields even while it sits among them. */}
@@ -2030,6 +1998,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                 type="text"
                 name="name"
                 defaultValue={PLACEHOLDER_NAMES.has(profile?.name) ? '' : profile?.name}
+                onChange={(e) => setPreviewName(e.target.value)}
                 placeholder="Your name"
               />
             </div>
@@ -2042,6 +2011,7 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
                 className={styles.profileModal__textarea}
                 name="description"
                 defaultValue={profile?.description}
+                onChange={(e) => setPreviewBio(e.target.value)}
                 placeholder="Tell us about yourself..."
                 rows={3}
               />

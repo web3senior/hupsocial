@@ -1,0 +1,273 @@
+// Live copy of a page header (a community's, a profile's) with its cover and avatar editable in
+// place. Sizes follow the real headers so what the owner frames here is what visitors see.
+.bannerEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__preview {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  &__cover {
+    position: relative;
+    height: 160px;
+    background: var(--surface-muted);
+    touch-action: none;
+    user-select: none;
+    outline: none;
+
+    &:focus-visible {
+      box-shadow: inset 0 0 0 2px var(--text);
+    }
+
+    &--draggable {
+      cursor: grab;
+    }
+
+    &--dragging {
+      cursor: grabbing;
+    }
+
+    @media (max-width: 600px) {
+      height: 120px;
+    }
+  }
+
+  &__coverImage {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+  }
+
+  &__coverEmpty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    width: 100%;
+    height: 100%;
+    background: none;
+    border: 2px dashed var(--border);
+    border-radius: 16px 16px 0 0;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+
+    small {
+      font-size: 0.75rem;
+      font-weight: 400;
+    }
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+  }
+
+  // Overlay controls sit on arbitrary photos, so they carry their own dark chip rather than
+  // theme colours that could vanish against the image
+  &__hint,
+  &__action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.6);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 500;
+    backdrop-filter: blur(4px);
+  }
+
+  &__hint {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  &__cover--draggable:hover &__hint,
+  &__cover:focus-visible &__hint {
+    opacity: 1;
+  }
+
+  &__coverActions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  &__action {
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: rgb(0 0 0 / 0.8);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  &__busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(0 0 0 / 0.35);
+    color: #fff;
+  }
+
+  &__body {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem 1.25rem 1.25rem;
+
+    // The profile page keeps the picture on the right of the name
+    &--avatar-end {
+      flex-direction: row-reverse;
+      justify-content: space-between;
+    }
+  }
+
+  &__avatarWrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+  }
+
+  &__avatar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    padding: 0;
+    border: 1px solid var(--border);
+    background: var(--surface-muted);
+    overflow: hidden;
+    cursor: pointer;
+
+    &--rounded {
+      border-radius: 16px;
+    }
+
+    &--circle {
+      border-radius: 50%;
+    }
+
+    &:hover:not(:disabled) .bannerEditor__avatarOverlay,
+    &:focus-visible .bannerEditor__avatarOverlay {
+      opacity: 1;
+    }
+  }
+
+  &__avatarImage {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  &__avatarInitial {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  &__avatarOverlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(0 0 0 / 0.45);
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  &__avatar:disabled &__avatarOverlay {
+    opacity: 1;
+  }
+
+  &__textButton {
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.72rem;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+      text-decoration: underline;
+    }
+  }
+
+  &__titleGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+    padding-top: 0.35rem;
+  }
+
+  &__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+
+    &--empty {
+      color: var(--text-muted);
+      opacity: 0.6;
+    }
+  }
+
+  &__subtitle {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    // A bio can run long; the preview shows its start, not the whole thing
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+
+    &--empty {
+      opacity: 0.6;
+    }
+  }
+
+  &__error {
+    color: var(--liked-color);
+  }
+}

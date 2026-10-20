@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAccount } from 'wagmi'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -16,9 +16,17 @@ import { chainIconFor, networkColorStyle } from '@/lib/networkColors'
 import useCommunityCategories from '@/hooks/useCommunityCategories'
 import { ADMISSION_OPTIONS } from '../../../membershipOptions'
 import { CommunityCard, CreatorName } from '../../../page'
-import CommunityGovernance from '@/app/proposals/_components/CommunityGovernance'
+import { CommunityGovernancePanel, useCommunityGovernanceState } from '@/app/proposals/_components/CommunityGovernance'
 import SegmentedControl from '@/components/ui/SegmentedControl'
+import { coverObjectPosition, coverPositionFrom } from '@/lib/coverPosition'
+import ProposalFeedItem from './ProposalFeedItem'
 import styles from './CommunityDetails.module.scss'
+
+const FEED_FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'posts', label: 'Posts' },
+  { value: 'proposals', label: 'Proposals' },
+]
 
 // membership_type in the indexed row stores the AdmissionMode enum — short pill wording comes
 // from the shared option list so a rename there can't leave this page behind
@@ -38,7 +46,25 @@ export default function CommunityDetails({ networkId, communityId, initialCommun
   // only exists once there is a wallet to ask about, and until then the page renders the seeded
   // row instead of a shimmer.
   const [viewerCommunity, setViewerCommunity] = useState(null)
-  const [section, setSection] = useState('discussion')
+  const [feedFilter, setFeedFilter] = useState('all')
+  // Proposals and the treasury live in the community feed, not behind a tab of their own
+  const governance = useCommunityGovernanceState(resolvedNetworkId, resolvedCommunityId)
+  const votingDelay = Number(governance.rules?.votingDelay ?? 0)
+  const proposalFeedItems = useMemo(
+    () =>
+      governance.proposals.map((proposal) => {
+        // The contract keeps no creation time; voteStart is creation plus the reading period.
+        // Using today's delay only drifts for proposals made before the owner changed it.
+        const time = (Number(proposal.voteStart) - votingDelay) * 1000
+        return {
+          key: `proposal-${proposal.id}`,
+          proposalId: String(proposal.id),
+          time,
+          node: <ProposalFeedItem proposal={proposal} chainId={governance.chainId} time={time} />,
+        }
+      }),
+    [governance.proposals, governance.chainId, votingDelay]
+  )
 
   // Two communities in a row share this component instance — the App Router re-renders the same
   // segment with new params instead of remounting — so a fetched row is only adopted while it
@@ -76,13 +102,14 @@ export default function CommunityDetails({ networkId, communityId, initialCommun
   // cidex keeps the community's whole IPFS metadata JSON in the indexed row, so the optional
   // website/socials come along with the columns it also splits out — no extra fetch, and a
   // malformed blob just renders no links.
-  const links = (() => {
+  const metadata = (() => {
     try {
-      return displayLinks(JSON.parse(community?.metadata ?? '')?.links)
+      return JSON.parse(community?.metadata ?? '') ?? {}
     } catch {
-      return []
+      return {}
     }
   })()
+  const links = displayLinks(metadata.links)
 
   return (
     <div className={styles.details}>
@@ -100,7 +127,12 @@ export default function CommunityDetails({ networkId, communityId, initialCommun
         {community && (
           <div className={`${styles.details__header} animate fade`} style={networkColorStyle(chainInfo)}>
             {community.cover_url ? (
-              <img src={resolveStorageImageUrl(community.cover_url, { width: 1200 })} alt="" className={styles.details__cover} />
+              <img
+                src={resolveStorageImageUrl(community.cover_url, { width: 1200 })}
+                alt=""
+                className={styles.details__cover}
+                style={{ objectPosition: coverObjectPosition(coverPositionFrom(metadata)) }}
+              />
             ) : (
               <div className={styles.details__cover} aria-hidden="true" />
             )}
@@ -184,17 +216,25 @@ export default function CommunityDetails({ networkId, communityId, initialCommun
           </div>
         )}
 
-        <SegmentedControl
-          options={[{ value: 'discussion', label: 'Posts' }, { value: 'governance', label: 'Proposals & treasury' }]}
-          value={section}
-          onChange={setSection}
-          label="Community section"
-          as="tabs"
+        <CommunityCard
+          id={Number(resolvedCommunityId)}
+          networkId={Number(resolvedNetworkId)}
+          hideHeader
+          row={community}
+          feedFilter={feedFilter}
+          extraFeedItems={proposalFeedItems}
+          feedHeader={
+            <div className={styles.details__feedHeader}>
+              {/* Stays on the feed after creating: the new proposal lands at the top of it */}
+              {community && <CommunityGovernancePanel governance={governance} onProposalCreated={() => setFeedFilter((value) => (value === 'posts' ? 'all' : value))} />}
+              <SegmentedControl options={FEED_FILTERS} value={feedFilter} onChange={setFeedFilter} label="Show in feed" size="sm" />
+            </div>
+          }
         />
-        {section === 'discussion' ? (
-          <CommunityCard id={Number(resolvedCommunityId)} networkId={Number(resolvedNetworkId)} hideHeader row={community} />
-        ) : community && (
-          <CommunityGovernance key={communityKey} networkId={resolvedNetworkId} communityId={resolvedCommunityId} communityName={name} embedded />
+        {feedFilter === 'proposals' && governance.hasMore && (
+          <button type="button" className={styles.details__loadMore} disabled={governance.isLoading} onClick={governance.loadMore}>
+            Load more proposals
+          </button>
         )}
       </div>
     </div>
