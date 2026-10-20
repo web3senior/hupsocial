@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { ArrowSquareOutIcon, EnvelopeSimpleIcon, ImageIcon, LinkSimpleIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { cloneElement, useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { ArrowSquareOutIcon, EnvelopeSimpleIcon, ImageIcon, LinkSimpleIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
 import CopyPostImageDialog from '@/components/CopyPostImageDialog'
 import { SAVED, copyPostImage, hasPostImage, supportsImageClipboard } from '@/lib/postImage'
-import NativePopover from './NativePopover'
+import NativeDialog from './NativeDialog'
 import Tooltip from './Tooltip'
-import styles from './Share.module.scss'
+import styles from './ShareDialog.module.scss'
 
 /**
  * Share Interaction Component
@@ -18,7 +19,7 @@ import styles from './Share.module.scss'
  * @param {Object} [props.item] Core content model with network metadata (post sharing).
  * @param {string} [props.url] Absolute URL to share instead of the post permalink.
  * @param {string} [props.title] Share title instead of the post text.
- * @param {import('react').ReactNode} [props.trigger] Custom popover trigger element.
+ * @param {import('react').ReactNode} [props.trigger] Custom share trigger element.
  * @param {import('react').RefObject<HTMLElement>} [props.captureRef] The post's own element, so
  *   "Copy as image" copies the card on screen rather than its link-preview rendition.
  * @param {string} [props.copyLabel] Label for the copy-link entry.
@@ -41,8 +42,15 @@ export const Share = ({
   copyLabel = 'Copy post link',
   copiedToast = 'Post link copied',
 }) => {
-  // The card being copied, held from the click that asked for it: the popover unmounts on close,
-  // so the node cannot be read again when the sheet renders.
+  const dialogRef = useRef(null)
+  const titleId = useId()
+  const close = () => dialogRef.current?.close()
+  const [isOpen, setIsOpen] = useState(false)
+  const open = () => setIsOpen(true)
+  useEffect(() => {
+    if (isOpen) dialogRef.current?.open()
+  }, [isOpen])
+  // Hold the card selected for the image-copy dialog.
   const [imageNode, setImageNode] = useState(null)
   // The menu's links are in the markup from the first render, and the post page renders that on
   // the server where there is no location. The origin arrives on mount so the first client render
@@ -71,7 +79,7 @@ export const Share = ({
 
   // Where there is a card on screen, the entry opens the sheet: the copy is that card, and the
   // reader sets its theme and colour before taking it. The node is read at click time and held,
-  // because the menu closing is what unmounts the popover this handler was called from.
+  // so the image dialog can use it after the share dialog closes.
   const handleCopyImage = (close) => {
     const node = captureRef?.current
 
@@ -134,20 +142,37 @@ export const Share = ({
 
   return (
     <>
-      <NativePopover
-        placement="bottom-end"
-        type="auto"
-        trigger={
-          trigger ?? (
-            <Tooltip content="Share" placement="bottom" size="compact" hoverOnly>
-              <button data-action="share" aria-label="Share post">
-                <UploadSimpleIcon width={17} height={17} />
-              </button>
-            </Tooltip>
-          )
-        }
-      >
-        {({ close }) => (
+      {trigger ? cloneElement(trigger, {
+        'aria-haspopup': 'dialog',
+        onClick: (event) => {
+          trigger.props.onClick?.(event)
+          if (!event.defaultPrevented) open()
+        },
+      }) : (
+        <Tooltip content="Share" placement="bottom" size="compact" hoverOnly>
+          <button type="button" data-action="share" aria-label="Share post" aria-haspopup="dialog" onClick={open}>
+            <UploadSimpleIcon width={17} height={17} />
+          </button>
+        </Tooltip>
+      )}
+      {mounted && createPortal(
+        <NativeDialog
+          ref={dialogRef}
+          className={styles.share__dialog}
+          aria-labelledby={titleId}
+          lightDismiss
+          onClose={(event) => {
+            event.stopPropagation()
+            setIsOpen(false)
+          }}
+          onCancel={(event) => event.stopPropagation()}
+        >
+          <header className={styles.share__header}>
+            <h2 id={titleId} className={styles.share__title}>Share</h2>
+            <button type="button" className={styles.share__close} aria-label="Close share dialog" onClick={close}>
+              <XIcon size={20} />
+            </button>
+          </header>
           <div className={styles.share__menu}>
             <ul className={styles.share__list}>
               <li>
@@ -185,8 +210,9 @@ export const Share = ({
               })}
             </ul>
           </div>
-        )}
-      </NativePopover>
+        </NativeDialog>,
+        document.body
+      )}
 
       {imageNode && <CopyPostImageDialog item={item} node={imageNode} onClose={() => setImageNode(null)} />}
     </>
