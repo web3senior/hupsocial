@@ -41,8 +41,8 @@ const measureExit = (container) => {
  * card's rendered height. On a remount with a snapshot, those heights go back onto the cards as
  * min-heights (`cardStyle`) so nothing can reflow while media and async card content resolve, and
  * a pre-paint loop keeps the anchor card at its old offset until the page has been still past the
- * settle window. Settling releases only the reservations below the viewport; cards above and on
- * screen keep theirs, so nothing the reader has passed can regrow and push the page.
+ * settle window. Settling releases every reservation and scrolls out whatever that removed above
+ * the anchor in the same task, so stale exit heights never leave gaps and the reader never moves.
  *
  * Cards are the `data-post-key` elements inside `containerRef`.
  *
@@ -120,22 +120,26 @@ export function useFeedScrollRestore({ containerRef, restore = null, ready = fal
     }
   }, [])
 
-  // Only cards wholly below the viewport give up their reservation: anything above or on screen
-  // keeps its exit height, so media still loading there can never shift the reader's place.
+  // Every card gives up its reservation: an exit height can outgrow what the card renders now
+  // (a "Show more" expanded before leaving comes back collapsed), and a kept one leaves a
+  // permanent gap. Whatever that removes above the reader is scrolled back out in the same task,
+  // before any paint, so the anchor card stays exactly where it sat.
   // Styles come off the DOM directly; React's next render only agrees with what is already there.
   const releaseCards = useCallback(() => {
     const container = containerRef.current
     const cards = reservedRef.current?.cards
     if (!cards || !container) return
 
-    const kept = {}
+    const anchor = findAnchor(container)
     for (const element of container.querySelectorAll(CARD_SELECTOR)) {
-      const key = element.dataset.postKey
-      if (!cards[key]) continue
-      if (element.getBoundingClientRect().top < window.innerHeight) kept[key] = cards[key]
-      else element.style.minHeight = ''
+      if (cards[element.dataset.postKey]) element.style.minHeight = ''
     }
-    setReserved((prev) => (prev?.cards ? { ...prev, cards: kept } : prev))
+    const card = anchor && container.querySelector(cardSelector(anchor.key))
+    if (card) {
+      const delta = card.getBoundingClientRect().top - anchor.offset
+      if (Math.abs(delta) >= 1) window.scrollTo({ top: window.scrollY + delta, behavior: 'instant' })
+    }
+    setReserved((prev) => (prev?.cards ? { ...prev, cards: null } : prev))
   }, [containerRef])
 
   // Kept reservations outlive the restore, so a later width change must drop them too.
