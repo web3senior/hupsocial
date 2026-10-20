@@ -21,6 +21,7 @@ import { webpAnimationOptions } from '@/lib/webpAnimation'
 import { getNftMetadata } from '@/lib/nftMetadataCache'
 import { isInlineDataUri } from '@/lib/nftMetadata'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { allowSvgInput } from '@/lib/sharpSvg'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -122,6 +123,7 @@ function parseDataUri(uri) {
  * render density instead makes the vector rasterize at the target size natively.
  */
 async function encodeToWebp(buffer, { width, quality, stillOnly }) {
+  allowSvgInput()
   const probe = await sharp(buffer).metadata()
 
   if (probe.format === 'svg') {

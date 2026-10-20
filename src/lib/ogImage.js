@@ -17,6 +17,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { extractIPFSCid, resolveIPFSImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
+import { allowSvgInput } from '@/lib/sharpSvg'
 
 /* Artwork past this is a broken or hostile source, not something worth decoding into a card */
 export const MAX_IMAGE_BYTES = 12 * 1024 * 1024
@@ -134,6 +135,7 @@ export const svgToPngDataUri = async (svg, sizePx) => {
   if (!svg) return null
 
   try {
+    allowSvgInput()
     const png = await sharp(Buffer.from(svg), { density: 72 * 4 })
       .resize({ width: sizePx, height: sizePx, fit: 'inside' })
       .png()
