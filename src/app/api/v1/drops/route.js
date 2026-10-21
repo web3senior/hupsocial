@@ -41,6 +41,10 @@ const DROP_COLUMNS = `
    reads as 0 until the migration lands. Without this the drops directory 500s in the gap. */
 const isMissingColumn = (error) => error?.code === 'ER_BAD_FIELD_ERROR'
 
+// Not closed and not minted out. The market's "Live drops" badge counts with this and the
+// directory's Live drops section lists with it, so the number always matches what the link shows.
+const LIVE_FILTER = 'd.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)'
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -48,12 +52,7 @@ export async function GET(request) {
       const [rows] = await pool.execute(
         `SELECT COUNT(*) AS count FROM drops d
          WHERE d.network_id IN (${LIVE_NETWORK_IDS.map(() => '?').join(',')})
-           AND d.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)
-           AND EXISTS (SELECT 1 FROM drop_phases p
-             WHERE p.network_id = d.network_id AND p.drop_id = d.drop_id
-               AND p.paused = 0 AND p.start_time <= UNIX_TIMESTAMP()
-               AND (p.end_time = 0 OR p.end_time > UNIX_TIMESTAMP())
-               AND (p.allocation = 0 OR p.minted < p.allocation))`,
+           AND ${LIVE_FILTER}`,
         LIVE_NETWORK_IDS,
       )
       return NextResponse.json({ success: true, count: Number(rows[0].count) })
@@ -76,10 +75,10 @@ export async function GET(request) {
       args.push(creator)
     }
     if (searchParams.get('status') === 'live') {
-      filters.push('d.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)')
+      filters.push(LIVE_FILTER)
     }
     if (searchParams.get('status') === 'minting') {
-      filters.push(`d.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)
+      filters.push(`${LIVE_FILTER}
         AND EXISTS (SELECT 1 FROM drop_phases p
           WHERE p.network_id = d.network_id AND p.drop_id = d.drop_id
             AND p.paused = 0 AND p.start_time <= UNIX_TIMESTAMP()
@@ -118,7 +117,7 @@ export async function GET(request) {
          FROM drops d
          LEFT JOIN users u ON u.wallet_address = d.creator
          WHERE d.network_id IN (${LIVE_NETWORK_IDS.map(() => '?').join(',')})
-           AND d.featured = 1 AND d.closed = 0 AND (d.max_supply = 0 OR d.minted < d.max_supply)
+           AND d.featured = 1 AND ${LIVE_FILTER}
          ORDER BY d.created_at DESC, d.drop_id DESC
          LIMIT 12`,
         LIVE_NETWORK_IDS,
