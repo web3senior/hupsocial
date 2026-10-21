@@ -140,6 +140,26 @@
     }
   }
 
+  // Wallet on another chain: said before the button that fixes it, so the switch isn't a surprise
+  &__chain {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    margin: 0 1.1rem 0.9rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: var(--global-border-radius);
+    background: color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent);
+    color: var(--text);
+    font-size: var(--font-size-12);
+    line-height: 1.4;
+
+    svg {
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+      color: var(--color-warning, #f59e0b);
+    }
+  }
+
   &__actions {
     display: flex;
     gap: 0.6rem;

@@ -2,7 +2,9 @@
 
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 import { formatUnits } from 'viem'
-import { ArrowRightIcon } from '@phosphor-icons/react'
+import { useConnection, useSwitchChain } from 'wagmi'
+import { ArrowRightIcon, WarningIcon } from '@phosphor-icons/react'
+import { config } from '@/config/wagmi'
 import NativeDialog from './ui/NativeDialog'
 import styles from './MintReviewDialog.module.scss'
 
@@ -34,7 +36,9 @@ const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address
  * @param {boolean} props.needsApproval Whether a token approval precedes the mint, which makes
  *   this a two-transaction flow and is worth saying before the first prompt rather than after.
  * @param {string} props.recipient Where the tokens land.
- * @param {string} [props.chainName] Chain the mint happens on.
+ * @param {number} [props.chainId] Chain the mint happens on. A wallet sitting on another chain
+ *   gets a switch in place of the confirm, so the mint never reaches the wallet on the wrong one.
+ * @param {string} [props.chainName] Its display name.
  * @param {boolean} [props.busy] A transaction is in flight: the dialog locks itself open — no
  *   cancel, no Esc, no backdrop click — until the caller closes it on success or the wallet
  *   refuses and the minter gets the form back to try again.
@@ -55,6 +59,7 @@ const MintReviewDialog = forwardRef(function MintReviewDialog(
     nativeDecimals,
     needsApproval = false,
     recipient,
+    chainId,
     chainName,
     busy = false,
     stage = null,
@@ -63,6 +68,9 @@ const MintReviewDialog = forwardRef(function MintReviewDialog(
   ref,
 ) {
   const dialogRef = useRef(null)
+  const { chain: walletChain } = useConnection()
+  const switchChain = useSwitchChain({ config })
+  const isWrongChain = Boolean(walletChain && chainId && walletChain.id !== chainId)
   useImperativeHandle(ref, () => ({ open: () => dialogRef.current?.open(), close: () => dialogRef.current?.close() }), [])
 
   const isFree = totalPrice === 0n
@@ -165,12 +173,28 @@ const MintReviewDialog = forwardRef(function MintReviewDialog(
         )}
       </dl>
 
+      {isWrongChain && !busy && (
+        <p className={styles.review__chain}>
+          <WarningIcon size={14} aria-hidden="true" />
+          Your wallet is on {walletChain?.name || 'another network'}. This mint happens on {chainName || 'a different network'}.
+        </p>
+      )}
+
       <div className={styles.review__actions}>
         <button type="button" className={styles.review__cancel} onClick={() => dialogRef.current?.close()} disabled={busy}>
           Cancel
         </button>
-        <button type="button" className={styles.review__confirm} disabled={busy} onClick={() => onConfirm?.()}>
-          {busy
+        <button
+          type="button"
+          className={styles.review__confirm}
+          disabled={busy || switchChain.isPending}
+          onClick={() => (isWrongChain && !busy ? switchChain.mutate({ chainId }) : onConfirm?.())}
+        >
+          {isWrongChain && !busy
+            ? switchChain.isPending
+              ? 'Switch in your wallet…'
+              : `Switch to ${chainName || 'the drop’s network'}`
+            : busy
             ? stage === 'approve'
               ? 'Approve in your wallet…'
               : stage === 'check'

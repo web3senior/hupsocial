@@ -624,6 +624,7 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
             nativeDecimals={nativeCurrency?.decimals ?? 18}
             needsApproval={Boolean(isTokenPriced && totalPrice > 0n && (allowanceRaw ?? 0n) < totalPrice)}
             recipient={address ?? ''}
+            chainId={chainId}
             chainName={chainInfo?.name}
             busy={isBusy}
             stage={mintStage}
