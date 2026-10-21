@@ -52,7 +52,8 @@ import { toast } from '@/components/NextToast'
 import { usePostStore } from '@/stores/usePostStore'
 import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
 import BrandingLinksFields from './_components/BrandingLinksFields'
-import ImagePicker from './_components/ImagePicker'
+import CommunityBrandingEditor from './_components/CommunityBrandingEditor'
+import { DEFAULT_COVER_POSITION, coverObjectPosition, coverPositionFrom } from '@/lib/coverPosition'
 import CreateCommunityModal from './_components/CreateCommunityModal'
 import CommunityTile, { CommunityTileSkeleton } from './_components/CommunityTile'
 import DropsHero, { HeroChain } from '@/components/DropsHero'
@@ -347,7 +348,28 @@ const KNOWN_REVERTS = {
   '0xcc2c06e8': REQUEST_ALREADY_HANDLED,
 }
 
-export function CommunityCard({ id, networkId = null, hideHeader = false, memberCount = null, row = null }) {
+// Indexed created_at arrives as ISO (DATETIME columns) or 'YYYY-MM-DD HH:MM:SS'; both parse here
+const feedTime = (createdAt) => new Date(String(createdAt ?? '').replace(' ', 'T')).getTime()
+
+// A post that embeds one of this community's own proposals already shows that proposal's card,
+// so the merged feed drops the standalone entry for it rather than showing the vote twice
+const embeddedProposalId = (post, chainId, communityId) => {
+  let content = post?.content
+  if (typeof content === 'string') {
+    try { content = JSON.parse(content) } catch { return null }
+  }
+  const ref = content?.proposal
+  if (!ref || Number(ref.chainId) !== Number(chainId) || String(ref.communityId) !== String(communityId)) return null
+  return String(ref.proposalId)
+}
+
+/**
+ * @param {'all'|'posts'|'proposals'} feedFilter — detail page only: which entries the feed shows.
+ * @param {Array<{key: string, proposalId: string, time: number, node: React.ReactNode}>} extraFeedItems —
+ *   detail page only: the community's proposals, merged into the posts by time (ms).
+ * @param {React.ReactNode} feedHeader — detail page only: rendered above the feed in place of its title.
+ */
+export function CommunityCard({ id, networkId = null, hideHeader = false, memberCount = null, row = null, feedFilter = 'all', extraFeedItems = null, feedHeader = null }) {
   const { address, isConnected } = useConnection()
   const { address: activeAccountAddress } = useAccount()
   // Shared across every card on the page by SWR — one request, not one per card
@@ -426,6 +448,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const [editDescription, setEditDescription] = useState('')
   const [editLogoUrl, setEditLogoUrl] = useState('')
   const [editCoverUrl, setEditCoverUrl] = useState('')
+  const [editCoverPosition, setEditCoverPosition] = useState(DEFAULT_COVER_POSITION)
   const [editSocials, setEditSocials] = useState(emptySocials)
   const [editExtraLinks, setEditExtraLinks] = useState([])
   const [editAdmission, setEditAdmission] = useState(0)
@@ -1797,13 +1820,33 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     }
   }
 
+  // Posts and proposals in one timeline. While older posts are still unpaged, a proposal older
+  // than the last loaded post waits for them — otherwise it would sit above posts newer than it.
+  const feedEntries = useMemo(() => {
+    if (!hideHeader) return []
+    const postEntries = feedFilter === 'proposals'
+      ? []
+      : communityPosts.map((post) => ({ key: `post-${post.id}`, post, time: feedTime(post.created_at) }))
+    if (feedFilter === 'posts' || !extraFeedItems?.length) return postEntries
+    if (feedFilter === 'proposals') return extraFeedItems
+
+    const shared = new Set(communityPosts.map((post) => embeddedProposalId(post, chainId, id)).filter(Boolean))
+    const postTimes = postEntries.map((entry) => entry.time).filter(Number.isFinite)
+    const oldestPost = hasMoreFeed && postTimes.length > 0 ? Math.min(...postTimes) : -Infinity
+    const proposals = extraFeedItems.filter((item) => !shared.has(item.proposalId) && item.time >= oldestPost)
+    // Posts keep the indexer's order among themselves; an unparseable time sorts as newest
+    // rather than scrambling the comparator
+    return [...postEntries, ...proposals].sort((a, b) => (Number.isFinite(b.time) ? b.time : Infinity) - (Number.isFinite(a.time) ? a.time : Infinity))
+  }, [hideHeader, feedFilter, communityPosts, extraFeedItems, hasMoreFeed, chainId, id])
+  const pagesPosts = feedFilter !== 'proposals'
+
   // Sentinel observer for the community feed — kept in a ref so the observer callback always
   // calls the latest closure (feedPage/hasMoreFeed) without re-attaching per render
   const feedSentinelRef = useRef(null)
   const loadMoreFeedRef = useRef(loadMoreFeed)
   loadMoreFeedRef.current = loadMoreFeed
   useEffect(() => {
-    if (!hideHeader) return
+    if (!hideHeader || !pagesPosts) return
     const el = feedSentinelRef.current
     if (!el) return
 
@@ -1815,7 +1858,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     )
     io.observe(el)
     return () => io.disconnect()
-  }, [hideHeader, communityPosts.length])
+  }, [hideHeader, pagesPosts, feedEntries.length])
 
   // Community metadata is stored on-chain as an IPFS CID only (matching how posts store just a
   // CID), not raw JSON. Only the cards that read communities() themselves need to resolve it —
@@ -1950,6 +1993,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
     setEditDescription(metadata.description || '')
     setEditLogoUrl(metadata['logo url'] || '')
     setEditCoverUrl(metadata['cover url'] || '')
+    setEditCoverPosition(coverPositionFrom(metadata))
     // Splits the stored array back into the dedicated social fields plus a free-form remainder,
     // so a save round-trips links this form has no dedicated input for
     const { socials: storedSocials, extra: storedExtraLinks } = parseLinks(metadata.links ?? [])
@@ -2044,6 +2088,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       description: editDescription,
       'logo url': editLogoUrl,
       'cover url': editCoverUrl,
+      ...(editCoverUrl ? { 'cover position': editCoverPosition } : {}),
       ...(updatedLinks.length > 0 ? { links: updatedLinks } : {}),
     }, address)
 
@@ -2613,7 +2658,12 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             <>
               <Link href={`/communities/${chainId}/${id}`} className={styles.card__link}>
                 {metadata['cover url'] ? (
-                  <img src={resolveStorageImageUrl(metadata['cover url'], { width: 800 }) || metadata['cover url']} alt="" className={styles.card__cover} />
+                  <img
+                    src={resolveStorageImageUrl(metadata['cover url'], { width: 800 }) || metadata['cover url']}
+                    alt=""
+                    className={styles.card__cover}
+                    style={{ objectPosition: coverObjectPosition(coverPositionFrom(metadata)) }}
+                  />
                 ) : (
                   <div className={styles.card__cover} aria-hidden="true" />
                 )}
@@ -2763,11 +2813,13 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
           {/* Sub-Feed Component Layer — detail page (hideHeader) only; the directory grid doesn't need it */}
           {hideHeader && (
             <div className={styles.feed}>
-              <h4 className={styles.feed__title}>Recent Updates</h4>
-              {isFeedLoading ? (
+              {feedHeader ?? <h4 className={styles.feed__title}>Recent Updates</h4>}
+              {isFeedLoading && pagesPosts ? (
                 <PostSkeletonGrid count={14} />
-              ) : communityPosts.length === 0 ? (
-                <div className={styles.feed__empty}>No posts published in this space yet.</div>
+              ) : feedEntries.length === 0 ? (
+                <div className={styles.feed__empty}>
+                  {feedFilter === 'proposals' ? 'No proposals yet. Members can start the first one.' : 'No posts published in this space yet.'}
+                </div>
               ) : (
                 // minHeight holds the document tall enough for a restore to land in one jump while
                 // the media in the restored posts is still loading; it's released once the scroll
@@ -2777,11 +2829,16 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                   ref={feedListRef}
                   style={reservedFeedHeight ? { minHeight: `${reservedFeedHeight}px` } : undefined}
                 >
-                  {communityPosts.map((post, i) => (
+                  {feedEntries.map(({ key, post, node }, i) => !post ? (
+                    <div key={key} className={clsx(!initialFeedCache && ['animate', 'fade'])}>
+                      {node}
+                      {i < feedEntries.length - 1 && <hr />}
+                    </div>
+                  ) : (
                     // Same open-on-click affordance as the home/trending feeds: the row
                     // navigates to the post's thread view (text selection doesn't trigger it)
                     <div
-                      key={post.id}
+                      key={key}
                       // A restored feed must repaint identically in place — no entrance replay
                       className={clsx('pointer', !initialFeedCache && ['animate', 'fade'])}
                       onPointerDown={rememberCardPointerDown}
@@ -2797,12 +2854,12 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                       }}
                     >
                       <PostCard item={post} chainId={chainId} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'bookmark']} />
-                      {i < communityPosts.length - 1 && <hr />}
+                      {i < feedEntries.length - 1 && <hr />}
                     </div>
                   ))}
                   {/* Infinite scroll: observed sentinel pulls the next page into view */}
-                  <div ref={feedSentinelRef} aria-hidden="true" />
-                  {isFeedLoadingMore && <PostSkeletonGrid count={3} />}
+                  {pagesPosts && <div ref={feedSentinelRef} aria-hidden="true" />}
+                  {pagesPosts && isFeedLoadingMore && <PostSkeletonGrid count={3} />}
                 </div>
               )}
             </div>
@@ -3434,9 +3491,18 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
             />
           </div>
 
-          <ImagePicker label="Logo" value={editLogoUrl} onChange={setEditLogoUrl} />
-
-          <ImagePicker label="Cover image" value={editCoverUrl} onChange={setEditCoverUrl} />
+          <CommunityBrandingEditor
+            name={editName}
+            summary={editSummary}
+            logoUrl={editLogoUrl}
+            onLogoChange={setEditLogoUrl}
+            coverUrl={editCoverUrl}
+            onCoverChange={setEditCoverUrl}
+            coverPosition={editCoverPosition}
+            onCoverPositionChange={setEditCoverPosition}
+            fieldClassName={styles.card__field}
+            labelClassName={styles.card__label}
+          />
 
           <BrandingLinksFields
             socials={editSocials}

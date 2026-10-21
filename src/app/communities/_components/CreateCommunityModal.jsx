@@ -20,7 +20,8 @@ import { buildLinks, emptySocials } from '@/lib/socialLinks'
 import { asClause, describeWalletError } from '@/lib/walletErrors'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import BrandingLinksFields from './BrandingLinksFields'
-import ImagePicker from './ImagePicker'
+import CommunityBrandingEditor from './CommunityBrandingEditor'
+import { DEFAULT_COVER_POSITION, clampCoverPosition } from '@/lib/coverPosition'
 import { AssetUnitLabel, TokenUnitHint } from './TokenAmount'
 import TokenAssetInput from './TokenAssetInput'
 import RecipientField from '@/components/ui/RecipientField'
@@ -89,6 +90,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
   const [description, setDescription] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
+  const [coverPosition, setCoverPosition] = useState(DEFAULT_COVER_POSITION)
   const [socials, setSocials] = useState(emptySocials)
   const [extraLinks, setExtraLinks] = useState([])
   const [admission, setAdmission] = useState(ADMISSION.Open)
@@ -123,6 +125,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       setDescription(draft.description ?? '')
       setLogoUrl(draft.logoUrl ?? '')
       setCoverUrl(draft.coverUrl ?? '')
+      setCoverPosition(clampCoverPosition(draft.coverPosition ?? DEFAULT_COVER_POSITION))
       // Merged over the empty shapes so a draft written before a field existed stays valid
       setSocials({ ...emptySocials, ...(draft.socials ?? {}) })
       setExtraLinks(Array.isArray(draft.extraLinks) ? draft.extraLinks : [])
@@ -158,6 +161,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
           description,
           logoUrl,
           coverUrl,
+          coverPosition,
           socials,
           extraLinks,
           admission,
@@ -174,7 +178,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     } catch {
       // Storage full or blocked — the form still works, it just won't survive a refresh
     }
-  }, [name, tag, category, summary, description, logoUrl, coverUrl, socials, extraLinks, admission, communityType, requirements, requirementMode, encrypted, paymentToken, paymentPrice, paymentIsLsp7, payoutDestination])
+  }, [name, tag, category, summary, description, logoUrl, coverUrl, coverPosition, socials, extraLinks, admission, communityType, requirements, requirementMode, encrypted, paymentToken, paymentPrice, paymentIsLsp7, payoutDestination])
 
   // Fields go back to their initial values once a community is fully created — the parent
   // closes the modal at that point, and reopening it with the created community's data still
@@ -190,6 +194,7 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
     setDescription('')
     setLogoUrl('')
     setCoverUrl('')
+    setCoverPosition(DEFAULT_COVER_POSITION)
     setSocials(emptySocials)
     setExtraLinks([])
     setAdmission(ADMISSION.Open)
@@ -464,6 +469,8 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
       description,
       'logo url': logoUrl,
       'cover url': coverUrl,
+      // Only written when there is a cover to frame
+      ...(coverUrl ? { 'cover position': coverPosition } : {}),
       ...(links.length > 0 ? { links } : {}),
     }, accountAddress)
 
@@ -804,18 +811,15 @@ const CreateCommunityModal = forwardRef(function CreateCommunityModal({ vault, v
             />
           </div>
 
-          <ImagePicker
-            label="Logo"
-            value={logoUrl}
-            onChange={setLogoUrl}
-            fieldClassName={styles.manager__field}
-            labelClassName={styles.manager__label}
-          />
-
-          <ImagePicker
-            label="Cover image"
-            value={coverUrl}
-            onChange={setCoverUrl}
+          <CommunityBrandingEditor
+            name={name}
+            summary={summary}
+            logoUrl={logoUrl}
+            onLogoChange={setLogoUrl}
+            coverUrl={coverUrl}
+            onCoverChange={setCoverUrl}
+            coverPosition={coverPosition}
+            onCoverPositionChange={setCoverPosition}
             fieldClassName={styles.manager__field}
             labelClassName={styles.manager__label}
           />

@@ -15,6 +15,7 @@ import { normalizeInterests } from '@/config/interestOptions'
 import { parseTunnelAddress } from '@/lib/tunnel'
 import { readableServerRegistry, readStoredReadableNumber } from '@/lib/readableServer'
 import { hasColumn } from '@/lib/schema'
+import { clampCoverPosition, readCoverPosition } from '@/lib/coverPosition'
 import { verifyWalletSignature } from '@/lib/walletSignature'
 import { PROFILE_SIGNATURE_MAX_AGE_MS, profileUpdateMessage } from '@/lib/profileSignature'
 
@@ -228,6 +229,8 @@ function shapeUniversalProfile(profile, row, address, { badge, origin, premium, 
      one way or the other — a picture, or a removal — speaks for it. */
   const indexedCover = profile.backgroundImages?.[0]?.src ?? null
   profile.profileHeader = resolveCoverUrl(hupIsAhead && storedCover.set ? storedCover.ref : indexedCover)
+  // Hup-native framing for whichever cover is shown — LSP3 has no field for it
+  profile.profileHeaderPosition = readCoverPosition(row?.profile_header_position)
 
   profile.wallet_address = normalizeAddress(address)
 
@@ -272,6 +275,9 @@ function shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) {
   /* Resolve profile image from any protocol (IPFS, UP cloud, http, etc.) */
   dbProfile.profileImage = resolveAvatarImageUrl(dbProfile.profileImage, AVATAR_MAX_SIZE)
   dbProfile.profileHeader = resolveCoverUrl(readStoredCover(dbProfile.profileHeader).ref)
+  const coverPosition = readCoverPosition(dbProfile.profile_header_position)
+  delete dbProfile.profile_header_position
+  dbProfile.profileHeaderPosition = coverPosition
 
   /* The folded copy and the cooldown stamp are the claim route's bookkeeping; `username` itself
      is what anyone renders. */
@@ -459,6 +465,7 @@ const OPTIONAL_COLUMNS = {
   accent_color: 'cidex/scripts/add-premium.sql',
   profile_sync_stamp: 'cidex/scripts/add-profile-sync-stamp.sql',
   profileHeader: 'cidex/scripts/add-profile-header.sql',
+  profile_header_position: 'cidex/scripts/add-profile-header-position.sql',
   interests: 'cidex/scripts/add-profile-interests.sql',
   tunnel_address: 'cidex/scripts/add-profile-tunnel-address.sql',
   readable_number: 'cidex/scripts/add-profile-readable-number.sql',
@@ -491,6 +498,7 @@ export async function PUT(request, { params }) {
     const profileImage = formData.get('profileImage')
     const profileHeader = formData.get('profileHeader')
     const removeProfileHeader = formData.get('removeProfileHeader') === '1'
+    const profileHeaderPosition = formData.get('profileHeaderPosition')
     const tags = formData.get('tags')
     const interests = formData.get('interests')
     const links = formData.get('links')
@@ -583,6 +591,15 @@ export async function PUT(request, { params }) {
     if ((coverRef || removeProfileHeader) && (await canWrite('profileHeader'))) {
       updateFields.push('`profileHeader` = ?')
       queryValues.push(coverRef ?? COVER_REMOVED)
+    }
+
+    /* Where the cover is framed. A removal clears it too, so the next picture starts centered;
+       an absent field leaves the stored framing alone, like every optional field here. */
+    const removesCover = removeProfileHeader && !coverRef
+    const hasPosition = typeof profileHeaderPosition === 'string' && profileHeaderPosition.trim() !== ''
+    if ((removesCover || hasPosition) && (await canWrite('profile_header_position'))) {
+      updateFields.push('`profile_header_position` = ?')
+      queryValues.push(removesCover ? null : clampCoverPosition(profileHeaderPosition))
     }
 
     /* The same moderator that checks a post, but as a gate rather than a warning: a picture sits

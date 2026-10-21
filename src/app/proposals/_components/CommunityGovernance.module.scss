@@ -127,4 +127,30 @@
     font-size: 0.75rem;
     color: var(--text-muted, #888);
   }
+
+  &__treasury {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  // Rules, treasury address, token balances and delegation — reference material, folded away so
+  // the community page leads with its feed
+  &__details {
+    summary {
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: var(--text-muted, #888);
+
+      &:hover {
+        color: var(--text);
+      }
+    }
+
+    > * + * {
+      margin-top: 0.85rem;
+    }
+  }
 }

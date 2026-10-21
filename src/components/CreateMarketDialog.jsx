@@ -167,7 +167,7 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
     setJudgeInputs((inputs) => inputs.map((input, i) => (i === index ? value : input)))
   }
 
-  // Device-file picker like the community ImagePicker — uploads to IPFS immediately and
+  // Device-file picker like the community branding editor (useImageUpload) — uploads to IPFS immediately and
   // keeps the CID in state; the metadata JSON carries it in the `image` field
   const handleImageSelect = async (e) => {
     const file = e.target.files?.[0]

@@ -42,9 +42,9 @@ import AttachPollDialog from '@/components/AttachPollDialog'
 import CreateFundDialog from '@/components/CreateFundDialog'
 import AttachFundDialog from '@/components/AttachFundDialog'
 import AttachTaskDialog from '@/components/AttachTaskDialog'
-import AttachProposalDialog from '@/app/proposals/_components/AttachProposalDialog'
+import CreateProposalDialog from '@/app/proposals/_components/CreateProposalDialog'
 import ProposalEmbed from '@/components/ProposalEmbed'
-import { governanceChains } from '@/lib/communityGovernance'
+import { governanceAddressFor } from '@/lib/communityGovernance'
 import { SEALED_PLACEHOLDER, categoryLabel } from '@/lib/task'
 import { sealSubmission } from '@/lib/taskVault'
 import { requestTaskFunding } from '@/lib/taskFundingBus'
@@ -534,7 +534,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const [proposal, setProposal] = useState(
     () => restoredContent?.proposal ?? proposalSeed ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.proposal ?? null) : null)
   )
-  const attachProposalRef = useRef(null)
+  // Writing in a community whose chain runs community voting: a proposal can be created here and
+  // attached in one step rather than made on the proposals page and pasted back as a link
+  const canCreateProposal = Boolean(communityTarget && governanceAddressFor(Number(communityTarget.networkId)))
+  const createProposalRef = useRef(null)
   // Every in-flight attachment upload, keyed by uploadId: the File so a failed tile can retry,
   // the AbortController so Remove cancels the transfer, the promise so submit can await it
   const uploadsRef = useRef(new Map())
@@ -776,13 +779,13 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       hint: 'Embed an app inside the post',
       attached: Boolean(miniApp),
     },
-    // Ungated by targetChainId like tokens to trade: the reference carries the proposal's own
-    // chain, and voting happens on the proposal page, never in the post's transaction
-    canAttachNft && governanceChains().length > 0 && {
+    // Only inside a community: the option starts a new vote there. Existing proposals reach the
+    // composer through "Share to feed" on their own page; the attached card's × removes one.
+    canAttachNft && canCreateProposal && {
       key: 'proposal',
       icon: BankIcon,
       label: 'Proposal',
-      hint: 'Share a group vote with live results',
+      hint: 'Start a community vote, right in this post',
       attached: Boolean(proposal),
     },
     // Ungated by targetChainId: the widget carries its own chain, so a post on a chain with no
@@ -808,7 +811,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       case 'drop': setShowAttachDrop(true); break
       case 'miniapp': attachMiniAppRef.current?.open(); break
       case 'tokentrade': attachTokenTradeRef.current?.open(); break
-      case 'proposal': attachProposalRef.current?.open(); break
+      case 'proposal': createProposalRef.current?.open(); break
       default: break
     }
   }, [])
@@ -2605,8 +2608,14 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       {/* Null is a real answer here — the dialog owns "remove from post" as well as the pick */}
       <AttachTokenTradeDialog ref={attachTokenTradeRef} value={tokenTrade} onAttach={(payload) => setTokenTrade(payload)} />
 
-      {/* Null is a real answer here too — the dialog offers "remove from post" */}
-      <AttachProposalDialog ref={attachProposalRef} value={proposal} onAttach={(reference) => setProposal(reference)} />
+      {canCreateProposal && (
+        <CreateProposalDialog
+          ref={createProposalRef}
+          chainId={Number(communityTarget.networkId)}
+          communityId={communityTarget.communityId}
+          onCreated={(reference) => setProposal(reference)}
+        />
+      )}
     </NativeDialog>
   )
 }

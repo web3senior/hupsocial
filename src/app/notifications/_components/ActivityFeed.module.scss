@@ -112,16 +112,11 @@
   &__count {
     padding: 0.1rem 0.45rem;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--foreground) 8%, transparent);
-    color: var(--text-muted);
+    background: var(--error-500);
+    color: #ffffff;
     font-size: 0.75rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-  }
-
-  &__tab--active &__count {
-    background: var(--blue-300);
-    color: #fff;
   }
 
   &__list {
