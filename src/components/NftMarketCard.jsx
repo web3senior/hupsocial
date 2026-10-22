@@ -100,9 +100,16 @@ export default function NftMarketCard({ listing, onCollectionResolved, layout = 
   const referralBps = Number(listing.referral_bps) || 0
   const referralPercent = referralBps > 0 ? new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(referralBps / 100) : null
 
+  // A sale settled from an accepted offer has no listing behind it (listing_id 0), so its
+  // tile opens the token page instead
+  const href =
+    Number(listing.listing_id) > 0
+      ? `/nfts/${networkId}/${listing.listing_id}`
+      : `/nfts/${networkId}/collection/${String(listing.collection).toLowerCase()}/${encodeURIComponent(listing.token_id)}`
+
   return (
     <div className={clsx(styles.nftCard, layout === 'compact' && styles['nftCard--compact'])}>
-      <Link href={`/nfts/${networkId}/${listing.listing_id}`} className={styles.nftCard__link} onClick={(e) => e.stopPropagation()}>
+      <Link href={href} className={styles.nftCard__link} onClick={(e) => e.stopPropagation()}>
         <div className={styles.nftCard__media}>
           {metadata.image ? (
             <img src={metadata.image} alt={metadata.name || 'NFT'} loading="lazy" onError={handleBrokenImage} />

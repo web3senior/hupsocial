@@ -26,6 +26,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { BACKED_LISTINGS_SQL } from '@/lib/nftListingBacking'
+import { marketRowsSql } from '@/lib/nftMarketRows'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -171,7 +172,6 @@ export async function GET(request, { params }) {
 
     const collection = String(address).toLowerCase()
     const statuses = STATUS_BY_KEY[searchParams.get('status')] || STATUS_BY_KEY.active
-    const placeholders = statuses.map(() => '?').join(',')
     const wholeCollection = searchParams.get('scope') === 'collection'
     const wantsFloor = searchParams.get('floor') === '1'
 
@@ -194,16 +194,14 @@ export async function GET(request, { params }) {
       : ''
     const floorParams = withFloor ? [networkId, collection, LISTING_STATUS_ACTIVE, currency.payment_token] : []
 
-    // scope=listed keeps the listing check as an EXISTS against nft_listings' idx_token, driven
-    // from the cache's primary key — the reverse order would scan every listing to find the few
-    // that have metadata. scope=collection drops the check entirely.
+    // scope=listed restricts to tokens the grid can show for this status — the same market rows
+    // the listings route reads, so sales settled from accepted offers count too. Uncorrelated on
+    // purpose: nft_trades has no token index, and a per-token EXISTS would rescan it once for
+    // every cached token. scope=collection drops the check entirely.
     const listedFilter = wholeCollection
       ? ''
-      : `AND EXISTS (
-             SELECT 1 FROM nft_listings l
-              WHERE l.network_id = m.network_id AND l.collection = m.collection
-                AND l.token_id = m.token_id AND l.status IN (${placeholders}) AND ${BACKED_LISTINGS_SQL}
-           )`
+      : `AND m.token_id IN (SELECT v.token_id FROM ${marketRowsSql(statuses)} v WHERE v.network_id = ? AND v.collection = ?)`
+    const listedParams = wholeCollection ? [] : [networkId, collection]
 
     // How much of what the grid can show is actually described by the facets below. The two
     // numbers differ for every token nobody has rendered yet — its traits are unknown, so
@@ -221,11 +219,11 @@ export async function GET(request, { params }) {
       : pool.execute(
           `SELECT COUNT(DISTINCT l.token_id) AS listed,
                   COUNT(DISTINCT m.token_id) AS resolved
-             FROM nft_listings l
+             FROM ${marketRowsSql(statuses)} l
              LEFT JOIN nft_metadata_cache m
                ON m.network_id = l.network_id AND m.collection = l.collection AND m.token_id = l.token_id
-            WHERE l.network_id = ? AND l.collection = ? AND l.status IN (${placeholders}) AND ${BACKED_LISTINGS_SQL}`,
-          [networkId, collection, ...statuses],
+            WHERE l.network_id = ? AND l.collection = ?`,
+          [networkId, collection],
         )
 
     const [[[counts]], [rows]] = await Promise.all([
@@ -238,7 +236,7 @@ export async function GET(request, { params }) {
             AND m.attributes IS NOT NULL AND m.attributes <> '[]'
             ${listedFilter}
           LIMIT ?`,
-        [...floorParams, networkId, collection, ...(wholeCollection ? [] : statuses), SCAN_LIMIT],
+        [...floorParams, networkId, collection, ...listedParams, SCAN_LIMIT],
       ),
     ])
 

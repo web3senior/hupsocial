@@ -108,7 +108,15 @@ function MarketRow({ listing, onCollectionResolved }) {
         <span className={styles.table__item}>
           {/* The same door the grid's tiles open, so a reader who switched layouts doesn't
               get a different destination for the same click */}
-          <Link href={`/nfts/${networkId}/${listing.listing_id}`} className={styles.table__itemLink}>
+          <Link
+            href={
+              // An accepted-offer sale has no listing (listing_id 0) — its token page stands in
+              Number(listing.listing_id) > 0
+                ? `/nfts/${networkId}/${listing.listing_id}`
+                : `/nfts/${networkId}/collection/${String(listing.collection).toLowerCase()}/${encodeURIComponent(listing.token_id)}`
+            }
+            className={styles.table__itemLink}
+          >
             <span className={styles.table__thumb}>
               {metadata.image ? (
                 <img src={metadata.image} alt="" loading="lazy" decoding="async" onError={handleBrokenImage} />
@@ -253,7 +261,7 @@ export default function MarketTable({ listings, isLoading = false, skeletonRows 
               ))
             : listings.map((listing) => (
                 <MarketRow
-                  key={`${listing.network_id}-${listing.listing_id}`}
+                  key={`${listing.network_id}-${listing.trade_id ?? listing.listing_id}`}
                   listing={listing}
                   onCollectionResolved={onCollectionResolved}
                 />

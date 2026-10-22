@@ -110,7 +110,7 @@ export default function CollectionView({ networkId, address }) {
   const isBrowsingCollection = status === 'collection' || isWalking
 
   const tableRows = items.map((listing) => ({
-    key: `${listing.network_id}-${listing.listing_id}`,
+    key: `${listing.network_id}-${listing.trade_id ?? listing.listing_id}`,
     tokenId: listing.token_id,
     isLsp8: Boolean(Number(listing.is_lsp8)),
     listingId: listing.listing_id,
@@ -171,7 +171,7 @@ export default function CollectionView({ networkId, address }) {
     [status, setStatus, setFilters],
   )
 
-  const filterChips = describeFilters(filters)
+  const filterChips = describeFilters(filters, status === 'sold')
 
   useEffect(() => {
     // The browse tab doesn't read listings at all — CollectionBrowser owns its own fetching,
@@ -299,7 +299,7 @@ export default function CollectionView({ networkId, address }) {
           <div className={styles.collection__tools}>
             {/* Both panels read listings, so both stand down for the tabs that don't */}
             {!isBrowsingCollection && (
-              <CollectionFilters chainId={chainId} collection={collection} chainInfo={chainInfo} value={filters} onChange={handleFiltersChange} />
+              <CollectionFilters chainId={chainId} collection={collection} chainInfo={chainInfo} value={filters} onChange={handleFiltersChange} isSoldView={status === 'sold'} />
             )}
 
             {/* Traits filter listings; the browse tab shows tokens whether or not they were
@@ -408,7 +408,7 @@ export default function CollectionView({ networkId, address }) {
         ) : (
           <div className={styles.collection__grid} data-layout={layout}>
             {items.map((listing) => (
-              <NftMarketCard key={`${listing.network_id}-${listing.listing_id}`} listing={listing} layout={layout} />
+              <NftMarketCard key={`${listing.network_id}-${listing.trade_id ?? listing.listing_id}`} listing={listing} layout={layout} />
             ))}
           </div>
         )}

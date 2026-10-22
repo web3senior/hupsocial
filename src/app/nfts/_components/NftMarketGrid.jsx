@@ -13,6 +13,7 @@ import { useProfile } from '@/hooks/useProfile'
 import useCollectionMetadataRefresh, { describeCollectionRefresh } from '@/hooks/useCollectionMetadataRefresh'
 import useGridLayout from '@/hooks/useGridLayout'
 import { appChains } from '@/config/contracts'
+import { shownSort, sortOptionsFor } from '@/lib/nftSortOptions'
 import { CONTRACTS } from '@/config/wagmi'
 import { toast } from '@/components/NextToast'
 import NativePopover from '@/components/ui/NativePopover'
@@ -689,8 +690,8 @@ export default function NftMarketGrid() {
             <div className={styles.filtersPanel__body}>
               <div className={styles.filtersPanel__field}>
                 <label htmlFor="nftFilterSort">Sort</label>
-                <select id="nftFilterSort" value={filters.sort} onChange={(e) => handleSortChange(e.target.value)}>
-                  {SORT_OPTIONS.map((o) => (
+                <select id="nftFilterSort" value={shownSort(filters.sort, filters.status === 'sold')} onChange={(e) => handleSortChange(e.target.value)}>
+                  {sortOptionsFor(SORT_OPTIONS, filters.status === 'sold').map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
@@ -907,7 +908,7 @@ export default function NftMarketGrid() {
         <div className={styles.market__grid} data-layout={layout}>
           {items.map((listing) => (
             <NftMarketCard
-              key={`${listing.network_id}-${listing.listing_id}`}
+              key={`${listing.network_id}-${listing.trade_id ?? listing.listing_id}`}
               listing={listing}
               layout={layout}
               onCollectionResolved={handleCollectionResolved}

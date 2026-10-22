@@ -233,10 +233,15 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
     { key: 'volume', label: 'Volume', value: money(stats.volume), title: quoteNote },
     { key: 'highest', label: 'Highest sale', value: money(stats.highestSale), title: quoteNote },
     {
-      key: 'traded',
-      label: 'NFTs traded',
-      value: stats.itemsSold > 0 ? COUNT_FORMAT.format(stats.itemsSold) : null,
-      title: stats.saleCount > 0 ? `${COUNT_FORMAT.format(stats.saleCount)} sales settled through HupTrade` : undefined,
+      // Counted per sale, not per NFT, so it is the same number the Sold tab lists one tile
+      // per sale for — a token that sold twice is two of each
+      key: 'sales',
+      label: 'Sales',
+      value: stats.saleCount > 0 ? COUNT_FORMAT.format(stats.saleCount) : null,
+      title:
+        stats.saleCount > 0
+          ? `${COUNT_FORMAT.format(stats.saleCount)} sales settled through HupTrade, across ${COUNT_FORMAT.format(stats.itemsSold)} distinct NFTs`
+          : undefined,
     },
     {
       key: 'supply',

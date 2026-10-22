@@ -10,6 +10,7 @@ import { useProfile } from '@/hooks/useProfile'
 import Avatar from '@/components/ui/Avatar'
 import NativePopover from '@/components/ui/NativePopover'
 import Tooltip from '@/components/ui/Tooltip'
+import { shownSort, sortOptionsFor } from '@/lib/nftSortOptions'
 import styles from './CollectionFilters.module.scss'
 
 // The same order keys GET /api/v1/nfts resolves in SQL
@@ -66,12 +67,13 @@ const toBaseUnits = (value, decimals) => {
  * Every applied filter as a removable chip descriptor. `reset` is the patch that clears it,
  * so the page can render the chips without knowing what any of them mean.
  * @param {Object} filters A DEFAULT_COLLECTION_FILTERS-shaped object.
+ * @param {boolean} [isSoldView] The grid shows only sales, so time sorts read as sale times.
  */
-export function describeFilters(filters) {
+export function describeFilters(filters, isSoldView = false) {
   const chips = []
 
   if (filters.sort !== DEFAULT_COLLECTION_FILTERS.sort) {
-    chips.push({ key: 'sort', label: 'Sort', value: labelOf(SORT_OPTIONS, filters.sort), reset: { sort: DEFAULT_COLLECTION_FILTERS.sort } })
+    chips.push({ key: 'sort', label: 'Sort', value: labelOf(sortOptionsFor(SORT_OPTIONS, isSoldView), shownSort(filters.sort, isSoldView)), reset: { sort: DEFAULT_COLLECTION_FILTERS.sort } })
   }
   if (filters.referral) {
     chips.push({ key: 'referral', label: 'Referral', value: labelOf(REFERRAL_OPTIONS, filters.referral), reset: { referral: '' } })
@@ -155,8 +157,9 @@ function SellerAvatar({ address, name }) {
  * @param {Object} [props.chainInfo] Entry from appChains — native currency symbol/decimals.
  * @param {Object} props.value A DEFAULT_COLLECTION_FILTERS-shaped object.
  * @param {Function} props.onChange Called with the next filter object. Must be stable.
+ * @param {boolean} [props.isSoldView] The grid shows only sales — see lib/nftSortOptions.
  */
-export default function CollectionFilters({ chainId, collection, chainInfo, value, onChange }) {
+export default function CollectionFilters({ chainId, collection, chainInfo, value, onChange, isSoldView = false }) {
   const [tokenOptions, setTokenOptions] = useState([])
   const [isLoadingTokens, setIsLoadingTokens] = useState(true)
   const [sellerQuery, setSellerQuery] = useState('')
@@ -166,7 +169,7 @@ export default function CollectionFilters({ chainId, collection, chainInfo, valu
 
   const selectedToken = tokenOptions.find((option) => option.value === value.token)
   const priceDecimals = usePriceDecimals(chainId, value.token, selectedToken?.decimals, chainInfo)
-  const chips = describeFilters(value)
+  const chips = describeFilters(value, isSoldView)
 
   const set = (patch) => onChange({ ...value, ...patch })
 
@@ -249,8 +252,8 @@ export default function CollectionFilters({ chainId, collection, chainInfo, valu
         <div className={styles.filters__body}>
           <div className={styles.filters__field}>
             <label htmlFor="collectionFilterSort">Sort</label>
-            <select id="collectionFilterSort" value={value.sort} onChange={(e) => set({ sort: e.target.value })}>
-              {SORT_OPTIONS.map((option) => (
+            <select id="collectionFilterSort" value={shownSort(value.sort, isSoldView)} onChange={(e) => set({ sort: e.target.value })}>
+              {sortOptionsFor(SORT_OPTIONS, isSoldView).map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

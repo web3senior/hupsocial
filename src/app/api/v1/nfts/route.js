@@ -6,10 +6,13 @@
  * two places token metadata enters the query: names and attributes aren't indexed by cidex,
  * but the app's read-through nft_metadata_cache has persisted them for every token that
  * has ever been rendered, so both resolve against that table — see the params below.
+ *
+ * Sold rows are sales out of nft_trades rather than sold listings — see lib/nftMarketRows.
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { BACKED_LISTINGS_SQL } from '@/lib/nftListingBacking'
+import { LISTING_STATUS_ACTIVE, marketRowsSql } from '@/lib/nftMarketRows'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 
 export const runtime = 'nodejs'
@@ -124,11 +127,13 @@ export async function GET(request) {
     const q = (searchParams.get('q') || '').trim().slice(0, MAX_SEARCH_LENGTH) // NFT name, collection name, seller name or address fragment
     const referral = searchParams.get('referral') // 'any' (>0) | 'none' (=0) | minimum bps, e.g. '500' for 5%+
     const traits = parseTraitFilters(searchParams.get('traits')) // JSON [{label, value}] — see above
-    const sort = searchParams.get('sort') || 'newest' // an ORDER_BY key below
     const statusKey = searchParams.get('status') || 'active'
     // Defaults to what's still buyable; 'active_sold'/'all' widen to the sold rows too. An
     // unknown key (a hand-edited URL, or the retired 'cancelled') degrades to active.
     const statuses = STATUS_BY_KEY[statusKey] || STATUS_BY_KEY.active
+    // Nothing but sales on screen, so time order means sale time — see ORDER_BY
+    const isSalesView = !statuses.includes(LISTING_STATUS_ACTIVE)
+    const sort = searchParams.get('sort') || 'newest' // an ORDER_BY key below
 
     // Status alone would still serve listings whose seller no longer holds the token — see
     // BACKED_LISTINGS_SQL for why that state exists and where the column comes from
@@ -230,36 +235,31 @@ export async function GET(request) {
         ` AND ${conditions.join(' AND ')})`
     }
 
+    // A sale settled from an accepted offer was never listed, so in a view that mixes it with
+    // listings it is placed by the time it sold; in a sales-only view every time order is sale
+    // time, which is what the panels label it as there
+    const eventAt = isSalesView ? 'l.sold_at' : 'COALESCE(l.listed_at, l.sold_at)'
     const ORDER_BY = {
-      newest: 'l.listed_at DESC',
-      oldest: 'l.listed_at ASC',
+      newest: `${eventAt} DESC, l.trade_id DESC`,
+      oldest: `${eventAt} ASC, l.trade_id ASC`,
       price_asc: 'CAST(l.price AS DECIMAL(65,0)) ASC',
       price_desc: 'CAST(l.price AS DECIMAL(65,0)) DESC',
       referral_desc: 'l.referral_bps DESC, l.listed_at DESC',
-      recently_sold: 'tr.last_sold_at DESC, l.listed_at DESC',
+      // NULL sold_at sorts after every sale under DESC, so live listings trail
+      recently_sold: 'l.sold_at DESC, l.trade_id DESC, l.listed_at DESC',
     }
     const orderBy = ORDER_BY[sort] || ORDER_BY.newest
-
-    // Pre-aggregated join, not a select-list subquery — see attachLastSales for the MariaDB
-    // trap. NULL last_sold_at sorts after every sale under DESC, so never-sold rows trail.
-    const tradeJoin =
-      sort === 'recently_sold'
-        ? ` LEFT JOIN (SELECT network_id, listing_id, MAX(sold_at) AS last_sold_at
-               FROM nft_trades GROUP BY network_id, listing_id) tr
-               ON tr.network_id = l.network_id AND tr.listing_id = l.listing_id`
-        : ''
 
     const [rows] = await pool.execute(
       `SELECT
          l.network_id, l.listing_id, l.seller AS wallet_address, l.collection, l.token_id,
          l.is_lsp8, l.payment_token, l.is_lsp7, CAST(l.price AS CHAR) AS price, l.referral_bps,
-         l.status, l.listed_at,
+         l.status, l.listed_at, l.trade_id, l.sold_at,
          st.symbol, st.decimals,
          u.name AS display_name, u.profileImage AS profile_image
-       FROM nft_listings l
+       FROM ${marketRowsSql(statuses)} l
        LEFT JOIN store_tokens st ON st.network_id = l.network_id AND st.token = l.payment_token
        LEFT JOIN users u ON u.wallet_address = l.seller
-       ${tradeJoin}
        ${whereClause}
        ORDER BY ${orderBy}
        LIMIT ? OFFSET ?`,
