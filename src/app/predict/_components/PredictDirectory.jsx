@@ -1,6 +1,6 @@
 'use client'
 
-import { Spinner } from '@/components/Loading'
+import { Spinner, PageLoader } from '@/components/Loading'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -259,7 +259,7 @@ export default function PredictDirectory() {
         </div>
       )}
 
-      {isLoading && <p className={styles.directory__empty}><Spinner size={16} color="currentColor" /> Loading markets...</p>}
+      {isLoading && <PageLoader />}
 
       {!isLoading && listMarkets.length === 0 && !showFeaturedStrip && (
         <div className={styles.directory__empty}>

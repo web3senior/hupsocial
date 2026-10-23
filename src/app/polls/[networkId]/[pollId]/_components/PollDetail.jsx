@@ -1,6 +1,6 @@
 'use client'
 
-import { Spinner } from '@/components/Loading'
+import { Spinner, PageLoader } from '@/components/Loading'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -116,7 +116,7 @@ export default function PollDetail({ networkId, pollId }) {
     )
   }
 
-  if (!poll) return <p className={styles.detail__empty}><Spinner size={16} color="currentColor" /> Loading poll...</p>
+  if (!poll) return <PageLoader />
 
   const status = pollStatus(poll)
   const options = pollOptions(poll)

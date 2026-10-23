@@ -27,7 +27,7 @@ import { useChatToken } from '@/hooks/useChatToken'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useProfile } from '@/hooks/useProfile'
 import { toast } from '@/components/NextToast'
-import { ContentSpinner, Spinner } from '@/components/Loading'
+import { Spinner, PageLoader } from '@/components/Loading'
 import CopyButton from '@/components/ui/CopyButton'
 import EmptyState from '@/components/ui/EmptyState'
 import Field from '@/components/ui/Field'
@@ -288,7 +288,7 @@ export default function LiveStudio() {
     )
   }
 
-  if (!mounted) return <ContentSpinner />
+  if (!mounted) return <PageLoader />
 
   if (!isConnected || !address) {
     return (
@@ -326,7 +326,7 @@ export default function LiveStudio() {
     )
   }
 
-  if (isStudioLoading && !studio) return <ContentSpinner />
+  if (isStudioLoading && !studio) return <PageLoader />
 
   if (studio && !studio.allowed) {
     return (

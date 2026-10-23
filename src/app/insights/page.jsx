@@ -6,7 +6,7 @@ import { useConnection } from 'wagmi'
 import { usePremium } from '@/hooks/usePremium'
 import { ChartBarIcon, EyeIcon, HeartIcon, UsersIcon, WalletIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import { useClientMounted } from '@/hooks/useClientMount'
 import Sparkline from '@/components/ui/Sparkline'
 import InsightsPeriodPicker from './_components/InsightsPeriodPicker'
@@ -128,9 +128,7 @@ export default function InsightsPage() {
               <p>Connect your wallet to see your Insights.</p>
             </div>
           ) : isLoading ? (
-            <div className={styles.page__loading}>
-              <ContentSpinner size="32px" />
-            </div>
+            <PageLoader />
           ) : error ? (
             <div className={styles.emptyState}>
               <ChartBarIcon size={48} />

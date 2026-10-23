@@ -6,7 +6,7 @@ import { BroadcastIcon, VideoCameraIcon } from '@phosphor-icons/react'
 import { appChains } from '@/config/contracts'
 import { liveIsConfigured, viewersLabel } from '@/lib/live'
 import { fetchLiveStreams } from '@/lib/liveApi'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import Profile from '@/components/Profile'
 import EmptyState from '@/components/ui/EmptyState'
 import LiveBadge from '@/components/ui/LiveBadge'
@@ -38,7 +38,7 @@ export default function LiveDirectory() {
         </EmptyState>
       )}
 
-      {isLoading && <ContentSpinner />}
+      {isLoading && <PageLoader />}
 
       {liveIsConfigured && !isLoading && error && !streams && (
         <EmptyState size="lg" align="center" icon={BroadcastIcon} as="div">

@@ -59,7 +59,7 @@ import Tooltip from '@/components/ui/Tooltip'
 import CopyButton from '@/components/ui/CopyButton'
 import Share from '@/components/ui/Share'
 import { toast } from '@/components/NextToast'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import styles from './DropDetails.module.scss'
 
 const shortAddress = (address) => (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '')
@@ -307,7 +307,7 @@ export default function DropDetails({ networkId, dropId, referral }) {
     )
   }
 
-  if (isLoading) return <ContentSpinner />
+  if (isLoading) return <PageLoader />
 
   if (!collection) {
     return (

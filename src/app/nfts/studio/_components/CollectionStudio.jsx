@@ -57,7 +57,7 @@ import HupMark from '@/components/ui/HupMark'
 import { describeWalletError } from '@/lib/walletErrors'
 import { networkColorStyle } from '@/lib/networkColors'
 import { toast } from '@/components/NextToast'
-import { Spinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import DropArtworkUpload from '@/components/DropArtworkUpload'
 import Profile from '@/components/Profile'
 import NftDetailModal from '@/components/NftDetailModal'
@@ -1235,10 +1235,7 @@ export default function CollectionStudio() {
 
       {input.trim() && !target && <p className={styles.studio__note}>That is not a valid contract address.</p>}
       {probe.status === 'loading' && (
-        <div className={styles.studio__loading} aria-live="polite" aria-busy="true">
-          <Spinner size="38px" strokeColor="var(--text-muted, #888)" color="var(--text)" />
-          <p>Reading {chain?.name}…</p>
-        </div>
+        <PageLoader label={`Reading ${chain?.name || 'collection'}`} />
       )}
       {(probe.status === 'empty' || probe.status === 'error') && (
         <p className={clsx(styles.studio__note, styles['studio__note--bad'])}>

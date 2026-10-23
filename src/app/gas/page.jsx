@@ -8,7 +8,7 @@ import { parseEther } from 'viem'
 import clsx from 'clsx'
 import { CheckIcon, CopyIcon, GasPumpIcon, WarningIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { shortTxError } from '@/lib/utils'
@@ -249,9 +249,7 @@ export default function GasPage() {
           </header>
 
           {!mounted || isLoading ? (
-            <div className={styles.page__loading}>
-              <ContentSpinner size="32px" />
-            </div>
+            <PageLoader />
           ) : error ? (
             <div className={styles.emptyState}>
               <WarningIcon size={40} />

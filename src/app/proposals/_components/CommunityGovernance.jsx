@@ -10,7 +10,7 @@ import { communityPath, communityProposalPath, formatRulePercent, COMMUNITY_PROP
 import { formatRelative, sameAddress } from '@/lib/communityProposal'
 import governanceAbi from '@/abis/HupCommunityGovernance.json'
 import communityAbi from '@/abis/HupCommunity.json'
-import { Spinner, ContentSpinner } from '@/components/Loading'
+import { Spinner, PageLoader } from '@/components/Loading'
 import { usePaymentToken } from '@/hooks/usePaymentToken'
 import TokenAssetInput from '@/app/communities/_components/TokenAssetInput'
 import CopyButton from '@/components/ui/CopyButton'
@@ -113,7 +113,7 @@ export function CommunityGovernancePanel({ governance, onProposalCreated }) {
   const { chainId, chain, communityId, writer, rules, treasury, balance, ready, isLoading, error, refetch, isOwner, isMember, active, refresh } = governance
 
   if (!writer.address) return <p className={styles.governance__muted}>Community voting and treasury are awaiting deployment on {chain?.name || 'this network'}.</p>
-  if (isLoading) return <ContentSpinner />
+  if (isLoading) return <PageLoader />
   if (!ready || error) {
     return (
       <div className={styles.governance__panel}>

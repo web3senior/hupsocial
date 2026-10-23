@@ -13,7 +13,7 @@ import { liveDuration, liveIsConfigured, viewersLabel } from '@/lib/live'
 import { fetchLiveStatus, killLiveStream } from '@/lib/liveApi'
 import { useChatToken } from '@/hooks/useChatToken'
 import { toast } from '@/components/NextToast'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import Profile from '@/components/Profile'
 import CopyButton from '@/components/ui/CopyButton'
 import EmptyState from '@/components/ui/EmptyState'
@@ -81,7 +81,7 @@ export default function LiveWatch({ address, name, username }) {
     )
   }
 
-  if (isLoading && !status) return <ContentSpinner />
+  if (isLoading && !status) return <PageLoader />
 
   if (!isLive) {
     return (

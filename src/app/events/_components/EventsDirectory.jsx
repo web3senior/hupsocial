@@ -1,6 +1,6 @@
 'use client'
 
-import { Spinner } from '@/components/Loading'
+import { Spinner, PageLoader } from '@/components/Loading'
 import { useMemo, useRef, useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import clsx from 'clsx'
@@ -148,7 +148,7 @@ export default function EventsDirectory() {
         </section>
       )}
 
-      {isLoading && <p className={styles.directory__empty}><Spinner size={16} color="currentColor" /> Loading events...</p>}
+      {isLoading && <PageLoader />}
 
       {!isLoading && events.length === 0 && (
         <div className={styles.directory__empty}>

@@ -22,7 +22,7 @@ import NftFrameDialog from '@/components/NftFrameDialog'
 import Share from '@/components/ui/Share'
 import HupMark from '@/components/ui/HupMark'
 import ModelViewer from '@/components/ui/ModelViewer'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import {
   ArrowSquareOutIcon,
   CaretLeftIcon,
@@ -134,7 +134,7 @@ export default function ListingDetail({ networkId, listingId }) {
   // collection" strip — one cached fetch, shared with the collection page itself
   const collectionInfo = useCollectionInfo({ chainId, collection: listing?.collection, isLsp8, enabled: Boolean(listing?.collection) })
 
-  if (isLoading) return <ContentSpinner />
+  if (isLoading) return <PageLoader />
 
   if (!listing) {
     return (

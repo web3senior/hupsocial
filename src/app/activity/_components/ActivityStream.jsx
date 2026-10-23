@@ -1,6 +1,6 @@
 'use client'
 
-import { Spinner } from '@/components/Loading'
+import { PageLoader, Spinner } from '@/components/Loading'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { ArrowClockwiseIcon, ArrowUpIcon, CubeIcon, ListDashesIcon, PulseIcon } from '@phosphor-icons/react'
@@ -58,16 +58,23 @@ export default function ActivityStream() {
   // The tab the on-screen rows belong to — a poll that lands after a tab switch must not merge
   // its rows into the new tab's list.
   const appliedTab = useRef(tab)
+  const requestedTab = useRef(tab)
   // Mirror of `rows` for the merge path, which has to diff against what is on screen without
   // reading state inside a setState updater. Synced after paint — a merge only ever runs from a
   // timer or a click, long after the rows it compares against were rendered.
   const rowsRef = useRef([])
+  const paginationRef = useRef(null)
+  const pagingRef = useRef(false)
 
   const load = useCallback(
     async ({ tabId, cursor = null, mode = 'replace', signal } = {}) => {
       const active = tabById(tabId)
 
-      if (mode === 'append') setIsPaging(true)
+      if (mode === 'append') {
+        if (pagingRef.current) return
+        pagingRef.current = true
+        setIsPaging(true)
+      }
       else if (mode === 'merge') setIsRefreshing(true)
       else setIsLoading(true)
       setError(null)
@@ -81,6 +88,7 @@ export default function ActivityStream() {
         const payload = await response.json()
 
         if (!response.ok || !payload.success) throw new Error(payload.error || 'Failed to fetch activity')
+        if (requestedTab.current !== tabId) return
 
         if (mode === 'append') {
           setRows((current) => mergeRows(current, payload.data))
@@ -108,9 +116,11 @@ export default function ActivityStream() {
         appliedTab.current = tabId
       } catch (err) {
         if (err.name === 'AbortError') return
+        if (requestedTab.current !== tabId) return
         console.error('Activity fetch error:', err)
         setError('Could not load activity.')
       } finally {
+        if (mode === 'append') pagingRef.current = false
         if (!signal?.aborted) {
           setIsLoading(false)
           setIsPaging(false)
@@ -126,6 +136,22 @@ export default function ActivityStream() {
   }, [rows])
 
   useEffect(() => {
+    const sentinel = paginationRef.current
+    if (!sentinel || !nextCursor || isLoading || isPaging || isRefreshing || error || appliedTab.current !== tab) return
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return
+      void load({ tabId: tab, cursor: nextCursor, mode: 'append' })
+    }, { rootMargin: '300px 0px' })
+    observer.observe(sentinel)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [tab, nextCursor, isLoading, isPaging, isRefreshing, error, load])
+
+  useEffect(() => {
+    requestedTab.current = tab
     const controller = new AbortController()
     // Deferred by a tick so the fetch's own setState lands outside the effect body. The previous
     // tab's rows are never cleared here — the skeleton covers them until the new page replaces
@@ -194,11 +220,7 @@ export default function ActivityStream() {
       )}
 
       {isLoading ? (
-        <ul className={styles.stream__skeleton}>
-          {Array.from({ length: 8 }).map((_, index) => (
-            <li key={index} />
-          ))}
-        </ul>
+        <PageLoader label="Loading activity" />
       ) : error ? (
         <div className={styles.stream__state}>
           <p>{error}</p>
@@ -233,14 +255,14 @@ export default function ActivityStream() {
           </div>
 
           {nextCursor && (
-            <button
-              type="button"
-              className={styles.stream__more}
-              onClick={() => load({ tabId: tab, cursor: nextCursor, mode: 'append' })}
-              disabled={isPaging}
+            <div
+              ref={paginationRef}
+              className={styles.stream__pagination}
+              role="status"
+              aria-label={isPaging ? 'Loading older activity' : 'Scroll for older activity'}
             >
-              {isPaging ? <Spinner color="currentColor" size={16} /> : 'Load more'}
-            </button>
+              {isPaging && <Spinner color="currentColor" size={16} />}
+            </div>
           )}
         </>
       )}

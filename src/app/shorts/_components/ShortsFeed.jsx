@@ -5,7 +5,7 @@ import { useConnection } from 'wagmi'
 import { getPosts } from '@/lib/api'
 import { ArrowDownIcon, ArrowUpIcon } from '@phosphor-icons/react'
 import { useMutedPreference, setMutedPreference } from '@/lib/soundPrefs'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import FeedError from '@/components/ui/FeedError'
 import ShortsPlayer from './ShortsPlayer'
 import styles from './ShortsFeed.module.scss'
@@ -328,7 +328,7 @@ export default function ShortsFeed() {
     return () => observer.disconnect()
   }, [slides.length, hasMore, page, loadPage])
 
-  if (isRestoring || (isLoading && !slides.length)) return <ContentSpinner />
+  if (isRestoring || (isLoading && !slides.length)) return <PageLoader />
 
   if (loadError) return <FeedError onRetry={() => loadPage(1)} />
 

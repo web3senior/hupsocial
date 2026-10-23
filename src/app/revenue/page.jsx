@@ -7,7 +7,7 @@ import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import { CurrencyDollarIcon, StorefrontIcon, WalletIcon, ImageIcon, HandCoinsIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
-import { Spinner, ContentSpinner } from '@/components/Loading'
+import { Spinner, PageLoader } from '@/components/Loading'
 import { useClientMounted } from '@/hooks/useClientMount'
 import RevenueHero from './_components/RevenueHero'
 import SaleCard from './_components/SaleCard'
@@ -105,9 +105,7 @@ export default function RevenuePage() {
               <p>{error.message}</p>
             </div>
           ) : !overview ? (
-            <div className={styles.page__loading}>
-              <ContentSpinner size="32px" />
-            </div>
+            <PageLoader />
           ) : totalPayments === 0 ? (
             <div className={styles.emptyState}>
               <StorefrontIcon size={48} />
@@ -168,9 +166,7 @@ export default function RevenuePage() {
                   <p>{emptyTab.body}</p>
                 </div>
               ) : isLoading ? (
-                <div className={styles.page__listLoading}>
-                  <ContentSpinner size="24px" />
-                </div>
+                <PageLoader />
               ) : (
                 <>
                   <ol className={styles.page__list}>

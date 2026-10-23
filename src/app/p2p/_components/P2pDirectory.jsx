@@ -10,7 +10,7 @@ import { appChains, CONTRACTS } from '@/config/contracts'
 import offersAbi from '@/abis/HupOffers.json'
 import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import TokenIdentity from '@/components/ui/TokenIdentity'
 import TokenIcon from '@/components/ui/TokenIcon'
 import useTokenIcon from '@/hooks/useTokenIcon'
@@ -422,7 +422,7 @@ export default function P2pDirectory() {
       </div>
 
       {isLoading ? (
-        <ContentSpinner />
+        <PageLoader />
       ) : deals.length === 0 ? (
         <p className={styles.p2p__empty}>
           {view === 'past'

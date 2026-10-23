@@ -81,12 +81,6 @@
     color: var(--text);
   }
 
-  &__listLoading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 3rem 0;
-  }
 
   &__list {
     display: flex;
@@ -119,12 +113,6 @@
     }
   }
 
-  &__loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 50svh;
-  }
 }
 
 .emptyState {

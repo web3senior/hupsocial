@@ -7,7 +7,7 @@ import clsx from 'clsx'
 import { useChainId, useConnection } from 'wagmi'
 import { CheckCircleIcon, PenNibIcon, ReceiptIcon, WalletIcon, WarningIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import EmptyState from '@/components/ui/EmptyState'
 import { appChains, CONTRACTS } from '@/config/contracts'
 import { ACTION_FEES } from '@/config/actionFees'
@@ -318,9 +318,7 @@ export default function FeesPage() {
           </div>
 
           {!mounted || isLoading ? (
-            <div className={styles.page__loading}>
-              <ContentSpinner size="32px" />
-            </div>
+            <PageLoader />
           ) : error ? (
             <EmptyState icon={WarningIcon} size="lg" align="center">
               Couldn’t read the networks right now. {error.message}

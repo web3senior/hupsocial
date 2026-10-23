@@ -1,6 +1,6 @@
 'use client'
 
-import { Spinner } from '@/components/Loading'
+import { Spinner, PageLoader } from '@/components/Loading'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import { useConnection, useSignMessage, useSignTypedData, useSwitchChain } from 'wagmi'
@@ -201,7 +201,7 @@ export default function ScheduledPosts() {
 
       {error && <p className={styles.error}>{error}</p>}
 
-      {isLoading && rows.length === 0 && <p className={styles.loading}><Spinner size={16} color="currentColor" /> Loading…</p>}
+      {isLoading && rows.length === 0 && <PageLoader />}
 
       {!isLoading && !error && rows.length === 0 && (
         <EmptyState icon={CalendarDotsIcon} align="center">

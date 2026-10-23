@@ -11,7 +11,7 @@ import { formatWhen, optionLabels, sameAddress, tallyRows } from '@/lib/communit
 import { usePaymentToken } from '@/hooks/usePaymentToken'
 import governanceAbi from '@/abis/HupCommunityGovernance.json'
 import communityAbi from '@/abis/HupCommunity.json'
-import { ContentSpinner, Spinner } from '@/components/Loading'
+import { Spinner, PageLoader } from '@/components/Loading'
 import CopyButton from '@/components/ui/CopyButton'
 import NewPost from '@/components/NewPost'
 import Profile from '@/components/Profile'
@@ -62,7 +62,7 @@ export default function CommunityProposalDetail({ networkId, communityId, propos
   const back = <Link className={styles.proposal__back} href={communityProposalsPath(chainId, communityId)}>← Community proposals & treasury</Link>
 
   if (!writer.address || isLoading || !belongs || error || result(1) === null) {
-    return <section className={styles.proposal}>{back}{isLoading ? <ContentSpinner /> : <p>{!writer.address ? 'Community voting is awaiting deployment on this network.' : 'This proposal could not be loaded for this community.'}</p>}</section>
+    return <section className={styles.proposal}>{back}{isLoading ? <PageLoader /> : <p>{!writer.address ? 'Community voting is awaiting deployment on this network.' : 'This proposal could not be loaded for this community.'}</p>}</section>
   }
 
   const labels = optionLabels(proposal, metadata)

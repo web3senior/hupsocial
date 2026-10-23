@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import styles from './page.module.scss'
 
 /**
@@ -14,7 +14,7 @@ export default function Loading() {
       <PageTitle name="Collection audit" />
       <div className={styles.page}>
         <div className={clsx('__container', styles.page__container, styles['page__container--loading'])} data-width="small">
-          <ContentSpinner />
+          <PageLoader />
         </div>
       </div>
     </>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import clsx from 'clsx'
 import Profile from '@/components/Profile'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import { profileFallbackFromRow } from '@/hooks/useProfile'
 import { formatRelativeTime } from '@/lib/collectionAuditFormat'
 import styles from '../page.module.scss'
@@ -76,7 +76,7 @@ export default function UsernamesSection() {
       </header>
 
       {loading && !stats ? (
-        <ContentSpinner />
+        <PageLoader />
       ) : stats && !stats.migrated ? (
         <p className={styles['admin-contracts__empty']}>
           This database has no username columns yet. Run <code>cidex/scripts/add-usernames.sql</code> first.

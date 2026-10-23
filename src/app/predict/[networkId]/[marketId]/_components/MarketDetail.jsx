@@ -20,7 +20,7 @@ import EditJudgesDialog from './EditJudgesDialog'
 import EditMarketDialog from './EditMarketDialog'
 import PlaceBetModal from '@/components/PlaceBetModal'
 import Share from '@/components/ui/Share'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import {
   CaretLeftIcon,
   CaretRightIcon,
@@ -205,7 +205,7 @@ export default function MarketDetail({ networkId, marketId }) {
     setResolveChoice(null)
   }
 
-  if (isLoading) return <ContentSpinner />
+  if (isLoading) return <PageLoader />
 
   if (!market) {
     return (

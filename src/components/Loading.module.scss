@@ -12,6 +12,16 @@
   justify-content: center;
 }
 
+.page-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 12rem;
+  padding: 1.5rem;
+}
+
 .globalLoader {
   position: fixed;
   inset: 0;

@@ -7,7 +7,7 @@ import { useConnection } from 'wagmi'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import { communityProposalsPath } from '@/lib/communityGovernance'
 import { chainNameFor } from '@/lib/communityProposal'
-import { Spinner, ContentSpinner } from '@/components/Loading'
+import { Spinner, PageLoader } from '@/components/Loading'
 import styles from './CommunityProposalDirectory.module.scss'
 
 const communityContracts = appChains
@@ -44,7 +44,7 @@ export default function CommunityProposalDirectory() {
         <input className={styles.directory__select} aria-label="Search communities" placeholder="Search communities" value={search} onChange={(event) => setSearch(event.target.value)} />
         <Link href="/communities" className={styles.directory__createButton}>Browse communities</Link>
       </div>
-      {isLoading && <ContentSpinner />}
+      {isLoading && <PageLoader />}
       {error && <div className={styles.directory__empty}><p>Could not load communities.</p><button type="button" onClick={() => mutate()}>Try again</button></div>}
       {!isLoading && !error && communities.length === 0 && <p>No communities found.</p>}
       <ul className={styles.directory__list}>

@@ -13,7 +13,7 @@ import { displayTokenId } from '@/lib/walletNfts'
 import { handleBrokenImage } from '@/lib/utils'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import { toast } from '@/components/NextToast'
-import { ContentSpinner } from '@/components/Loading'
+import { PageLoader } from '@/components/Loading'
 import HupMark from '@/components/ui/HupMark'
 import styles from './MyOffers.module.scss'
 
@@ -218,7 +218,7 @@ export default function MyOffers() {
       </div>
 
       {isLoading ? (
-        <ContentSpinner />
+        <PageLoader />
       ) : rows.length === 0 ? (
         <p className={styles.myOffers__empty}>
           {view === 'active' ? (

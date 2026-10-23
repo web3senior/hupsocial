@@ -139,7 +139,7 @@ export default function LivePlayer({ streamId, title }) {
 
       {phase === 'connecting' && (
         <div className={styles.player__cover}>
-          <Spinner size={32} color="#fff" label="Connecting to the stream" />
+          <Spinner size={24} label="Connecting to the stream" />
         </div>
       )}
 

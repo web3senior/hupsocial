@@ -2,6 +2,7 @@
 
 import { useOffline } from 'next/offline'
 import clsx from 'clsx'
+import { PageLoader } from '@/components/Loading'
 import styles from './loading.module.scss'
 
 /**
@@ -17,19 +18,7 @@ export default function Loading({ containerWidth = 'small', headerClearance = tr
 
   return (
     <div className={clsx('__container', styles.loading, !headerClearance && styles['loading--inline'])} data-width={containerWidth} aria-busy="true" aria-label="Loading page">
-      <div className={styles.loading__header}>
-        <div className={clsx('shimmer', 'rounded', styles['loading__title'])} />
-      </div>
-
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className={styles.loading__row} aria-hidden="true">
-          <div className={clsx('shimmer', 'rounded', styles['loading__avatar'])} />
-          <div className={styles.loading__lines}>
-            <div className={clsx('shimmer', 'rounded', styles['loading__line'], styles['loading__line--short'])} />
-            <div className={clsx('shimmer', 'rounded', styles['loading__line'])} />
-          </div>
-        </div>
-      ))}
+      <PageLoader />
 
       {isOffline && (
         <p className={styles.loading__status} role="status">
