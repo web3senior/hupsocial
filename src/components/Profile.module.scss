@@ -7,6 +7,11 @@
 }
 
 .profile {
+  &.profile--linked {
+    width: 100%;
+    color: inherit;
+    text-decoration: none;
+  }
   // The picture is shorter than the two lines beside it — name over address — so it centres
   // against them. Top-aligning the two boxes left the picture sitting visibly high, because a
   // line box carries leading above its glyphs that a circle does not.

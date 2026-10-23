@@ -147,7 +147,7 @@ export default function LeaderboardPage() {
     <>
       <PageTitle name="Leaderboard" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="large">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <header className={styles.header}>
             <div className={styles.filters} role="group" aria-label="Leaderboard filters">
               <SegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} label="Period" iconOnly />

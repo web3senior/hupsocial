@@ -8,7 +8,7 @@
   bottom: 0;
   z-index: 3;
 
-  border-right: 1px solid transparent;
+  border: 0;
   background-color: var(--background);
 
   padding: 1rem 0.5rem;
@@ -42,6 +42,7 @@
   .navList {
     width: 100%;
     padding-inline: 0;
+    margin-inline-end: 0;
     scrollbar-gutter: stable;
   }
 
@@ -55,13 +56,48 @@
     margin-inline: 8px 0;
   }
 
-  .aside__toggle {
-    margin-inline: 8px 0;
+}
+
+.aside.aside--grid {
+  @include md-up {
+    position: sticky;
+    top: 0;
+    grid-column: left-start / feed-start;
+    grid-row: 1;
+    // Match the right rail: sit at the feed-facing edge of the side track.
+    justify-self: end;
+    align-self: start;
+    box-sizing: border-box;
+    margin-block: 0;
+    padding-block: 0;
+    padding: 1rem .5rem;
+    bottom: auto;
+    height: 100dvh;
+    max-height: 100dvh;
+    max-width: 100%;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0;
+    background-color: var(--surface);
+
+    .navContainer {
+      height: 100%;
+      min-height: 0;
+    }
+
+    .navList {
+      margin-top: 0.75rem;
+    }
+
+    .header,
+    .footerNav {
+      flex-shrink: 0;
+    }
   }
 }
 
 .expanded {
-  width: 250px;
+  width: 280px;
   border-color: var(--gray-300);
   background-color: var(--background);
 
@@ -87,7 +123,8 @@
   flex-direction: column;
   gap: 0.2rem;
   list-style: none;
-  padding-right: 0.1rem; // Add some padding to prevent scrollbar from overlapping content
+  padding-inline-end: 0;
+  margin-inline-end: -0.5rem;
 
   // Both rails scroll: the compact one runs out of room first, since a zoomed-in viewport
   // holds fewer rows than the icons the rail carries.
@@ -214,9 +251,54 @@
   margin-top: auto;
 }
 
+.aside__profile {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius, 16px);
+  background-color: var(--gray-50);
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &--compact {
+    justify-content: center;
+    padding: 0.5rem 0.25rem;
+  }
+}
+
 .more {
   display: flex;
   flex-direction: column;
+}
+
+.link.aside__post-button {
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 0.75rem;
+  border: 1px solid var(--app-accent);
+  border-radius: var(--global-border-radius, 16px);
+  background-color: var(--app-accent);
+  color: var(--app-accent-text);
+  font-weight: 600;
+
+  .iconWrapper,
+  .linkText {
+    color: inherit;
+  }
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--app-accent) 90%, black);
+  }
 }
 
 .moreButton {
@@ -461,13 +543,13 @@
   width: 7px;
   height: 7px;
   border-radius: 1000px;
-  background-color: var(--error-500);
+  background-color: var(--app-accent);
 }
 
 .notificationBadgeCounter {
   margin-left: auto;
-  background-color: var(--error-500);
-  color: #ffffff;
+  background-color: var(--app-accent);
+  color: var(--app-accent-text);
   font-size: 0.75rem;
   font-weight: 700;
   padding: 2px 6px;
@@ -499,7 +581,7 @@
 
 
 .aside--placeholder {
-  width: 250px;
+  width: 280px;
 
   @include lg-down {
     width: 64px;
@@ -564,8 +646,7 @@
   }
 }
 
-.aside__close,
-.aside__toggle {
+.aside__close {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -584,11 +665,11 @@
   }
 }
 
-.aside__toggle {
-  box-sizing: border-box;
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
-  margin-inline: auto;
-  margin-top: 0.5rem;
+:global([data-theme='dark']) .aside {
+  background-color: transparent;
+}
+
+:global([data-theme='dark']) .aside__profile,
+:global([data-theme='terminal']) .aside__profile {
+  background-color: var(--surface-muted);
 }

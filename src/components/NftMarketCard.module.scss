@@ -189,7 +189,7 @@
     white-space: nowrap;
   }
 
-  // Footer: who's selling on the left, what it costs on the right
+  // Price below the artwork.
   &__footer {
     display: flex;
     align-items: center;
@@ -198,47 +198,14 @@
     margin-top: 0.15rem;
   }
 
-  &__seller {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    min-width: 0;
-  }
-
-  &__sellerAvatar {
-    flex-shrink: 0;
-    width: 30px;
-    height: 30px;
-    border-radius: 999px;
-    object-fit: cover;
-    background-color: var(--surface-muted);
-
-    &--fallback {
-      display: grid;
-      place-items: center;
-      color: var(--text-muted);
-      font-size: var(--font-size-12, 0.78rem);
-      font-weight: 700;
-    }
-  }
-
-  &__sellerMeta {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  &__sellerLabel {
-    color: var(--text-muted);
-    font-size: var(--font-size-10, 10px);
-  }
-
-  &__sellerName {
-    overflow: hidden;
-    font-size: var(--font-size-12, 0.78rem);
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  &__owner {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1;
+    display: inline-flex;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(20, 22, 28, 0.55);
   }
 
   &__pricePill {
@@ -306,12 +273,11 @@
 
 // Small grid: roughly half the comfortable column. What survives is what a buyer scans down
 // a wall of tiles — which id it is, what it costs, what it last went for. The collection name
-// goes (every tile on a collection page carries the same one) and so does the seller.
+// goes (every tile on a collection page carries the same one) while the seller stays over the artwork.
 .nftCard--compact {
   gap: 0.45rem;
   padding: 0.35rem;
 
-  .nftCard__seller,
   .nftCard__title,
   .nftCard__skeleton,
   .nftCard__priceIcon,

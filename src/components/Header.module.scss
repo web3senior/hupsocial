@@ -34,11 +34,15 @@
     pointer-events: none;
 
     // Seated over the page's measured shell (Header.jsx), so the title centres on the card and
-    // the back arrow starts at its edge. Borderless: the shell is a rounded card of its own.
+    // the back arrow starts at its edge. Match the square page shell below it.
     &--cell {
       right: auto;
       left: var(--title-cell-left);
       width: var(--title-cell-width);
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+      border-top: 0;
+      border-radius: 0;
     }
   }
 

@@ -26,9 +26,7 @@
     transition: none;
   }
 
-  // The home shell is a three-track grid: the feed centred between two equal side tracks, one
-  // --layout-gap on either side of it, and the rail in the right track. The left track never
-  // gets narrower than the fixed aside, so the feed keeps a gap from it instead of sliding under.
+  // Share the desktop shell's feed and right-rail tracks; the sidebar owns its first column.
   &.home {
     position: relative;
     display: grid;
@@ -42,6 +40,7 @@
     // On a desktop the heading row is home's top bar (the app header only floats Connect there),
     // so what sticks beneath it — the rail, the new-posts pill — clears the bar's height alone
     @include resp.md-up {
+      grid-template-columns: subgrid;
       --sticky-bar-clearance: var(--header-height);
     }
 
@@ -57,13 +56,21 @@
   }
 
   &.home &__tab-bar {
+    border: 1px solid var(--border);
+    border-top: 0;
+    border-radius: 0;
+
+    @include resp.sm-down {
+      border: none;
+    }
+
     @include resp.md-up {
       top: 0;
       margin-top: 0;
       min-height: var(--header-height);
       display: flex;
       align-items: center;
-      // Inset to the feed card's own content edge; borderless, the card below is rounded
+      // Align the heading with the feed card's content edge.
       padding-inline: 1.25rem;
     }
   }
@@ -93,13 +100,19 @@
     z-index: 2;
     margin-top: var(--app-header-clearance);
     padding: 0.75rem 0;
-    background-color: var(--background);
+    background-color: color-mix(in srgb, var(--background) 75%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+  }
+
+  &.home &__container {
+    border-top: 0;
   }
 
   &__container {
     position: relative;
     border: 1px solid var(--border);
-    border-radius: var(--page-border-radius);
+    border-radius: 0;
     overflow: hidden;
 
     // 2. Prefixed mixin with namespace

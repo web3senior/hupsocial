@@ -19,7 +19,7 @@ const findPageShell = (main) =>
   [...main.querySelectorAll('div[class*="__container"]')].find((element) => {
     if (getComputedStyle(element).borderLeftWidth === '0px') return false
     return element.getBoundingClientRect().width > 300
-  })
+  }) || [...main.querySelectorAll('div[class*="__container"][data-width]')].find((element) => element.getBoundingClientRect().width > 300)
 
 /**
  * Where the title bar sits: over the page's own shell, so the title centres on the card and the
@@ -37,8 +37,15 @@ const useTitleCell = (isActive, pathname) => {
       return undefined
     }
 
+    let markedShell = null
+
     const measure = () => {
       const shell = window.matchMedia(DESKTOP_QUERY).matches ? findPageShell(main) : null
+      if (shell !== markedShell) {
+        markedShell?.removeAttribute('data-page-shell')
+        shell?.setAttribute('data-page-shell', '')
+        markedShell = shell
+      }
       if (!shell) {
         setCell(null)
         return
@@ -58,6 +65,7 @@ const useTitleCell = (isActive, pathname) => {
     return () => {
       observer.disconnect()
       window.removeEventListener('resize', measure)
+      markedShell?.removeAttribute('data-page-shell')
     }
   }, [isActive, pathname])
 

@@ -1,5 +1,5 @@
-import { ContentSpinner } from '@/components/Loading'
+import RouteLoading from '@/app/loading'
 
 export default function Loading() {
-  return <ContentSpinner />
+  return <RouteLoading containerWidth="small" />
 }

@@ -57,20 +57,20 @@ const dedupePosts = (list) => {
 }
 
 /**
- * Renders a single feed of posts: the unscoped "For you" feed, one locked to a
+ * Renders a single feed of posts: the unscoped "Home" feed, one locked to a
  * specific network (chainId), or the cross-network "premium" feed (posts with
  * an active HupBazaar listing — the bazaar page). Extracted from app/page.jsx so
  * it can be mounted per-tab from HomeTabStrip's tab dispatch.
  *
  * Feed state (posts/pagination) is kept LOCAL to this instance rather than in
- * the shared usePostStore - multiple tabs (For you, several network tabs) can
+ * the shared usePostStore - multiple tabs (Home, several network tabs) can
  * exist at once, and a single global "hasInitialized" flag would make every
  * tab after the first skip fetching and show the wrong feed's posts.
  */
 export default function HomeFeedTab({
   feedMode = 'foryou',
   networkId = null,
-  title = 'For you',
+  title = 'Home',
   changeDocumentTitle = false,
   // Section pages (bazaar) run wider so the feed lines up with their sibling tabs
   containerWidth = 'small',
@@ -471,7 +471,7 @@ export default function HomeFeedTab({
 
         <div className={clsx(styles.tabContent, styles.feedTab, 'relative')}>
           <div className={clsx(styles.page, 'motion-slideDownIn')}>
-            <div className={clsx('__container', styles.page__container)} data-width="medium">
+            <div className={clsx('__container', styles.page__container)} data-width={containerWidth}>
               {lead}
               {isRefreshing && (
               <div className={clsx(styles.refreshSpinnerWrap, 'animate fade')}>

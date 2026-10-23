@@ -10,7 +10,7 @@ import ComposePrompt from '@/components/home/ComposePrompt'
 import clsx from 'clsx'
 import styles from './page.module.scss'
 
-// Only the default "For you" tab is bundled with the route; the other tab
+// Only the default "Home" tab is bundled with the route; the other tab
 // panels load on demand so they don't delay the initial navigation to "/".
 const FollowingFeedTab = dynamic(() => import('@/components/tabs/FollowingFeedTab'))
 const TrendingFeedTab = dynamic(() => import('@/components/tabs/TrendingFeedTab'))
@@ -35,7 +35,7 @@ export default function Page() {
       {/* Keyed per tab: switching between two network tabs must remount the
           feed (not reuse the instance) so each one hydrates its own session
           cache and snapshots its own state on exit. */}
-      {activeTab?.type === 'foryou' && <HomeFeedTab key={activeTab.id} feedMode="foryou" title="For you" lead={<ComposePrompt />} />}
+      {activeTab?.type === 'foryou' && <HomeFeedTab key={activeTab.id} feedMode="foryou" title="Home" lead={<ComposePrompt />} />}
       {activeTab?.type === 'network' && (
         <HomeFeedTab key={activeTab.id} feedMode="network" networkId={activeTab.chainId} title={activeTab.label} lead={<ComposePrompt />} />
       )}

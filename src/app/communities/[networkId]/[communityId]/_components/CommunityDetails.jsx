@@ -115,7 +115,7 @@ export default function CommunityDetails({ networkId, communityId, initialCommun
     <div className={styles.details}>
       <PageTitle name={name} />
 
-      <div className={`__container ${styles.details__container}`} data-width="medium">
+      <div className={`__container ${styles.details__container}`} data-width="small">
         <Link href={`/communities`} className={styles.details__back}>
           <ArrowLeftIcon size={16} />
           Back to Communities

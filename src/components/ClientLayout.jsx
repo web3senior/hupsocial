@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import clsx from 'clsx'
 import SplashScreen from '@/components/SplashScreen'
 import NextToast from './NextToast'
 import WagmiContext from '@/contexts/WagmiContext'
@@ -56,8 +57,10 @@ export default function ClientLayout({ children }) {
 
       <WagmiContext>
         <Header />
-        <Aside />
-        <main className={styles.main}>{children}</main>
+        <div className={clsx(styles.shell, pathname === '/' && styles['shell--home'])}>
+          <Aside inLayoutGrid />
+          <main className={clsx(styles.main, styles['main--grid'], pathname === '/' && styles['main--home'])}>{children}</main>
+        </div>
         <Footer />
         {/* Removed because it appeas in Universal profile app too. TODO: add a condition later */}
         {/* <InstallAppDialog /> */}

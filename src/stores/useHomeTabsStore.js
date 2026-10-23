@@ -9,7 +9,7 @@ import { solanaChainFor } from '@/config/solana'
 // Static schema for non-network tab types. Icons/labels stay out of localStorage
 // (same reasoning as NAV_ITEMS_SCHEMA in useSidebarStore.js) to avoid serialization issues.
 export const TAB_TYPE_SCHEMA = {
-  foryou: { label: 'For you', icon: HouseIcon },
+  foryou: { label: 'Home', icon: HouseIcon },
   following: { label: 'Following', icon: UserCheckIcon },
   trending: { label: 'Trending', icon: FlameIcon },
   status: { label: 'Status', icon: BroadcastIcon },

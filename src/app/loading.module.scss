@@ -3,9 +3,13 @@
   flex-direction: column;
   gap: 1.25rem;
   // Clears the fixed header, which the routes themselves do through the PageTitle spacer
-  padding-top: 4.5rem;
+  padding-top: var(--header-height, 70px);
   // Held back a beat: a route that arrives quickly never shows a skeleton at all
   animation: loading-reveal 200ms ease-out 150ms both;
+
+  &--inline {
+    padding-top: 0;
+  }
 
   &__header {
     padding: 0 1.25rem;

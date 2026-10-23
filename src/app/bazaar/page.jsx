@@ -11,7 +11,7 @@ export default function Page() {
   return (
     <>
       <PageTitle name="Marketplace" />
-      <HomeFeedTab feedMode="premium" title="Marketplace" containerWidth="medium" />
+      <HomeFeedTab feedMode="premium" title="Marketplace" containerWidth="small" />
     </>
   )
 }

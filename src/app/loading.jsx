@@ -12,11 +12,11 @@ import styles from './loading.module.scss'
  * boundary it renders in the meantime. Without a loading boundary there is nothing to show and
  * the click reads as dead. Deliberately shape-neutral — it stands in for any route.
  */
-export default function Loading() {
+export default function Loading({ containerWidth = 'small', headerClearance = true }) {
   const isOffline = useOffline()
 
   return (
-    <div className={clsx('__container', styles.loading)} data-width="small">
+    <div className={clsx('__container', styles.loading, !headerClearance && styles['loading--inline'])} data-width={containerWidth} aria-busy="true" aria-label="Loading page">
       <div className={styles.loading__header}>
         <div className={clsx('shimmer', 'rounded', styles['loading__title'])} />
       </div>

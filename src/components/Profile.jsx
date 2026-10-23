@@ -25,7 +25,7 @@ import UPlogo from '@/../public/up.png'
 import { openConnect } from '@/lib/connectDialog'
 import styles from './Profile.module.scss'
 
-export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, fingerprint = true, className, fallback }) {
+export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, fingerprint = true, linkBox = false, onNavigate, className, fallback }) {
   const router = useRouter()
   // `fallback` is the name and picture a post row already carries (profileFallbackFromRow):
   // the byline paints with it at once and the fetched profile replaces it
@@ -37,7 +37,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
 
   // A card lays the identity out in a column under the picture, where the handle reads as the
   // second line of the same label rather than a mark trailing the name
-  const handleUnderName = variant === 'stacked'
+  const handleUnderName = variant === 'stacked' || variant === 'nameAndUsername'
 
   // The picture's laid-out size, handed to the stylesheet so the shimmer that stands in for it
   // reserves the same box and the fingerprint keeps its proportion. Only `imageOnly` surfaces
@@ -96,7 +96,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 16, height: 16 }} />
               <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 16, height: 16 }} />
             </div>
-            {isFullLike && <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 10 }} />}
+            {(isFullLike || handleUnderName) && <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 10 }} />}
           </div>
         )}
       </div>
@@ -128,9 +128,18 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
     </>
   )
 
+  const Container = linkBox ? Link : 'div'
+  const containerProps = linkBox ? {
+    href: profileHref,
+    prefetch: false,
+    onClick: onNavigate,
+    onMouseEnter: () => creator && router.prefetch(profileHref),
+    onFocus: () => creator && router.prefetch(profileHref),
+  } : {}
+
   return (
-    <div className={clsx(styles.profile, 'flex', className)} style={avatarBox}>
-      {hoverCard ? (
+    <Container {...containerProps} className={clsx(styles.profile, linkBox && styles['profile--linked'], 'flex', className)} style={avatarBox}>
+      {linkBox ? <span className={styles.imageWrapper}>{picture}</span> : hoverCard ? (
         <NativePopover
           trigger={
             <button
@@ -169,7 +178,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
           <div className={styles.nameRow}>
             {/* Hover-only prefetch: visible links re-prefetch on every router cache invalidation,
                 which looped the chat's sender names into a render per link per second */}
-            <Link
+            {linkBox ? <span className={styles.name}>{displayName}</span> : <Link
               href={profileHref}
               prefetch={false}
               className={styles.name}
@@ -178,11 +187,11 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               onFocus={() => creator && router.prefetch(profileHref)}
             >
               {displayName}
-            </Link>
+            </Link>}
             {/* Straight after the name, the way a paid mark is read everywhere else. It is a
                 claim about the account, not about the post's chain, so it takes no chain colour. */}
             <PremiumBadge premium={profile.premium} />
-            <CommunityBadge badge={profile.badge} iconOnly />
+            <CommunityBadge badge={profile.badge} iconOnly linked={!linkBox} />
             {/* The automated mark sits ahead of the chain and Universal Profile glyphs: those two
                 say where a post came from, this one says what published it. */}
             <AgentBadge agent={profile.agent} iconOnly />
@@ -192,7 +201,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               </div>
             )}
             {profile.source === `universal_profile` && (
-              <div className={clsx(styles.badge, styles['badge--link'])} title={`View Universal Profile`} onClick={handleUniversalProfile}>
+              <div className={clsx(styles.badge, !linkBox && styles['badge--link'])} title={`Universal Profile`} onClick={linkBox ? undefined : handleUniversalProfile}>
                 <Image alt={`Universal Profile`} src={UPlogo} width={14} height={14} />
               </div>
             )}
@@ -218,7 +227,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
           {isFullLike && creator && <code className={styles.address}>{truncatedAddress}</code>}
         </div>
       )}
-    </div>
+    </Container>
   )
 }
 
@@ -226,15 +235,20 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
 // straight from the profile payload, which re-joins community_members on every fetch, so what is
 // on screen is a live membership claim and not a remembered one: leaving the community (or being
 // banned from it) drops the pill on the next load without anything being written.
-export const CommunityBadge = ({ badge, size = 'sm', iconOnly = false }) => {
+export const CommunityBadge = ({ badge, size = 'sm', iconOnly = false, linked = true }) => {
   if (!badge?.tag) return null
 
+  const Tag = linked ? Link : 'span'
+  const linkProps = linked ? {
+    href: `/communities/${badge.networkId}/${badge.communityId}`,
+    onClick: (event) => event.stopPropagation(),
+  } : {}
+
   return (
-    <Link
-      href={`/communities/${badge.networkId}/${badge.communityId}`}
+    <Tag
+      {...linkProps}
       className={clsx(styles.communityTag, size === 'lg' && styles['communityTag--lg'], iconOnly && styles['communityTag--icon'])}
       title={iconOnly ? `${badge.tag} — member of ${badge.communityName}` : `Member of ${badge.communityName}`}
-      onClick={(e) => e.stopPropagation()}
     >
       {badge.logoUrl ? (
         <img className={styles.communityTag__logo} src={badge.logoUrl} alt="" width={10} height={10} />
@@ -243,7 +257,7 @@ export const CommunityBadge = ({ badge, size = 'sm', iconOnly = false }) => {
         iconOnly && <span className={styles.communityTag__initial}>{badge.tag.slice(0, 1)}</span>
       )}
       {!iconOnly && <span>{badge.tag}</span>}
-    </Link>
+    </Tag>
   )
 }
 

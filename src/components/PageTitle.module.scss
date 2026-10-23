@@ -9,3 +9,10 @@
     height: 4.5rem;
   }
 }
+
+@media (min-width: 768px) {
+  .pageTitle__spacer,
+  .pageTitle__spacer--padded {
+    height: var(--header-height);
+  }
+}

@@ -20,7 +20,6 @@ import {
   PlusIcon,
   PlayCircleIcon,
   PulseIcon,
-  SealCheckIcon,
   SquaresFourIcon,
   ToolboxIcon,
   TrophyIcon,
@@ -49,7 +48,7 @@ const withoutStrandedDividers = (items) =>
   })
 
 export const NAV_ITEMS_SCHEMA = [
-  { id: 'foryou', name: 'For you', path: '/', icon: HouseIcon },
+  { id: 'foryou', name: 'Home', path: '/', icon: HouseIcon },
   { id: 'shorts', name: 'Shorts', path: '/shorts', icon: PlayCircleIcon },
   { id: 'live', name: 'Live', path: '/live', icon: BroadcastIcon },
   { id: 'new-post', name: 'New post', component: 'new-post', icon: PlusIcon },
@@ -59,6 +58,7 @@ export const NAV_ITEMS_SCHEMA = [
   // `badge` keys into NAV_BADGES in Aside.jsx; drop it once the feature has settled in.
   { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon },
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
+  { id: 'bazaar', name: 'Marketplace', path: sectionLanding(SECTIONS.bazaar), icon: ImageIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
   // Sits with the social rows rather than the market ones: a poll costs nothing and asks for
   // an opinion. A checklist, not a bar chart — Insights owns ChartBar here, and the sideways
   // variant just reads as a chart someone knocked over.
@@ -72,7 +72,6 @@ export const NAV_ITEMS_SCHEMA = [
   // not something they listed for sale. The directory is public and the only reading surface
   // for long-form, so it earns a row rather than living behind the More menu.
   { id: 'articles', name: 'Articles', path: '/articles', icon: ArticleIcon },
-  { id: 'bazaar', name: 'Marketplace', path: sectionLanding(SECTIONS.bazaar), icon: ImageIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
   // Beside Marketplace: an escrowed deal on the same HupOffers contract the NFT market's offers use
   { id: 'p2p', name: 'P2P', path: '/p2p', icon: HandshakeIcon },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
@@ -84,8 +83,6 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
   // Your own sales, so it sits with the rest of your account rather than in the market block
   { id: 'revenue', name: 'Money', path: '/revenue', icon: CurrencyDollarIcon },
-  // Last in the account block: what you pay Hup, under everything Hup pays you.
-  { id: 'premium', name: 'Premium', path: '/premium', icon: SealCheckIcon },
 ]
 
 // Baskets migrated from the pre-wallet era live under this key until the

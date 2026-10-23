@@ -112,8 +112,8 @@
   &__count {
     padding: 0.1rem 0.45rem;
     border-radius: 999px;
-    background: var(--error-500);
-    color: #ffffff;
+    background: var(--app-accent);
+    color: var(--app-accent-text);
     font-size: 0.75rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;

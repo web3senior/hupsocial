@@ -6,16 +6,12 @@ import clsx from 'clsx'
 import { CubeIcon, DiamondIcon, TagIcon } from '@phosphor-icons/react'
 import HupMark from '@/components/ui/HupMark'
 import { formatStake } from '@/hooks/useStakeToken'
-import { useProfile } from '@/hooks/useProfile'
 import { handleBrokenImage } from '@/lib/utils'
-import Avatar from '@/components/ui/Avatar'
 import useNftMetadata from '@/hooks/useNftMetadata'
 import NftQuickBuy from '@/components/NftQuickBuy'
 import { appChains } from '@/config/contracts'
 import styles from './NftMarketCard.module.scss'
 import Profile from './Profile'
-
-const shortAddress = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`
 
 const TOKEN_ID_FORMAT = new Intl.NumberFormat('en')
 
@@ -60,10 +56,6 @@ export default function NftMarketCard({ listing, onCollectionResolved, layout = 
   const isLsp8 = Boolean(Number(listing.is_lsp8))
   const isSold = Number(listing.status) === 2
 
-  // Same resolver the grid's seller filter uses — the row's own profile_image is
-  // DB/UP-only and points plain EOA sellers at a broken image
-  const { profile } = useProfile(listing.wallet_address)
-
   const metadata = useNftMetadata({
     chainId: networkId,
     collection: listing.collection,
@@ -93,7 +85,6 @@ export default function NftMarketCard({ listing, onCollectionResolved, layout = 
 
   const formattedPrice = formatStake(listing.price, listing.decimals)
   const lastSalePrice = listing.last_sale_price ? formatStake(listing.last_sale_price, listing.last_sale_decimals) : null
-  const sellerName = listing.display_name || (listing.wallet_address ? shortAddress(listing.wallet_address) : '')
 
   // Seller-set referral share, same formatting as TradeCard — reposters filter on it,
   // so it has to be readable on the tile. Moot once sold, so it rides with the badge.
@@ -149,21 +140,8 @@ export default function NftMarketCard({ listing, onCollectionResolved, layout = 
             </span>
           </div>
 
-          {/* Seller left, price right — the two facts a buyer compares tile to tile */}
+          {/* Price stays below the artwork; seller identity sits over the image. */}
           <div className={styles.nftCard__footer}>
-            <span className={styles.nftCard__seller}>
-              {profile?.profileImage ? (
-                <Avatar className={styles.nftCard__sellerAvatar} src={profile.profileImage} size={30} />
-              ) : (
-                <span className={clsx(styles.nftCard__sellerAvatar, styles['nftCard__sellerAvatar--fallback'])} aria-hidden="true">
-                  {sellerName.slice(0, 1).toUpperCase()}
-                </span>
-              )}
-              <span className={styles.nftCard__sellerMeta}>
-                <span className={styles.nftCard__sellerLabel}>{isSold ? 'Sold by' : 'Owned by'}</span>
-                <span className={styles.nftCard__sellerName}>{sellerName}</span>
-              </span>
-            </span>
             <span className={styles.nftCard__pricePill}>
               {formattedPrice ?? '…'}
               {listing.symbol && <span className={styles.nftCard__pricePillSymbol}>{listing.symbol}</span>}
@@ -183,6 +161,12 @@ export default function NftMarketCard({ listing, onCollectionResolved, layout = 
           )}
         </div>
       </Link>
+
+      {listing.wallet_address && (
+        <span className={styles.nftCard__owner}>
+          <Profile creator={listing.wallet_address} networkId={networkId} variant="imageOnly" size={26} fingerprint={false} />
+        </span>
+      )}
 
       {/* Hover overlay riding the artwork's bottom edge; NftQuickBuy self-gates for
           sold/cancelled rows and the seller's own tiles, leaving an inert empty layer */}
