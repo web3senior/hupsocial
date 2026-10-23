@@ -16,6 +16,8 @@ import {
 import { getPublicClient } from 'wagmi/actions'
 import { canSessionPayGas, isSessionActive, isSessionUnusableError, localStorageBatchLikeKey, writeWithBurnerSession } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
+import { enqueueAutoLike, isAutoLikeNetwork } from '@/lib/autoLikeBatch'
+import { preflightQueue } from '@/lib/batchLike'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { isSolanaNetworkId } from '@/config/solana'
 import { openConnect } from '@/lib/connectDialog'
@@ -34,7 +36,8 @@ import Tooltip from './Tooltip'
 /**
  * Like Interaction Component
  *
- * A like is queued into the per-chain basket by default (Settings → Batch Like) and goes
+ * LUKSO likes are automatically relayed in short batches when sponsorship is enabled.
+ * Other likes are queued into the per-chain basket by default (Settings → Batch Like) and go
  * onchain when the user taps that chain's floating heart (components/BatchLikeTrigger).
  * With the basket off, and always for unlike, the tap sends immediately — batchLike([id])
  * or unlike(id): sponsored by the relay where the chain allows it, signed silently by an
@@ -210,6 +213,51 @@ export const Like = ({ post, onUpdate }) => {
     if (gaslessCooldown(functionName, chainId, address) > 0) return false
 
     try {
+      if (functionName === 'batchLike' && isAutoLikeNetwork(chainId)) {
+        await enqueueAutoLike({
+          chainId,
+          owner: address,
+          id: post.id,
+          send: async (ids) => {
+            const { likeable, dropped } = await preflightQueue({
+              client: targetPublicClient,
+              contractAddress: CONTRACTS[`chain${chainId}`].hup,
+              ids,
+              viewer: address,
+            })
+            const failures = new Map()
+            for (const entry of dropped) {
+              if (entry.reason === 'already liked') continue
+              const error = new Error(`Cannot like post: ${entry.reason}`)
+              error.code = 'AUTO_LIKE_INVALID'
+              failures.set(String(entry.id), error)
+            }
+            if (likeable.length) {
+              const txHash = await relayHupAction({
+                chain: chainDefinition,
+                publicClient: targetPublicClient,
+                owner: address,
+                functionName,
+                args: [address, likeable],
+                signTypedDataAsync,
+                useSessionKey,
+              })
+              // Do not sign the next batch with a nonce still awaiting confirmation.
+              try {
+                const receipt = await targetPublicClient.waitForTransactionReceipt({ hash: txHash })
+                if (receipt.status !== 'success') throw new Error('Like transaction reverted')
+              } catch (error) {
+                // A submitted transaction must never trigger a second wallet send.
+                error.code = 'AUTO_LIKE_SUBMITTED'
+                throw error
+              }
+            }
+            return failures
+          },
+        })
+        return true
+      }
+
       await relayHupAction({
         chain: chainDefinition,
         publicClient: targetPublicClient,
@@ -222,6 +270,7 @@ export const Like = ({ post, onUpdate }) => {
 
       return true
     } catch (err) {
+      if (err.code === 'AUTO_LIKE_SUBMITTED' || err.code === 'AUTO_LIKE_INVALID') throw err
       if (err.code === 'RELAY_COOLDOWN') {
         toast('Free-like allowance is used up for now — using your wallet instead.', 'info')
       } else {
@@ -388,6 +437,8 @@ export const Like = ({ post, onUpdate }) => {
       sendHeart(false)
     } else if (isQueued) {
       removeFromBatch(actor, post.network_id, post.id)
+    } else if (isAutoLikeNetwork(chainId) && isGaslessEnabled(chainId)) {
+      sendHeart(true)
     } else if (localStorage.getItem(localStorageBatchLikeKey) !== 'false') {
       addToBatch(actor, post.network_id, post.id)
     } else {
@@ -416,7 +467,7 @@ export const Like = ({ post, onUpdate }) => {
           disabled={isLoading}
           className={clsx('like-button', isLoading && 'processing', isQueued && 'queued')}
           onClick={handleLikeInteraction}
-          aria-label={isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
+          aria-label={isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Like post'}
         >
           {/* The optimistic heart is the pending feedback — no loader swap, so the
               icon and counter never jump while the tx settles */}
