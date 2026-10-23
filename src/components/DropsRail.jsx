@@ -212,7 +212,7 @@ export default function DropsRail({ networkId = null, className, variant = 'feed
     <section className={clsx(styles['drops-rail'], isSidebar && styles['drops-rail--sidebar'], className)} aria-labelledby={titleId}>
       <div className={styles['drops-rail__head']}>
         <h2 id={titleId} className={styles['drops-rail__title']}>
-          <span className={styles['drops-rail__pulse']} aria-hidden="true" />
+          {!isSidebar && <span className={styles['drops-rail__pulse']} aria-hidden="true" />}
           {isSidebar ? 'Live drops' : 'Minting now'}
         </h2>
 

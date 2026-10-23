@@ -219,7 +219,7 @@ export default function LeaderboardPage() {
                 ))}
               </section>
 
-              <section className={styles.leaderList} aria-label="Leaderboard rows">
+              <section className={styles.leaderList} aria-label="Leaderboard rows, scroll horizontally for all statistics" tabIndex={0}>
                 <div className={styles.leaderRowHeader}>
                   <span>#</span>
                   <span>Profiles</span>
@@ -245,7 +245,7 @@ export default function LeaderboardPage() {
                     </span>
                     <Profile
                       creator={leader.wallet_address}
-                      variant="fullWithoutTime"
+                      variant="imageOnly"
                       size={ROW_AVATAR_SIZE}
                       className={styles.avatar}
                     />
