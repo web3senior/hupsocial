@@ -47,6 +47,7 @@
 // --- Post ---
 .post {
   --post-button-bg: var(--surface-muted);
+  --post-hover-bg: var(--gray-50);
   // Owns its text colour: the post details wrapper paints --text, which dims to 65% white in dark
   color: var(--foreground);
 
@@ -57,16 +58,18 @@
   padding: 20px 20px 0 20px;
   place-items: stretch;
 
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-color: var(--post-hover-bg);
+    }
+  }
+
   @media (max-width: 640px) {
     padding: 10px;
   }
 
   &[data-content='false'] {
     .post {
-      &:hover {
-        background-color: var(--gray-200);
-      }
-
       &__main {
         padding-left: 3rem;
       }
@@ -599,10 +602,12 @@
 
 :global([data-theme='dark']) .post {
   --post-button-bg: #20232a;
+  --post-hover-bg: var(--surface-muted);
 }
 
 :global([data-theme='terminal']) .post {
   --post-button-bg: #12301c;
+  --post-hover-bg: var(--surface-muted);
 }
 
 // --- Post icon buttons ---
