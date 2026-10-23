@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
@@ -79,7 +79,7 @@ const remainingRatio = (row) => {
 }
 
 /** One drop, drawn from its indexed row. Only the artwork needs a fetch. */
-function DropRailCard({ row, phase, status }) {
+function DropRailCard({ row, phase, status, still = false }) {
   const chainId = Number(row.network_id)
   const dropId = Number(row.drop_id)
   const chainInfo = appChains.find((chain) => chain.id === chainId)
@@ -96,7 +96,7 @@ function DropRailCard({ row, phase, status }) {
   // Spec LSP4 icon is flat; the nested read covers our own pre-spec writes
   const icon = body?.icon?.[0]?.[0]?.url || body?.icon?.[0]?.url || (typeof body?.icon === 'string' ? body.icon : '')
   const artwork = image || icon
-  const imageUrl = artwork ? resolveStorageImageUrl(artwork, { width: ARTWORK_WIDTH }) : null
+  const imageUrl = artwork ? resolveStorageImageUrl(artwork, { width: ARTWORK_WIDTH, still }) : null
 
   const name = row.name || body?.name || `Drop #${dropId}`
   const minted = Number(row.minted)
@@ -172,7 +172,9 @@ function DropRailCard({ row, phase, status }) {
  *
  * @param {number|null} [props.networkId] Scopes the rail to one chain, for a network tab.
  */
-export default function DropsRail({ networkId = null, className }) {
+export default function DropsRail({ networkId = null, className, variant = 'feed' }) {
+  const titleId = useId()
+  const isSidebar = variant === 'sidebar'
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000)
@@ -207,11 +209,11 @@ export default function DropsRail({ networkId = null, className }) {
   if (drops.length === 0) return null
 
   return (
-    <section className={clsx(styles['drops-rail'], className)} aria-labelledby="drops-rail-title">
+    <section className={clsx(styles['drops-rail'], isSidebar && styles['drops-rail--sidebar'], className)} aria-labelledby={titleId}>
       <div className={styles['drops-rail__head']}>
-        <h2 id="drops-rail-title" className={styles['drops-rail__title']}>
+        <h2 id={titleId} className={styles['drops-rail__title']}>
           <span className={styles['drops-rail__pulse']} aria-hidden="true" />
-          Minting now
+          {isSidebar ? 'Live drops' : 'Minting now'}
         </h2>
 
         <Link href="/drops" className={styles['drops-rail__all']}>
@@ -222,8 +224,8 @@ export default function DropsRail({ networkId = null, className }) {
 
       <div className={styles['drops-rail__strip']}>
         <ul ref={trackRef} className={styles['drops-rail__track']}>
-          {drops.map((entry) => (
-            <DropRailCard key={`${entry.row.network_id}-${entry.row.drop_id}`} row={entry.row} phase={entry.phase} status={entry.status} />
+          {(isSidebar ? drops.slice(0, 3) : drops).map((entry) => (
+            <DropRailCard key={`${entry.row.network_id}-${entry.row.drop_id}`} row={entry.row} phase={entry.phase} status={entry.status} still={isSidebar} />
           ))}
         </ul>
 

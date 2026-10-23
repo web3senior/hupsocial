@@ -464,6 +464,8 @@
   right: 0;
   z-index: 1;
   border: none;
+  border-inline: 1px solid var(--border);
+  border-radius: 0;
   width: 100%;
   flex: 1;
   pointer-events: auto;
@@ -472,12 +474,6 @@
   padding: 0.5rem 0;
   cursor: pointer;
   background-color: var(--surface);
-
-  // 2. Prefixed mixin with namespace
-  @include resp.small-up {
-    border-radius: 1000px;
-    margin-bottom: 4px;
-  }
 
   &:hover {
     background-color: var(--surface);

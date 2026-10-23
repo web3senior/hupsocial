@@ -1,6 +1,7 @@
 'use client'
 
 import WhatsHappening from './WhatsHappening'
+import DropsRail from '@/components/DropsRail'
 import styles from './HomeRail.module.scss'
 
 /**
@@ -11,6 +12,7 @@ export default function HomeRail() {
   return (
     <div className={styles.rail}>
       <WhatsHappening />
+      <DropsRail variant="sidebar" />
     </div>
   )
 }
