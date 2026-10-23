@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { erc20Abi, formatEther, formatUnits, isAddress, parseEther, parseUnits, zeroAddress } from 'viem'
 import { lukso, celo, sepolia, base, monad, bsc, monadTestnet, arbitrumSepolia, somniaTestnet, unichainSepolia, optimismSepolia /* , baseSepolia */ } from 'wagmi/chains'
@@ -755,7 +756,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item, onPendingCou
 
               <div className={styles.actions}>
                 <button type="button" onClick={handleEdit} disabled={isLoadingContent} className={styles.loadContentButton}>
-                  {isLoadingContent ? 'Loading...' : 'Edit'}
+                  {isLoadingContent ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Edit'}
                 </button>
                 {listing.isActive && (
                   <button type="button" onClick={handleCancel} disabled={isBusy} className={styles.cancelButton}>
@@ -859,7 +860,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item, onPendingCou
                   disabled={isLoadingContent || isBusy}
                   className={styles.loadContentButton}
                 >
-                  {isLoadingContent ? 'Loading...' : 'Load existing gated content'}
+                  {isLoadingContent ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load existing gated content'}
                 </button>
               )}
 
@@ -1038,7 +1039,7 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item, onPendingCou
             <section className={styles.buyers}>
               <h4>Buyers</h4>
               {loadingPending && <p className={styles.muted}>Checking for pending keys...</p>}
-              {loadingPurchases && <p className={styles.muted}>Loading...</p>}
+              {loadingPurchases && <p className={styles.muted}><Spinner size={16} color="currentColor" /> Loading...</p>}
               {!loadingPurchases && totalBuyers === 0 && <p className={styles.muted}>No purchases yet.</p>}
               {!loadingPurchases && totalBuyers > 0 && (
                 <>

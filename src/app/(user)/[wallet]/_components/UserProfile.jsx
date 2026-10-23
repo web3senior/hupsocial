@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import Link from 'next/link'
 import { isEvmAddress, isSolanaAddress, shortAddress } from '@/lib/address'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
@@ -404,7 +405,7 @@ const PostFeed = ({ feed, emptyLabel, cardStyle, onPostClick, onPostPrefetch }) 
       {feed.hasMore && (
         <div className="flex justify-content-center p-100">
           <button className={styles.loadMore} onClick={feed.loadMore} disabled={feed.isFetching}>
-            {feed.isFetching ? 'Loading...' : 'Load More'}
+            {feed.isFetching ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load More'}
           </button>
         </div>
       )}

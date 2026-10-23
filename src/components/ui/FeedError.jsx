@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useOffline } from 'next/offline'
-import clsx from 'clsx'
+import { Spinner } from '@/components/Loading'
 import styles from './FeedError.module.scss'
 
 /**
@@ -30,21 +30,25 @@ export default function FeedError({ message, onRetry, isRetrying = false }) {
       <p className={styles['feed-error__message']}>{copy}</p>
 
       <button type="button" className={styles['feed-error__retry']} onClick={onRetry} disabled={isRetrying}>
-        <svg
-          className={clsx(styles['feed-error__icon'], isRetrying && styles['feed-error__icon--spinning'])}
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-          <polyline points="21 3 21 9 15 9" />
-        </svg>
+        {isRetrying ? (
+          <Spinner size={16} color="currentColor" label="Retrying" />
+        ) : (
+          <svg
+            className={styles['feed-error__icon']}
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <polyline points="21 3 21 9 15 9" />
+          </svg>
+        )}
         {isRetrying ? 'Retrying' : 'Retry'}
       </button>
     </div>

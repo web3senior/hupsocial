@@ -348,9 +348,6 @@
       white-space: nowrap;
     }
 
-    &--spinning {
-      animation: collectionHeaderSpin 0.9s linear infinite;
-    }
   }
 
   &__creators {
@@ -529,11 +526,5 @@
 
   50% {
     opacity: 0.45;
-  }
-}
-
-@keyframes collectionHeaderSpin {
-  to {
-    transform: rotate(360deg);
   }
 }

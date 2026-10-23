@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
@@ -15,8 +16,7 @@ import {
   DotsThreeIcon,
   LinkSimpleIcon,
   ShieldCheckIcon,
-  SpinnerGapIcon,
-} from '@phosphor-icons/react'
+  } from '@phosphor-icons/react'
 import { buildAssetLinks } from '@/components/TradeCard'
 import { getNftCollectionTokens } from '@/lib/api'
 import { formatStake } from '@/hooks/useStakeToken'
@@ -385,7 +385,7 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
                           close()
                         }}
                       >
-                        <ArrowsClockwiseIcon size={15} className={clsx(isRefreshing && styles['header__menuItem--spinning'])} />
+                        {isRefreshing ? <Spinner size={15} color="currentColor" /> : <ArrowsClockwiseIcon size={15} />}
                         <span>
                           Refresh collection
                           <small>Re-read the banner, description, links and every NFT from the blockchain</small>
@@ -461,7 +461,7 @@ export default function CollectionHeader({ chainId, chainInfo, address, info, st
                   className={clsx(styles.header__chip, styles['header__chip--auditing'])}
                   title={permanence.audit?.startedAt ? "Hup is probing where this collection's bytes live" : "Queued for Hup's permanence audit — a worker picks it up next"}
                 >
-                  <SpinnerGapIcon size={12} className={styles['header__menuItem--spinning']} />
+                  <Spinner color="currentColor" size={12} />
                   {permanence.audit?.startedAt ? 'Auditing' : 'Audit queued'}
                 </span>
               ) : null}

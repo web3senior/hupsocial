@@ -1,6 +1,7 @@
 /* @file app/admin/contracts/page.jsx */
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useState, useEffect, useRef } from 'react'
 import { useConnection, useWriteContract } from 'wagmi' // Hook added here
 import { waitForTransactionReceipt } from 'wagmi/actions'
@@ -2217,7 +2218,7 @@ export default function Page() {
                 <div className={styles['admin-contracts__detail-row']}>
                   <span className={styles['admin-contracts__detail-label']}>On-Chain Follower System</span>
                   <div className={styles['admin-contracts__detail-value']}>
-                    {(!state || state.loading) && <span>Loading…</span>}
+                    {(!state || state.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                     {state?.error && (
                       <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                         {state.error}
@@ -2760,7 +2761,7 @@ export default function Page() {
                       </div>
 
                       <div className={styles['admin-contracts__details']}>
-                        {!balances && <span className={styles['admin-contracts__detail-value']}>Loading…</span>}
+                        {!balances && <span className={styles['admin-contracts__detail-value']}><Spinner size={16} color="currentColor" /> Loading…</span>}
 
                         {balances?.error && (
                           <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
@@ -3061,7 +3062,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Current Fees</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!fees || fees.loading) && <span>Loading…</span>}
+                            {(!fees || fees.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {fees?.error && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                                 {fees.error}
@@ -3386,7 +3387,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Current Fees</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!fees || fees.loading) && <span>Loading…</span>}
+                            {(!fees || fees.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {fees?.error && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                                 {fees.error}
@@ -3592,7 +3593,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Current Fees</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!fees || fees.loading) && <span>Loading…</span>}
+                            {(!fees || fees.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {fees?.error && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                                 {fees.error}
@@ -3803,7 +3804,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Current Config</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!predictConfig || predictConfig.loading) && <span>Loading…</span>}
+                            {(!predictConfig || predictConfig.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {predictConfig?.error && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                                 {predictConfig.error}
@@ -4100,7 +4101,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Current Sale Fee</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!fee || fee.loading) && <span>Loading…</span>}
+                            {(!fee || fee.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {fee?.error && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                                 {fee.error}
@@ -4300,7 +4301,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Accrued Fees (withdrawable)</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!fee || fee.loading) && <span>Loading…</span>}
+                            {(!fee || fee.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {fee && !fee.loading && !fee.error && (
                               <strong>
                                 {formatNative(fee.accruedNative)} {symbol}
@@ -4312,7 +4313,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Current Offer Fee</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!fee || fee.loading) && <span>Loading…</span>}
+                            {(!fee || fee.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {fee?.error && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                                 {fee.error}
@@ -4503,7 +4504,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Contract Version</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!versionState || versionState.loading) && <span>Loading…</span>}
+                            {(!versionState || versionState.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {versionState?.error && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                                 {versionState.error}
@@ -4710,7 +4711,7 @@ export default function Page() {
                                 {dropStandardLabel(id)} deployer — standard {id} ({hint})
                               </span>
                               <div className={styles['admin-contracts__detail-value']}>
-                                {(!state || state.loading) && <span>Loading…</span>}
+                                {(!state || state.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                                 {state && !state.loading && !state.error && !isRegistered && (
                                   <div
                                     className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}
@@ -4767,7 +4768,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Followers-Gate Registry</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!state || state.loading) && <span>Loading…</span>}
+                            {(!state || state.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {followerUnset && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--warning'])}>
                                 ⚠️ Unset (address zero) — followers-gated drops can&apos;t be created on this chain
@@ -5240,7 +5241,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Contract</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!fundConfig || fundConfig.loading) && <span>Loading…</span>}
+                            {(!fundConfig || fundConfig.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {fundConfig?.error && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                                 {fundConfig.error}
@@ -5461,7 +5462,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Contract</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!taskConfig || taskConfig.loading) && <span>Loading…</span>}
+                            {(!taskConfig || taskConfig.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {taskConfig?.error && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                                 {taskConfig.error}
@@ -5780,7 +5781,7 @@ export default function Page() {
                             <span className={styles['admin-contracts__detail-label']}>Token Balances</span>
                             <div className={styles['admin-contracts__detail-value']}>
                               {!tokenBalances.items ? (
-                                <span>Loading…</span>
+                                <span><Spinner size={16} color="currentColor" /> Loading…</span>
                               ) : (
                                 tokenBalances.items.map((item, index) => (
                                   <span key={item.token}>
@@ -5802,7 +5803,7 @@ export default function Page() {
                         <div className={styles['admin-contracts__detail-row']}>
                           <span className={styles['admin-contracts__detail-label']}>Current Prices</span>
                           <div className={styles['admin-contracts__detail-value']}>
-                            {(!plans || plans.loading) && <span>Loading…</span>}
+                            {(!plans || plans.loading) && <span><Spinner size={16} color="currentColor" /> Loading…</span>}
                             {plans?.error && (
                               <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>
                                 {plans.error}

@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import { useConnection, useSignMessage, useSignTypedData, useSwitchChain } from 'wagmi'
@@ -9,7 +10,6 @@ import {
   CalendarDotsIcon,
   CheckCircleIcon,
   PaperPlaneTiltIcon,
-  SpinnerIcon,
   WarningCircleIcon,
   XCircleIcon,
 } from '@phosphor-icons/react'
@@ -47,7 +47,7 @@ const SENDING_POLL_MS = 5000
 const POST_NOW_BACKDATE_S = 30
 
 const stateOf = (row) => {
-  if (row.status === 'sending') return { key: 'sending', label: 'Publishing…', Icon: SpinnerIcon }
+  if (row.status === 'sending') return { key: 'sending', label: 'Publishing…', Icon: Spinner }
   if (row.status === 'sent') return { key: 'sent', label: 'Sent', Icon: CheckCircleIcon }
   if (row.status === 'failed') return { key: 'failed', label: row.lastError ? `Failed: ${row.lastError}` : 'Failed', Icon: WarningCircleIcon }
   if (row.status === 'cancelled') return { key: 'cancelled', label: 'Cancelled', Icon: XCircleIcon }
@@ -201,7 +201,7 @@ export default function ScheduledPosts() {
 
       {error && <p className={styles.error}>{error}</p>}
 
-      {isLoading && rows.length === 0 && <p className={styles.loading}>Loading…</p>}
+      {isLoading && rows.length === 0 && <p className={styles.loading}><Spinner size={16} color="currentColor" /> Loading…</p>}
 
       {!isLoading && !error && rows.length === 0 && (
         <EmptyState icon={CalendarDotsIcon} align="center">
@@ -239,7 +239,7 @@ export default function ScheduledPosts() {
 
               <footer className={styles.row__footer}>
                 <span className={clsx(styles.row__state, styles[`row__state--${state.key}`])}>
-                  <Icon size={16} />
+                  <Icon size={16} color="currentColor" />
                   {state.label}
                 </span>
 

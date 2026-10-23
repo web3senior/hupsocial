@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useMemo, useRef, useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import clsx from 'clsx'
@@ -147,7 +148,7 @@ export default function EventsDirectory() {
         </section>
       )}
 
-      {isLoading && <p className={styles.directory__empty}>Loading events...</p>}
+      {isLoading && <p className={styles.directory__empty}><Spinner size={16} color="currentColor" /> Loading events...</p>}
 
       {!isLoading && events.length === 0 && (
         <div className={styles.directory__empty}>
@@ -165,7 +166,7 @@ export default function EventsDirectory() {
 
       {hasMore && (
         <button type="button" className={styles.directory__loadMore} onClick={() => setSize(size + 1)} disabled={isValidating}>
-          {isValidating ? 'Loading...' : 'Load more'}
+          {isValidating ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load more'}
         </button>
       )}
 

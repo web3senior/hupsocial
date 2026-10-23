@@ -7,7 +7,7 @@ import { useConnection } from 'wagmi'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import { communityProposalsPath } from '@/lib/communityGovernance'
 import { chainNameFor } from '@/lib/communityProposal'
-import { ContentSpinner } from '@/components/Loading'
+import { Spinner, ContentSpinner } from '@/components/Loading'
 import styles from './CommunityProposalDirectory.module.scss'
 
 const communityContracts = appChains
@@ -62,7 +62,7 @@ export default function CommunityProposalDirectory() {
           </li>
         ))}
       </ul>
-      {data?.at(-1)?.nextPage && <button type="button" className={styles.directory__loadMore} disabled={isValidating} onClick={() => setSize(size + 1)}>{isValidating ? 'Loading…' : 'Load more'}</button>}
+      {data?.at(-1)?.nextPage && <button type="button" className={styles.directory__loadMore} disabled={isValidating} onClick={() => setSize(size + 1)}>{isValidating ? <><Spinner size={16} color="currentColor" /> Loading…</> : 'Load more'}</button>}
     </div>
   )
 }

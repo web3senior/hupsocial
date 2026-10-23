@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { FunnelIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
@@ -117,7 +118,7 @@ export default function TraitFilter({ traits, selected, onChange, isLoading, lis
           )}
 
           {isLoading && traits.length === 0 ? (
-            <p className={styles.traitFilter__hint}>Loading traits...</p>
+            <p className={styles.traitFilter__hint}><Spinner size={16} color="currentColor" /> Loading traits...</p>
           ) : visibleTraits.length === 0 ? (
             <p className={styles.traitFilter__hint}>
               {traits.length === 0 ? 'No NFT from this collection on the market carries traits yet.' : 'No trait matches that search.'}

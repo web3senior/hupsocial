@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useState } from 'react'
 import { useReadContract } from 'wagmi'
 import { erc20Abi, parseUnits } from 'viem'
@@ -288,7 +289,7 @@ export default function CollectionFilters({ chainId, collection, chainInfo, valu
               ))}
             </select>
             {tokenOptions.length === 0 && (
-              <small className={styles.filters__hint}>{isLoadingTokens ? 'Loading currencies...' : 'Nothing from this collection has been listed yet'}</small>
+              <small className={styles.filters__hint}>{isLoadingTokens ? <><Spinner size={16} color="currentColor" /> Loading currencies...</> : 'Nothing from this collection has been listed yet'}</small>
             )}
           </div>
 

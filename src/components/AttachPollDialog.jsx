@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import clsx from 'clsx'
@@ -103,7 +104,7 @@ const AttachPollDialog = forwardRef(function AttachPollDialog({ chainId, onAttac
           <h4>Or attach one you already asked</h4>
 
           {!address && <p className={styles.attachPoll__empty}>Connect your wallet to see your polls.</p>}
-          {address && isLoading && <p className={styles.attachPoll__empty}>Loading your polls…</p>}
+          {address && isLoading && <p className={styles.attachPoll__empty}><Spinner size={16} color="currentColor" /> Loading your polls…</p>}
           {address && !isLoading && polls.length === 0 && (
             <p className={styles.attachPoll__empty}>
               <ListChecksIcon size={20} />

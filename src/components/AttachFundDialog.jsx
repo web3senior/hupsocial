@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import clsx from 'clsx'
@@ -105,7 +106,7 @@ const AttachFundDialog = forwardRef(function AttachFundDialog({ chainId, onAttac
           <h4>Or attach one you already started</h4>
 
           {!address && <p className={styles.attachFund__empty}>Connect your wallet to see your campaigns.</p>}
-          {address && isLoading && <p className={styles.attachFund__empty}>Loading your campaigns…</p>}
+          {address && isLoading && <p className={styles.attachFund__empty}><Spinner size={16} color="currentColor" /> Loading your campaigns…</p>}
           {address && !isLoading && campaigns.length === 0 && (
             <p className={styles.attachFund__empty}>
               <BagIcon size={20} />

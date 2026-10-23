@@ -53,9 +53,6 @@
       color: var(--text-muted);
     }
 
-    &--spinning {
-      animation: nftMarketRefreshSpin 0.9s linear infinite;
-    }
   }
 
   &__sellButton {
@@ -440,12 +437,6 @@
 :global([data-theme='terminal']) {
   .search {
     --search-bg: #12301c;
-  }
-}
-
-@keyframes nftMarketRefreshSpin {
-  to {
-    transform: rotate(360deg);
   }
 }
 

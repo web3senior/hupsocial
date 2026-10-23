@@ -263,10 +263,6 @@
     text-align: inherit;
   }
 
-  &__spin {
-    animation: collectionAuditSpin 0.9s linear infinite;
-  }
-
   &__badges {
     display: flex;
     flex-wrap: wrap;
@@ -862,12 +858,6 @@
     &__table &__row--group td {
       border-top: none;
     }
-  }
-}
-
-@keyframes collectionAuditSpin {
-  to {
-    transform: rotate(360deg);
   }
 }
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -258,7 +259,7 @@ export default function PredictDirectory() {
         </div>
       )}
 
-      {isLoading && <p className={styles.directory__empty}>Loading markets...</p>}
+      {isLoading && <p className={styles.directory__empty}><Spinner size={16} color="currentColor" /> Loading markets...</p>}
 
       {!isLoading && listMarkets.length === 0 && !showFeaturedStrip && (
         <div className={styles.directory__empty}>
@@ -281,7 +282,7 @@ export default function PredictDirectory() {
 
       {hasMore && (
         <button type="button" className={styles.directory__loadMore} onClick={() => setSize(size + 1)} disabled={isValidating}>
-          {isValidating ? 'Loading...' : 'Load more'}
+          {isValidating ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load more'}
         </button>
       )}
 

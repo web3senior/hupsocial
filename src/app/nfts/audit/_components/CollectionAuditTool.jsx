@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -352,7 +353,7 @@ export default function CollectionAuditTool() {
         </div>
 
         {boardRows.length === 0 ? (
-          <p className={styles.tool__note}>{isBoardLoading ? 'Loading…' : 'Nothing has been audited yet — paste a collection above to be the first.'}</p>
+          <p className={styles.tool__note}>{isBoardLoading ? <><Spinner size={16} color="currentColor" /> Loading…</> : 'Nothing has been audited yet — paste a collection above to be the first.'}</p>
         ) : (
           <div className={styles.tool__tableWrap}>
             <table className={styles.tool__table}>

@@ -7,7 +7,7 @@ import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import { CurrencyDollarIcon, StorefrontIcon, WalletIcon, ImageIcon, HandCoinsIcon } from '@phosphor-icons/react'
 import PageTitle from '@/components/PageTitle'
-import { ContentSpinner } from '@/components/Loading'
+import { Spinner, ContentSpinner } from '@/components/Loading'
 import { useClientMounted } from '@/hooks/useClientMount'
 import RevenueHero from './_components/RevenueHero'
 import SaleCard from './_components/SaleCard'
@@ -186,7 +186,7 @@ export default function RevenuePage() {
                       onClick={() => setSize(size + 1)}
                       disabled={isValidating}
                     >
-                      {isValidating ? 'Loading…' : 'Load more'}
+                      {isValidating ? <><Spinner size={16} color="currentColor" /> Loading…</> : 'Load more'}
                     </button>
                   )}
                 </>

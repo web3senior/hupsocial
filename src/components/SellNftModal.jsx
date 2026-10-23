@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useRef, useState } from 'react'
 import {
   useConnection,
@@ -1196,7 +1197,7 @@ const SellNftModal = ({ chainId: initialChainId = null, token = null, onAttached
             <div className={styles.sellNftModal__previewMain}>
               {metadata.image && <img src={metadata.image} alt={metadata.name || 'NFT'} />}
               <div className={styles.sellNftModal__previewText}>
-                <strong>{metadata.name || (metadata.isLoading ? 'Loading…' : 'Unknown token')}</strong>
+                <strong>{metadata.name || (metadata.isLoading ? <><Spinner size={16} color="currentColor" /> Loading…</> : 'Unknown token')}</strong>
                 {metadata.collectionName && <span>{metadata.collectionName}</span>}
                 {isOwner && <span className={styles.sellNftModal__owned}>Owned by you ✓</span>}
                 {owner && !isOwner && <span className={styles.sellNftModal__warning}>This token belongs to another wallet</span>}

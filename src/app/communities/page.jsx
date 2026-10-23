@@ -57,7 +57,7 @@ import { DEFAULT_COVER_POSITION, coverObjectPosition, coverPositionFrom } from '
 import CreateCommunityModal from './_components/CreateCommunityModal'
 import CommunityTile, { CommunityTileSkeleton } from './_components/CommunityTile'
 import DropsHero, { HeroChain } from '@/components/DropsHero'
-import { ContentSpinner } from '@/components/Loading'
+import { Spinner, ContentSpinner } from '@/components/Loading'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
 import { AssetUnitLabel, TokenRequirementTag, TokenUnitHint } from './_components/TokenAmount'
 import TokenAssetInput from './_components/TokenAssetInput'
@@ -3958,7 +3958,7 @@ export default function CommunitiesPage() {
                   disabled={isDirectoryLoading}
                 >
                   {isDirectoryLoading ? <ContentSpinner size={16} /> : null}
-                  {isDirectoryLoading ? 'Loading' : `Show more · ${countFormat.format(totalCommunities - communityRows.length)} left`}
+                  {isDirectoryLoading ? <><Spinner size={16} color="currentColor" /> Loading</> : `Show more · ${countFormat.format(totalCommunities - communityRows.length)} left`}
                 </button>
               </div>
             )}

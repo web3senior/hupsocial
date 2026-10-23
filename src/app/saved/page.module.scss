@@ -98,12 +98,6 @@
 
   &__spinner {
     flex-shrink: 0;
-    width: 13px;
-    height: 13px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    border-top-color: var(--network-color-primary, var(--color-primary));
-    animation: savedSpin 0.7s linear infinite;
   }
 }
 
@@ -507,11 +501,5 @@
   }
   50% {
     opacity: 1;
-  }
-}
-
-@keyframes savedSpin {
-  to {
-    transform: rotate(1turn);
   }
 }

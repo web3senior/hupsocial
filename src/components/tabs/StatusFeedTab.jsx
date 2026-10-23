@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useState, useEffect, useCallback } from 'react'
 import clsx from 'clsx'
 import { getStatuses } from '@/lib/api'
@@ -116,7 +117,7 @@ export default function StatusFeedTab() {
       {hasMore && (
         <div className="flex justify-content-center p-100">
           <button className={styles['status-feed__load-more']} onClick={loadMore} disabled={isFetching}>
-            {isFetching ? 'Loading...' : 'Load More'}
+            {isFetching ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load More'}
           </button>
         </div>
       )}

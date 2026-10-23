@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
@@ -267,7 +268,7 @@ export default function CollectionBrowser({
       {hasMore && !isLoading && (
         <div className={styles.browser__loadMoreWrap}>
           <button type="button" className={styles.browser__loadMore} onClick={loadMore} disabled={isFetchingMore}>
-            {isFetchingMore ? 'Loading...' : 'Load more'}
+            {isFetchingMore ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load more'}
           </button>
         </div>
       )}

@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -653,7 +654,7 @@ export default function NftMarketGrid() {
             onClick={handleRefreshCollection}
             disabled={collectionRefresh.isRefreshing}
           >
-            <ArrowsClockwiseIcon size={16} className={clsx(collectionRefresh.isRefreshing && styles['market__refreshButton--spinning'])} />
+            {collectionRefresh.isRefreshing ? <Spinner size={16} color="currentColor" /> : <ArrowsClockwiseIcon size={16} />}
           </button>
         )}
 
@@ -832,7 +833,7 @@ export default function NftMarketGrid() {
                 </select>
                 {tokenOptions.length === 0 && (
                   <small className={styles.filtersPanel__hint}>
-                    {isLoadingTokens ? 'Loading currencies...' : 'No listings on this network yet'}
+                    {isLoadingTokens ? <><Spinner size={16} color="currentColor" /> Loading currencies...</> : 'No listings on this network yet'}
                   </small>
                 )}
               </div>
@@ -920,7 +921,7 @@ export default function NftMarketGrid() {
       {hasMore && !isLoading && (
         <div className={styles.market__loadMoreWrap}>
           <button type="button" className={styles.market__loadMore} onClick={loadMore} disabled={isFetchingMore}>
-            {isFetchingMore ? 'Loading...' : 'Load more'}
+            {isFetchingMore ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load more'}
           </button>
         </div>
       )}

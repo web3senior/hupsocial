@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
@@ -283,7 +284,7 @@ export default function CollectionAuditReport({ chainId, chainInfo, collection, 
             <strong>The audit could not run</strong>
             <p>{audit?.error || 'The collection did not answer as a contract on this network.'}</p>
             <button type="button" className={styles.audit__button} onClick={onRequest} disabled={isRequesting}>
-              <ArrowsClockwiseIcon size={14} className={clsx(isRequesting && styles['audit__spin'])} /> Try again
+              {isRequesting ? <Spinner size={14} color="currentColor" /> : <ArrowsClockwiseIcon size={14} />} Try again
             </button>
           </>
         ) : (
@@ -331,7 +332,7 @@ export default function CollectionAuditReport({ chainId, chainInfo, collection, 
             <span className={styles.audit__title}>Will this collection’s files still be there in ten years?</span>
             {status === 'refreshing' && (
               <span className={styles.audit__refreshing}>
-                <ArrowsClockwiseIcon size={12} className={styles.audit__spin} /> {audit.startedAt ? audit.progress || 're-auditing' : audit.queueAhead > 0 ? `queued, ${COUNT.format(audit.queueAhead)} ahead` : 're-audit queued'}
+                <Spinner size={12} color="currentColor" /> {audit.startedAt ? audit.progress || 're-auditing' : audit.queueAhead > 0 ? `queued, ${COUNT.format(audit.queueAhead)} ahead` : 're-audit queued'}
               </span>
             )}
           </div>
@@ -356,7 +357,7 @@ export default function CollectionAuditReport({ chainId, chainInfo, collection, 
         </div>
         <div className={styles.audit__actions}>
           <button type="button" className={styles.audit__button} onClick={onRequest} disabled={isRequesting || isPending} title="Ask cidex to probe this collection again">
-            <ArrowsClockwiseIcon size={14} className={clsx((isRequesting || isPending) && styles.audit__spin)} />
+            {isRequesting || isPending ? <Spinner size={14} color="currentColor" /> : <ArrowsClockwiseIcon size={14} />}
             {isPending ? 'Auditing…' : 'Re-check'}
           </button>
           {requestError && <small className={styles.audit__requestError}>{requestError.message}</small>}

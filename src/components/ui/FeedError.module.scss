@@ -41,19 +41,5 @@
 
   &__icon {
     flex-shrink: 0;
-
-    &--spinning {
-      animation: feed-error-spin 0.8s linear infinite;
-
-      @media (prefers-reduced-motion: reduce) {
-        animation: none;
-      }
-    }
-  }
-}
-
-@keyframes feed-error-spin {
-  100% {
-    transform: rotate(360deg);
   }
 }

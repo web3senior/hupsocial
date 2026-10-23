@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useRouter } from 'next/navigation'
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useConnection } from 'wagmi'
@@ -539,7 +540,7 @@ export default function HomeFeedTab({
                 }}
                 disabled={isFetching}
               >
-                {isFetching ? 'Loading...' : 'Load More'}
+                {isFetching ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load More'}
               </button>
             </div>
           )}

@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import clsx from 'clsx'
 import { useCashtags } from '@/hooks/useCashtags'
 import TokenIcon from '@/components/ui/TokenIcon'
@@ -30,7 +31,7 @@ export default function Ticker({ symbol }) {
   const { tokens, isLoading } = useCashtags(null, [symbol])
   const token = tokens[0]
 
-  if (isLoading) return <div className={styles.tickerContainer}>Loading...</div>
+  if (isLoading) return <div className={styles.tickerContainer}><Spinner size={16} color="currentColor" /> Loading...</div>
   if (!token?.price) return null
 
   const { name, price, logo, chainSlug, chainId, address, mcap, holders } = token

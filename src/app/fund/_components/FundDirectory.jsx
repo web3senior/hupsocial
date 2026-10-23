@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import useSWRInfinite from 'swr/infinite'
@@ -270,7 +271,7 @@ export default function FundDirectory() {
 
       {hasMore && (
         <button type="button" className={styles.directory__loadMore} onClick={() => setSize(size + 1)} disabled={isValidating}>
-          {isValidating ? 'Loading...' : 'Load more'}
+          {isValidating ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load more'}
         </button>
       )}
 

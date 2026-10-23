@@ -1,7 +1,8 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import clsx from 'clsx'
-import { HeartIcon, SpinnerIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
+import { HeartIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 import NativePopover from '@/components/ui/NativePopover'
 import { toast } from '@/components/NextToast'
 import { useBatchLike } from '@/hooks/useBatchLike'
@@ -66,7 +67,7 @@ export default function BatchLikeTrigger({ className, badgeClassName }) {
               onClick={() => send(group.networkId)}
             >
               {isSending ? (
-                <SpinnerIcon className="animate spin" />
+                <Spinner color="currentColor" size={20} />
               ) : (
                 <HeartIcon weight="fill" color="var(--batch-like-color, #facc15)" />
               )}
@@ -128,7 +129,7 @@ export default function BatchLikeTrigger({ className, badgeClassName }) {
                         <HeartIcon size={11} weight="fill" />
                         {group.count}
                       </span>
-                      {pendingNetworkId === group.networkId && <SpinnerIcon size={14} className="animate spin" />}
+                      {pendingNetworkId === group.networkId && <Spinner color="currentColor" size={14} />}
                     </button>
 
                     <button

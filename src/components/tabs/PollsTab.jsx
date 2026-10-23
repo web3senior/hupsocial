@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useMemo } from 'react'
 import Link from 'next/link'
 import useSWRInfinite from 'swr/infinite'
@@ -42,7 +43,7 @@ export default function PollsTab() {
   return (
     <div className={clsx(styles.tabContent, 'relative')}>
       <div className="__container" data-width="medium">
-        {isLoading && <p className={styles.pollsTab__status}>Loading polls...</p>}
+        {isLoading && <p className={styles.pollsTab__status}><Spinner size={16} color="currentColor" /> Loading polls...</p>}
 
         {!isLoading && polls.length === 0 && <NoData name="polls" />}
 
@@ -104,7 +105,7 @@ export default function PollsTab() {
 
         {hasMore && (
           <button type="button" className={styles.pollsTab__loadMore} onClick={() => setSize(size + 1)} disabled={isValidating}>
-            {isValidating ? 'Loading...' : 'Load more'}
+            {isValidating ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load more'}
           </button>
         )}
 

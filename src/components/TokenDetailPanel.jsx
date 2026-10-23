@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
@@ -557,7 +558,7 @@ export default function TokenDetailPanel({
                 {topOfferUsd && <span className={styles.token__usd}>{topOfferUsd}</span>}
               </p>
             ) : (
-              <p className={styles.token__status}>{market.isLoading ? 'Loading…' : 'Not listed'}</p>
+              <p className={styles.token__status}>{market.isLoading ? <><Spinner size={16} color="currentColor" /> Loading…</> : 'Not listed'}</p>
             )}
           </div>
         )}
@@ -622,7 +623,7 @@ export default function TokenDetailPanel({
           aside={priceSeries?.points.length ? `${priceSeries.points.length} ${priceSeries.points.length === 1 ? 'sale' : 'sales'}` : null}
         >
           {!priceSeries || priceSeries.points.length === 0 ? (
-            <p className={styles.token__empty}>{market.isLoading ? 'Loading…' : 'This token has never sold on Hup.'}</p>
+            <p className={styles.token__empty}>{market.isLoading ? <><Spinner size={16} color="currentColor" /> Loading…</> : 'This token has never sold on Hup.'}</p>
           ) : priceSeries.points.length === 1 ? (
             // One point is not a trend, and a line chart drawn through it would imply one
             <p className={styles.token__single}>
@@ -684,7 +685,7 @@ export default function TokenDetailPanel({
         <DetailSection title="Listings" icon={<ListBulletsIcon size={16} />} count={listing ? 1 : 0} defaultOpen={Boolean(listing)}>
           {!listing ? (
             <p className={styles.token__empty}>
-              {market.isLoading ? 'Loading…' : 'Not listed for sale. Any past listings are in Activity below.'}
+              {market.isLoading ? <><Spinner size={16} color="currentColor" /> Loading…</> : 'Not listed for sale. Any past listings are in Activity below.'}
             </p>
           ) : (
             <div className={styles.token__scroller}>
@@ -824,7 +825,7 @@ export default function TokenDetailPanel({
         <DetailSection title="Activity" icon={<ClockCounterClockwiseIcon size={16} />} count={market.activity.length}>
           {market.activity.length === 0 ? (
             <p className={styles.token__empty}>
-              {market.isLoading ? 'Loading…' : 'Nothing has happened to this token on Hup yet — no listings, offers or sales.'}
+              {market.isLoading ? <><Spinner size={16} color="currentColor" /> Loading…</> : 'Nothing has happened to this token on Hup yet — no listings, offers or sales.'}
             </p>
           ) : (
             <ul className={styles.token__activity}>
@@ -1023,7 +1024,7 @@ export default function TokenDetailPanel({
               disabled={metadata.isRefreshing}
               title="Re-read this NFT's name, traits and artwork from the blockchain"
             >
-              <ArrowsClockwiseIcon size={14} className={clsx(metadata.isRefreshing && styles['token__action--spinning'])} />
+              {metadata.isRefreshing ? <Spinner size={14} color="currentColor" /> : <ArrowsClockwiseIcon size={14} />}
               {metadata.isRefreshing ? 'Refreshing…' : 'Refresh metadata'}
             </button>
 
@@ -1035,7 +1036,7 @@ export default function TokenDetailPanel({
               title="Re-read every NFT in this collection from the blockchain"
             >
               {collectionRefresh.isRefreshing ? (
-                <ArrowsClockwiseIcon size={14} className={styles['token__action--spinning']} />
+                <Spinner size={14} color="currentColor" />
               ) : (
                 <StackIcon size={14} />
               )}

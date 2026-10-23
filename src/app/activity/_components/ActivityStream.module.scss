@@ -83,10 +83,6 @@
     flex-direction: column;
   }
 
-  &__spin {
-    animation: activity-spin 0.9s linear infinite;
-  }
-
   &__more {
     padding: 0.75rem;
     border: 1px solid var(--border);
@@ -149,12 +145,6 @@
       background-size: 200% 100%;
       animation: activity-shimmer 1.4s ease-in-out infinite;
     }
-  }
-}
-
-@keyframes activity-spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 

@@ -1,8 +1,9 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowSquareOutIcon, ArrowsCounterClockwiseIcon, ClockIcon, HeartIcon, PulseIcon, SpinnerIcon, UserIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, ArrowsCounterClockwiseIcon, ClockIcon, HeartIcon, PulseIcon, UserIcon } from '@phosphor-icons/react'
 import { useConnection } from 'wagmi'
 import Profile from '@/components/Profile'
 import { toRelativeTime } from '@/lib/dateHelper'
@@ -112,14 +113,14 @@ export default function LikedPosts() {
           aria-label="Refresh liked posts"
           title="Refresh liked posts"
         >
-          <ArrowsCounterClockwiseIcon className={isLoading ? styles.spin : undefined} size={16} />
+          {isLoading ? <Spinner size={16} color="currentColor" label="Refreshing" /> : <ArrowsCounterClockwiseIcon size={16} />}
         </button>
       </div>
 
       <div className={styles.feed}>
         {!hasItems && isLoading ? (
           <div className={styles.status}>
-            <SpinnerIcon className={styles.spin} size={16} />
+            <Spinner color="currentColor" size={16} />
             Loading liked items...
           </div>
         ) : null}
@@ -150,7 +151,7 @@ export default function LikedPosts() {
           >
             {isLoading ? (
               <>
-                <SpinnerIcon className={styles.spin} size={16} />
+                <Spinner color="currentColor" size={16} />
                 Loading...
               </>
             ) : (
@@ -234,7 +235,7 @@ function LikedPostRow({ item, currentAddress }) {
           
           {isLoadingPost && (
             <div className={styles.postPreviewLoader}>
-              <SpinnerIcon className={styles.spin} size={12} />
+              <Spinner color="currentColor" size={12} />
               <span>Loading content...</span>
             </div>
           )}

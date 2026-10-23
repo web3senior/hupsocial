@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useState } from 'react'
 import { EnvelopeSimpleIcon } from '@phosphor-icons/react'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -124,7 +125,7 @@ export default function EmailNotifications() {
 
       {!isConnected && <p className={styles.emailNotif__hint}>Connect a wallet to set up email notifications.</p>}
 
-      {isConnected && step === 'loading' && <p className={styles.emailNotif__hint}>Loading…</p>}
+      {isConnected && step === 'loading' && <p className={styles.emailNotif__hint}><Spinner size={16} color="currentColor" /> Loading…</p>}
 
       {isConnected && step === 'input' && (
         <form className={styles.emailNotif__form} onSubmit={requestCode}>

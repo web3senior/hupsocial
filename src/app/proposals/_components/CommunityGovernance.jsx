@@ -10,7 +10,7 @@ import { communityPath, communityProposalPath, formatRulePercent, COMMUNITY_PROP
 import { formatRelative, sameAddress } from '@/lib/communityProposal'
 import governanceAbi from '@/abis/HupCommunityGovernance.json'
 import communityAbi from '@/abis/HupCommunity.json'
-import { ContentSpinner } from '@/components/Loading'
+import { Spinner, ContentSpinner } from '@/components/Loading'
 import { usePaymentToken } from '@/hooks/usePaymentToken'
 import TokenAssetInput from '@/app/communities/_components/TokenAssetInput'
 import CopyButton from '@/components/ui/CopyButton'
@@ -204,7 +204,7 @@ function TreasuryTokenBalance({ treasury, chainId }) {
     <div className={styles.governance__field}>
       <span>Check token balance</span>
       <TokenAssetInput chainId={chainId} value={asset} onChange={setAsset} allowNative={false} />
-      {asset && <span>{isLoading || token.isLoading ? 'Loading token…' : error || amount === null || !token.exists ? 'Could not read this token balance' : `${formatUnits(amount, token.decimals)} ${token.symbol}`}</span>}
+      {asset && <span>{isLoading || token.isLoading ? <><Spinner size={16} color="currentColor" /> Loading token…</> : error || amount === null || !token.exists ? 'Could not read this token balance' : `${formatUnits(amount, token.decimals)} ${token.symbol}`}</span>}
     </div>
   )
 }

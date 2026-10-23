@@ -32,7 +32,7 @@ import { useProfile } from '@/hooks/useProfile'
 import EmojiPicker from '@/components/EmojiPicker'
 import GifPicker from '@/components/GifPicker'
 import EmptyState from '@/components/ui/EmptyState'
-import { ContentSpinner, MessageLoader } from '@/components/Loading'
+import { Spinner, ContentSpinner, MessageLoader } from '@/components/Loading'
 import NativePopover from '@/components/ui/NativePopover'
 import { toast } from '@/components/NextToast'
 import { openConnect } from '@/lib/connectDialog'
@@ -1285,11 +1285,11 @@ function Room({
       <div className={styles.room} ref={listRef} onScroll={onScroll} hidden={searching}>
         <div className={styles.room__content} ref={contentRef}>
           {messages === null ? (
-            <div className={styles.room__notice}>Loading…</div>
+            <div className={styles.room__notice}><Spinner size={16} color="currentColor" /> Loading…</div>
           ) : (
             <>
               {hasOlder && (
-                <div className={styles.room__notice}>{isPaging ? 'Loading earlier messages…' : 'Scroll up for earlier messages'}</div>
+                <div className={styles.room__notice}>{isPaging ? <><Spinner size={16} color="currentColor" /> Loading earlier messages…</> : 'Scroll up for earlier messages'}</div>
               )}
               {messages.length === 0 && (
                 <EmptyState icon={ChatCircleIcon} align="center" size="sm" className={styles.room__empty}>
@@ -1318,7 +1318,7 @@ function Room({
                 />
               ))}
               {hasNewer && (
-                <div className={styles.room__notice}>{isPaging ? 'Loading newer messages…' : 'Scroll down for newer messages'}</div>
+                <div className={styles.room__notice}>{isPaging ? <><Spinner size={16} color="currentColor" /> Loading newer messages…</> : 'Scroll down for newer messages'}</div>
               )}
             </>
           )}

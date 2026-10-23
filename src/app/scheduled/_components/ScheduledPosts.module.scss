@@ -136,9 +136,6 @@
       color: var(--warning-500, #f59e0b);
     }
 
-    &--sending svg {
-      animation: spin 1s linear infinite;
-    }
   }
 
   &__actions {
@@ -175,11 +172,5 @@
 
   &__action--danger {
     color: #cb2e2e;
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
   }
 }

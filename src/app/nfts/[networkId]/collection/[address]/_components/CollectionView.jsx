@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { XIcon } from '@phosphor-icons/react'
@@ -416,7 +417,7 @@ export default function CollectionView({ networkId, address }) {
         {hasMore && !isLoading && !isBrowsingCollection && (
           <div className={styles.collection__loadMoreWrap}>
             <button type="button" className={styles.collection__loadMore} onClick={loadMore} disabled={isFetchingMore}>
-              {isFetchingMore ? 'Loading...' : 'Load more'}
+              {isFetchingMore ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load more'}
             </button>
           </div>
         )}

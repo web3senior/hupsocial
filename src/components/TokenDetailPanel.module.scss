@@ -239,9 +239,6 @@ $rarity: (
       }
     }
 
-    &--spinning {
-      animation: token-detail-spin 0.9s linear infinite;
-    }
   }
 
   // The record itself: a stack of DetailSections, each owning its own frame
@@ -786,11 +783,5 @@ $rarity: (
     background: var(--network-color-primary);
     border-radius: 999px;
     white-space: nowrap;
-  }
-}
-
-@keyframes token-detail-spin {
-  to {
-    transform: rotate(360deg);
   }
 }

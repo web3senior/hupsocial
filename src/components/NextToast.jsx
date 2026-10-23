@@ -1,6 +1,8 @@
 'use client'
 
 import clsx from 'clsx'
+import { createRoot } from 'react-dom/client'
+import { Spinner } from '@/components/Loading'
 import styles from './NextToast.module.scss'
 
 const DEFAULT_DURATION = 5000
@@ -18,7 +20,6 @@ const ICONS = {
   danger: `<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10ZM9.707 8.293a1 1 0 0 0-1.414 1.414L10.586 12l-2.293 2.293a1 1 0 1 0 1.414 1.414L12 13.414l2.293 2.293a1 1 0 0 0 1.414-1.414L13.414 12l2.293-2.293a1 1 0 0 0-1.414-1.414L12 10.586 9.707 8.293Z"/></svg>`,
   warning: `<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.257 3.099c.765-1.36 2.722-1.36 3.486 0l8.485 15.098c.75 1.335-.214 2.985-1.743 2.985H3.515c-1.53 0-2.493-1.65-1.743-2.985L10.257 3.1ZM12 8a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V9a1 1 0 0 1 1-1Zm0 10a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z"/></svg>`,
   info: `<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Zm0-16a1.25 1.25 0 1 0 0 2.5A1.25 1.25 0 0 0 12 6Zm1 5a1 1 0 1 0-2 0v6a1 1 0 1 0 2 0v-6Z"/></svg>`,
-  loading: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9"/></svg>`,
 }
 
 const CLOSE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`
@@ -80,6 +81,13 @@ export const toast = (message = `Default message`, type, options) => {
 
   const icon = document.createElement(`span`)
   icon.className = styles['toast__icon']
+  let loadingRoot = null
+
+  const clearLoading = () => {
+    if (!loadingRoot) return
+    loadingRoot.unmount()
+    loadingRoot = null
+  }
 
   const text = document.createElement(`span`)
   text.className = styles['toast__message']
@@ -90,10 +98,19 @@ export const toast = (message = `Default message`, type, options) => {
   const applyType = (nextType) => {
     resolvedType = TYPE_ALIASES[nextType] ?? nextType
     div.className = clsx(styles['toast'], styles[resolvedType])
-    if (ICONS[resolvedType]) {
+    if (resolvedType === 'loading') {
+      if (!loadingRoot) {
+        icon.replaceChildren()
+        loadingRoot = createRoot(icon)
+      }
+      loadingRoot.render(<Spinner size={20} color="currentColor" />)
+      if (!icon.isConnected) div.insertBefore(icon, text)
+    } else if (ICONS[resolvedType]) {
+      clearLoading()
       icon.innerHTML = ICONS[resolvedType]
       if (!icon.isConnected) div.insertBefore(icon, text)
     } else if (icon.isConnected) {
+      clearLoading()
       icon.remove()
     }
   }
@@ -148,6 +165,7 @@ export const toast = (message = `Default message`, type, options) => {
     div.addEventListener(
       `animationend`,
       () => {
+        clearLoading()
         div.remove()
         restack(container)
       },

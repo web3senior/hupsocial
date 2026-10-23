@@ -229,10 +229,6 @@
     }
   }
 
-  &__spin {
-    animation: tokenInspectSpin 0.9s linear infinite;
-  }
-
   // The verdict in five sentences: icon, question and answer
   &__plain {
     list-style: none;
@@ -721,11 +717,5 @@
   }
   50% {
     opacity: 0.55;
-  }
-}
-
-@keyframes tokenInspectSpin {
-  to {
-    transform: rotate(360deg);
   }
 }

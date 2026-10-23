@@ -1,8 +1,9 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { ArrowClockwiseIcon, ArrowUpIcon, CubeIcon, ListDashesIcon, PulseIcon, SpinnerIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArrowUpIcon, CubeIcon, ListDashesIcon, PulseIcon } from '@phosphor-icons/react'
 import useStoredChoice from '@/hooks/useStoredChoice'
 import SegmentedControl from '@/components/ui/SegmentedControl'
 import ActivityBlock, { BlockGap } from './ActivityBlock'
@@ -181,7 +182,7 @@ export default function ActivityStream() {
           disabled={isRefreshing || isLoading}
           aria-label="Refresh activity"
         >
-          <ArrowClockwiseIcon size={16} className={clsx(isRefreshing && styles.stream__spin)} />
+          {isRefreshing ? <Spinner size={16} color="currentColor" label="Refreshing" /> : <ArrowClockwiseIcon size={16} />}
         </button>
       </header>
 
@@ -238,7 +239,7 @@ export default function ActivityStream() {
               onClick={() => load({ tabId: tab, cursor: nextCursor, mode: 'append' })}
               disabled={isPaging}
             >
-              {isPaging ? <SpinnerIcon size={16} className={styles.stream__spin} /> : 'Load more'}
+              {isPaging ? <Spinner color="currentColor" size={16} /> : 'Load more'}
             </button>
           )}
         </>

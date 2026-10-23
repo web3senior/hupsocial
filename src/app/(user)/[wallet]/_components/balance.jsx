@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { getActiveChain, initHupContract } from '@/lib/communication'
 import { useConnection, useBalance } from 'wagmi'
 import styles from './balance.module.scss'
@@ -41,7 +42,7 @@ export default function Balance({ addr, chainId = null }) {
   if (isBalanceLoading) {
     return (
       <div style={{ padding: '20px' }}>
-        <p>Loading balance...</p>
+        <p><Spinner size={16} color="currentColor" /> Loading balance...</p>
       </div>
     )
   }

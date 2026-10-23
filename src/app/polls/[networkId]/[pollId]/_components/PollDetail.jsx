@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -115,7 +116,7 @@ export default function PollDetail({ networkId, pollId }) {
     )
   }
 
-  if (!poll) return <p className={styles.detail__empty}>Loading poll...</p>
+  if (!poll) return <p className={styles.detail__empty}><Spinner size={16} color="currentColor" /> Loading poll...</p>
 
   const status = pollStatus(poll)
   const options = pollOptions(poll)
@@ -260,7 +261,7 @@ export default function PollDetail({ networkId, pollId }) {
 
         {hasMoreVotes && (
           <button type="button" className={styles.detail__more} onClick={loadMoreVotes} disabled={isLoadingVotes}>
-            {isLoadingVotes ? 'Loading...' : 'Show more voters'}
+            {isLoadingVotes ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Show more voters'}
           </button>
         )}
 

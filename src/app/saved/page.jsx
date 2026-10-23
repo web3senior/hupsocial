@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
@@ -341,7 +342,7 @@ export default function SavedPage() {
                     placeholder={selectedFolder ? `Search in ${selectedFolder.name}` : 'Search saved posts'}
                     aria-label="Search saved posts"
                   />
-                  {(isSearchPending || (isRefreshing && searchQuery)) && <span className={styles.search__spinner} aria-hidden="true" />}
+                  {(isSearchPending || (isRefreshing && searchQuery)) && <Spinner size={13} className={styles.search__spinner} label="Searching" />}
                   {queryInput && (
                     <button type="button" className={styles.search__clear} onClick={clearSearch} aria-label="Clear search">
                       <XIcon size={14} weight="bold" />
@@ -610,7 +611,7 @@ export default function SavedPage() {
                       <div ref={sentinelRef} aria-hidden="true" />
                       <div className="flex justify-content-center p-100">
                         <button className={styles.loadMore} onClick={loadMore} disabled={isLoadingMore}>
-                          {isLoadingMore ? 'Loading…' : 'Load more'}
+                          {isLoadingMore ? <><Spinner size={16} color="currentColor" /> Loading…</> : 'Load more'}
                         </button>
                       </div>
                     </>

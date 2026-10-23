@@ -1,7 +1,6 @@
 import React from 'react'
 import clsx from 'clsx'
 import { Clock, Ring } from 'loading-dev'
-import { Orb } from '@yogesharc/thinking-orbs'
 import styles from './Loading.module.scss'
 
 // Swap this for any other loading-dev export to restyle every spinner in the app.
@@ -43,9 +42,7 @@ export const ContentSpinner = ({ size = 20, color, className }) => (
 // Linear loading
 export const LinearLoading = () => (
   <div className={styles.loading}>
-    <div className={clsx(styles.loading__container, 'd-f-c', 'flex-column')}>
-      <div />
-    </div>
+    <Spinner />
   </div>
 )
 
@@ -56,10 +53,9 @@ export const MessageLoader = () => (
   </span>
 )
 
-// The AI status slot (Hupi): a dotted orb whose motion says what the agent is doing —
-// 'reasoning', 'searching', 'working', 'waiting'… It draws in currentColor, so the caller tints it.
-export const ThinkingOrb = ({ state = 'reasoning', size = 18, label = 'Thinking', className }) => (
-  <Orb state={state} size={size} label={label} className={className} />
+// Keep the shared AI status slot on the app's loading indicator.
+export const ThinkingOrb = ({ size = 18, label = 'Thinking', className }) => (
+  <Spinner size={size} color="currentColor" label={label} className={className} />
 )
 
 export default GlobalLoader

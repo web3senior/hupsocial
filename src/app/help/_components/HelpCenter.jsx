@@ -1,7 +1,8 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useState, useCallback } from 'react'
-import { CaretDownIcon, ChatIcon, CheckCircleIcon, PaperPlaneTiltIcon, QuestionIcon, QuestionIcon as GuestIcon, SpinnerIcon, WarningCircleIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, ChatIcon, CheckCircleIcon, PaperPlaneTiltIcon, QuestionIcon, QuestionIcon as GuestIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { useConnection } from 'wagmi'
 import { getViewerId } from '@/lib/viewer'
 import styles from './HelpCenter.module.scss'
@@ -223,7 +224,7 @@ export default function HelpCenter() {
           >
             {isSubmitting ? (
               <>
-                <SpinnerIcon className={styles.spin} size={18} />
+                <Spinner color="currentColor" size={18} />
                 Submitting Ticket...
               </>
             ) : (

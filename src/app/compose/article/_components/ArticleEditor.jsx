@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useConnection } from 'wagmi'
@@ -14,7 +15,6 @@ import {
   ListBulletsIcon,
   PencilSimpleIcon,
   QuotesIcon,
-  SpinnerIcon,
   TextBIcon,
   TextHOneIcon,
   TextItalicIcon,
@@ -402,7 +402,7 @@ export default function ArticleEditor() {
           </button>
 
           <button type="button" className={styles.editor__publish} onClick={handlePublish} disabled={!canPublish}>
-            {isPreparing ? <SpinnerIcon size={16} className={styles.editor__spin} /> : null}
+            {isPreparing ? <Spinner color="currentColor" size={16} /> : null}
             <span>{isPreparing ? 'Preparing…' : 'Continue'}</span>
           </button>
         </div>
@@ -424,7 +424,7 @@ export default function ArticleEditor() {
             onClick={() => coverInputRef.current?.click()}
             disabled={isUploadingCover}
           >
-            {isUploadingCover ? <SpinnerIcon size={20} className={styles.editor__spin} /> : <ImageIcon size={20} />}
+            {isUploadingCover ? <Spinner color="currentColor" size={20} /> : <ImageIcon size={20} />}
             <span>{isUploadingCover ? 'Uploading cover…' : 'Add a cover image'}</span>
           </button>
         )}

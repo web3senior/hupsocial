@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
@@ -239,7 +240,7 @@ export default function FloorChart({ chainId, collection, chainInfo }) {
 
       {!hasTrend ? (
         <EmptyState align="center" size="sm" className={styles.chart__empty}>
-          {isLoading ? 'Loading floor history…' : `Nothing was listed on enough days in the last ${days} days to chart a floor.`}
+          {isLoading ? <><Spinner size={16} color="currentColor" /> Loading floor history…</> : `Nothing was listed on enough days in the last ${days} days to chart a floor.`}
         </EmptyState>
       ) : (
         /* Refetching a new range dims the existing render instead of swapping in a skeleton,

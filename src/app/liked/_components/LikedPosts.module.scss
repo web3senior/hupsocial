@@ -211,10 +211,6 @@
   margin: 0;
 }
 
-.spin {
-  animation: spin 0.9s linear infinite;
-}
-
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -224,12 +220,6 @@
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 

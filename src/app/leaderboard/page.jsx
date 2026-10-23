@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import useSWRInfinite from 'swr/infinite'
@@ -266,7 +267,7 @@ export default function LeaderboardPage() {
                 <div className={styles.loadMoreWrap}>
                   <button type="button" className={styles.loadMore} onClick={() => setSize(size + 1)} disabled={isLoadingMore}>
                     <ArrowDownIcon size={16} />
-                    <span>{isLoadingMore ? 'Loading' : 'Load more'}</span>
+                    <span>{isLoadingMore ? <><Spinner size={16} color="currentColor" /> Loading</> : 'Load more'}</span>
                   </button>
                 </div>
               )}

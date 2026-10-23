@@ -73,10 +73,6 @@
     }
   }
 
-  &__spin {
-    animation: editor-spin 0.9s linear infinite;
-  }
-
   /* Cover */
   &__cover {
     position: relative;
@@ -414,11 +410,5 @@
   &__over {
     color: var(--warning-500, #dc2626);
     font-weight: 600;
-  }
-}
-
-@keyframes editor-spin {
-  to {
-    transform: rotate(360deg);
   }
 }

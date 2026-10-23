@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useState } from 'react'
 import Link from 'next/link'
 import clsx from 'clsx'
@@ -174,7 +175,7 @@ export default function TokenInspection({ chainId, chainInfo, collection, tokenI
           align="center"
           action={
             <button type="button" className={styles.inspect__button} onClick={onRefresh} disabled={isRefreshing}>
-              <ArrowsClockwiseIcon size={14} className={clsx(isRefreshing && styles.inspect__spin)} /> Try again
+              {isRefreshing ? <Spinner size={14} color="currentColor" /> : <ArrowsClockwiseIcon size={14} />} Try again
             </button>
           }
         >
@@ -239,7 +240,7 @@ export default function TokenInspection({ chainId, chainInfo, collection, tokenI
         </div>
         <div className={styles.inspect__actions}>
           <button type="button" className={styles.inspect__button} onClick={onRefresh} disabled={isRefreshing} title="Decode it again, past the cache">
-            <ArrowsClockwiseIcon size={14} className={clsx(isRefreshing && styles.inspect__spin)} />
+            {isRefreshing ? <Spinner size={14} color="currentColor" /> : <ArrowsClockwiseIcon size={14} />}
             {isRefreshing ? 'Inspecting…' : 'Re-check'}
           </button>
           <CopyButton value={shareHref} label="Copy link" title="Copy a link to this token's inspection" variant="chip" size={13} />

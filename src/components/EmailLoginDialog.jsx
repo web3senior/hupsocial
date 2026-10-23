@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useRef, useState } from 'react'
 import { EnvelopeSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { useConnect, useConnectors } from 'wagmi'
@@ -280,7 +281,7 @@ export default function EmailLoginDialog() {
           </button>
         </header>
 
-        {step === 'silent' && <p className={styles.emailDialog__hint}>Loading…</p>}
+        {step === 'silent' && <p className={styles.emailDialog__hint}><Spinner size={16} color="currentColor" /> Loading…</p>}
 
         {step === 'choose' && (
           <div className={styles.emailDialog__form}>

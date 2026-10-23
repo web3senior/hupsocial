@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
 import { useConnection } from 'wagmi'
@@ -158,7 +159,7 @@ export default function FollowingFeedTab() {
       {hasMore && (
         <div className="flex justify-content-center p-100">
           <button className={clsx(styles.loadMore)} onClick={loadMore} disabled={isFetching}>
-            {isFetching ? 'Loading...' : 'Load More'}
+            {isFetching ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Load More'}
           </button>
         </div>
       )}

@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -136,7 +137,7 @@ export default function FundDetail({ networkId, campaignId }) {
     )
   }
 
-  if (!campaign) return <p className={styles.detail__loading}>Loading campaign...</p>
+  if (!campaign) return <p className={styles.detail__loading}><Spinner size={16} color="currentColor" /> Loading campaign...</p>
 
   const status = fundStatus(campaign)
   const percent = fundProgress(campaign)
@@ -488,7 +489,7 @@ export default function FundDetail({ networkId, campaignId }) {
 
         {hasMoreBackings && (
           <button type="button" className={styles.detail__more} onClick={loadMoreBackings} disabled={isLoadingBackings}>
-            {isLoadingBackings ? 'Loading...' : 'Show more backers'}
+            {isLoadingBackings ? <><Spinner size={16} color="currentColor" /> Loading...</> : 'Show more backers'}
           </button>
         )}
 

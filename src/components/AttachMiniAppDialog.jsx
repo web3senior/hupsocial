@@ -1,5 +1,6 @@
 'use client'
 
+import { Spinner } from '@/components/Loading'
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { MagnifyingGlassIcon, PuzzlePieceIcon, XIcon } from '@phosphor-icons/react'
@@ -72,7 +73,7 @@ const AttachMiniAppDialog = forwardRef(function AttachMiniAppDialog({ onAttached
         {error ? (
           <p className={styles.attachDialog__state}>{error.message}</p>
         ) : isLoading ? (
-          <p className={styles.attachDialog__state}>Loading apps...</p>
+          <p className={styles.attachDialog__state}><Spinner size={16} color="currentColor" /> Loading apps...</p>
         ) : embeddableApps.length === 0 ? (
           <p className={styles.attachDialog__state}>
             {query ? `No mini apps match "${query}".` : 'No apps are approved for embedding yet. Apps are reviewed before they can run inside posts.'}
