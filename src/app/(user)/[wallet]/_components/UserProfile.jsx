@@ -35,7 +35,6 @@ import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
 import { InfoIcon, ThreeDotIcon } from '@/components/Icons'
 import { SealCheckIcon } from '@phosphor-icons/react'
-import ProfileInsights from '@/components/ProfileInsights'
 import ReadableNumber from '@/components/ReadableNumber'
 import UPlogo from '@/../public/up.png'
 import { uploadFileToIPFS } from '@/lib/ipfs'
@@ -302,8 +301,6 @@ export default function UserProfile({ address: routeAddress }) {
           <div className={`${styles.profileWrapper}`}>
             <Profile addr={profileAddress} />
 
-            {/* Ensure posts and the list exist before mounting */}
-            {postsFeed.posts?.list?.length > 0 && <ProfileInsights addr={profileAddress} posts={postsFeed.posts} />}
           </div>
 
           <section className={`${styles.tab} flex flex-row align-items-center justify-content-center w-100`}>

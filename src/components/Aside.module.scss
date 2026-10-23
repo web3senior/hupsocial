@@ -648,6 +648,11 @@
   .link {
     justify-content: flex-start;
   }
+
+  .aside__post-button {
+    justify-content: center;
+    text-align: center;
+  }
 }
 
 .aside__close {
@@ -671,6 +676,10 @@
 
 :global([data-theme='dark']) .aside {
   background-color: transparent;
+}
+
+:global([data-theme='dark']) .aside.aside__drawer {
+  background-color: var(--background);
 }
 
 :global([data-theme='dark']) .aside__profile,

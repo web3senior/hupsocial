@@ -4,7 +4,7 @@
  * AIML API that reads Hup through the read-only tools in lib/hupiTools.
  *
  * AIML API exposes an OpenAI-compatible surface, so this reuses the `openai` SDK with another
- * baseURL, as the Kimi route does. Identity is the chat session token (one signature serves the
+ * baseURL. Identity is the chat session token (one signature serves the
  * dock and Hupi); any signed-in wallet may ask, within a daily turn quota.
  *
  * The answer streams as NDJSON, one event per line:
