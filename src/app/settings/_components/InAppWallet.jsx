@@ -156,7 +156,7 @@ export default function InAppWallet({ onOpenSecurity }) {
         targetBurnerAddress = burner.address
       }
 
-      const duration = 3600 * 24 * 30 // 30 days
+      const duration = 3600 * 24 * 365 // 1 year
 
       writeContract({
         address: activeChain[1].hup,
@@ -290,7 +290,6 @@ export default function InAppWallet({ onOpenSecurity }) {
                     <p className="m-0">
                       <strong>Expires At:</strong> <br />
                       <code>
-                        {sessionActive ? 'In ' : ''}
                         {sessionActive ? toRelativeTime(expiresAt) : 'Expired'}
                       </code>
                     </p>

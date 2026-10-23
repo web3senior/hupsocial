@@ -110,7 +110,7 @@ export default function SettingsTab() {
         targetBurnerAddress = localStorage.getItem(localStorageBurnerAddress)
       }
 
-      const duration = 3600 * 24 * 30 // 30 days
+      const duration = 3600 * 24 * 365 // 1 year
 
       writeContract({
         address: activeChain[1].hup,
@@ -243,7 +243,6 @@ export default function SettingsTab() {
                     <p className="m-0">
                       <strong>Expires At:</strong> <br />
                       <code>
-                        {sessionActive ? 'In ' : ''}
                         {sessionActive ? toRelativeTime(expiresAt) : 'Expired'}
                       </code>
                     </p>

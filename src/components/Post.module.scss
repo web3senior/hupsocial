@@ -446,18 +446,18 @@
         cursor: pointer;
       }
 
-      // Hover tint tracks the button's own state so an already-liked heart keeps
-      // its liked color instead of flipping to the batch-queue yellow
+      // Use the same heart tint for queued and confirmed likes.
       &[data-action='like'] {
         &:hover {
-          color: color-mix(in srgb, var(--batch-like-color, #facc15) 60%, transparent);
+          color: color-mix(in srgb, var(--liked-color, #ff007a) 60%, transparent);
           &:before {
-            background-color: color-mix(in srgb, var(--batch-like-color, #facc15) 10%, transparent);
+            background-color: color-mix(in srgb, var(--liked-color, #ff007a) 10%, transparent);
           }
         }
 
-        // Liked: counter matches the filled heart, hover only deepens the halo
-        &[data-liked='true'] {
+        // The counter matches the filled heart, including while queued.
+        &[data-liked='true'],
+        &[data-queued='true'] {
           color: var(--liked-color, #ff007a);
 
           &:hover {
@@ -468,14 +468,6 @@
           }
         }
 
-        // Queued for the batch like: already yellow, keep it solid on hover
-        &[data-queued='true'] {
-          color: var(--batch-like-color, #facc15);
-
-          &:hover {
-            color: var(--batch-like-color, #facc15);
-          }
-        }
       }
 
       // Orange, not the green a repost usually gets: green now belongs to the tip, which

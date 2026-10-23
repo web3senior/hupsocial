@@ -375,6 +375,7 @@ export const Like = ({ post, onUpdate }) => {
     likeOverride && likeOverride.liked !== interactionState.isLiked
       ? Math.max(0, interactionState.likeCount + (likeOverride.liked ? 1 : -1))
       : interactionState.likeCount
+  const displayedLikeCount = likeCount + (isQueued && !isLiked ? 1 : 0)
 
   const handleLikeInteraction = (e) => {
     e.stopPropagation()
@@ -422,7 +423,7 @@ export const Like = ({ post, onUpdate }) => {
               icon and counter never jump while the tx settles */}
           <HeartIcon width={18} height={18} color={heartColor} weight={heartWeight} />
 
-          {likeCount > 0 && <Counter value={likeCount} />}
+          {displayedLikeCount > 0 && <Counter value={displayedLikeCount} />}
         </button>
       </Tooltip>
     </div>

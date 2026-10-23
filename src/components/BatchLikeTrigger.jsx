@@ -25,7 +25,7 @@ const compact = (count) => (count > 99 ? '99+' : count)
  *
  * One chain per heart is the honest shape of a hard constraint, not decoration: batchLike
  * runs on a single Hup contract, so there is no "send all" that would not turn into a run
- * of switch-and-sign prompts. Each heart carries the chain's name with a "Send now" line
+ * of switch-and-sign prompts. Each heart carries the chain's name with a "Submit likes" line
  * under it (so the tap reads as sending, not choosing), its queued count, and a small
  * clear chip — the only way to drop a queued like whose post has scrolled out of
  * reach.
@@ -63,7 +63,7 @@ export default function BatchLikeTrigger({ className, badgeClassName }) {
               type="button"
               className={clsx(className, styles.chainHeart__send)}
               disabled={isProcessing}
-              aria-label={`Send ${likesLabel(group.count)} on ${group.name}`}
+              aria-label={`Submit ${likesLabel(group.count)} on ${group.name}`}
               onClick={() => send(group.networkId)}
             >
               {isSending ? (
@@ -72,7 +72,7 @@ export default function BatchLikeTrigger({ className, badgeClassName }) {
                 <HeartIcon weight="fill" color="var(--batch-like-color, #facc15)" />
               )}
               <span className={styles.chainHeart__caption}>{group.name}</span>
-              <span className={styles.chainHeart__cta}>{isSending ? 'Sending…' : 'Send now'}</span>
+              <span className={styles.chainHeart__cta}>{isSending ? 'Submitting…' : 'Submit likes'}</span>
               <span className={badgeClassName}>{compact(group.count)}</span>
             </button>
 
@@ -118,7 +118,7 @@ export default function BatchLikeTrigger({ className, badgeClassName }) {
                       type="button"
                       className={styles.network}
                       disabled={isProcessing}
-                      aria-label={`Send ${likesLabel(group.count)} on ${group.name}`}
+                      aria-label={`Submit ${likesLabel(group.count)} on ${group.name}`}
                       onClick={() => {
                         close()
                         send(group.networkId)
