@@ -27,7 +27,7 @@ export default async function Page({ params, searchParams }) {
           the collection resolves, spacerless so the gap never doubles. */}
       <PageTitle name={`NFT drop #${dropId}`} />
       <div className={styles.page}>
-        <div className={`__container ${styles.page__container}`} data-width="small">
+        <div className={`__container ${styles.page__container}`} data-width="xlarge">
           <DropDetails networkId={networkId} dropId={dropId} referral={typeof ref === 'string' ? ref : undefined} />
         </div>
       </div>
