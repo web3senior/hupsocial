@@ -39,7 +39,7 @@ export default async function Page({ params }) {
     <>
       <PageTitle name="Live" changeDocumentTitle={false} backHref="/live" backLabel="Live" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="large">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <LiveWatch address={streamer.address} name={streamer.name} username={streamer.username} />
         </div>
       </div>

@@ -3744,7 +3744,7 @@ export default function CommunitiesPage() {
       <PageTitle name="Communities" />
 
       <div className={clsx(styles.page, 'animate', 'fade')}>
-        <div className={clsx('__container', styles.page__container)} data-width="small">
+        <div className={clsx('__container', styles.page__container)} data-width="xlarge">
           <div className={styles.directory}>
             {/* No heading here — PageTitle already puts "Communities" in the fixed header */}
             <DropsHero

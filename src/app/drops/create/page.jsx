@@ -13,7 +13,7 @@ export default function CreateDropPage() {
     <>
       <PageTitle name="Create a drop" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="large">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           {/* useSearchParams reads the ?chain= link, so the view needs a boundary to render into */}
           <Suspense fallback={null}>
             <CreateDropView />

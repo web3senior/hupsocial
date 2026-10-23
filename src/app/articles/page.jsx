@@ -21,7 +21,7 @@ export default function Page() {
     <>
       <PageTitle name="Articles" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <ArticlesDirectory />
         </div>
       </div>

@@ -19,7 +19,7 @@ export default function Page() {
         {/* The card shell is the sibling section pages' (drops, swap, launches), but its width
             belongs to whichever view is up — a league table needs room a feed-width column
             can't give it — so MarketViews carries it and picks the width */}
-        <Suspense fallback={<RouteLoading containerWidth="small" headerClearance={false} />}>
+        <Suspense fallback={<RouteLoading containerWidth="xlarge" headerClearance={false} />}>
           <MarketViews shellClassName={styles.page__container} />
         </Suspense>
       </div>

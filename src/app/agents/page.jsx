@@ -92,7 +92,7 @@ export default function AgentsPage() {
   return (
     <>
       <PageTitle name="Agents" />
-      <div className={clsx('__container', styles.page__container)} data-width="medium">
+      <div className={clsx('__container', styles.page__container)} data-width="small">
         <section className={styles.hero} aria-labelledby="agents-title">
           {/* The Robinhood-green galaxy from /screensaver, drawn straight onto the page background */}
           <GalaxyCanvas variant="robinhood" centered transparent className={styles.hero__canvas} />

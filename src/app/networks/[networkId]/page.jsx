@@ -15,7 +15,7 @@ export default async function Page({ params }) {
     <>
       <PageTitle name={chain ? chain.name : `Networks`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <div className={clsx('__container', styles.page__container)} data-width={`medium`}>
+        <div className={clsx('__container', styles.page__container)} data-width="small">
           {chain ? <NetworkDetails chain={chain} /> : <NetworkNotFound />}
         </div>
       </div>

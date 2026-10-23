@@ -15,7 +15,7 @@ export default function Page() {
     <>
       <PageTitle name={`Networks`} />
       <div className={styles.page}>
-        <div className={clsx('__container', styles.page__container)} data-width={`medium`}>
+        <div className={clsx('__container', styles.page__container)} data-width="small">
           <p className={styles.page__intro}>
             Every chain {process.env.NEXT_PUBLIC_NAME} runs on. Open one to read its RPC, its explorer and every contract deployed there.
           </p>

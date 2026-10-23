@@ -124,7 +124,7 @@ export default function MarketViews({ shellClassName }) {
   return (
     // The shared large step — the global container rule (styles/Global.scss) clears the
     // fixed sidebar with the live --aside-width, so the card needs no page-local sizing
-    <div className={clsx('__container', shellClassName)} data-width={`small`}>
+    <div className={clsx('__container', shellClassName)} data-width={`xlarge`}>
       {/* Above the toolbar, so both readings open on the same showcase — it bleeds to the
           card's edges and follows the shared chain filter */}
       <FeaturedCollections networkId={networkId} />

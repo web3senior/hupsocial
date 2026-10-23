@@ -134,7 +134,7 @@ export default async function Page({ params }) {
         {/* The container class has to sit on a div — Global.scss scopes the width map to
             `div[class*='__container']`, so putting it on the <article> silently did nothing and
             the prose ran the full width of the viewport, under the fixed sidebar. */}
-        <div className="__container" data-width="medium">
+        <div className="__container" data-width="small">
           <article className={styles.article}>
             <header className={styles.article__header}>
               <h1 className={styles.article__title} dir="auto">

@@ -13,7 +13,7 @@ export default function CollectionAuditPage() {
     <>
       <PageTitle name="Collection audit" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="large">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           {/* The tool reads its target from the query string, which is a client-side concern */}
           <Suspense fallback={null}>
             <CollectionAuditTool />

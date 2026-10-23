@@ -7,7 +7,7 @@ export default function Page() {
     <>
       <PageTitle name={`Liked`} />
       <div className={styles.page}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <LikedPosts />
         </div>
       </div>

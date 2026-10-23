@@ -71,7 +71,7 @@ export default function Page() {
       <>
         <PageTitle name="Broadcast" />
         <div className={`${styles.page} ms-motion-slideDownIn`}>
-          <div className={`__container ${styles.page__container}`} data-width="medium">
+          <div className={`__container ${styles.page__container}`} data-width="small">
             <p className={styles.gate}>Connect your wallet to continue.</p>
           </div>
         </div>
@@ -84,7 +84,7 @@ export default function Page() {
       <>
         <PageTitle name="Broadcast" />
         <div className={`${styles.page} ms-motion-slideDownIn`}>
-          <div className={`__container ${styles.page__container}`} data-width="medium">
+          <div className={`__container ${styles.page__container}`} data-width="small">
             <p className={styles.gate}>You do not have permission to access this page.</p>
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function Page() {
     <>
       <PageTitle name="Broadcast" />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <div className={styles.card}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="message">

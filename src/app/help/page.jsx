@@ -7,7 +7,7 @@ export default function Page() {
     <>
       <PageTitle name={`Help Center`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <HelpCenter />
         </div>
       </div>

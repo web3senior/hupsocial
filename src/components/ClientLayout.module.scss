@@ -1,6 +1,8 @@
+@use '@/styles/abstract/containers' as containers;
+
 .shell {
   --layout-gap: 2rem;
-  --layout-content-width: var(--home-feed-width);
+  --layout-content-width: var(--container-small);
 
   @media (min-width: 768px) {
     display: grid;
@@ -11,6 +13,14 @@
     column-gap: var(--layout-gap);
     align-items: start;
     min-height: 100svh;
+  }
+}
+
+// The outer page container (or its loading fallback) controls the track size.
+// Ignore nested containers, such as a dialog or a narrower section inside a page.
+@each $name, $width in containers.$widths {
+  .shell:has(.main--grid div[class*='__container'][data-width='#{$name}']:not(div[class*='__container'][data-width] div[class*='__container'][data-width])) {
+    --layout-content-width: var(--container-#{$name});
   }
 }
 

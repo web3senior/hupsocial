@@ -101,7 +101,7 @@ export default function AppsPage() {
     <>
       <PageTitle name="Apps" />
       <div className={clsx(styles.page, 'animate', 'fade')}>
-        <div className={`__container`} data-width="medium">
+        <div className={`__container`} data-width="small">
           <header className={styles.page__header}>
             <label className={clsx(styles.search, 'rounded-full')}>
               <MagnifyingGlassIcon size={18} aria-hidden="true" />
@@ -127,7 +127,7 @@ export default function AppsPage() {
             </button>
           </header>
         </div>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <BuildSection />
 
           <div className={styles.filterbar}>

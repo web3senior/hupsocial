@@ -7,7 +7,7 @@ export default function Page() {
     <PageTitle name={`privacy policy`}/>
       <div className={`${styles.page} ms-motion-slideDownIn`}>
         <div className={`__container ${styles.page__container}`}
-         data-width={`medium`}>
+         data-width="small">
           <h1>
             <strong>Hup social Privacy Policy</strong>
           </h1>

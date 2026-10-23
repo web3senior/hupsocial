@@ -147,7 +147,7 @@ export default function LeaderboardPage() {
     <>
       <PageTitle name="Leaderboard" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="small">
+        <div className={`__container ${styles.page__container}`} data-width="xlarge">
           <header className={styles.header}>
             <div className={styles.filters} role="group" aria-label="Leaderboard filters">
               <SegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} label="Period" iconOnly />
@@ -245,7 +245,7 @@ export default function LeaderboardPage() {
                     </span>
                     <Profile
                       creator={leader.wallet_address}
-                      variant="imageOnly"
+                      variant="nameAndUsername"
                       size={ROW_AVATAR_SIZE}
                       className={styles.avatar}
                     />

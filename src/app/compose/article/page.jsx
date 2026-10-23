@@ -17,7 +17,7 @@ export default function Page() {
           stacked reads as the title printed twice. The spacer PageTitle provides is still wanted. */}
       <PageTitle name="Write an article" showInHeader={false} />
       <div className={styles.page}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <ArticleEditor />
         </div>
       </div>

@@ -120,7 +120,7 @@ export default function InsightsPage() {
     <>
       <PageTitle name="Insights" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           {!mounted ? null : !isConnected ? (
             <div className={styles.emptyState}>
               <WalletIcon size={48} />

@@ -12,7 +12,7 @@ export default function Page() {
     <>
       <PageTitle name={`Activity`} />
       <div className={`${styles.page} ms-motion-slideDownIn`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <p className={styles.page__lede}>Every onchain action on Hup, newest first, across all networks.</p>
           <ActivityStream />
         </div>

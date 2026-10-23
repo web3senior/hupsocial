@@ -65,7 +65,7 @@ export default function StatusOverview() {
 
   return (
     <section className={styles.status} aria-label="Hup system status">
-      <div className={clsx('__container', styles.status__container)} data-width="medium">
+      <div className={clsx('__container', styles.status__container)} data-width="small">
         <header className={styles.status__header}>
           <p className={styles.status__eyebrow}>Hup service availability</p>
           <h1 className={styles.status__title}>System status</h1>

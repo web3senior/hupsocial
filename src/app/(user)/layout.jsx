@@ -5,7 +5,7 @@ import styles from './Layout.module.scss'
 export default function UserLayout({ children }) {
   return (
     <div className={`${styles.page}`}>
-      {/* <div className={`__container ${styles.page__container} d-flex grid--gap-1`} data-width={`medium`}> */}
+      {/* <div className={`__container ${styles.page__container} d-flex grid--gap-1`} data-width="small"> */}
       {/* <div className={`h-100`}>
           <Nav />
         </div> */}

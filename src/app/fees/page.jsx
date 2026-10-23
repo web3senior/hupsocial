@@ -285,7 +285,7 @@ export default function FeesPage() {
     <>
       <PageTitle name="Fees" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <header className={styles.hero}>
             <ReceiptIcon size={32} />
             <h1 className={styles.hero__title}>Where your fee goes</h1>

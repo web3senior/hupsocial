@@ -13,7 +13,7 @@ export default function CollectionStudioPage() {
     <>
       <PageTitle name="Studio" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="xxlarge">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           {/* The studio reads its target from the query string, which is a client-side concern */}
           <Suspense fallback={null}>
             <CollectionStudio />

@@ -1,5 +1,6 @@
 @use 'abstract' as *;
 @use 'components' as *;
+@use 'abstract/containers' as containers;
 // @use './../node_modules/animate.css/animate.min.css';
 // @use './../node_modules/office-ui-fabric-core/src/sass/Fabric.scss';
 
@@ -79,29 +80,24 @@ ul {
   display: none;
 }
 
+// Expose the same sizes to layout grids without duplicating pixel widths.
+:root {
+  @each $name, $width in containers.$widths {
+    --container-#{$name}: #{$width};
+  }
+}
+
 // Container base styles
 div[class*='__container'] {
   position: relative;
   margin: 0 auto;
   width: 100%;
 
-  // Map configuration for conventional data-width modifiers
-  $container-widths: (
-    'small': 640px,   // Mobile landscape / Small tablets
-    'medium': 768px,  // Tablets
-    'large': 1024px,  // Small laptops
-    'xlarge': 1280px, // Desktops
-    'xxlarge': 1536px, // Large screens
-    // Edge to edge, for trading surfaces that want every pixel. The clearance maths below still
-    // applies, so it seats flush beside the aside instead of sliding under it.
-    'full': 100%
-  );
-
   // Loop to generate data-width attribute selectors dynamically
-  @each $name, $width in $container-widths {
+  @each $name, $width in containers.$widths {
     &[data-width='#{$name}'] {
-      --container-max: #{$width};
-      max-width: $width;
+      --container-max: var(--container-#{$name});
+      max-width: var(--container-max);
     }
   }
 

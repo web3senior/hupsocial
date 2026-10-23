@@ -309,7 +309,7 @@ $secondary-color: #9e481d;
 
   // Home grid (app/page.module.scss): feed | rail with this gap between them, and the smallest
   // gap any page's containers keep from the sidebar (styles/Global.scss).
-  --home-feed-width: 640px;
+  --home-feed-width: var(--container-small);
   --home-rail-width: 320px;
   --layout-gap: 1.5rem;
 

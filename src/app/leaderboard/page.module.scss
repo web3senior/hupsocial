@@ -11,6 +11,8 @@
   min-height: 85svh;
 
   &__container {
+    container-name: leaderboard;
+    container-type: inline-size;
     position: relative;
     min-height: 100svh;
     background-color: var(--surface);
@@ -456,7 +458,28 @@
 }
 
 .avatar {
+  min-width: 0;
 
+  > :nth-child(2) {
+    display: none;
+    min-width: 0;
+    overflow: hidden;
+  }
+}
+
+@container leaderboard (min-width: 960px) {
+  .leaderList {
+    --leader-columns: 36px 240px repeat(8, minmax(80px, 1fr)) 96px;
+  }
+
+  .leaderRowHeader,
+  .leaderRow {
+    min-width: 1140px;
+  }
+
+  .avatar > :nth-child(2) {
+    display: flex;
+  }
 }
 
 .avatarLarge {

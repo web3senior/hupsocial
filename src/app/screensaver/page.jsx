@@ -12,7 +12,7 @@ export default function ScreensaverPage() {
     <>
       <PageTitle name="Screensaver" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="large">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <ScreensaverGallery />
         </div>
       </div>

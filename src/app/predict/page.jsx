@@ -9,7 +9,7 @@ export default function PredictPage() {
     <>
       <PageTitle name="Predict" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="medium">
+        <div className={`__container ${styles.page__container}`} data-width="small">
           <PredictDirectory />
         </div>
       </div>

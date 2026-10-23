@@ -12,7 +12,7 @@ export default function DropsPage() {
     <>
       <PageTitle name="Drops" />
       <div className={`${styles.page} animate fade`}>
-        <div className={`__container ${styles.page__container}`} data-width="large">
+        <div className={`__container ${styles.page__container}`} data-width="xlarge">
           <DropsDirectory />
         </div>
       </div>

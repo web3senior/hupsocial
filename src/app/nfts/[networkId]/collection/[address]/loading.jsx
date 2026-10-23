@@ -12,7 +12,7 @@ export default function Loading() {
     <>
       <PageTitle name="NFT collection" />
       <div className={styles.loading}>
-        <div className={`__container ${styles.loading__container}`} data-width={`xlarge`}>
+        <div className={`__container ${styles.loading__container}`} data-width="small">
           <div className={`shimmer ${styles.loading__banner}`} />
           <div className={`shimmer ${styles.loading__identity}`} />
           <div className={`shimmer ${styles.loading__address}`} />
