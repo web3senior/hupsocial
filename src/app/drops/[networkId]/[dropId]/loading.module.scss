@@ -5,6 +5,7 @@
   min-height: 85svh;
 
   &__container {
+    container-type: inline-size;
     position: relative;
     min-height: 100svh;
     background-color: var(--surface);
@@ -30,8 +31,7 @@
   }
 
   &__media {
-    width: min(100%, 320px);
-    justify-self: center;
+    width: 100%;
     aspect-ratio: 1;
     border-radius: 24px;
   }
@@ -62,4 +62,12 @@
     height: 300px;
     border-radius: 16px;
   }
+}
+
+@container (min-width: 720px) {
+  .loading__layout {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
+    gap: 2rem;
+  }
+
 }
