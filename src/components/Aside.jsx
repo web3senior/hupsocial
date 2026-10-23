@@ -117,7 +117,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
 
   const content = (
     <>
-      <div className={styles.iconWrapper} data-icon={item.name}>
+      {item.id !== 'new-post' && <div className={styles.iconWrapper} data-icon={item.name}>
         {item.avatarSrc ? (
           <Avatar
             className={clsx(styles.navAvatar, isActive && styles.navAvatarActive)}
@@ -130,8 +130,8 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
 
         {/* Render a tiny alert badge overlay over icon when sidebar is tightly compact */}
         {isNotificationItem && isCompact && unreadCount > 0 && <span className={styles.notificationBadgeDot} aria-hidden="true" />}
-      </div>
-      {!isCompact && <span className={styles.linkText}>{item.name}</span>}
+      </div>}
+      {(!isCompact || item.id === 'new-post') && <span className={styles.linkText}>{item.name}</span>}
 
       {badge && !isCompact && <NavBadge label={badge.label} background={badge.background} color={badge.color} />}
 

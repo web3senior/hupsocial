@@ -51,7 +51,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'foryou', name: 'Home', path: '/', icon: HouseIcon },
   { id: 'shorts', name: 'Shorts', path: '/shorts', icon: PlayCircleIcon },
   { id: 'live', name: 'Live', path: '/live', icon: BroadcastIcon },
-  { id: 'new-post', name: 'New post', component: 'new-post', icon: PlusIcon },
+  { id: 'new-post', name: 'Post', component: 'new-post', icon: PlusIcon },
   { id: 'search', name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
   { id: 'notifications', name: 'Notifications', path: '/notifications', icon: BellIcon, hasBadge: true },
   { id: 'divider-primary', type: 'divider' },

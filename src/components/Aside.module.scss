@@ -291,6 +291,10 @@
   color: var(--app-accent-text);
   font-weight: 600;
 
+  .linkText {
+    display: inline;
+  }
+
   .iconWrapper,
   .linkText {
     color: inherit;
