@@ -115,10 +115,25 @@
     border-radius: 0;
     overflow: hidden;
 
+    // Keep the feed edge above positioned post backgrounds and hover effects.
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      border-radius: inherit;
+      box-shadow: inset 1px 0 var(--border), inset -1px 0 var(--border), inset 0 -1px var(--border);
+      pointer-events: none;
+    }
+
     // 2. Prefixed mixin with namespace
     @include resp.sm-down {
       border: none;
       border-radius: unset;
+
+      &::after {
+        content: none;
+      }
     }
   }
 
