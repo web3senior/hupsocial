@@ -360,7 +360,7 @@ export async function POST(request) {
     const onChainNonce = BigInt(await forwarder.nonces(fullRequest.from))
     if (fullRequest.nonce < onChainNonce) {
       console.error('RELAY_NONCE_REPLAY:', { requested: fullRequest.nonce.toString(), onChain: onChainNonce.toString() })
-      return NextResponse.json({ error: 'Nonce already used (replay).' }, { status: 400 })
+      return NextResponse.json({ error: 'Nonce already used (replay).', code: 'RELAY_NONCE_CONFLICT' }, { status: 409 })
     }
 
     /* A nonce ahead of confirmed state used to skip simulation, on the theory that a pending tx sat
@@ -372,7 +372,7 @@ export async function POST(request) {
     if (fullRequest.nonce > onChainNonce) {
       console.error('RELAY_NONCE_AHEAD:', { requested: fullRequest.nonce.toString(), onChain: onChainNonce.toString() })
       return NextResponse.json(
-        { error: 'Nonce is ahead of the forwarder — re-sign at the current nonce.', nonce: onChainNonce.toString() },
+        { error: 'Nonce is ahead of the forwarder — re-sign at the current nonce.', code: 'RELAY_NONCE_CONFLICT', nonce: onChainNonce.toString() },
         { status: 409 },
       )
     }
@@ -392,6 +392,14 @@ export async function POST(request) {
 
         // For InvalidSigner: read the forwarder's actual EIP-712 domain to surface mismatches.
         if (reason === 'ERC2771ForwarderInvalidSigner') {
+          // Another device may have confirmed a request after the nonce check above.
+          const currentNonce = BigInt(await forwarder.nonces(fullRequest.from))
+          if (currentNonce !== fullRequest.nonce) {
+            return NextResponse.json({
+              error: 'Forwarder nonce changed before simulation. Re-sign the request.',
+              code: 'RELAY_NONCE_CONFLICT',
+            }, { status: 409 })
+          }
           try {
             const eip712Iface = new ethers.Interface(['function eip712Domain() view returns (bytes1,string,string,uint256,address,bytes32,uint256[])'])
             const raw = await provider.call({ to: forwarderAddress, data: eip712Iface.encodeFunctionData('eip712Domain') })
@@ -418,15 +426,21 @@ export async function POST(request) {
     // eth_estimateGas on LUKSO returns no revert data and is unreliable.
     // Skip auto-estimation by providing an explicit gasLimit (inner gas + forwarder overhead).
     const { maxPriorityFeePerGas, maxFeePerGas } = await relayerFees(provider)
-    recordThrottleHit(bucket, chainId, fullRequest.from)
-
-    const tx = await enqueueRelayerSend(chainId, () =>
-      forwarder.execute(fullRequest, {
-        gasLimit: BigInt(fullRequest.gas) + 100000n,
+    const tx = await enqueueRelayerSend(chainId, async () => {
+      const gasLimit = BigInt(fullRequest.gas) + 100000n
+      const balance = await provider.getBalance(relayer.address, 'pending')
+      if (balance < gasLimit * maxFeePerGas) {
+        const error = new Error('The relayer has insufficient funds for this transaction.')
+        error.code = 'INSUFFICIENT_FUNDS'
+        throw error
+      }
+      recordThrottleHit(bucket, chainId, fullRequest.from)
+      return forwarder.execute(fullRequest, {
+        gasLimit,
         maxPriorityFeePerGas,
         maxFeePerGas,
-      }),
-    )
+      })
+    })
 
     return NextResponse.json({
       success: true,
@@ -440,6 +454,10 @@ export async function POST(request) {
 
     const errorMessage = await decodeRevert(error).catch(() => error.message)
     console.error('RELAY_ERROR:', errorMessage, error.code)
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+    const insufficientFunds = error.code === 'INSUFFICIENT_FUNDS' || error.info?.error?.code === 'INSUFFICIENT_FUNDS'
+    return NextResponse.json({
+      error: errorMessage,
+      code: insufficientFunds ? 'RELAY_INSUFFICIENT_FUNDS' : 'RELAY_UNAVAILABLE',
+    }, { status: insufficientFunds ? 503 : 500 })
   }
 }

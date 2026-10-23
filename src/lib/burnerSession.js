@@ -317,8 +317,21 @@ export const getStoredBurner = () => {
  * Checks if the session is active on-chain.
  * Runs completely in the background without needing to decrypt the private key.
  */
-export const isSessionActive = async ({ userAddress, publicClient }) => {
-  const session = await getUserSessions(userAddress)
+export const isSessionActive = async ({ userAddress, publicClient, contractAddress }) => {
+  const session = userAddress && contractAddress && publicClient
+    ? await publicClient.readContract({
+      address: contractAddress,
+      abi: [{
+        type: 'function',
+        name: 'userSessions',
+        stateMutability: 'view',
+        inputs: [{ name: 'owner', type: 'address' }],
+        outputs: [{ name: 'burnerKey', type: 'address' }, { name: 'expiresAt', type: 'uint256' }],
+      }],
+      functionName: 'userSessions',
+      args: [userAddress],
+    })
+    : await getUserSessions(userAddress)
 
   if (!userAddress) {
     return {

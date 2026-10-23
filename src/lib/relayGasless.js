@@ -24,6 +24,7 @@ import pollsAbi from '@/abis/HupPolls.json'
 import { CONTRACTS } from '@/config/contracts'
 import { formatWait, gaslessBucketFor, gaslessPolicyFor, isGaslessChainId } from '@/config/gasless'
 import { getBurnerSignerSilent } from '@/lib/burnerSession'
+import { createRelaySubmissionQueue, retryRelayNonce } from './relaySubmission.mjs'
 
 const prefix = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
 
@@ -374,7 +375,7 @@ export const signHupForwardRequest = async ({
  *   the same forwarder and the same relay route; only the address and ABI differ.
  * @returns {Promise<string>} Relayed transaction hash.
  */
-export const relayHupAction = async ({
+const submitRelayAction = async ({
   chain,
   publicClient,
   owner,
@@ -425,9 +426,44 @@ export const relayHupAction = async ({
     throw throttled(retryAfter)
   }
 
-  if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Relay failed')
+  if (!res.ok || !payload?.success) {
+    const error = new Error(payload?.error || 'Relay failed')
+    error.code = payload?.code || 'RELAY_UNAVAILABLE'
+    throw error
+  }
 
   holdUntil(bucket, chainId, owner, gaslessPolicyFor(bucket).cooldownMs)
 
+  // Keep the signer locked until the forwarder nonce advances onchain.
+  try {
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: payload.txHash })
+    if (receipt.status !== 'success') throw new Error('Relayed transaction reverted')
+  } catch (cause) {
+    const error = new Error('Relay submitted the transaction but could not confirm success. Check its status before retrying.', { cause })
+    error.code = 'RELAY_SUBMITTED'
+    error.txHash = payload.txHash
+    throw error
+  }
+
   return payload.txHash
+}
+
+const enqueueRelaySubmission = createRelaySubmissionQueue()
+
+/** Share a nonce queue across actions; Web Locks also coordinate same-origin tabs. */
+export const relayHupAction = (params) => {
+  let signer
+  try {
+    signer = params.useSessionKey ? getBurnerSignerSilent(params.chain).address : params.owner
+  } catch (error) {
+    return Promise.reject(unsupported(error.message))
+  }
+  const key = `hup-relay:${Number(params.chain?.id)}:${String(signer).toLowerCase()}`
+  return enqueueRelaySubmission(key, () => {
+    const send = () => retryRelayNonce(() => submitRelayAction(params), params.useSessionKey)
+    if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+      return navigator.locks.request(key, send)
+    }
+    return send()
+  })
 }

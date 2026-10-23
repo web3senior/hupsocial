@@ -28,7 +28,8 @@ import {
   isSessionUnusableError,
   writeWithBurnerSession,
 } from '@/lib/burnerSession'
-import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
+import { isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
+import { allowsRelayPaidFallback } from '@/lib/relaySubmission.mjs'
 import { MAX_BATCH_LIKE_COUNT, chunk, describeDropped, preflightQueue } from '@/lib/batchLike'
 import { getWalletBatchMap, useSidebarStore } from '@/stores/useSidebarStore'
 import { toast } from '@/components/NextToast'
@@ -204,6 +205,7 @@ export const useBatchLike = () => {
         const session = await isSessionActive({
           userAddress: address,
           publicClient: targetPublicClient ?? publicClient,
+          contractAddress: targetChain.hup,
         })
 
         // The vault gates BOTH session paths — sponsored relay signing and the local burner
@@ -216,9 +218,8 @@ export const useBatchLike = () => {
           try {
             await ensureVaultUnlocked({ reason: queue.length === 1 ? 'This like' : `These ${queue.length} likes` })
           } catch (err) {
-            // Cancelling the unlock is not a failed batch — the wallet path still works, and a
-            // heart that stops working reads as broken
             if (err.code !== 4001) console.warn('Session key unavailable:', err.message)
+            if (isGaslessEnabled(networkId)) throw err
             sessionUsable = false
           }
         }
@@ -240,9 +241,7 @@ export const useBatchLike = () => {
 
         const batches = chunk(queue, MAX_BATCH_LIKE_COUNT)
 
-        // The pre-check only skips a relay round trip that the local cooldown mirror already
-        // knows is doomed; the server stays the authority once a request goes out.
-        let relayUsable = isGaslessEnabled(networkId) && gaslessCooldown('batchLike', networkId, address) === 0
+        let relayUsable = isGaslessEnabled(networkId)
 
         for (let index = 0; index < batches.length; index++) {
           const batch = batches[index]
@@ -265,15 +264,9 @@ export const useBatchLike = () => {
 
               sent = true
             } catch (err) {
-              // Unlike posting, a like cooldown falls back to the paid path instead of
-              // stopping: the free-like window can be a long wait, hearts that stop working
-              // read as broken, and the wallet prompt itself is the user's consent to pay.
+              if (!allowsRelayPaidFallback(err)) throw err
               relayUsable = false
-              if (err.code === 'RELAY_COOLDOWN') {
-                toast('Free-like allowance is used up for now — sending with your wallet instead.', 'info')
-              } else {
-                console.warn('Gasless like unavailable:', err.message)
-              }
+              toast('Relayer has insufficient funds — using your session or wallet to pay gas.', 'info')
             }
           }
 
@@ -322,7 +315,9 @@ export const useBatchLike = () => {
         toast(likedLabel, 'success')
       } catch (err) {
         console.error('Batch like transaction failed:', err)
-        toast(shortTxError(err, 'Batch like failed'), 'error')
+        toast(err.code === 'RELAY_SUBMITTED'
+          ? 'Remaining likes stay queued. Check the submitted transaction before retrying.'
+          : `${shortTxError(err, 'Batch like failed')}. Remaining likes stay queued.`, 'error')
       } finally {
         setPendingNetworkId(null)
       }

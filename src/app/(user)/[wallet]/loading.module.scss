@@ -11,13 +11,13 @@
     background-color: var(--surface);
     border: 1px solid var(--border);
     box-shadow: var(--card-elevation, var(--shadow-md));
-    border-radius: var(--page-border-radius);
+    border-radius: 0;
     overflow: hidden;
 
     @media (max-width: 600px) {
       border: none;
       filter: none;
-      border-radius: unset;
+      border-radius: 0;
     }
   }
 

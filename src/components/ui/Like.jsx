@@ -15,7 +15,8 @@ import {
 } from 'wagmi'
 import { getPublicClient } from 'wagmi/actions'
 import { canSessionPayGas, isSessionActive, isSessionUnusableError, localStorageBatchLikeKey, writeWithBurnerSession } from '@/lib/burnerSession'
-import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
+import { isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
+import { allowsRelayPaidFallback } from '@/lib/relaySubmission.mjs'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { isSolanaNetworkId } from '@/config/solana'
 import { openConnect } from '@/lib/connectDialog'
@@ -194,11 +195,8 @@ export const Like = ({ post, onUpdate }) => {
 
   /**
    * Relays a heart action through the forwarder so the tap costs the user nothing. Returns
-   * false whenever the relay is unavailable — cooldown included: the free window can be a
-   * long wait, so the tap falls back to the usual session/wallet path instead of blocking,
-   * and the wallet prompt there is the user's consent to pay. Unlike has a much smaller
-   * window than like on purpose — that asymmetry is what caps heart-toggle farming (see
-   * config/gasless.js).
+   * false when sponsorship is disabled or the relayer has insufficient funds. Other
+   * failures preserve the action for retry instead of unexpectedly opening the wallet.
    * @param {string} functionName 'batchLike' or 'unlike'.
    * @param {Array} args Owner-first args for that function.
    * @param {Object} target The post's chain, from resolveTarget().
@@ -207,7 +205,6 @@ export const Like = ({ post, onUpdate }) => {
    */
   const tryGaslessHeart = async (functionName, args, { chainDefinition, targetPublicClient }, useSessionKey) => {
     if (!isGaslessEnabled(chainId)) return false
-    if (gaslessCooldown(functionName, chainId, address) > 0) return false
 
     try {
       await relayHupAction({
@@ -222,11 +219,8 @@ export const Like = ({ post, onUpdate }) => {
 
       return true
     } catch (err) {
-      if (err.code === 'RELAY_COOLDOWN') {
-        toast('Free-like allowance is used up for now — using your wallet instead.', 'info')
-      } else {
-        console.warn('Gasless like unavailable:', err.message)
-      }
+      if (!allowsRelayPaidFallback(err)) throw err
+      toast('Relayer has insufficient funds — using your session or wallet to pay gas.', 'info')
       return false
     }
   }
@@ -309,7 +303,7 @@ export const Like = ({ post, onUpdate }) => {
     }
 
     try {
-      const session = await isSessionActive({ userAddress: address, publicClient: targetPublicClient })
+      const session = await isSessionActive({ userAddress: address, publicClient: targetPublicClient, contractAddress: targetChain.hup })
 
       if (await tryGaslessHeart(functionName, args, target, session.active)) {
         settle()
@@ -319,8 +313,7 @@ export const Like = ({ post, onUpdate }) => {
       // The contract resolves the burner key back to the owner, so the session key signs
       // unlike() exactly like it signs batchLike() — and neither needs a wallet confirmation.
       // It pays its own gas though, and it is funded per chain: an empty balance here falls
-      // through to the wallet instead of failing the tap, the same way a spent free-like
-      // allowance does. A heart that stops working reads as broken.
+      // through to the wallet when sponsorship is disabled or the relayer lacks funds.
       if (session.active) {
         if (await canSessionPayGas(targetPublicClient)) {
           try {
@@ -361,8 +354,15 @@ export const Like = ({ post, onUpdate }) => {
     } catch (err) {
       console.error(`${liked ? 'Like' : 'Unlike'} failed:`, err)
       pendingActionRef.current = null
-      toast(shortTxError(err, liked ? 'Could not like post' : 'Could not remove like'), 'error')
       mutate(previousData, { revalidate: false })
+      if (liked && isGaslessEnabled(chainId)) {
+        addToBatch(actor, post.network_id, post.id)
+        toast(err.code === 'RELAY_SUBMITTED'
+          ? 'Like remains queued. Check the submitted transaction before retrying.'
+          : 'Like saved in your queue. Submit again when the relayer is available.', 'info')
+      } else {
+        toast(shortTxError(err, liked ? 'Could not like post' : 'Could not remove like'), 'error')
+      }
     }
   }
 
