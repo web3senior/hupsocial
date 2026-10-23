@@ -22,18 +22,16 @@
 
   &__layout {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 2.25rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
     align-items: start;
     margin-top: 2.6rem;
 
-    @media (max-width: 800px) {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 1.25rem;
-    }
   }
 
   &__media {
+    width: min(100%, 320px);
+    justify-self: center;
     aspect-ratio: 1;
     border-radius: 24px;
   }

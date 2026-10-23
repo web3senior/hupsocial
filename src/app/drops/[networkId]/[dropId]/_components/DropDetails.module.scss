@@ -17,26 +17,19 @@
     }
   }
 
-  // --- hero: artwork beside the facts ---
+  // --- hero: compact artwork above the facts ---
   &__hero {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 2.25rem;
-
-    @media (max-width: 800px) {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 1.25rem;
-    }
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
   }
 
-  // The facts column runs far longer than the artwork, so the artwork holds position as they
-  // scroll past — which needs a column tall enough to travel in, hence the wrapper
+  // Keep the artwork compact within the shared feed-width page.
   &__mediaColumn {
     min-width: 0;
 
-    @media (min-width: 801px) {
-      align-self: stretch;
-    }
+    width: min(100%, 320px);
+    justify-self: center;
   }
 
   &__media {
@@ -44,11 +37,6 @@
     aspect-ratio: 1;
     overflow: hidden;
 
-    @media (min-width: 801px) {
-      position: sticky;
-      // Clears the app header the page scrolls under
-      inset-block-start: 5rem;
-    }
     border: 1px solid var(--border);
     border-radius: 24px;
     // --background equals --surface in the light and terminal themes, so a block nested on a
