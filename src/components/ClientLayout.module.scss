@@ -20,6 +20,7 @@
 
   :global([data-page-shell]) {
     border: 1px solid var(--border);
+    border-inline: var(--page-shell-side-border, 1px solid var(--border));
     border-top: 0;
     border-radius: 0;
     box-shadow: none;
