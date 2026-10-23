@@ -1,5 +1,5 @@
 import Web3 from 'web3'
-import { config, CONTRACTS, setNetworkColor } from '@/config/wagmi'
+import { config, CONTRACTS } from '@/config/wagmi'
 import postAbi from '@/abi/post.json'
 import statusAbi from '@/abi/status.json'
 import commentAbi from '@/abi/post-comment.json'
@@ -19,7 +19,6 @@ export const getActiveChain = () => {
     const isConnected = config.state.status === 'connected'
     const walletChain = isConnected && connection ? config.chains.find((c) => c.id === connection.chainId) : null
     if (walletChain) {
-      setNetworkColor(walletChain)
       const baseContracts = CONTRACTS[`chain${walletChain.id}`]
       if (baseContracts) {
         const cloned = { ...baseContracts }
@@ -36,7 +35,6 @@ export const getActiveChain = () => {
     const userSelectedChain = config.chains.filter((filterItem) => filterItem.id.toString() === activeChain.toString())
 
     if (userSelectedChain.length > 0) {
-      setNetworkColor(userSelectedChain[0])
       const baseContracts = CONTRACTS[`chain${userSelectedChain[0].id}`]
       if (baseContracts) {
         const cloned = { ...baseContracts }

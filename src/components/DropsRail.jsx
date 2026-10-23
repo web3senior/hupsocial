@@ -150,7 +150,6 @@ function DropRailCard({ row, phase, status }) {
               value={minted}
               max={maxSupply}
               height={4}
-              color={chainInfo?.primaryColor}
               animated={isLive}
               ariaLabel={`${countFormat.format(minted)} of ${countFormat.format(maxSupply)} minted`}
             />

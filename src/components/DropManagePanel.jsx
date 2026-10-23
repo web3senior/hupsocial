@@ -698,7 +698,6 @@ export default function DropManagePanel({ chainId, dropId, drop, collection, onC
             className={styles.manage__phaseTrack}
             phases={phases}
             slots={MAX_DROP_PHASES}
-            color={chainInfo?.primaryColor}
           />
           <ul>
             {phases.map((phase, index) => {

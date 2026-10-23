@@ -523,7 +523,6 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
           label={<span className={styles.dropCard__progressLabel}>{`${countFormat.format(minted)}/${countFormat.format(maxSupply)} minted`}</span>}
           value={minted}
           max={maxSupply}
-          color={chainInfo?.primaryColor}
           animated={isLive}
           sparkle={isLive}
           marker={markerUrl ? <img src={markerUrl} alt="" loading="lazy" /> : <HupMark size={9} />}

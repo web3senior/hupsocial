@@ -22,7 +22,7 @@ import { setActiveChainId, useActiveChain } from '@/hooks/useActiveChain'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import { SOLANA_CHAINS, SOLANA_ICON_URL } from '@/config/solana'
-import { config, setNetworkColor } from '@/config/wagmi'
+import { config } from '@/config/wagmi'
 import { profilePath } from '@/lib/username'
 import { markFirstConnect } from '@/lib/firstConnect'
 import styles from './ConnectWallet.module.scss'
@@ -319,7 +319,6 @@ export function WalletOptions({ onConnected }) {
       await solana.connect(name)
       if (!activeChain?.isSolana && SOLANA_CHAINS[0]) {
         setActiveChainId(SOLANA_CHAINS[0].id)
-        setNetworkColor(SOLANA_CHAINS[0])
       }
       onConnected?.()
     } catch (connectError) {

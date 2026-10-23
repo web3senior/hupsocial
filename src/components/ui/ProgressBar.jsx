@@ -17,7 +17,7 @@ const toLength = (value) => (typeof value === 'number' ? `${value}px` : value)
 
 /**
  * Progress Bar. Colour, height, radius, and track all arrive as custom properties, so a caller
- * styles it from its own module or a chain's palette. Fill source, in precedence order:
+ * styles it from its own module. Fill source, in precedence order:
  * `startsAt`/`endsAt` (timed mode, ticks on its own clock), `percent`, then `value`/`max`.
  *
  * @param {Object} props
@@ -27,7 +27,7 @@ const toLength = (value) => (typeof value === 'number' ? `${value}px` : value)
  * @param {number|string} [props.startsAt] Unix seconds the window opened — timed mode.
  * @param {number|string} [props.endsAt] Unix seconds the window closes — timed mode.
  * @param {boolean} [props.countdown=false] Timed mode drains instead of filling.
- * @param {string} [props.color] Any CSS colour for the fill. Defaults to the active chain's.
+ * @param {string} [props.color] Any CSS colour for the fill. Defaults to the app accent.
  * @param {string} [props.trackColor] Any CSS colour for the groove behind it.
  * @param {number|string} [props.height=6] Track thickness.
  * @param {number|string} [props.radius=999] Corner radius.

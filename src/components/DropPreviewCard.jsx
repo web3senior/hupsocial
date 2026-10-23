@@ -103,7 +103,6 @@ export default function DropPreviewCard({
             value={0}
             max={supply}
             height={5}
-            color={chainInfo?.primaryColor}
             marker={markerUrl ? <img src={markerUrl} alt="" /> : <HupMark size={8} />}
             ariaLabel={`0 of ${countFormat.format(supply)} minted`}
           />

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import { useConnection } from 'wagmi'
-import { config, setNetworkColor } from '@/config/wagmi'
+import { config } from '@/config/wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { isSolanaNetworkId, solanaChainFor } from '@/config/solana'
 
@@ -73,10 +73,6 @@ export const useActiveChain = () => {
   // following the wallet would make Solana unreachable for as long as one is connected
   const chainId = isSolanaNetworkId(storedId) ? storedId : isConnected && walletChain ? walletChain.id : storedId
   const chain = isSolanaNetworkId(chainId) ? solanaChainFor(chainId) : (config.chains.find((item) => item.id === chainId) ?? null)
-
-  useEffect(() => {
-    if (chain) setNetworkColor(chain)
-  }, [chain?.id])
 
   return { chain, chainId: chain?.id ?? null, isConnected }
 }

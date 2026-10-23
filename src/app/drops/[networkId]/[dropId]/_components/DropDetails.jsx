@@ -595,7 +595,6 @@ export default function DropDetails({ networkId, dropId, referral }) {
                 value={minted}
                 max={maxSupply}
                 height={10}
-                color={chainInfo.primaryColor}
                 animated={isLive}
                 sparkle={isLive}
                 marker={markerUrl ? <img src={markerUrl} alt="" /> : <HupMark size={10} />}

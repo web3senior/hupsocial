@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import clsx from 'clsx'
 import { CaretDownIcon, CheckCircleIcon, CheckFatIcon } from '@phosphor-icons/react'
 import { useSwitchChain } from 'wagmi'
-import { config, setNetworkColor } from '@/config/wagmi'
+import { config } from '@/config/wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { setActiveChainId, useActiveChain } from '@/hooks/useActiveChain'
 import { SOLANA_CHAINS } from '@/config/solana'
@@ -38,7 +38,6 @@ export default function NetworkSelect({ className, placement = 'bottom-end', max
   const handleSelect = (target, close) => {
     const apply = () => {
       setActiveChainId(target.id)
-      setNetworkColor(target)
       onChange?.(target.id)
     }
 

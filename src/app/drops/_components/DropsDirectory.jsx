@@ -131,7 +131,6 @@ function DropTile({ row, inStrip = false }) {
               value={minted}
               max={maxSupply}
               height={5}
-              color={chainInfo?.primaryColor}
               animated={!isSoldOut && !isClosed}
               sparkle={!isSoldOut && !isClosed}
               marker={markerUrl ? <img src={markerUrl} alt="" loading="lazy" /> : <HupMark size={8} />}

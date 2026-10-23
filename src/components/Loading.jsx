@@ -6,8 +6,8 @@ import styles from './Loading.module.scss'
 // Swap this for any other loading-dev export to restyle every spinner in the app.
 const Indicator = Ring
 
-// --network-color-primary is runtime-only, so the literal fallback has to stay.
-const DEFAULT_COLOR = 'var(--network-color-primary, #1D9BF0)'
+// Loading color is independent of wallet connection and the selected network.
+const DEFAULT_COLOR = 'var(--app-accent, #1d9bf0)'
 
 // Call sites pass CSS lengths ('14px'); loading-dev takes a number of pixels.
 const toPixels = (size, fallback) => {

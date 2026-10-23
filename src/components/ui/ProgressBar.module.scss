@@ -2,8 +2,7 @@
   --progress-height: 6px;
   --progress-radius: 999px;
   --progress-marker-size: 15px;
-  // --network-color-primary is only set once a wallet connects, hence the fallback
-  --progress-color: var(--network-color-primary, var(--color-primary, #ec4899));
+  --progress-color: var(--app-accent, #1d9bf0);
   --progress-track: color-mix(in srgb, var(--text-muted, #888) 18%, transparent);
 
   position: relative;

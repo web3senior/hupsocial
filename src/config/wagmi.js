@@ -199,32 +199,3 @@ if (lastSession) {
     // Storage is unavailable: the wallet still reconnects, only without the head start
   }
 }
-
-/**
- * Set network colors
- * @param {json} chain
- */
-export const setNetworkColor = (chain) => {
-  const rootElement = document.documentElement
-  // A chain with no colours must clear the variables, not write the string "undefined" into
-  // them: a defined-but-invalid custom property beats every var() fallback and paints each
-  // network-coloured control transparent
-  if (chain?.primaryColor) {
-    rootElement.style.setProperty(`--network-color-primary`, chain.primaryColor)
-    rootElement.style.setProperty(`--network-color-text`, chain.textColor || '#fff')
-  } else {
-    rootElement.style.removeProperty(`--network-color-primary`)
-    rootElement.style.removeProperty(`--network-color-text`)
-  }
-}
-
-/**
- * Get network colors
- * @param {json} chain
- */
-export const getNetworkColor = () => {
-  const rootElement = document.documentElement
-  const primaryColor = rootElement.style.getPropertyValue(`--network-color-primary`)
-  const secondaryColor = rootElement.style.getPropertyValue(`--network-color-text`)
-  return { primaryColor, secondaryColor }
-}

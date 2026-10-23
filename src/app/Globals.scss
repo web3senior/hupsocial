@@ -1,5 +1,11 @@
 :root,
 [data-theme='light'] {
+  // App controls keep the same accent before and after wallet/network hydration.
+  --app-accent: #1d9bf0;
+  --app-accent-text: #ffffff;
+  --network-color-primary: var(--app-accent);
+  --network-color-text: var(--app-accent-text);
+  --network-color-primary-rgb: 29, 155, 240;
   --surface-1: #191919;
   --surface-2: #1f1f1f;
   --surface-3: #2a2a2a;
@@ -97,7 +103,7 @@
   --color-icon-muted: #4b5563;
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%23666666' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
-  --accent-primary: var(--network-color-text);
+  --accent-primary: var(--app-accent);
   --accent-press: var(--accent-primary);
   accent-color: var(--accent-primary);
   color-scheme: light;
@@ -174,7 +180,7 @@
   --color-icon-muted: #52525b;
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none'%3E%3Cpath d='M4 6l4 4 4-4' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
-  --accent-primary: var(--network-color-text);
+  --accent-primary: var(--app-accent);
   --accent-press: var(--accent-primary);
   accent-color: var(--accent-primary);
   color-scheme: dark;

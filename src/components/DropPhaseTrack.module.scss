@@ -1,6 +1,6 @@
 .track {
-  // --network-color-primary is only set once a wallet connects, hence the fallback
-  --phase-color: var(--network-color-primary, var(--color-primary, #ec4899));
+  // Phase progress uses the app accent regardless of network.
+  --phase-color: var(--app-accent, #1d9bf0);
   --phase-height: 6px;
   --phase-gap: 0.28rem;
 

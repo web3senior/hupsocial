@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import clsx from 'clsx'
 import { formatEther } from 'viem'
 import { useReadContracts, useSwitchChain } from 'wagmi'
-import { config, setNetworkColor } from '@/config/wagmi'
+import { config } from '@/config/wagmi'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { setActiveChainId, useActiveChain } from '@/hooks/useActiveChain'
@@ -31,8 +31,8 @@ export const dropChains = appChains.filter((chain) => CONTRACTS[`chain${chain.id
  * HupDrops engine are offered, each with what it charges to create — the one number that actually
  * decides this, and the reason the choice comes first rather than being inherited silently.
  *
- * Picking writes through to the app's active chain and switches the wallet with it, so the header,
- * the form's colours and the transaction can never end up naming three different networks.
+ * Picking writes through to the app's active chain and switches the wallet with it,
+ * keeping the header and transaction on the same network.
  *
  * @param {number} props.chainId The chain currently chosen.
  * @param {boolean} [props.disabled] Locked while the form is busy.
@@ -60,7 +60,6 @@ export default function DropChainPicker({ chainId, disabled = false }) {
 
     const apply = () => {
       setActiveChainId(chain.id)
-      setNetworkColor(chain)
     }
 
     // Same order as NetworkSelect: the wallet moves first, and the app follows only if it agreed

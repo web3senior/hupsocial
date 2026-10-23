@@ -2186,10 +2186,6 @@ export default function Page() {
             <div
               key={stateKey}
               className={styles['admin-contracts__card']}
-              style={{
-                '--network-color-primary': chain.primaryColor || '#f97316',
-                '--network-color-text': chain.textColor || '#0d0d0d',
-              }}
             >
               <div className={styles['admin-contracts__card-header']}>
                 <div className={styles['admin-contracts__network-info']}>
@@ -2714,10 +2710,6 @@ export default function Page() {
                   className={clsx(styles['admin-contracts__chip'], {
                     [styles['admin-contracts__chip--active']]: chainFilter === chain.id,
                   })}
-                  style={{
-                    '--network-color-primary': chain.primaryColor || '#f97316',
-                    '--network-color-text': chain.textColor || '#0d0d0d',
-                  }}
                 >
                   <img src={chain.iconUrl} alt="" className={styles['admin-contracts__chip-icon']} />
                   {chain.name}
@@ -2745,10 +2737,6 @@ export default function Page() {
                     <div
                       key={`balances-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -2844,10 +2832,6 @@ export default function Page() {
                     <div
                       key={chain.id}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -3030,10 +3014,6 @@ export default function Page() {
                     <div
                       key={`sell-fees-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -3188,10 +3168,6 @@ export default function Page() {
                     <div
                       key={`treasury-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -3350,10 +3326,6 @@ export default function Page() {
                     <div
                       key={`events-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -3556,10 +3528,6 @@ export default function Page() {
                     <div
                       key={`apps-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -3763,10 +3731,6 @@ export default function Page() {
                     <div
                       key={`predict-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -4064,10 +4028,6 @@ export default function Page() {
                     <div
                       key={`trade-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -4264,10 +4224,6 @@ export default function Page() {
                     <div
                       key={`offers-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -4472,10 +4428,6 @@ export default function Page() {
                     <div
                       key={`tipper-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -4664,10 +4616,6 @@ export default function Page() {
                     <div
                       key={`drops-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -5209,10 +5157,6 @@ export default function Page() {
                     <div
                       key={`fund-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -5430,10 +5374,6 @@ export default function Page() {
                     <div
                       key={`tasks-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f97316',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>
@@ -5742,10 +5682,6 @@ export default function Page() {
                     <div
                       key={`premium-${chain.id}`}
                       className={styles['admin-contracts__card']}
-                      style={{
-                        '--network-color-primary': chain.primaryColor || '#f59e0b',
-                        '--network-color-text': chain.textColor || '#0d0d0d',
-                      }}
                     >
                       <div className={styles['admin-contracts__card-header']}>
                         <div className={styles['admin-contracts__network-info']}>

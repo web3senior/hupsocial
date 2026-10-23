@@ -26,14 +26,14 @@ const statusText = (phase, status) => {
 /**
  * Drop Phase Track
  * The whole mint schedule as one strip — a segment per phase, up to the engine's eight. Ended
- * phases read solid and dim, the live one carries the chain's colour and fills with its own
+ * phases read solid and dim, the live one carries the app accent and fills with its own
  * clock, and what's still coming stays faint. The creator's manage panel is its only home; the
  * public drop surfaces list phases in words instead.
  * @param {Object} props
  * @param {Array} props.phases Phase structs from `phasesOf`, or indexed rows carrying startTime/endTime/paused.
  * @param {number} [props.slots] Pad to this many segments with ghosts, capped at the engine's eight.
  * @param {boolean} [props.caption=true] The "2/8 · Presale · Live" line under the strip.
- * @param {string} [props.color] Fill colour; defaults to the drop chain's primary.
+ * @param {string} [props.color] Fill colour; defaults to the app accent.
  * @param {string} [props.className] Layout class from the consumer's module.
  */
 export default function DropPhaseTrack({ phases = [], slots, caption = true, color, className }) {

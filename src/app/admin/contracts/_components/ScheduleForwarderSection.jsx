@@ -114,7 +114,6 @@ export default function ScheduleForwarderSection({ chains }) {
             <div
               key={chain.id}
               className={styles['admin-contracts__card']}
-              style={{ '--network-color-primary': chain.primaryColor || '#f97316', '--network-color-text': chain.textColor || '#0d0d0d' }}
             >
               <div className={styles['admin-contracts__card-header']}>
                 <div className={styles['admin-contracts__network-info']}>
