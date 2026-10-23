@@ -53,14 +53,25 @@
 
   -webkit-tap-highlight-color: transparent;
   position: relative;
-  transition: background-color 0.1s ease-out;
+  isolation: isolate;
   cursor: pointer;
   padding: 20px 20px 0 20px;
   place-items: stretch;
 
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 1px;
+    z-index: -1;
+    background-color: var(--post-hover-bg);
+    opacity: 0;
+    transition: opacity 0.1s ease-out;
+    pointer-events: none;
+  }
+
   @media (hover: hover) and (pointer: fine) {
-    &:hover {
-      background-color: var(--post-hover-bg);
+    &:hover::before {
+      opacity: 1;
     }
   }
 
@@ -597,6 +608,16 @@
         }
       }
     }
+  }
+}
+
+// Keep the thread connector above both the post and comment hover layers.
+.postCard {
+  position: relative;
+  isolation: isolate;
+
+  .post {
+    isolation: auto;
   }
 }
 

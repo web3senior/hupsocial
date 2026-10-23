@@ -948,7 +948,7 @@ export function PostCard({ item, actions, chainId, networkName }) {
   }
 
   return (
-    <>
+    <div className={styles.postCard}>
       <Post item={item} actions={actions} chainId={chainId} networkName={networkName} hasCommentBelow={hasCommentBelow} />
       {shouldFetch &&
         (isLastCommentLoading ? (
@@ -967,7 +967,7 @@ export function PostCard({ item, actions, chainId, networkName }) {
             />
           </div>
         ) : null)}
-    </>
+    </div>
   )
 }
 
