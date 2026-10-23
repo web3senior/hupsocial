@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { XIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { usePremium } from '@/hooks/usePremium'
+import WhatsHappening from './WhatsHappening'
 import blueCheckMark from '@/../public/icons/blue-checkmark.svg'
 import styles from './HomeRail.module.scss'
 
@@ -23,13 +24,14 @@ const readUpsellDismissed = () => {
 
 /**
  * Home Rail
- * The column beside the home feed on wide screens: an upgrade card for viewers without Premium.
+ * The column beside the home feed on wide screens: Premium and trending posts.
  * "Who to follow" lives in the feed itself (WhoToFollow), between posts.
  */
 export default function HomeRail() {
   return (
     <div className={styles.rail}>
       <PremiumUpsell />
+      <WhatsHappening />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import useSWR from 'swr'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import clsx from 'clsx'
-import { ArticleIcon, BookIcon, BugIcon, CalendarDotsIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HandCoinsIcon, HardDrivesIcon, HeadCircuitIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, ReceiptIcon, RobotIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
+import { ArticleIcon, BookIcon, BugIcon, CalendarDotsIcon, CaretDoubleLeftIcon, CaretDoubleRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HandCoinsIcon, HardDrivesIcon, HeadCircuitIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, ReceiptIcon, RobotIcon, SunIcon, TerminalWindowIcon, XIcon } from '@phosphor-icons/react'
 import { CircleIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
@@ -24,6 +24,7 @@ import { openConnect } from '@/lib/connectDialog'
 import BatchLikeTrigger from './BatchLikeTrigger'
 import Hupi from './hupi/Hupi'
 import NativePopover from './ui/NativePopover'
+import NativeDialog from './ui/NativeDialog'
 import Tooltip from './ui/Tooltip'
 import NavBadge from './ui/NavBadge'
 import Avatar from './ui/Avatar'
@@ -33,6 +34,18 @@ import styles from './Aside.module.scss'
 // A visible tab revalidates on focus and on every client-side navigation, so its tick only has to
 // cover a reader sitting still on one page. A hidden tab polls for one reason — raising the
 // favicon badge — and nobody is waiting on it, so it ticks far more slowly.
+const subscribeViewport = (onChange) => {
+  const query = window.matchMedia('(min-width: 768px) and (max-width: 1023px)')
+  window.addEventListener('resize', onChange)
+  query.addEventListener('change', onChange)
+  return () => {
+    window.removeEventListener('resize', onChange)
+    query.removeEventListener('change', onChange)
+  }
+}
+const getViewport = () => window.innerWidth < 768 ? 'mobile' : window.innerWidth < 1024 ? 'tablet' : 'desktop'
+const getServerViewport = () => 'desktop'
+
 const NOTIFICATION_POLL_MS = 120_000
 const HIDDEN_NOTIFICATION_POLL_MS = 300_000
 
@@ -190,11 +203,9 @@ export default function Aside() {
   const claimLegacyBatch = useSidebarStore((state) => state.claimLegacyBatch)
 
   // Safe item fallback array structure avoids runtime evaluation crash errors
-  const navItems = getNavItems(address) ?? []
+  const navItems = useMemo(() => getNavItems(address) ?? [], [getNavItems, address])
   const isMenuOpen = useSidebarStore((state) => state.isMenuOpen)
   const toggleMenu = useSidebarStore((state) => state.toggleMenu)
-  const toggleMobileMenu = useSidebarStore((state) => state.toggleMobileMenu)
-  const closeMenu = useSidebarStore((state) => state.closeMenu)
   const isMobileMenuOpen = useSidebarStore((state) => state.isMobileMenuOpen)
   const closeMobileMenu = useSidebarStore((state) => state.closeMobileMenu)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
@@ -229,18 +240,10 @@ export default function Aside() {
     revalidateUnread()
   }, [pathname, revalidateUnread])
 
-  const [isWideScreen, setIsWideScreen] = useState(false)
-
-  useEffect(() => {
-    const mql = window.matchMedia('(min-width: 768px)')
-
-    setIsWideScreen(mql.matches)
-
-    const handleChange = (event) => setIsWideScreen(event.matches)
-    mql.addEventListener('change', handleChange)
-
-    return () => mql.removeEventListener('change', handleChange)
-  }, [])
+  const viewport = useSyncExternalStore(subscribeViewport, getViewport, getServerViewport)
+  const isWideScreen = viewport !== 'mobile'
+  const isTablet = viewport === 'tablet'
+  const drawerRef = useRef(null)
 
   // Only fetch a profile once a wallet is connected — the disconnected state keeps the plain icon
   const { profile } = useProfile(isConnected && address ? address : null)
@@ -263,19 +266,29 @@ export default function Aside() {
     ]
   }, [address, isConnected, navItems, profile?.profileImage, profile?.username])
 
+  // Network information pages share their prefix with post details.
+  const isNetworksActive = /^\/networks(?:\/[^/]+)?\/?$/.test(pathname ?? '')
   const isMobileLayout = !isWideScreen
-  const isExpanded = isMobileLayout ? isMobileMenuOpen : isMenuOpen
+  const isExpanded = isMobileLayout || (!isTablet && isMenuOpen)
   const isCompact = !isExpanded
   const shouldShowMobileMenu = isMobileLayout && isMobileMenuOpen
-  const closeSidebar = isMobileLayout ? closeMobileMenu : closeMenu
+  const closeSidebar = closeMobileMenu
+
+  useEffect(() => {
+    closeMobileMenu()
+  }, [pathname, isWideScreen, closeMobileMenu])
+
+  useEffect(() => {
+    if (mounted && shouldShowMobileMenu) drawerRef.current?.open()
+    else drawerRef.current?.close()
+  }, [mounted, shouldShowMobileMenu])
 
   // How much of the viewport's left edge this sidebar actually owns, published as
   // --aside-width on the root element so CSS can size against the real footprint instead of
   // assuming the widest state (the NFT Market's card does — see MarketViews.module.scss,
   // which used to pin a ghost 250px gap beside a compact sidebar and shove the page right).
-  // A ResizeObserver rather than deriving from isExpanded: the compact width is fit-content,
-  // so the browser's measurement is the only honest one, and the observer streams the 0.3s
-  // fold so a consumer can glide alongside it. Nothing here re-renders — the value goes
+  // A ResizeObserver publishes the actual rendered width, including padding and borders,
+  // so consumers follow the sidebar's footprint. Nothing here re-renders — the value goes
   // straight to a custom property. On the mobile layout the element parks off-canvas at its
   // full width, so what it owns is zero. Before mount the placeholder renders untracked and
   // the property stays unset — consumers fall back to the expanded width, which is exactly
@@ -303,25 +316,7 @@ export default function Aside() {
     }
   }, [isMobileLayout, mounted])
 
-  const [tooltipReady, setTooltipReady] = useState(false)
-
-  useEffect(() => {
-    if (!isCompact) {
-      setTooltipReady(false)
-      return
-    }
-    // Wait for sidebar close transition to finish (0.1s delay + 0.3s transition)
-    const t = setTimeout(() => setTooltipReady(true), 420)
-    return () => clearTimeout(t)
-  }, [isCompact])
-
-  const handleToggleMenu = () => {
-    if (isMobileLayout) {
-      toggleMobileMenu()
-    } else {
-      toggleMenu()
-    }
-  }
+  const tooltipReady = isCompact
 
   // The scrollbar thumb is transparent at rest and only painted while the list is hovered or
   // scrolling (SCSS). Scroll fires per frame, so the class is toggled on the element directly
@@ -355,244 +350,242 @@ export default function Aside() {
   }
 
   if (!mounted) {
-    return <aside className={styles.aside} style={{ width: '250px' }} />
+    return <aside className={clsx(styles.aside, styles['aside--placeholder'])} aria-hidden="true" />
   }
 
+  const SidebarSurface = isMobileLayout ? NativeDialog : 'aside'
+  const surfaceProps = isMobileLayout ? {
+    ref: drawerRef,
+    lightDismiss: true,
+    onCancel: (event) => event.stopPropagation(),
+    onClose: (event) => {
+      event.stopPropagation()
+      closeMobileMenu()
+    },
+  } : { ref: asideRef }
+
   return (
-    <aside
-      ref={asideRef}
-      className={clsx(
-        styles.aside,
-        !isMobileLayout && (isExpanded ? styles.expanded : styles.compact),
-        shouldShowMobileMenu && styles.show,
-        shouldShowMobileMenu && styles.expanded
-      )}
-    >
-      <div className={styles.navContainer}>
-        <header className={styles.header}>
-          <div className={styles.logoWrapper}>
-            <Link href="/" className="flex align-items-center gap-025" aria-label="Home">
-              <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
-              {isExpanded && <span className={styles.logoCap}>{process.env.NEXT_PUBLIC_NAME || 'Hup'}</span>}
-              {isExpanded && <span className={styles.logoBadge}>Beta</span>}
-            </Link>
-          </div>
+    <>
+      <SidebarSurface
+        {...surfaceProps}
+        id="main-sidebar"
+        aria-label="Main menu"
+        className={clsx(styles.aside, isMobileLayout ? styles.aside__drawer : (isExpanded ? styles.expanded : styles.compact))}
+      >
+        <div className={styles.navContainer}>
+          <header className={styles.header}>
+            <div className={styles.logoWrapper}>
+              <Link href="/" className="flex align-items-center gap-025" aria-label="Home">
+                <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
+                {isExpanded && <span className={styles.logoCap}>{process.env.NEXT_PUBLIC_NAME || 'Hup'}</span>}
+              </Link>
+            </div>
 
-          {isExpanded && (
-            <button
-              type="button"
-              className={styles.menuButton}
-              onClick={handleToggleMenu}
-              aria-label="Collapse sidebar"
-              aria-expanded={isExpanded}
-            >
-              <CaretDoubleLeftIcon size={18} />
-            </button>
-          )}
-
-          <button
-            type="button"
-            className={clsx(styles.menuButton, styles.menuButtonFloat)}
-            onClick={handleToggleMenu}
-            aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-            aria-expanded={isExpanded}
-          >
-            {isExpanded ? <CaretDoubleLeftIcon size={18} /> : <CaretDoubleRightIcon size={18} />}
-          </button>
-        </header>
-
-        <ul className={styles.navList} ref={navListRef} onScroll={handleNavListScroll}>
-          {navLinks.map((item, index) => (
-            <li key={item.id ?? `${item.type}-${index}`}>
-              <NavLink
-                item={item}
-                isActive={isActiveItem(pathname, item)}
-                isCompact={isCompact}
-                showTooltip={tooltipReady}
-                unreadCount={unreadCount}
-                onNavigate={isMobileLayout ? closeSidebar : undefined}
-                onLinkClick={item.id === 'foryou' ? handleHomeLinkClick : undefined}
-              />
-            </li>
-          ))}
-        </ul>
-
-        <div className={styles.footerNav}>
-          <NativePopover
-            trigger={
-              <Tooltip content={tooltipReady ? 'More' : null} placement="right" size="compact" hoverOnly>
-                <button type="button" className={clsx(styles.link, styles.moreButton)} aria-label="More">
-                  <div className={styles.iconWrapper}>
-                    <EqualsIcon size={24} />
-                  </div>
-                  {!isCompact && <span className={styles.linkText}>More</span>}
-                </button>
-              </Tooltip>
-            }
-            placement="right-end"
-            type="auto"
-          >
-            {({ close }) => (
-              <div className={styles.popoverContent}>
-                <ul className="flex flex-column gap-050">
-                  <li>
-                    <Link href="/settings" onClick={close} className="flex align-items-center gap-050">
-                      <GearIcon size={16} />
-                      <span>Settings</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/compose/article" onClick={close} className="flex align-items-center gap-050">
-                      <ArticleIcon size={16} />
-                      <span>Write an article</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/liked" onClick={close} className="flex align-items-center gap-050">
-                      <HeartIcon size={16} />
-                      <span>Liked</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/scheduled" onClick={close} className="flex align-items-center gap-050">
-                      <CalendarDotsIcon size={16} />
-                      <span>Scheduled posts</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/nfts/offers" onClick={close} className="flex align-items-center gap-050">
-                      <HandCoinsIcon size={16} />
-                      <span>My offers</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/gas" onClick={close} className="flex align-items-center gap-050">
-                      <GasPumpIcon size={16} />
-                      <span>Gas tank</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/fees" onClick={close} className="flex align-items-center gap-050">
-                      <ReceiptIcon size={16} />
-                      <span>Fees</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <div className={styles.themeWrapper}>
-                      <div className="flex align-items-center gap-050">
-                        <PaletteIcon size={16} />
-                        <span>Theme</span>
-                      </div>
-                      <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '30px' }}>
-                        {themeOptions.map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            aria-pressed={theme === option.id}
-                            onClick={() => setTheme(option.id)}
-                            className={clsx(theme === option.id && styles.active)}
-                          >
-                            {option.icon}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </li>
-                  <li>
-                    <a
-                      href="https://docs.hup.social"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={close}
-                      className="flex align-items-center gap-050"
-                    >
-                      <BookIcon size={16} />
-                      <span>Documentation</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      href="/llms.txt"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={close}
-                      className="flex align-items-center gap-050"
-                    >
-                      <RobotIcon size={16} />
-                      <span>llms.txt</span>
-                    </a>
-                  </li>
-                  <li>
-                    <Link href="/agents" onClick={close} className="flex align-items-center gap-050">
-                      <HeadCircuitIcon size={16} />
-                      <span>AI agents</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                      <ChatCenteredDotsIcon size={16} />
-                      <span>Send feedback</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                      <BugIcon size={16} />
-                      <span>Report a problem</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/status" onClick={close} className={clsx('flex', 'align-items-center', 'gap-050')}>
-                      <HardDrivesIcon size={16} />
-                      <span>System status</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/install" onClick={close} className="flex align-items-center gap-050">
-                      <DownloadSimpleIcon size={16} />
-                      <span>Install {process.env.NEXT_PUBLIC_NAME}</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <a
-                      href="https://github.com/web3senior/hupsocial"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={close}
-                      className="flex align-items-center gap-050"
-                    >
-                      <GitHub />
-                      <span>GitHub</span>
-                    </a>
-                  </li>
-                  <li>
-                    <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                      <QuestionIcon size={16} />
-                      <span>Help</span>
-                    </Link>
-                  </li>
-                </ul>
-              </div>
+            {isMobileLayout && (
+              <button type="button" className={styles.aside__close} onClick={closeMobileMenu} aria-label="Close menu">
+                <XIcon size={20} aria-hidden="true" />
+              </button>
             )}
-          </NativePopover>
+          </header>
 
-          <Tooltip content={tooltipReady ? 'Networks' : null} placement="right" size="compact" hoverOnly>
-            <Link
-              href="/networks"
-              className={clsx(styles.link, isActivePath(pathname, '/networks') && styles.linkActive)}
-              aria-label="Networks"
-              aria-current={isActivePath(pathname, '/networks') ? 'page' : undefined}
-              // Mobile only, like every other nav row: on desktop the expanded sidebar is a state the
-              // user set, and folding it away on a plain navigation loses it for the rest of the session
-              onClick={isMobileLayout ? closeSidebar : undefined}
+          <ul className={styles.navList} ref={navListRef} onScroll={handleNavListScroll}>
+            {navLinks.map((item, index) => (
+              <li key={item.id ?? `${item.type}-${index}`}>
+                <NavLink
+                  item={item}
+                  isActive={isActiveItem(pathname, item)}
+                  isCompact={isCompact}
+                  showTooltip={tooltipReady}
+                  unreadCount={unreadCount}
+                  onNavigate={isMobileLayout ? closeSidebar : undefined}
+                  onLinkClick={item.id === 'foryou' ? handleHomeLinkClick : undefined}
+                />
+              </li>
+            ))}
+          </ul>
+
+          <div className={styles.footerNav}>
+            <NativePopover
+              trigger={
+                <Tooltip content={tooltipReady ? 'More' : null} placement="right" size="compact" hoverOnly>
+                  <button type="button" className={clsx(styles.link, styles.moreButton)} aria-label="More">
+                    <div className={styles.iconWrapper}>
+                      <EqualsIcon size={24} />
+                    </div>
+                    {!isCompact && <span className={styles.linkText}>More</span>}
+                  </button>
+                </Tooltip>
+              }
+              placement="right-end"
+              type="auto"
             >
-              <div className={styles.iconWrapper}>
-                <StackIcon size={20} weight={isActivePath(pathname, '/networks') ? 'fill' : 'regular'} />
-              </div>
-              {!isCompact && <span className={styles.linkText}>Networks</span>}
-            </Link>
-          </Tooltip>
+              {({ close }) => (
+                <div className={styles.popoverContent}>
+                  <ul className="flex flex-column gap-050">
+                    <li>
+                      <Link href="/settings" onClick={close} className="flex align-items-center gap-050">
+                        <GearIcon size={16} />
+                        <span>Settings</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/compose/article" onClick={close} className="flex align-items-center gap-050">
+                        <ArticleIcon size={16} />
+                        <span>Write an article</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/liked" onClick={close} className="flex align-items-center gap-050">
+                        <HeartIcon size={16} />
+                        <span>Liked</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/scheduled" onClick={close} className="flex align-items-center gap-050">
+                        <CalendarDotsIcon size={16} />
+                        <span>Scheduled posts</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/nfts/offers" onClick={close} className="flex align-items-center gap-050">
+                        <HandCoinsIcon size={16} />
+                        <span>My offers</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/gas" onClick={close} className="flex align-items-center gap-050">
+                        <GasPumpIcon size={16} />
+                        <span>Gas tank</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/fees" onClick={close} className="flex align-items-center gap-050">
+                        <ReceiptIcon size={16} />
+                        <span>Fees</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <div className={styles.themeWrapper}>
+                        <div className="flex align-items-center gap-050">
+                          <PaletteIcon size={16} />
+                          <span>Theme</span>
+                        </div>
+                        <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '30px' }}>
+                          {themeOptions.map((option) => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              aria-pressed={theme === option.id}
+                              onClick={() => setTheme(option.id)}
+                              className={clsx(theme === option.id && styles.active)}
+                            >
+                              {option.icon}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </li>
+                    <li>
+                      <a
+                        href="https://docs.hup.social"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={close}
+                        className="flex align-items-center gap-050"
+                      >
+                        <BookIcon size={16} />
+                        <span>Documentation</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a
+                        href="/llms.txt"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={close}
+                        className="flex align-items-center gap-050"
+                      >
+                        <RobotIcon size={16} />
+                        <span>llms.txt</span>
+                      </a>
+                    </li>
+                    <li>
+                      <Link href="/agents" onClick={close} className="flex align-items-center gap-050">
+                        <HeadCircuitIcon size={16} />
+                        <span>AI agents</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/help" onClick={close} className="flex align-items-center gap-050">
+                        <ChatCenteredDotsIcon size={16} />
+                        <span>Send feedback</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/help" onClick={close} className="flex align-items-center gap-050">
+                        <BugIcon size={16} />
+                        <span>Report a problem</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/status" onClick={close} className={clsx('flex', 'align-items-center', 'gap-050')}>
+                        <HardDrivesIcon size={16} />
+                        <span>System status</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/install" onClick={close} className="flex align-items-center gap-050">
+                        <DownloadSimpleIcon size={16} />
+                        <span>Install {process.env.NEXT_PUBLIC_NAME}</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <a
+                        href="https://github.com/web3senior/hupsocial"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={close}
+                        className="flex align-items-center gap-050"
+                      >
+                        <GitHub />
+                        <span>GitHub</span>
+                      </a>
+                    </li>
+                    <li>
+                      <Link href="/help" onClick={close} className="flex align-items-center gap-050">
+                        <QuestionIcon size={16} />
+                        <span>Help</span>
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </NativePopover>
+
+            <Tooltip content={tooltipReady ? 'Networks' : null} placement="right" size="compact" hoverOnly>
+              <Link
+                href="/networks"
+                className={clsx(styles.link, isNetworksActive && styles.linkActive)}
+                aria-label="Networks"
+                aria-current={isNetworksActive ? 'page' : undefined}
+                // Mobile only, like every other nav row: on desktop the expanded sidebar is a state the
+                // user set, and folding it away on a plain navigation loses it for the rest of the session
+                onClick={isMobileLayout ? closeSidebar : undefined}
+              >
+                <div className={styles.iconWrapper}>
+                  <StackIcon size={20} weight={isNetworksActive ? 'fill' : 'regular'} />
+                </div>
+                {!isCompact && <span className={styles.linkText}>Networks</span>}
+              </Link>
+            </Tooltip>
+            {!isMobileLayout && !isTablet && (
+              <button type="button" className={styles.aside__toggle} onClick={toggleMenu} aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'} aria-expanded={isExpanded} aria-controls="main-sidebar">
+                {isExpanded ? <CaretDoubleLeftIcon size={20} aria-hidden="true" /> : <CaretDoubleRightIcon size={20} aria-hidden="true" />}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      </SidebarSurface>
 
       <div className={styles.floatingActions}>
         <Hupi className={styles.floatingActions__button} />
@@ -613,6 +606,6 @@ export default function Aside() {
           <PlusIcon/>
         </button>
       </div>
-    </aside>
+    </>
   )
 }
