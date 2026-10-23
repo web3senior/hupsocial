@@ -125,7 +125,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
             size={20}
           />
         ) : (
-          <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
+          <Icon size={24} weight={isActive ? 'fill' : 'regular'} />
         )}
 
         {/* Render a tiny alert badge overlay over icon when sidebar is tightly compact */}
@@ -148,7 +148,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
         <Tooltip content={showTooltip ? item.name : null} placement="right" size="compact" hoverOnly>
           <button
             type="button"
-            className={clsx(styles.link, styles.moreButton, item.id === 'new-post' && styles['aside__post-button'])}
+            className={clsx(styles.link, styles.moreButton, item.id === 'new-post' && [styles['aside__post-button'], 'rounded-full'])}
             aria-label={item.name}
             onClick={() => {
               // The composer can only publish with a wallet behind it — offer the chooser here

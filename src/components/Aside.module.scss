@@ -150,9 +150,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
   min-width: 32px;
-  height: 32px;
+  height: 36px;
   padding: 0 0.25rem;
   border-radius: 1000px;
   text-decoration: none;
@@ -183,6 +183,7 @@
 }
 
 .linkText {
+  font-size: 1.125rem;
   color: var(--black);
   white-space: nowrap;
   opacity: 1;
@@ -286,7 +287,6 @@
   min-height: 48px;
   margin-top: 0.75rem;
   border: 1px solid var(--app-accent);
-  border-radius: var(--global-border-radius, 16px);
   background-color: var(--app-accent);
   color: var(--app-accent-text);
   font-weight: 600;

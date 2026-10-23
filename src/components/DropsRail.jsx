@@ -188,6 +188,7 @@ export default function DropsRail({ networkId = null, className, variant = 'feed
   const drops = useMemo(() => {
     const rows = data?.data ?? []
     return rows
+      .filter((row) => !isSidebar || Number(row.featured) === 1)
       .map((row) => ({ row, ...(railPhase(row, now) ?? {}) }))
       .filter((entry) => entry.status)
       .sort((a, b) => {
@@ -200,7 +201,7 @@ export default function DropsRail({ networkId = null, className, variant = 'feed
         if (aEnd !== bEnd) return aEnd - bEnd
         return remainingRatio(a.row) - remainingRatio(b.row)
       })
-  }, [data, now])
+  }, [data, now, isSidebar])
 
   const { trackRef, edges, nudge } = useStripScroll(drops.length)
 
