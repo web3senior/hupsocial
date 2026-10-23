@@ -571,7 +571,7 @@ export default function Aside({ inLayoutGrid = false }) {
                 className={clsx(styles.aside__profile, isCompact && styles['aside__profile--compact'])}
                 creator={address}
                 variant={isCompact ? 'imageOnly' : 'nameAndUsername'}
-                size={isCompact ? 36 : 44}
+                size={36}
                 hoverCard={false}
                 linkBox
                 onNavigate={isMobileLayout ? closeSidebar : undefined}

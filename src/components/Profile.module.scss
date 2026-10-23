@@ -84,6 +84,7 @@
 .nameColumn {
   min-width: 0;
   max-width: 100%;
+  gap: var(--profile-text-gap, 0.25rem);
 }
 
 // Text shares one baseline (the 13px time centred against the 16px name sat high); glyphs
@@ -112,7 +113,7 @@
   @extend %clip-clears-descenders;
   position: relative;
   font-weight: 600;
-  line-height: var(--system-16-line-height);
+  line-height: var(--profile-text-line-height, var(--system-16-line-height));
   font-family: var(--font-sans);
   color: inherit;
   text-decoration: none;
@@ -245,7 +246,7 @@
   font-weight: 400;
   font-family: var(--font-sans);
   font-size: inherit;
-  line-height: var(--system-16-line-height);
+  line-height: var(--profile-text-line-height, var(--system-16-line-height));
   color: var(--gray-400);
   min-width: 0;
   overflow: hidden;

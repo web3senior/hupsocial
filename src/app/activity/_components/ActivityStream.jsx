@@ -11,7 +11,7 @@ import ActivityTape from './ActivityTape'
 import { TABS, groupIntoBlocks, skippedBlocksBetween } from './activityModel'
 import styles from './ActivityStream.module.scss'
 
-const PAGE_SIZE = 30
+const PAGE_SIZE = 50
 // Long enough that an idle tab is not polling the union query every few seconds, short enough
 // that the page feels live while somebody watches it.
 const REFRESH_MS = 45_000

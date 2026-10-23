@@ -174,7 +174,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
       )}
 
       {variant !== 'imageOnly' && (
-        <div className={clsx(styles.nameColumn, 'flex flex-column align-items-start justify-content-center gap-025')}>
+        <div className={clsx(styles.nameColumn, 'flex flex-column align-items-start justify-content-center')}>
           <div className={styles.nameRow}>
             {/* Hover-only prefetch: visible links re-prefetch on every router cache invalidation,
                 which looped the chat's sender names into a render per link per second */}
