@@ -1,11 +1,10 @@
 'use client'
 
 import { Spinner } from '@/components/Loading'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import useSWRInfinite from 'swr/infinite'
 import {
-  ArrowDownIcon,
   CalendarDotIcon,
   CalendarDotsIcon,
   ChatCircleIcon,
@@ -143,6 +142,31 @@ export default function LeaderboardPage() {
   const hasMore = Boolean(meta?.hasMore)
   const isLoadingMore = isValidating && size > 1
 
+  // Fetch the next page as the reader nears the end. The callback lives in a ref so the observer
+  // never re-attaches just because it closed over fresher state; re-observing after each page
+  // lands re-fires it when the sentinel is still on screen.
+  const sentinelRef = useRef(null)
+  const loadMoreRef = useRef(null)
+  useEffect(() => {
+    loadMoreRef.current = () => {
+      if (!isValidating) setSize(size + 1)
+    }
+  }, [isValidating, setSize, size])
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMoreRef.current?.()
+      },
+      { rootMargin: '400px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, leaders.length])
+
   return (
     <>
       <PageTitle name="Leaderboard" />
@@ -264,11 +288,8 @@ export default function LeaderboardPage() {
               </section>
 
               {hasMore && (
-                <div className={styles.loadMoreWrap}>
-                  <button type="button" className={styles.loadMore} onClick={() => setSize(size + 1)} disabled={isLoadingMore}>
-                    <ArrowDownIcon size={16} />
-                    <span>{isLoadingMore ? <><Spinner size={16} color="currentColor" /> Loading</> : 'Load more'}</span>
-                  </button>
+                <div ref={sentinelRef} className={styles.loadMoreWrap} aria-live="polite">
+                  {isLoadingMore && <Spinner size={20} />}
                 </div>
               )}
             </>

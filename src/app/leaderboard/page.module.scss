@@ -514,29 +514,13 @@
   font-weight: 800;
 }
 
+/* Scroll sentinel: holds its height so the spinner appearing never shifts the list */
 .loadMoreWrap {
   display: flex;
-  justify-content: center;
-  padding: 1rem 0 0.25rem;
-}
-
-.loadMore {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  min-height: 40px;
-  padding: 0 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  background-color: var(--surface);
-  font-weight: 700;
-
-  &:disabled {
-    cursor: progress;
-    opacity: var(--disabled-opacity);
-  }
+  min-height: 56px;
+  padding: 1rem 0 0.25rem;
 }
 
 .emptyState,
