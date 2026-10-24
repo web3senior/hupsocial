@@ -17,7 +17,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { useFaviconBadge } from '@/hooks/useFaviconBadge'
 import { useTitleBadge } from '@/hooks/useTitleBadge'
 import Profile from '@/components/Profile'
-import { useSidebarStore } from '@/stores/useSidebarStore'
+import { MORE_NAV_ITEMS_SCHEMA, useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import { openConnect } from '@/lib/connectDialog'
 import BatchLikeTrigger from './BatchLikeTrigger'
@@ -387,7 +387,7 @@ export default function Aside({ inLayoutGrid = false }) {
               <NativePopover
                 trigger={
                   <Tooltip content={tooltipReady ? 'More' : null} placement="right" size="compact" hoverOnly>
-                    <button type="button" className={clsx(styles.link, styles.moreButton)} aria-label="More">
+                    <button type="button" className={clsx(styles.link, styles.moreButton, MORE_NAV_ITEMS_SCHEMA.some((item) => isActiveItem(pathname, item)) && styles.linkActive)} aria-label="More">
                       <div className={styles.iconWrapper}>
                         <EqualsIcon size={24} />
                       </div>
@@ -401,6 +401,18 @@ export default function Aside({ inLayoutGrid = false }) {
                 {({ close }) => (
                   <div className={styles.popoverContent}>
                     <ul className="flex flex-column gap-050">
+                      {MORE_NAV_ITEMS_SCHEMA.map((item) => {
+                        const Icon = item.icon
+                        const isActive = isActiveItem(pathname, item)
+                        return (
+                          <li key={item.id}>
+                            <Link href={item.path} onClick={close} className={clsx('flex align-items-center gap-050', isActive && styles.linkActive)} aria-current={isActive ? 'page' : undefined}>
+                              <Icon size={16} weight={isActive ? 'fill' : 'regular'} />
+                              <span>{item.name}</span>
+                            </Link>
+                          </li>
+                        )
+                      })}
                       <li>
                         <Link href="/settings" onClick={close} className="flex align-items-center gap-050">
                           <GearIcon size={16} />

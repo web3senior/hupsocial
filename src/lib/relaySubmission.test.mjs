@@ -72,8 +72,9 @@ test('wallet signatures are never automatically prompted twice', async () => {
   assert.equal(attempts, 1)
 })
 
-test('only confirmed insufficient relayer funds allows the paid fallback', () => {
+test('only insufficient relayer funds or a sessionless smart account allows the paid fallback', () => {
   assert.equal(allowsRelayPaidFallback({ code: 'RELAY_INSUFFICIENT_FUNDS' }), true)
+  assert.equal(allowsRelayPaidFallback({ code: 'RELAY_NEEDS_SESSION' }), true)
   assert.equal(allowsRelayPaidFallback(new Error('insufficient funds')), false)
   assert.equal(allowsRelayPaidFallback(), false)
 })

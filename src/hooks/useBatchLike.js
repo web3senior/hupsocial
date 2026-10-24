@@ -266,7 +266,7 @@ export const useBatchLike = () => {
             } catch (err) {
               if (!allowsRelayPaidFallback(err)) throw err
               relayUsable = false
-              toast('Relayer has insufficient funds — using your session or wallet to pay gas.', 'info')
+              if (err.code === 'RELAY_INSUFFICIENT_FUNDS') toast('Relayer has insufficient funds — using your session or wallet to pay gas.', 'info')
             }
           }
 

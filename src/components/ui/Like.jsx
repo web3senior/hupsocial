@@ -195,7 +195,8 @@ export const Like = ({ post, onUpdate }) => {
 
   /**
    * Relays a heart action through the forwarder so the tap costs the user nothing. Returns
-   * false when sponsorship is disabled or the relayer has insufficient funds. Other
+   * false when sponsorship is disabled, the relayer has insufficient funds, or a smart account
+   * (Universal Profile) has no session key to sign with. Other
    * failures preserve the action for retry instead of unexpectedly opening the wallet.
    * @param {string} functionName 'batchLike' or 'unlike'.
    * @param {Array} args Owner-first args for that function.
@@ -220,7 +221,7 @@ export const Like = ({ post, onUpdate }) => {
       return true
     } catch (err) {
       if (!allowsRelayPaidFallback(err)) throw err
-      toast('Relayer has insufficient funds — using your session or wallet to pay gas.', 'info')
+      if (err.code === 'RELAY_INSUFFICIENT_FUNDS') toast('Relayer has insufficient funds — using your session or wallet to pay gas.', 'info')
       return false
     }
   }

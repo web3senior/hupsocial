@@ -72,9 +72,9 @@ const EIP7702_DESIGNATOR = '0xef0100'
 
 const isContractAccountCode = (code) => Boolean(code) && code !== '0x' && !code.toLowerCase().startsWith(EIP7702_DESIGNATOR)
 
-const unsupported = (message) => {
+const unsupported = (message, code = 'RELAY_UNSUPPORTED') => {
   const error = new Error(message)
-  error.code = 'RELAY_UNSUPPORTED'
+  error.code = code
   return error
 }
 
@@ -321,9 +321,10 @@ export const signHupForwardRequest = async ({
 
     // Universal Profiles and other contract accounts cannot be `from`: the forwarder
     // ECDSA-recovers the signer, which never matches a contract address. They reach the
-    // relay through the session-key path above instead.
+    // relay through the session-key path above instead. Nothing is signed or sent yet, so
+    // callers may hand the action to the wallet as an ordinary transaction.
     const code = await publicClient.getCode({ address: owner }).catch(() => null)
-    if (isContractAccountCode(code)) throw unsupported('Smart account wallets need an active session key for gasless actions')
+    if (isContractAccountCode(code)) throw unsupported('Smart account wallets need an active session key for gasless actions', 'RELAY_NEEDS_SESSION')
 
     from = owner
     sign = (domain, message) =>

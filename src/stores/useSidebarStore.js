@@ -59,21 +59,8 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon },
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
   { id: 'bazaar', name: 'Marketplace', path: sectionLanding(SECTIONS.bazaar), icon: ImageIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
-  // Sits with the social rows rather than the market ones: a poll costs nothing and asks for
-  // an opinion. A checklist, not a bar chart — Insights owns ChartBar here, and the sideways
-  // variant just reads as a chart someone knocked over.
-  { id: 'polls', name: 'Polls', path: '/polls', icon: ListChecksIcon },
-  // Beside polls, not in Trade: a bet here is parimutuel and judge-resolved, with no way out before it settles
   { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
-  // Beside polls for the same reason: asking people for something, in public, on the record.
-  { id: 'fund', name: 'Fundraise', path: '/fund', icon: CurrencyCircleDollarIcon },
   { id: 'tasks', name: 'Tasks', path: '/tasks', icon: ToolboxIcon },
-  // With the social rows for the same reason polls are: an article is something someone wrote,
-  // not something they listed for sale. The directory is public and the only reading surface
-  // for long-form, so it earns a row rather than living behind the More menu.
-  { id: 'articles', name: 'Articles', path: '/articles', icon: ArticleIcon },
-  // Beside Marketplace: an escrowed deal on the same HupOffers contract the NFT market's offers use
-  { id: 'p2p', name: 'P2P', path: '/p2p', icon: HandshakeIcon },
   { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
   { id: 'divider-secondary', type: 'divider' },
@@ -83,6 +70,13 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
   // Your own sales, so it sits with the rest of your account rather than in the market block
   { id: 'revenue', name: 'Money', path: '/revenue', icon: CurrencyDollarIcon },
+]
+
+export const MORE_NAV_ITEMS_SCHEMA = [
+  { id: 'polls', name: 'Polls', path: '/polls', icon: ListChecksIcon },
+  { id: 'fund', name: 'Fundraise', path: '/fund', icon: CurrencyCircleDollarIcon },
+  { id: 'articles', name: 'Articles', path: '/articles', icon: ArticleIcon },
+  { id: 'p2p', name: 'P2P', path: '/p2p', icon: HandshakeIcon },
 ]
 
 // Baskets migrated from the pre-wallet era live under this key until the
