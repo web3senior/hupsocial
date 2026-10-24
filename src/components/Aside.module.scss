@@ -299,9 +299,9 @@
   width: 100%;
   min-height: 48px;
   margin-top: 0.75rem;
-  border: 1px solid var(--border);
-  background-color: var(--surface);
-  color: var(--text);
+  border: 1px solid #303030;
+  background-color: #171717;
+  color: #ffffff;
   font-weight: 600;
 
   .linkText {
@@ -314,7 +314,7 @@
   }
 
   &:hover {
-    background-color: var(--surface-muted);
+    background-color: #222222;
   }
 }
 
