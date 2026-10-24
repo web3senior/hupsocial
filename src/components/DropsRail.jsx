@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import clsx from 'clsx'
 import { formatUnits, zeroAddress } from 'viem'
 import { usePaymentToken } from '@/hooks/usePaymentToken'
-import { ArrowRightIcon, CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
+import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import { appChains } from '@/config/contracts'
 import { chainIconFor, networkColorStyle } from '@/lib/networkColors'
 import { PHASE_STATUS, phaseStatus } from '@/lib/drops'
@@ -217,10 +217,7 @@ export default function DropsRail({ networkId = null, className, variant = 'feed
           {isSidebar ? 'Live drops' : 'Minting now'}
         </h2>
 
-        <Link href="/drops" className={styles['drops-rail__all']}>
-          All drops
-          <ArrowRightIcon size={13} weight="bold" />
-        </Link>
+        {!isSidebar && <Link href="/drops" className={styles['drops-rail__all']}>All drops</Link>}
       </div>
 
       <div className={styles['drops-rail__strip']}>
@@ -251,6 +248,7 @@ export default function DropsRail({ networkId = null, className, variant = 'feed
           <CaretRightIcon size={14} weight="bold" />
         </button>
       </div>
+      {isSidebar && <Link href="/drops" className={styles['drops-rail__all']}>All drops</Link>}
     </section>
   )
 }

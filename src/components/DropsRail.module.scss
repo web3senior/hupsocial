@@ -11,6 +11,10 @@
   border-radius: var(--page-border-radius, 16px);
   background-color: var(--surface);
 
+  .drops-rail__all {
+    margin-top: 0.75rem;
+  }
+
   .drops-rail__title {
     font-size: 1.125rem;
     font-weight: 800;

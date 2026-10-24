@@ -50,7 +50,6 @@ const withoutStrandedDividers = (items) =>
 export const NAV_ITEMS_SCHEMA = [
   { id: 'foryou', name: 'Home', path: '/', icon: HouseIcon },
   { id: 'shorts', name: 'Shorts', path: '/shorts', icon: PlayCircleIcon },
-  { id: 'live', name: 'Live', path: '/live', icon: BroadcastIcon },
   { id: 'new-post', name: 'Post', component: 'new-post', icon: PlusIcon },
   { id: 'search', name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
   { id: 'notifications', name: 'Notifications', path: '/notifications', icon: BellIcon, hasBadge: true },
@@ -61,7 +60,6 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'bazaar', name: 'Marketplace', path: sectionLanding(SECTIONS.bazaar), icon: ImageIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
   { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
   { id: 'tasks', name: 'Tasks', path: '/tasks', icon: ToolboxIcon },
-  { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
   { id: 'divider-secondary', type: 'divider' },
   { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
@@ -73,10 +71,12 @@ export const NAV_ITEMS_SCHEMA = [
 ]
 
 export const MORE_NAV_ITEMS_SCHEMA = [
+  { id: 'live', name: 'Live', path: '/live', icon: BroadcastIcon },
   { id: 'polls', name: 'Polls', path: '/polls', icon: ListChecksIcon },
   { id: 'fund', name: 'Fundraise', path: '/fund', icon: CurrencyCircleDollarIcon },
   { id: 'articles', name: 'Articles', path: '/articles', icon: ArticleIcon },
   { id: 'p2p', name: 'P2P', path: '/p2p', icon: HandshakeIcon },
+  { id: 'events', name: 'Events', path: '/events', icon: CalendarBlankIcon },
 ]
 
 // Baskets migrated from the pre-wallet era live under this key until the

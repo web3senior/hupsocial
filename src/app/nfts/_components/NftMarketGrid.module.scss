@@ -28,6 +28,19 @@
     &:hover {
       border-color: var(--text-muted);
     }
+
+    &--offers {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem;
+      width: auto;
+      padding-inline: 0.75rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+    }
   }
 
   /* Shares the funnel's shape — both are icon-only affordances in the toolbar, and a

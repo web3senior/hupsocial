@@ -661,8 +661,9 @@ export default function NftMarketGrid() {
         {/* The buy side's counterpart to listing: every offer this wallet has out across
             the market, including expired ones still holding escrow to reclaim */}
         <Tooltip placement="top-end" content="Offers you've made — cancel live ones or reclaim escrow from expired ones.">
-          <Link href="/nfts/offers" className={styles.market__filterButton} aria-label="My offers">
+          <Link href="/nfts/offers" className={clsx(styles.market__filterButton, styles['market__filterButton--offers'])} aria-label="My offers">
             <HandCoinsIcon size={16} />
+            <span>My offers</span>
           </Link>
         </Tooltip>
 
