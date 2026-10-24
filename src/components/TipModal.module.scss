@@ -270,6 +270,37 @@
     }
   }
 
+  &__chainWarning {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--warning-surface, rgba(245, 158, 11, 0.12));
+    border: 1px solid var(--warning-500, #f59e0b);
+    border-radius: var(--global-border-radius);
+    padding: 0.5rem 0.75rem;
+    font-size: var(--font-size-12);
+
+    span {
+      flex: 1;
+    }
+
+    button {
+      flex-shrink: 0;
+      border: 1px solid var(--warning-500, #f59e0b);
+      background: transparent;
+      color: inherit;
+      border-radius: var(--global-border-radius);
+      padding: 0.3rem 0.6rem;
+      font-size: var(--font-size-12);
+      cursor: pointer;
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+  }
+
   &__footer {
     display: flex;
     flex-direction: column;

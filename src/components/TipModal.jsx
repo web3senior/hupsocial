@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useConnection, useReadContract, useWriteContract } from 'wagmi'
+import { useConnection, useReadContract, useSwitchChain, useWriteContract } from 'wagmi'
 import { waitForTransactionReceipt } from 'wagmi/actions'
 import { encodeAbiParameters, erc20Abi, hexToString, isAddress, parseUnits, zeroAddress } from 'viem'
 import clsx from 'clsx'
+import { WarningIcon } from '@phosphor-icons/react'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
@@ -116,7 +117,8 @@ const TipModal = ({ item, setShowTipModal }) => {
   // the handler settles: for a tip that is the hash (the modal closes on it), for an approval
   // it is the receipt (the modal stays open).
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { address } = useConnection()
+  const { address, chain: walletChain } = useConnection()
+  const switchChain = useSwitchChain({ config })
   const dialogRef = useRef(null)
   const creator = item.wallet_address
 
@@ -127,6 +129,7 @@ const TipModal = ({ item, setShowTipModal }) => {
   const nativeCurrency = chainInfo?.nativeCurrency
   const tipTokens = TIP_TOKENS[chainId] ?? []
   const isLukso = LUKSO_CHAIN_IDS.includes(chainId)
+  const isWrongChain = Boolean(walletChain && walletChain.id !== chainId)
 
   const isTokenTip = paymentChoice !== 'native'
   const isCustomToken = paymentChoice === 'custom-erc20' || paymentChoice === 'custom-lsp7'
@@ -255,7 +258,13 @@ const TipModal = ({ item, setShowTipModal }) => {
   const needsApproval = isTokenTip && !isErc677 && allowance !== undefined && amountUnits !== null && allowance < amountUnits
 
   const { isPending, writeContractAsync } = useWriteContract()
-  const isBusy = isPending || isSubmitting
+  const isBusy = isPending || isSubmitting || switchChain.isPending
+
+  // A chainId-pinned write against a wallet on another chain is rejected outright, so a send
+  // that skipped the Switch banner still moves the wallet to the post's chain first
+  const ensureChain = async () => {
+    if (isWrongChain) await switchChain.mutateAsync({ chainId })
+  }
 
   const amountLabel = `${amountNumber.format(parsedAmount)} ${symbol}`
 
@@ -286,6 +295,7 @@ const TipModal = ({ item, setShowTipModal }) => {
     }
 
     try {
+      await ensureChain()
       const hash = await writeContractAsync(
         isLsp7
           ? { abi: lsp7Abi, address: tokenAddress, functionName: 'authorizeOperator', args: [tipperAddress, amountUnits, '0x'], chainId }
@@ -311,6 +321,8 @@ const TipModal = ({ item, setShowTipModal }) => {
 
     setIsSubmitting(true)
     try {
+      await ensureChain()
+
       // ERC677: one transaction, no approve. The tipper is credited from onTokenTransfer, which
       // reads the post id out of the payload.
       if (isErc677) {
@@ -368,6 +380,16 @@ const TipModal = ({ item, setShowTipModal }) => {
             {isSelf ? `This is your own post` : `Your tip goes directly to the creator's wallet`}
           </p>
         </div>
+
+        {isWrongChain && (
+          <div className={styles.tipModal__chainWarning}>
+            <WarningIcon size={14} />
+            <span>This post lives on {chainInfo?.name || 'another network'}.</span>
+            <button type="button" onClick={() => switchChain.mutate({ chainId })} disabled={switchChain.isPending}>
+              {switchChain.isPending ? 'Switching…' : 'Switch'}
+            </button>
+          </div>
+        )}
 
         <div className={styles.tipModal__field}>
           <label htmlFor="tipModalToken">Token</label>
