@@ -99,7 +99,6 @@ const normalizeNavItem = (item) => {
 }
 
 const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNavigate, onLinkClick }) => {
-  const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
   // The wallet for the active network: a Solana wallet on a Solana cluster, EVM elsewhere
   const { isConnected: canCompose } = useActiveWallet()
@@ -164,8 +163,6 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
             {content}
           </button>
         </Tooltip>
-
-        {isComponentOpen && <Component item={item} onClose={() => setIsComponentOpen(false)} />}
       </>
     )
   }
@@ -206,6 +203,7 @@ export default function Aside({ inLayoutGrid = false }) {
   const isMenuOpen = useSidebarStore((state) => state.isMenuOpen)
   const isMobileMenuOpen = useSidebarStore((state) => state.isMobileMenuOpen)
   const closeMobileMenu = useSidebarStore((state) => state.closeMobileMenu)
+  const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
 
   // Hand any pre-wallet basket over to the first wallet that connects
@@ -588,6 +586,9 @@ export default function Aside({ inLayoutGrid = false }) {
           </div>
         </div>
       </SidebarSurface>
+
+      {/* The composer must stay outside the drawer that closes when Post is tapped. */}
+      {isComponentOpen && <NewPost onClose={() => setIsComponentOpen(false)} />}
 
       <div className={styles.floatingActions}>
         <Hupi className={styles.floatingActions__button} />
