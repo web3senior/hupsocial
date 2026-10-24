@@ -769,31 +769,20 @@ function Room({
     })
   }, [])
 
-  // Initial window: the page around the last seen line when there is one, else the newest page
+  // Initial window: always the newest page. Opening around the last seen line left a reader
+  // with a long backlog parked mid-history behind the Latest button; the divider still marks
+  // where they left off whenever that line falls inside this page
   useEffect(() => {
     let cancelled = false
     const load = async () => {
       try {
-        if (openedAtId > 0) {
-          const [olderPage, newerPage] = await Promise.all([
-            fetchRoomMessages({ token: tokenRef.current, before: openedAtId + 1 }),
-            fetchRoomMessages({ token: tokenRef.current, after: openedAtId }),
-          ])
-          if (cancelled) return
-          serverTimeRef.current = newerPage.serverTime
-          applyPresence(newerPage)
-          setMessages(mergeSorted(olderPage.messages, newerPage.messages))
-          setHasOlder(olderPage.hasMore)
-          setHasNewer(newerPage.hasMore)
-        } else {
-          const page = await fetchRoomMessages({ token: tokenRef.current })
-          if (cancelled) return
-          serverTimeRef.current = page.serverTime
-          applyPresence(page)
-          setMessages(page.messages)
-          setHasOlder(page.hasMore)
-          setHasNewer(false)
-        }
+        const page = await fetchRoomMessages({ token: tokenRef.current })
+        if (cancelled) return
+        serverTimeRef.current = page.serverTime
+        applyPresence(page)
+        setMessages(page.messages)
+        setHasOlder(page.hasMore)
+        setHasNewer(false)
       } catch {
         // The live-edge poll keeps asking, so the room recovers on its own once the server does
         if (!cancelled) {
@@ -806,19 +795,15 @@ function Room({
     return () => {
       cancelled = true
     }
-  }, [openedAtId, applyPresence])
+  }, [applyPresence])
 
-  // First paint of the window: rest on the divider when there is one, else on the newest line
+  // First paint of the window: rest on the newest line and follow it from there
   useEffect(() => {
     if (!isLoaded || !active || initialScrollDone) return
     const list = listRef.current
     if (!list) return
-    if (dividerRef.current) {
-      stickRef.current = false
-      list.scrollTop = Math.max(0, dividerRef.current.offsetTop - 48)
-    } else {
-      list.scrollTop = list.scrollHeight
-    }
+    stickRef.current = true
+    list.scrollTop = list.scrollHeight
     setInitialScrollDone(true)
   }, [isLoaded, active, initialScrollDone])
 
@@ -837,7 +822,20 @@ function Room({
         applyEdited(data.edited)
         if (data.messages.length) setMessages((current) => mergeSorted(current ?? [], data.messages))
         applyViews(data.views)
-        if (data.hasMore) setHasNewer(true)
+        if (data.hasMore) {
+          // More landed than one page holds (the card sat closed through a busy stretch). A
+          // reader at the bottom skips straight to the newest page instead of being parked
+          // behind Latest; one scrolled up into history keeps their place
+          if (stickRef.current) {
+            const latest = await fetchRoomMessages({ token: tokenRef.current })
+            if (cancelled) return
+            serverTimeRef.current = latest.serverTime
+            setMessages(latest.messages)
+            setHasOlder(latest.hasMore)
+          } else {
+            setHasNewer(true)
+          }
+        }
       } catch {
         /* The next tick tries again */
       }
@@ -923,8 +921,8 @@ function Room({
     return () => observer.disconnect()
   }, [active, isLoaded])
 
-  // Reopening puts the reader back where they were, or at the bottom if that is where they sat;
-  // an unread mention wins over both, so the card opens on the line that called them
+  // Reopening always lands on the newest line; an unread mention wins, so the card opens on
+  // the line that called them
   useEffect(() => {
     if (!active || !initialScrollDone) return undefined
     const frame = requestAnimationFrame(() => {
@@ -936,7 +934,8 @@ function Room({
         list.scrollTop = Math.max(0, mentioned.offsetTop - list.offsetTop - 48)
         return
       }
-      list.scrollTop = stickRef.current ? list.scrollHeight : savedScrollRef.current
+      stickRef.current = true
+      list.scrollTop = list.scrollHeight
     })
     return () => cancelAnimationFrame(frame)
   }, [active, initialScrollDone, focusId])

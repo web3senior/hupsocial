@@ -8,7 +8,8 @@ import { formatEther, zeroAddress } from 'viem'
 import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import { canSessionPayGas, isSessionActive, isSessionUnusableError, writeWithBurnerSession } from '@/lib/burnerSession'
+import { shortTxError } from '@/lib/utils'
 import { marketStatus, outcomeColor, parseJsonArray, toRelative } from '@/lib/predict'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
@@ -173,28 +174,40 @@ export default function MarketDetail({ networkId, marketId }) {
       ? { active: false }
       : await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
 
+    // The session key pays its own gas and is funded per chain, so an empty one on this network
+    // falls through to the wallet instead of surfacing the node's insufficient-funds error
     if (session.active) {
-      setIsBurnerBusy(true)
-      try {
-        await writeWithBurnerSession({
-          chain: chainInfo,
-          contractAddress: predictAddress,
-          abi: predictAbi,
-          functionName,
-          args: value > 0n ? [...args, { value }] : args,
-        })
-        toast(`${actionLabel} confirmed — the page updates once the indexer catches up`, 'success')
-        setResolveMode(false)
-        setResolveChoice(null)
-        refetchClaimable()
-        refetchCreatorEarnings()
-        mutate()
-      } catch (err) {
-        toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-      } finally {
-        setIsBurnerBusy(false)
+      if (await canSessionPayGas(publicClient)) {
+        setIsBurnerBusy(true)
+        try {
+          await writeWithBurnerSession({
+            chain: chainInfo,
+            contractAddress: predictAddress,
+            abi: predictAbi,
+            functionName,
+            args: value > 0n ? [...args, { value }] : args,
+          })
+          toast(`${actionLabel} confirmed — the page updates once the indexer catches up`, 'success')
+          setResolveMode(false)
+          setResolveChoice(null)
+          refetchClaimable()
+          refetchCreatorEarnings()
+          mutate()
+          return
+        } catch (err) {
+          // Only a failure that never reached the mempool is safe to re-send from the wallet;
+          // a revert is the real answer and must not be sent twice
+          if (!isSessionUnusableError(err)) {
+            toast(shortTxError(err) || 'Transaction rejected or encountered an error.', 'error')
+            return
+          }
+          console.warn('Session key could not send this action:', err.message)
+        } finally {
+          setIsBurnerBusy(false)
+        }
+      } else {
+        toast('Session key has no gas on this network — sending with your wallet.', 'info')
       }
-      return
     }
 
     setLastAction(actionLabel)
