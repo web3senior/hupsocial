@@ -47,7 +47,6 @@
 // --- Post ---
 .post {
   --post-button-bg: var(--surface-muted);
-  --post-hover-bg: var(--gray-50);
   // Owns its text colour: the post details wrapper paints --text, which dims to 65% white in dark
   color: var(--foreground);
 
@@ -57,23 +56,6 @@
   cursor: pointer;
   padding: 20px 20px 0 20px;
   place-items: stretch;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0 1px;
-    z-index: -1;
-    background-color: var(--post-hover-bg);
-    opacity: 0;
-    transition: opacity 0.1s ease-out;
-    pointer-events: none;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    &:hover::before {
-      opacity: 0.35;
-    }
-  }
 
   @media (max-width: 640px) {
     padding: 10px;
@@ -372,28 +354,35 @@
 
   &__actions {
     color: var(--black-400);
+    padding-top: 0.5rem;
     padding-bottom: 0.5rem;
-    font-size: var(--system-13-font-size);
+    font-size: 0.875rem;
     font-weight: 400;
     gap: 4px;
     cursor: default;
     user-select: none;
     width: 100%;
 
-    // On a phone the groups dissolve so space-between spreads all seven buttons across the
-    // row — that free space is what an earned tip badge takes, instead of the icons
     &__group {
-      gap: 4px;
+      gap: 2px;
+    }
 
-      @media (max-width: 600px) {
-        display: contents;
+    // Threads-style: the primary actions sit packed together at the start of the row
+    .post__actions__group--primary {
+      flex: 1;
+      min-width: 0;
+      justify-content: flex-start;
+      margin-left: -8px; // Optically align the first icon, not its halo, with the text above
+
+      // Tracks the buttons' tighter padding below
+      @media (max-width: 400px) {
+        margin-left: -6px;
       }
     }
 
     @media (max-width: 600px) {
       gap: 2px;
-      // Last resort for a row that still can't fit (four-figure counters beside a
-      // three-figure tip on a 320px phone): the tail wraps rather than leaving the card
+      // Keep controls inside narrow cards when their counters grow.
       flex-wrap: wrap;
       row-gap: 4px;
     }
@@ -401,9 +390,17 @@
     button,
     a {
       @extend %icon-ripple-button;
-      padding: 10px;
-      transition: all 0.01s ease-in-out;
-      color: var(--black-600);
+      // Square around a bare icon, so its halo is a 1:1 circle; a count (the Counter div)
+      // stretches it into a pill the way Threads draws its action buttons
+      padding: 8px;
+
+      &:has(> div) {
+        padding-inline-end: 12px;
+      }
+      transition:
+        color 0.2s ease,
+        transform 0.12s ease;
+      color: var(--text);
       // A shrunk button renders its 18px glyph 13px wide and oval — the row gives up padding instead
       flex: none;
 
@@ -413,22 +410,30 @@
 
       // Keyed on data-action: the menus these buttons open render inside this row with icons of their own size
       &[data-action] > svg {
-        width: 18px;
-        height: 18px;
+        width: 20px;
+        height: 20px;
       }
 
-      // Horizontal padding is the row's slack; the vertical keeps the 34px tap height
-      @media (max-width: 600px) {
-        padding: 8px 5px;
-      }
-
+      // Narrow phones shrink the padding on every side, so a bare icon stays 1:1 (32px)
       @media (max-width: 400px) {
-        padding: 8px 3px;
+        padding: 6px;
+
+        &:has(> div) {
+          padding-inline-end: 9px;
+        }
       }
 
+      // The same pill the mobile nav uses (Footer.module.scss): full size behind the button,
+      // it grows into place from 72% with a slight overshoot instead of fading in flat
       &:before {
         @extend %icon-ripple;
+        width: 100%;
+        height: 100%;
         background-color: var(--post-button-bg);
+        transform: translate(-50%, -50%) scale(0.72);
+        transition:
+          transform 0.18s cubic-bezier(0.34, 1.46, 0.64, 1),
+          opacity 0.2s ease;
       }
 
       [data-theme='dark'] & {
@@ -437,104 +442,40 @@
         }
       }
 
-      &:hover {
-        &:before {
-          width: 100%;
-          height: 100%;
+      // Hover only raises a neutral halo — the icon keeps its resting color, so the row
+      // never flashes a different hue per action. Fine pointers only, so a tap on touch
+      // doesn't leave the pill stuck on.
+      @media (hover: hover) and (pointer: fine) {
+        &:hover:before {
           opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+          background-color: var(--post-button-bg);
         }
-        cursor: pointer;
+      }
+
+      // Soft tap shrink, matching the mobile nav's press feedback
+      &:active {
+        transform: scale(0.94);
       }
 
       // Use the same heart tint for queued and confirmed likes.
       &[data-action='like'] {
-        &:hover {
-          color: color-mix(in srgb, var(--liked-color, #ff007a) 60%, transparent);
-          &:before {
-            background-color: color-mix(in srgb, var(--liked-color, #ff007a) 10%, transparent);
-          }
-        }
-
         // The counter matches the filled heart, including while queued.
         &[data-liked='true'],
         &[data-queued='true'] {
           color: var(--liked-color, #ff007a);
-
-          &:hover {
-            color: var(--liked-color, #ff007a);
-            &:before {
-              background-color: color-mix(in srgb, var(--liked-color, #ff007a) 10%, transparent);
-            }
-          }
-        }
-
-      }
-
-      // Orange, not the green a repost usually gets: green now belongs to the tip, which
-      // wears it at rest on every earning post, and two greens a few pixels apart in the
-      // same row stop reading as two different actions. Orange is free once the tip's own
-      // hover moves onto its green below.
-      &[data-action='repost']:hover {
-        color: color-mix(in srgb, var(--orange-400) 70%, transparent);
-        &:before {
-          background-color: color-mix(in srgb, var(--orange-400) 12%, transparent);
         }
       }
 
-      &[data-action='bookmark'] {
-        &:hover {
-          color: color-mix(in srgb, var(--blue-400) 60%, transparent);
-          &:before {
-            background-color: color-mix(in srgb, var(--blue-400) 10%, transparent);
-          }
-        }
-
-        // Saved: the counter takes the filled mark's blue, hover only deepens the halo
-        &[data-saved='true'] {
-          color: var(--blue-500);
-
-          &:hover {
-            color: var(--blue-500);
-          }
-        }
+      // Saved: the counter takes the filled mark's blue
+      &[data-action='bookmark'][data-saved='true'] {
+        color: var(--blue-500);
       }
 
-      &[data-action='comment']:hover {
-        color: color-mix(in srgb, var(--indigo-400) 60%, transparent);
-        &:before {
-          background-color: color-mix(in srgb, var(--indigo-400) 10%, transparent);
-        }
-      }
-
-      &[data-action='share']:hover {
-        color: color-mix(in srgb, var(--teal) 60%, transparent);
-        &:before {
-          background-color: color-mix(in srgb, var(--teal) 10%, transparent);
-        }
-      }
-
-      &[data-action='view']:hover {
-        color: color-mix(in srgb, var(--purple-400) 60%, transparent);
-        &:before {
-          background-color: color-mix(in srgb, var(--purple-400) 10%, transparent);
-        }
-      }
-
-      // Icon inherits currentColor: themed base color (Globals.scss per-theme var),
-      // orange tint across icon + counter on hover
+      // Icon inherits currentColor: themed base color (Globals.scss per-theme var)
       &[data-action='tip'] {
         color: var(--color-icon-muted, var(--black-600));
         // --tip-earned-color comes from Globals.scss so drop earnings can wear the same green
-
-        // Hovers in its own green, the colour it already wears once the post has earned —
-        // one action, one hue, in both states
-        &:hover {
-          color: color-mix(in srgb, var(--tip-earned-color) 75%, transparent);
-
-          &:before {
-            background-color: color-mix(in srgb, var(--tip-earned-color) 12%, transparent);
-          }
-        }
 
         // The post has taken real money: the amount leaves the grey counter row and becomes
         // a tinted pill, so even a $0.20 tip reads as an event rather than one more metric.
@@ -551,7 +492,7 @@
             padding-inline: 8px;
             margin-inline-start: 2px;
             border-radius: 999px;
-            background-color: color-mix(in srgb, var(--tip-earned-color) 14%, transparent);
+            background-color: var(--post-button-bg);
             color: var(--tip-earned-color);
             font-weight: 600;
             font-variant-numeric: tabular-nums;
@@ -575,11 +516,11 @@
             color: var(--tip-earned-color);
 
             > div {
-              background-color: color-mix(in srgb, var(--tip-earned-color) 24%, transparent);
+              background-color: var(--post-button-bg);
             }
 
             &:before {
-              background-color: color-mix(in srgb, var(--tip-earned-color) 10%, transparent);
+              background-color: var(--post-button-bg);
             }
           }
         }
@@ -615,12 +556,10 @@
 
 :global([data-theme='dark']) .post {
   --post-button-bg: #20232a;
-  --post-hover-bg: var(--surface-muted);
 }
 
 :global([data-theme='terminal']) .post {
   --post-button-bg: #12301c;
-  --post-hover-bg: var(--surface-muted);
 }
 
 // --- Post icon buttons ---

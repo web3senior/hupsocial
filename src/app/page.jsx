@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic'
 import { useHomeTabsStore, resolveTabs } from '@/stores/useHomeTabsStore'
 import HomeTabStrip from '@/components/HomeTabStrip'
 import HomeFeedTab from '@/components/tabs/HomeFeedTab'
-import HomeRail from '@/components/home/HomeRail'
 import ComposePrompt from '@/components/home/ComposePrompt'
 import clsx from 'clsx'
 import styles from './page.module.scss'
@@ -45,11 +44,6 @@ export default function Page() {
       {activeTab?.type === 'status' && <StatusFeedTab />}
       {activeTab?.type === 'polls' && <PollsTab />}
 
-      {/* Beside the feed on wide screens only; the feed column itself keeps its viewport centring.
-          Last in the DOM so it stacks over the tab bar's full-width sticky background. */}
-      <aside className={styles.home__rail} aria-label="Suggestions">
-        <HomeRail />
-      </aside>
     </div>
   )
 }

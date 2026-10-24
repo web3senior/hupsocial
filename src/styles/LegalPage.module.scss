@@ -1,0 +1,35 @@
+.legal {
+  &__container {
+    padding: clamp(1rem, 3vw, 2rem);
+    color: var(--foreground);
+    background: var(--surface);
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.75rem;
+      line-height: 1.3;
+    }
+
+    h2 {
+      margin: 1.75rem 0 0.5rem;
+      font-size: 1.125rem;
+      line-height: 1.4;
+    }
+
+    p {
+      margin: 0 0 1rem;
+    }
+
+    a {
+      color: var(--app-accent);
+      text-underline-offset: 3px;
+    }
+  }
+
+  &__updated {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+  }
+}

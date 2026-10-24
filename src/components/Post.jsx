@@ -16,7 +16,8 @@ import abi from '@/abi/post.json'
 import { getActiveChain } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
-import { CommentIcon, ShareIcon } from '@/components/Icons'
+import { CommentIcon, ShareIcon, TipIcon } from '@/components/Icons'
+import { openConnect } from '@/lib/connectDialog'
 import MediaGallery from './Gallery'
 import {
   CaretDownIcon,
@@ -81,7 +82,6 @@ import { txExplorerUrl } from '@/lib/explorer'
 import { shortTxError } from '@/lib/utils'
 import CommentAction from './ui/CommentAction'
 import Repost from './ui/Repost'
-import Tip from './ui/Tip'
 import View from './ui/View'
 import Bookmark from './ui/Bookmark'
 import Share from './ui/Share'
@@ -327,7 +327,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               </div>
             )}
 
-            <Nav item={item} setShowEditModal={setShowEditModal} setShowReportModal={setShowReportModal} />
+            <Nav item={item} setShowEditModal={setShowEditModal} setShowReportModal={setShowReportModal} tipPost={displayItem || item} onTip={actionsSet.has('tip') ? setShowTipModal : undefined} />
           </div>
         </header>
 
@@ -484,21 +484,20 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
             }}
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-between`}
           >
-            <div className={clsx(styles.post__actions__group, 'flex flex-row align-items-center justify-content-start')}>
+            <div className={clsx(styles.post__actions__group, styles['post__actions__group--primary'], 'flex flex-row align-items-center')}>
+              {/* Threads order: like, comment, repost, share */}
               {actionsSet.has('like') && <Like post={displayItem || item} />}
 
               {actionsSet.has('comment') && <CommentAction post={commentTarget} onComment={setShowCommentModal} />}
 
               {actionsSet.has('repost') && <Repost post={displayItem || item} onQuote={() => setShowQuoteModal(displayItem || item)} />}
 
-              {actionsSet.has('tip') && <Tip post={displayItem || item} onTip={setShowTipModal} />}
-
-              {actionsSet.has('view') && <View post={item} />}
-            </div>
-            <div className={clsx(styles.post__actions__group, 'flex align-items-center')}>
-              {actionsSet.has('bookmark') && <Bookmark post={displayItem || item} />}
               {/* captureRef: the card copies itself, exactly as it is on screen */}
               {actionsSet.has('share') && <Share item={displayItem || item} captureRef={sectionRef} />}
+            </div>
+            <div className={clsx(styles.post__actions__group, 'flex align-items-center')}>
+              {actionsSet.has('view') && <View post={item} />}
+              {actionsSet.has('bookmark') && <Bookmark post={displayItem || item} />}
             </div>
           </div>
         </footer>
@@ -638,7 +637,7 @@ const PostDocumentActions = ({ item, close }) => {
   )
 }
 
-const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
+const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip }) => {
   const postIsArticle = (() => {
     try {
       const content = typeof item?.content === 'string' ? JSON.parse(item.content) : item?.content
@@ -825,6 +824,22 @@ const Nav = ({ item, setShowEditModal, setShowReportModal }) => {
                   rel="noopener noreferrer"
                   aria-label="View transaction proof on block explorer"
                   onClick={(e) => e.stopPropagation()}
+                />
+              )}
+              {onTip && (
+                <MenuItem
+                  icon={<TipIcon />}
+                  label="Tip creator"
+                  description="Send a tip to support this creator"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    close()
+                    if (!isConnected) {
+                      if (!openConnect()) toast('Please connect wallet', 'error')
+                      return
+                    }
+                    onTip(tipPost)
+                  }}
                 />
               )}
               <PostDocumentActions item={item} close={close} />

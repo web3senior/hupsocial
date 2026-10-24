@@ -26,12 +26,9 @@ export default function ComposePrompt() {
 
   return (
     <div className={styles.prompt}>
-      <Avatar className={styles.prompt__avatar} src={isConnected ? profile?.profileImage : null} size={36} />
+      <Avatar className={styles.prompt__avatar} src={isConnected ? profile?.profileImage : null} size={44} />
       <button type="button" className={styles.prompt__field} onClick={handleCompose}>
-        What&apos;s new?
-      </button>
-      <button type="button" className={styles.prompt__post} onClick={handleCompose}>
-        Post
+        What&apos;s happening?
       </button>
     </div>
   )

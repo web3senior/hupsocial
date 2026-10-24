@@ -7,7 +7,6 @@ import { usePostStats } from '@/hooks/usePostStats'
 import { toast } from '@/components/NextToast'
 import { openConnect } from '@/lib/connectDialog'
 import Counter from './Counter'
-import Tooltip from './Tooltip'
 
 /**
  * Comment Interaction Component
@@ -38,12 +37,10 @@ export const CommentAction = ({ post, onComment }) => {
   if (!post.allow_comment) return null
 
   return (
-    <Tooltip content="Reply" placement="bottom" size="compact" hoverOnly>
-      <button data-action="comment" aria-label="Comment on post" onClick={handleComment}>
-        <ChatCircleIcon width={17} height={17} />
-        {commentCount > 0 && <Counter value={commentCount} />}
-      </button>
-    </Tooltip>
+    <button title="Reply" data-action="comment" aria-label="Comment on post" onClick={handleComment}>
+      <ChatCircleIcon width={17} height={17} />
+      {commentCount > 0 && <Counter value={commentCount} />}
+    </button>
   )
 }
 

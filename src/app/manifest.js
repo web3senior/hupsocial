@@ -14,7 +14,8 @@ export default function manifest() {
     display: 'standalone',
     lang: 'en',
     dir: 'ltr',
-    background_color: '#ffffff',
+    // The installed app's launch splash. Matches the dark theme's --background (Globals.scss)
+    background_color: '#131313',
     theme_color: '#000000',
     categories: ['social', 'finance'],
     icons: [

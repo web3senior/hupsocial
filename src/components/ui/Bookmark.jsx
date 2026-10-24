@@ -11,7 +11,6 @@ import { getBookmarkFoldersKey } from '@/lib/savedPostsKey'
 import Counter from './Counter'
 import { openConnect } from '@/lib/connectDialog'
 import NativePopover from './NativePopover'
-import Tooltip from './Tooltip'
 import postStyles from '../Post.module.scss'
 
 const countFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
@@ -242,17 +241,16 @@ export const Bookmark = ({ post }) => {
         }
       }}
       trigger={
-        <Tooltip content={tooltip} placement="bottom" size="compact" hoverOnly>
-          <button
-            data-action="bookmark"
-            data-saved={interactionState.isBookmarked ? 'true' : undefined}
-            disabled={isLoading}
-            aria-label={interactionState.isBookmarked ? 'Manage saved post' : 'Save post'}
-          >
-            <BookmarkIcon width={17} height={17} weight={iconWeight} />
-            {bookmarkCount > 0 && <Counter value={bookmarkCount} />}
-          </button>
-        </Tooltip>
+        <button
+          title={tooltip}
+          data-action="bookmark"
+          data-saved={interactionState.isBookmarked ? 'true' : undefined}
+          disabled={isLoading}
+          aria-label={interactionState.isBookmarked ? 'Manage saved post' : 'Save post'}
+        >
+          <BookmarkIcon width={17} height={17} weight={iconWeight} />
+          {bookmarkCount > 0 && <Counter value={bookmarkCount} />}
+        </button>
       }
     >
       {({ close }) => (

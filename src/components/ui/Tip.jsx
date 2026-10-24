@@ -7,7 +7,6 @@ import { toast } from '@/components/NextToast'
 import { TipIcon } from '@/components/Icons'
 import { openConnect } from '@/lib/connectDialog'
 import Counter from './Counter'
-import Tooltip from './Tooltip'
 import styles from './Tip.module.scss'
 
 const compactUsd = new Intl.NumberFormat('en', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 })
@@ -66,30 +65,25 @@ export const Tip = ({ post, onTip }) => {
 
   if (!isMounted) return null
 
+  const title = hasEarned ? `Earned ${formatEarned(earnedUsd)} from ${tipCount} ${tipCount === 1 ? 'tip' : 'tips'}` : 'Tip creator'
+
   return (
-    <Tooltip
-      content={hasEarned ? `Earned ${formatEarned(earnedUsd)} from ${tipCount} ${tipCount === 1 ? 'tip' : 'tips'}` : 'Tip creator'}
-      placement="bottom"
-      size="compact"
-      hoverOnly
-    >
-      <button data-action="tip" data-earned={hasEarned || undefined} aria-label="Tip the author" onClick={handleTip}>
-        <TipIcon />
-        {hasEarned ? (
-          // Keyed on the dollar figure so the counter replays its slide-up when a tip lands,
-          // not on every price tick that leaves the rounded label unchanged.
-          <Counter value={formatEarned(earnedUsd)}>
-            {/* The spinning sign stands in for the "+$" — the figure is what it earned */}
-            <span className={styles.tipEarned}>
-              <img className={styles.tipEarned__sign} src={DOLLAR_SIGN_SRC} alt="" />
-              {formatEarnedFigure(earnedUsd)}
-            </span>
-          </Counter>
-        ) : (
-          tipCount > 0 && !unpriced && <Counter value={tipCount}>{compactCount.format(tipCount)}</Counter>
-        )}
-      </button>
-    </Tooltip>
+    <button title={title} data-action="tip" data-earned={hasEarned || undefined} aria-label="Tip the author" onClick={handleTip}>
+      <TipIcon />
+      {hasEarned ? (
+        // Keyed on the dollar figure so the counter replays its slide-up when a tip lands,
+        // not on every price tick that leaves the rounded label unchanged.
+        <Counter value={formatEarned(earnedUsd)}>
+          {/* The spinning sign stands in for the "+$" — the figure is what it earned */}
+          <span className={styles.tipEarned}>
+            <img className={styles.tipEarned__sign} src={DOLLAR_SIGN_SRC} alt="" />
+            {formatEarnedFigure(earnedUsd)}
+          </span>
+        </Counter>
+      ) : (
+        tipCount > 0 && !unpriced && <Counter value={tipCount}>{compactCount.format(tipCount)}</Counter>
+      )}
+    </button>
   )
 }
 

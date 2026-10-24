@@ -16,7 +16,8 @@ import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useFaviconBadge } from '@/hooks/useFaviconBadge'
 import { useTitleBadge } from '@/hooks/useTitleBadge'
-import Profile from '@/components/Profile'
+import { useProfile } from '@/hooks/useProfile'
+import { profilePath } from '@/lib/username'
 import { MORE_NAV_ITEMS_SCHEMA, useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import { openConnect } from '@/lib/connectDialog'
@@ -67,6 +68,23 @@ const themeOptions = [
   { id: 'terminal', icon: <TerminalWindowIcon size={16} /> },
 ]
 
+// Captions for the groups that follow each store divider — the expanded rail labels its
+// sections instead of drawing a rule between them.
+const SECTION_LABELS = {
+  'divider-primary': 'Explore',
+  'divider-secondary': 'Your space',
+}
+
+// Split the flat nav list on its dividers so each group renders as its own section
+const groupNavItems = (items) => items.reduce((groups, item) => {
+  if (item.type === 'divider') {
+    groups.push({ id: item.id, label: SECTION_LABELS[item.id], items: [] })
+  } else {
+    groups[groups.length - 1].items.push(item)
+  }
+  return groups
+}, [{ id: 'primary', items: [] }]).filter((group) => group.items.length > 0)
+
 const isActivePath = (pathname, path) => {
   if (!pathname || !path) return false
   if (path === '/') return pathname === '/'
@@ -116,21 +134,21 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
 
   const content = (
     <>
-      {item.id !== 'new-post' && <div className={styles.iconWrapper} data-icon={item.name}>
-        {item.avatarSrc ? (
+      <div className={styles.iconWrapper} data-icon={item.name}>
+        {item.avatarSrc !== undefined ? (
           <Avatar
             className={clsx(styles.navAvatar, isActive && styles.navAvatarActive)}
             src={item.avatarSrc}
             size={20}
           />
         ) : (
-          <Icon size={24} weight={isActive ? 'fill' : 'regular'} />
+          <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
         )}
 
         {/* Render a tiny alert badge overlay over icon when sidebar is tightly compact */}
         {isNotificationItem && isCompact && unreadCount > 0 && <span className={styles.notificationBadgeDot} aria-hidden="true" />}
-      </div>}
-      {(!isCompact || item.id === 'new-post') && <span className={styles.linkText}>{item.name}</span>}
+      </div>
+      {!isCompact && <span className={styles.linkText}>{item.name}</span>}
 
       {badge && !isCompact && <NavBadge label={badge.label} background={badge.background} color={badge.color} />}
 
@@ -147,7 +165,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
         <Tooltip content={showTooltip ? item.name : null} placement="right" size="compact" hoverOnly>
           <button
             type="button"
-            className={clsx(styles.link, styles.moreButton, item.id === 'new-post' && [styles['aside__post-button'], 'rounded-full'])}
+            className={clsx(styles.link, styles.moreButton)}
             aria-label={item.name}
             onClick={() => {
               // The composer can only publish with a wallet behind it — offer the chooser here
@@ -244,6 +262,23 @@ export default function Aside({ inLayoutGrid = false }) {
   const navLinks = useMemo(() => navItems
     .map(normalizeNavItem)
     .filter((item) => item.id !== 'profile' && (item.type === 'divider' || item.path || item.component)), [navItems])
+  const hasWallet = Boolean(isConnected && address)
+  const { profile } = useProfile(hasWallet ? address : null)
+
+  // Profile closes the account group (after Money): the connected wallet's picture and page, or
+  // the connect flow for a signed-out visitor
+  const profileItem = useMemo(() => (hasWallet
+    ? { id: 'profile', name: 'Profile', path: profilePath(address, profile?.username), avatarSrc: profile?.profileImage ?? '' }
+    : { id: 'profile', name: 'Profile', path: '/connect', icon: UserIcon, prefetch: false }
+  ), [hasWallet, address, profile?.username, profile?.profileImage])
+
+  const navGroups = useMemo(() => {
+    const groups = groupNavItems(navLinks)
+    const last = groups[groups.length - 1]
+    return last
+      ? [...groups.slice(0, -1), { ...last, items: [...last.items, profileItem] }]
+      : [{ id: 'primary', items: [profileItem] }]
+  }, [navLinks, profileItem])
 
   // Network information pages share their prefix with post details.
   const isNetworksActive = /^\/networks(?:\/[^/]+)?\/?$/.test(pathname ?? '')
@@ -332,6 +367,166 @@ export default function Aside({ inLayoutGrid = false }) {
     return <aside className={clsx(styles.aside, styles['aside--placeholder'], inLayoutGrid && styles['aside--grid'])} aria-hidden="true" />
   }
 
+  const isMoreActive = MORE_NAV_ITEMS_SCHEMA.some((item) => isActiveItem(pathname, item))
+
+  const renderMoreMenu = (trigger, placement) => (
+    <NativePopover trigger={trigger} placement={placement} type="auto">
+      {({ close }) => (
+        <div className={styles.popoverContent}>
+          <ul className="flex flex-column gap-050">
+            {MORE_NAV_ITEMS_SCHEMA.map((item) => {
+              const Icon = item.icon
+              const isActive = isActiveItem(pathname, item)
+              return (
+                <li key={item.id}>
+                  <Link href={item.path} onClick={close} className={clsx('flex align-items-center gap-050', isActive && styles.linkActive)} aria-current={isActive ? 'page' : undefined}>
+                    <Icon size={16} weight={isActive ? 'fill' : 'regular'} />
+                    <span>{item.name}</span>
+                  </Link>
+                </li>
+              )
+            })}
+            <li>
+              <Link href="/settings" onClick={close} className="flex align-items-center gap-050">
+                <GearIcon size={16} />
+                <span>Settings</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/compose/article" onClick={close} className="flex align-items-center gap-050">
+                <ArticleIcon size={16} />
+                <span>Write an article</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/liked" onClick={close} className="flex align-items-center gap-050">
+                <HeartIcon size={16} />
+                <span>Liked</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/scheduled" onClick={close} className="flex align-items-center gap-050">
+                <CalendarDotsIcon size={16} />
+                <span>Scheduled posts</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/gas" onClick={close} className="flex align-items-center gap-050">
+                <GasPumpIcon size={16} />
+                <span>Gas tank</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/premium" onClick={close} className="flex align-items-center gap-050" aria-current={pathname === '/premium' ? 'page' : undefined}>
+                <SealCheckIcon size={16} />
+                <span>Premium</span>
+              </Link>
+            </li>
+            <li>
+              <div className={styles.themeWrapper}>
+                <div className="flex align-items-center gap-050">
+                  <PaletteIcon size={16} />
+                  <span>Theme</span>
+                </div>
+                <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '30px' }}>
+                  {themeOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      aria-pressed={theme === option.id}
+                      onClick={() => setTheme(option.id)}
+                      className={clsx(theme === option.id && styles.active)}
+                    >
+                      {option.icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </li>
+            <li>
+              <Link href="/networks" onClick={close} className="flex align-items-center gap-050" aria-current={isNetworksActive ? 'page' : undefined}>
+                <StackIcon size={16} weight={isNetworksActive ? 'fill' : 'regular'} />
+                <span>Networks</span>
+              </Link>
+            </li>
+            <li>
+              <a
+                href="https://docs.hup.social"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={close}
+                className="flex align-items-center gap-050"
+              >
+                <BookIcon size={16} />
+                <span>Documentation</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href="/llms.txt"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={close}
+                className="flex align-items-center gap-050"
+              >
+                <RobotIcon size={16} />
+                <span>llms.txt</span>
+              </a>
+            </li>
+            <li>
+              <Link href="/agents" onClick={close} className="flex align-items-center gap-050">
+                <HeadCircuitIcon size={16} />
+                <span>AI agents</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/help" onClick={close} className="flex align-items-center gap-050">
+                <ChatCenteredDotsIcon size={16} />
+                <span>Send feedback</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/help" onClick={close} className="flex align-items-center gap-050">
+                <BugIcon size={16} />
+                <span>Report a problem</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/status" onClick={close} className={clsx('flex', 'align-items-center', 'gap-050')}>
+                <HardDrivesIcon size={16} />
+                <span>System status</span>
+              </Link>
+            </li>
+            <li>
+              <Link href="/install" onClick={close} className="flex align-items-center gap-050">
+                <DownloadSimpleIcon size={16} />
+                <span>Install {process.env.NEXT_PUBLIC_NAME}</span>
+              </Link>
+            </li>
+            <li>
+              <a
+                href="https://github.com/web3senior/hupsocial"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={close}
+                className="flex align-items-center gap-050"
+              >
+                <GitHub />
+                <span>GitHub</span>
+              </a>
+            </li>
+            <li>
+              <Link href="/help" onClick={close} className="flex align-items-center gap-050">
+                <QuestionIcon size={16} />
+                <span>Help</span>
+              </Link>
+            </li>
+          </ul>
+        </div>
+      )}
+    </NativePopover>
+  )
+
   const SidebarSurface = isMobileLayout ? NativeDialog : 'aside'
   const surfaceProps = isMobileLayout ? {
     ref: drawerRef,
@@ -355,234 +550,69 @@ export default function Aside({ inLayoutGrid = false }) {
           <header className={styles.header}>
             <div className={styles.logoWrapper}>
               <Link href="/" className="flex align-items-center gap-025" aria-label="Home">
-                <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
-                {isExpanded && <span className={styles.logoCap}>{process.env.NEXT_PUBLIC_NAME || 'Hup'}</span>}
+                <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={24} height={24} priority />
+                {isExpanded && <span className={styles.logoCap}>hup.social</span>}
               </Link>
             </div>
 
-            {isMobileLayout && (
-              <button type="button" className={styles.aside__close} onClick={closeMobileMenu} aria-label="Close menu">
-                <XIcon size={20} aria-hidden="true" />
-              </button>
+            {isExpanded && (
+              <div className={styles.header__actions}>
+                {renderMoreMenu(
+                  <button type="button" className={clsx(styles.header__button, isMoreActive && styles['header__button--active'])} aria-label="More">
+                    <EqualsIcon size={20} aria-hidden="true" />
+                  </button>,
+                  'bottom-end'
+                )}
+
+                {isMobileLayout && (
+                  <button type="button" className={styles.header__button} onClick={closeMobileMenu} aria-label="Close menu">
+                    <XIcon size={20} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             )}
           </header>
 
-          <ul className={styles.navList} ref={navListRef} onScroll={handleNavListScroll}>
-            {navLinks.filter((item) => item.id !== 'new-post').map((item, index) => (
-              <li key={item.id ?? `${item.type}-${index}`}>
-                <NavLink
-                  item={item}
-                  isActive={isActiveItem(pathname, item)}
-                  isCompact={isCompact}
-                  showTooltip={tooltipReady}
-                  unreadCount={unreadCount}
-                  onNavigate={isMobileLayout ? closeSidebar : undefined}
-                  onLinkClick={item.id === 'foryou' ? handleHomeLinkClick : undefined}
-                />
-              </li>
-            ))}
-            <li>
-              <NativePopover
-                trigger={
-                  <Tooltip content={tooltipReady ? 'More' : null} placement="right" size="compact" hoverOnly>
-                    <button type="button" className={clsx(styles.link, styles.moreButton, MORE_NAV_ITEMS_SCHEMA.some((item) => isActiveItem(pathname, item)) && styles.linkActive)} aria-label="More">
-                      <div className={styles.iconWrapper}>
-                        <EqualsIcon size={24} />
-                      </div>
-                      {!isCompact && <span className={styles.linkText}>More</span>}
-                    </button>
-                  </Tooltip>
-                }
-                placement="right-end"
-                type="auto"
-              >
-                {({ close }) => (
-                  <div className={styles.popoverContent}>
-                    <ul className="flex flex-column gap-050">
-                      {MORE_NAV_ITEMS_SCHEMA.map((item) => {
-                        const Icon = item.icon
-                        const isActive = isActiveItem(pathname, item)
-                        return (
-                          <li key={item.id}>
-                            <Link href={item.path} onClick={close} className={clsx('flex align-items-center gap-050', isActive && styles.linkActive)} aria-current={isActive ? 'page' : undefined}>
-                              <Icon size={16} weight={isActive ? 'fill' : 'regular'} />
-                              <span>{item.name}</span>
-                            </Link>
-                          </li>
-                        )
-                      })}
-                      <li>
-                        <Link href="/settings" onClick={close} className="flex align-items-center gap-050">
-                          <GearIcon size={16} />
-                          <span>Settings</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/compose/article" onClick={close} className="flex align-items-center gap-050">
-                          <ArticleIcon size={16} />
-                          <span>Write an article</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/liked" onClick={close} className="flex align-items-center gap-050">
-                          <HeartIcon size={16} />
-                          <span>Liked</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/scheduled" onClick={close} className="flex align-items-center gap-050">
-                          <CalendarDotsIcon size={16} />
-                          <span>Scheduled posts</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/gas" onClick={close} className="flex align-items-center gap-050">
-                          <GasPumpIcon size={16} />
-                          <span>Gas tank</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/premium" onClick={close} className="flex align-items-center gap-050" aria-current={pathname === '/premium' ? 'page' : undefined}>
-                          <SealCheckIcon size={16} />
-                          <span>Premium</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <div className={styles.themeWrapper}>
-                          <div className="flex align-items-center gap-050">
-                            <PaletteIcon size={16} />
-                            <span>Theme</span>
-                          </div>
-                          <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '30px' }}>
-                            {themeOptions.map((option) => (
-                              <button
-                                key={option.id}
-                                type="button"
-                                aria-pressed={theme === option.id}
-                                onClick={() => setTheme(option.id)}
-                                className={clsx(theme === option.id && styles.active)}
-                              >
-                                {option.icon}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </li>
-                      <li>
-                        <Link href="/networks" onClick={close} className="flex align-items-center gap-050" aria-current={isNetworksActive ? 'page' : undefined}>
-                          <StackIcon size={16} weight={isNetworksActive ? 'fill' : 'regular'} />
-                          <span>Networks</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <a
-                          href="https://docs.hup.social"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={close}
-                          className="flex align-items-center gap-050"
-                        >
-                          <BookIcon size={16} />
-                          <span>Documentation</span>
-                        </a>
-                      </li>
-                      <li>
-                        <a
-                          href="/llms.txt"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={close}
-                          className="flex align-items-center gap-050"
-                        >
-                          <RobotIcon size={16} />
-                          <span>llms.txt</span>
-                        </a>
-                      </li>
-                      <li>
-                        <Link href="/agents" onClick={close} className="flex align-items-center gap-050">
-                          <HeadCircuitIcon size={16} />
-                          <span>AI agents</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                          <ChatCenteredDotsIcon size={16} />
-                          <span>Send feedback</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                          <BugIcon size={16} />
-                          <span>Report a problem</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/status" onClick={close} className={clsx('flex', 'align-items-center', 'gap-050')}>
-                          <HardDrivesIcon size={16} />
-                          <span>System status</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/install" onClick={close} className="flex align-items-center gap-050">
-                          <DownloadSimpleIcon size={16} />
-                          <span>Install {process.env.NEXT_PUBLIC_NAME}</span>
-                        </Link>
-                      </li>
-                      <li>
-                        <a
-                          href="https://github.com/web3senior/hupsocial"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={close}
-                          className="flex align-items-center gap-050"
-                        >
-                          <GitHub />
-                          <span>GitHub</span>
-                        </a>
-                      </li>
-                      <li>
-                        <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                          <QuestionIcon size={16} />
-                          <span>Help</span>
-                        </Link>
-                      </li>
-                    </ul>
-                  </div>
-                )}
-              </NativePopover>
-            </li>
-            {navLinks.filter((item) => item.id === 'new-post').map((item) => (
-              <li key={item.id}>
-                <NavLink
-                  item={item}
-                  isCompact={isCompact}
-                  showTooltip={tooltipReady}
-                  onNavigate={isMobileLayout ? closeSidebar : undefined}
-                />
-              </li>
-            ))}
-          </ul>
+          <div className={styles.navList} ref={navListRef} onScroll={handleNavListScroll}>
+            {navGroups.map((group, groupIndex) => (
+              <section key={group.id} className={styles.navSection} aria-label={group.label}>
+                {group.label && (isExpanded
+                  ? <h2 className={styles.navSection__label}>{group.label}</h2>
+                  : <hr className={styles.divider} aria-hidden="true" />)}
 
-          <div className={styles.footerNav}>
-            {isConnected && address ? (
-              <Profile
-                className={clsx(styles.aside__profile, isCompact && styles['aside__profile--compact'])}
-                creator={address}
-                variant={isCompact ? 'imageOnly' : 'nameAndUsername'}
-                size={36}
-                hoverCard={false}
-                linkBox
-                onNavigate={isMobileLayout ? closeSidebar : undefined}
-              />
-            ) : (
-              <NavLink
-                item={{ id: 'profile', name: 'Profile', path: '/connect', icon: UserIcon, prefetch: false }}
-                isActive={pathname === '/connect'}
-                isCompact={isCompact}
-                showTooltip={tooltipReady}
-                onNavigate={isMobileLayout ? closeSidebar : undefined}
-              />
-            )}
+                <ul className={styles.navSection__list}>
+                  {group.items.map((item) => (
+                    <li key={item.id}>
+                      <NavLink
+                        item={item}
+                        isActive={isActiveItem(pathname, item)}
+                        isCompact={isCompact}
+                        showTooltip={tooltipReady}
+                        unreadCount={unreadCount}
+                        onNavigate={isMobileLayout ? closeSidebar : undefined}
+                        onLinkClick={item.id === 'foryou' ? handleHomeLinkClick : undefined}
+                      />
+                    </li>
+                  ))}
+
+                  {/* The compact rail has no header room, so More rides at the end of the list */}
+                  {isCompact && groupIndex === navGroups.length - 1 && (
+                    <li>
+                      {renderMoreMenu(
+                        <Tooltip content={tooltipReady ? 'More' : null} placement="right" size="compact" hoverOnly>
+                          <button type="button" className={clsx(styles.link, styles.moreButton, isMoreActive && styles.linkActive)} aria-label="More">
+                            <div className={styles.iconWrapper}>
+                              <EqualsIcon size={20} />
+                            </div>
+                          </button>
+                        </Tooltip>,
+                        'right-end'
+                      )}
+                    </li>
+                  )}
+                </ul>
+              </section>
+            ))}
           </div>
         </div>
       </SidebarSurface>
