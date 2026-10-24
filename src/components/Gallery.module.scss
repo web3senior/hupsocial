@@ -10,10 +10,12 @@
   transition: transform 0.2s ease;
   z-index: 0;
   cursor: pointer;
-  &:hover .controls {
+  &:hover .controls,
+  &:hover .volume {
     opacity: 1;
   }
-  &:active {
+  /* A press on the volume slider is a drag, not a tap on the card */
+  &:active:not(:has(.volume:active)) {
     transform: scale(0.95);
   }
 }
@@ -136,6 +138,104 @@
   &:hover {
     background: rgba(0, 0, 0, 0.8);
   }
+}
+
+/* Volume pill: the mute toggle sits at the foot and the slider grows above it on hover or focus.
+   Mobile browsers mostly hand volume to the hardware buttons, so there it opens only on a tap. */
+.volume {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 5;
+  cursor: default;
+
+  @media (hover: none) {
+    opacity: 1;
+  }
+
+  &:hover,
+  &:focus-within {
+    .volume__slider {
+      height: 88px;
+      margin: 14px 0 6px;
+      opacity: 1;
+    }
+  }
+
+  &__slider {
+    appearance: none;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 6px;
+    height: 0;
+    margin: 0;
+    border-radius: 999px;
+    background: linear-gradient(
+      to top,
+      rgba(255, 255, 255, 0.85) var(--volume-fill),
+      rgba(255, 255, 255, 0.3) var(--volume-fill)
+    );
+    opacity: 0;
+    cursor: pointer;
+    transition:
+      height 0.2s,
+      margin 0.2s,
+      opacity 0.2s;
+
+    &::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    &::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border: none;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    &:focus-visible {
+      outline: 2px solid white;
+      outline-offset: 4px;
+    }
+  }
+
+  &__toggle {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    color: white;
+    background: transparent;
+    cursor: pointer;
+  }
+}
+
+/* The volume pill holds the bottom-right corner of a video, so the badge moves aside */
+.mediaContainer[data-video] .aiBadge {
+  right: auto;
+  left: 0.75rem;
 }
 
 /* Play/pause pill for GIFs — always visible, since it doubles as the "this is a

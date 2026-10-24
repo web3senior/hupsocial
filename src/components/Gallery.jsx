@@ -41,6 +41,8 @@ export default function MediaGallery({ data = [] }) {
   /* Which stills have arrived (or failed), so the loading sweep stops with the download */
   const [loadedStills, setLoadedStills] = useState({})
   const [isMuted, setIsMuted] = useState(true)
+  // The ref feeds elements as they mount; the state drives the slider
+  const [volume, setVolume] = useState(DEFAULT_SOUND_PREFS.volume)
   const volumeRef = useRef(DEFAULT_SOUND_PREFS.volume)
   const [revealedItems, setRevealedItems] = useState({})
   // GIFs open paused on their first frame; these track which ones the reader started
@@ -67,12 +69,15 @@ export default function MediaGallery({ data = [] }) {
     align: 'start',
     containScroll: 'trimSnaps',
     dragFree: true,
+    // Dragging the volume slider must not swipe the carousel along with it
+    watchDrag: (_, event) => !event.target.closest?.('[data-no-drag]'),
   })
 
   // Restore persisted sound prefs after mount (post-hydration, so SSR markup stays in sync)
   useEffect(() => {
     const prefs = loadSoundPrefs()
     volumeRef.current = prefs.volume
+    setVolume(prefs.volume)
     setIsMuted(prefs.muted)
     videoRefs.current.forEach((video) => {
       if (video) video.volume = prefs.volume
@@ -93,10 +98,27 @@ export default function MediaGallery({ data = [] }) {
     persistSoundPrefs(nextMuted)
   }
 
+  /* The inline volume slider. Dragging to the bottom mutes but keeps the last audible level, so
+     the toggle brings the sound back where it was rather than at zero. */
+  const handleVolumeSlide = (e) => {
+    const level = Number(e.target.value)
+    const nextMuted = level === 0
+    if (!nextMuted) {
+      volumeRef.current = level
+      setVolume(level)
+      videoRefs.current.forEach((video) => {
+        if (video) video.volume = level
+      })
+    }
+    setIsMuted(nextMuted)
+    persistSoundPrefs(nextMuted)
+  }
+
   // Fired by the lightbox video's native controls — keep every player in sync
   const handleVideoVolumeChange = (e) => {
     const video = e.currentTarget
     volumeRef.current = video.volume
+    setVolume(video.volume)
     setIsMuted(video.muted)
     saveSoundPrefs({ volume: video.volume, muted: video.muted })
   }
@@ -538,8 +560,26 @@ export default function MediaGallery({ data = [] }) {
                       >
                         <CornersOutIcon size={16} />
                       </button>
+                    </div>
+                  )}
+
+                  {item.type === 'video' && (
+                    /* The card behind toggles playback on click, so nothing in here may reach it */
+                    <div className={styles.volume} data-no-drag="" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="range"
+                        className={styles.volume__slider}
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={isMuted ? 0 : volume}
+                        onChange={handleVolumeSlide}
+                        aria-label="Volume"
+                        style={{ '--volume-fill': `${(isMuted ? 0 : volume) * 100}%` }}
+                      />
                       <button
-                        className={styles.iconButton}
+                        type="button"
+                        className={styles.volume__toggle}
                         onClick={toggleMute}
                         aria-label={isMuted ? 'Unmute video' : 'Mute video'}
                       >
