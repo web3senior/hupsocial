@@ -2,15 +2,18 @@
    which is more than a single line can hold legibly. The winner is the only coloured thing on
    the card, so the eye lands on the result before anything else. */
 .pollCard {
-  --poll-radius: 12px;
+  --poll-radius: 20px;
   /* Greens are literal rather than tokenised because the palette has no success ramp. Tints
      are alpha over the card's own background, so they hold in both themes instead of turning
      into a pale block on a dark surface. */
-  --poll-win-line: #16a34a;
-  --poll-win-fill: #15803d;
-  --poll-win-track: rgba(22, 163, 74, 0.25);
-  --poll-win-tint: rgba(22, 163, 74, 0.08);
-  --poll-win-text: #15803d;
+  --poll-win-line: rgba(34, 197, 94, 0.55);
+  --poll-win-fill: #065f35;
+  --poll-win-track: #059652;
+  --poll-win-tint: rgba(34, 197, 94, 0.06);
+  --poll-win-text: #16a34a;
+  /* Neutral bars for every other row: a soft fill on a softer groove, alpha so both themes hold */
+  --poll-bar-fill: rgba(127, 127, 127, 0.18);
+  --poll-bar-track: rgba(127, 127, 127, 0.08);
   /* The two lifecycle hues, named here so the window bar can be handed one as a colour rather
      than a class. Literal rather than --primary: that token resolves to the app's blue, which
      would put a running poll's bar in a different colour from the "Open" badge beside it
@@ -70,13 +73,13 @@
   &__option {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.5rem;
     width: 100%;
     border: 1px solid var(--border);
     border-radius: var(--poll-radius);
     background: transparent;
     color: inherit;
-    padding: 0.75rem 0.9rem;
+    padding: 0.85rem 1.25rem;
     font-family: inherit;
     font-size: var(--font-size-14, 0.875rem);
     text-align: left;
@@ -98,17 +101,14 @@
       }
     }
 
-    &--chosen {
-      border-color: var(--primary, #ec4899);
-    }
-
-    &--winner {
+    &--highlight {
       border-color: var(--poll-win-line);
       background: var(--poll-win-tint);
 
       .pollCard__optionLabel,
       .pollCard__optionShare,
-      .pollCard__optionVotes {
+      .pollCard__optionVotes,
+      .pollCard__optionLabel svg {
         color: var(--poll-win-text);
       }
 
@@ -146,13 +146,15 @@
 
   &__optionShare {
     flex-shrink: 0;
-    font-size: var(--font-size-12);
+    font-size: var(--font-size-14, 0.875rem);
+    font-variant-numeric: tabular-nums;
     color: var(--text-muted, #888);
   }
 
   &__optionVotes {
-    font-size: var(--font-size-12);
-    color: var(--text-muted, #888);
+    font-size: var(--font-size-13, 0.8125rem);
+    color: var(--foreground);
+    opacity: 0.85;
   }
 
   /* Slimmer than a result bar and pinned above the footer: it measures the clock, not the
@@ -171,7 +173,7 @@
 
   &__total {
     font-weight: 700;
-    color: inherit;
+    color: var(--foreground);
     text-decoration: underline;
     text-underline-offset: 2px;
 

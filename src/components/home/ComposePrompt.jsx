@@ -26,7 +26,9 @@ export default function ComposePrompt() {
 
   return (
     <div className={styles.prompt}>
-      <Avatar className={styles.prompt__avatar} src={isConnected ? profile?.profileImage : null} size={44} />
+      {/* 38px, the same picture size Post hands its Profile byline, so the prompt and the
+          posts under it share one avatar column */}
+      <Avatar className={styles.prompt__avatar} src={isConnected ? profile?.profileImage : null} size={38} />
       <button type="button" className={styles.prompt__field} onClick={handleCompose}>
         What&apos;s happening?
       </button>

@@ -1,63 +1,127 @@
 .add-tab {
   display: flex;
   flex-direction: column;
-  min-width: 220px;
+  width: 280px;
+  max-width: calc(100vw - 2rem);
   padding: 0.375rem;
 
   &__trigger {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    // Sits beside the scrollable tab row; must not get squeezed when tabs overflow
+    gap: 0.375rem;
+    height: 34px;
+    padding: 0 0.875rem;
+    // Sits beside the feed heading; must not get squeezed by a long title
     flex-shrink: 0;
-    border: none;
-    border-radius: 50%;
-  background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-muted);
+    color: var(--foreground);
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
     cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+
+  &__trigger-label {
+    white-space: nowrap;
+  }
+
+  &__header {
+    padding: 0.5rem 0.75rem 0.625rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--foreground);
+  }
+
+  &__hint {
+    margin: 0.125rem 0 0;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: var(--text-muted, #767676);
   }
 
   &__item {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 0.75rem;
     width: 100%;
-    padding: 0.625rem 0.75rem;
+    padding: 0.5rem 0.75rem;
     border: none;
     background: none;
     border-radius: 8px;
+    color: var(--foreground);
     cursor: pointer;
     text-align: left;
     font-size: 0.9375rem;
 
-    &:hover:not(&--disabled) {
-     background: var(--surface-muted);
+    &:hover {
+      background: var(--surface-muted);
     }
 
-    &--disabled {
-      opacity: 0.5;
-      cursor: default;
+    &--added .add-tab__icon {
+      background: var(--foreground);
+      color: var(--background);
     }
 
     &--muted {
-      color: var(--color-text-muted, #767676);
+      font-weight: 600;
+      color: var(--text-muted, #767676);
     }
   }
 
-  &__label {
+  &__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--surface-muted);
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
     flex: 1;
+    min-width: 0;
+  }
+
+  &__label {
+    font-weight: 500;
+  }
+
+  &__description {
+    font-size: 0.8125rem;
+    color: var(--text-muted, #767676);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__trailing {
     display: inline-flex;
-    color: var(--color-text-muted, #767676);
+    flex: none;
+    color: var(--text-muted, #767676);
   }
 
   &__chain-icon {
     display: inline-flex;
-    width: 18px;
-    height: 18px;
+    flex: none;
+    width: 22px;
+    height: 22px;
 
     svg,
     img {

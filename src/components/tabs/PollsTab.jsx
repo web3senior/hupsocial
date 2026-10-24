@@ -42,7 +42,9 @@ export default function PollsTab() {
 
   return (
     <div className={clsx(styles.tabContent, 'relative')}>
-      <div className="__container" data-width="medium">
+      {/* Small, like every other feed tab: the home grid's feed track sizes to its content
+          on desktop, so a medium container here widened the whole column and its tab bar */}
+      <div className="__container" data-width="small">
         {isLoading && <p className={styles.pollsTab__status}><Spinner size={16} color="currentColor" /> Loading polls...</p>}
 
         {!isLoading && polls.length === 0 && <NoData name="polls" />}

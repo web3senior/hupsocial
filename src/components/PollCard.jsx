@@ -226,6 +226,9 @@ export default function PollCard({ pollRef }) {
           // The leader is styled as the winner only once the poll is settled — a live poll's
           // front-runner is a running score, not a result
           const isWinner = showResults && option.isLeader && status.key === 'closed'
+          // One green row per card: the settled winner, or — while the poll runs — the
+          // viewer's own pick, so they find their ballot at a glance
+          const isHighlighted = showResults && (isWinner || (isChosen && status.key !== 'closed'))
 
           return (
             <li key={option.index}>
@@ -233,8 +236,7 @@ export default function PollCard({ pollRef }) {
                 type="button"
                 className={clsx(styles.pollCard__option, {
                   [styles['pollCard__option--result']]: showResults,
-                  [styles['pollCard__option--chosen']]: isChosen,
-                  [styles['pollCard__option--winner']]: isWinner,
+                  [styles['pollCard__option--highlight']]: isHighlighted,
                 })}
                 onClick={() => castVote(option.index)}
                 disabled={!isOpen || hasVoted || isBusy || isBlocked}
@@ -258,11 +260,9 @@ export default function PollCard({ pollRef }) {
                       percent={option.share}
                       gradient={false}
                       decorative
-                      // The winner owns the only colour on a settled card. Before that, the
-                      // viewer's own pick is the one bar in the accent, so they can find their
-                      // ballot without hunting for the tick beside the label.
-                      color={isWinner ? 'var(--poll-win-fill)' : isChosen ? 'var(--primary, #ec4899)' : 'var(--text-muted, #a1a1aa)'}
-                      trackColor={isWinner ? 'var(--poll-win-track)' : 'var(--surface-muted, rgba(0, 0, 0, 0.06))'}
+                      height={10}
+                      color={isHighlighted ? 'var(--poll-win-fill)' : 'var(--poll-bar-fill)'}
+                      trackColor={isHighlighted ? 'var(--poll-win-track)' : 'var(--poll-bar-track)'}
                     />
                     <span className={styles.pollCard__optionVotes}>
                       {formatVotes(option.votes)} {option.votes === 1 ? 'vote' : 'votes'}

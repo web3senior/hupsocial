@@ -34,6 +34,7 @@ export default function HomeTabStrip() {
       >
         {({ close }) => (
           <div className={styles['tab-strip__menu']}>
+            <p className={styles['tab-strip__section']}>Your feeds</p>
             {resolvedTabs.map((tab) => {
               const isActive = tab.id === activeTabId
 
@@ -66,6 +67,13 @@ export default function HomeTabStrip() {
                 </div>
               )
             })}
+
+            {/* Most people never find the add button on their own; point at it from here */}
+            <p className={styles['tab-strip__hint']}>
+              {resolvedTabs.length === 1
+                ? 'Want Following, Trending, Polls or a single network? Tap “Add feed” to pin it here.'
+                : 'Tap “Add feed” to pin more feeds.'}
+            </p>
           </div>
         )}
       </NativePopover>
