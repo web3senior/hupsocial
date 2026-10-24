@@ -340,6 +340,19 @@
     color: var(--gray-400);
   }
 
+  &__followersShimmer {
+    width: 90px;
+    height: 1.25rem;
+    border-radius: 6px;
+  }
+
+  // Same box as a button, so the row doesn't jump when the label lands
+  &__btnShimmer {
+    flex: 1;
+    height: 2.4rem;
+    border-radius: 10px;
+  }
+
   &__actions {
     display: flex;
     gap: 0.75rem;

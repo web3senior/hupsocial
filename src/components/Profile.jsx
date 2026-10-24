@@ -18,6 +18,7 @@ import { toast } from '@/components/NextToast'
 import AgentBadge from './ui/AgentBadge'
 import Avatar from './ui/Avatar'
 import PremiumBadge from './ui/PremiumBadge'
+import Shimmer from './ui/Shimmer'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
 import NativePopover from './ui/NativePopover'
 import clsx from 'clsx'
@@ -124,7 +125,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
     </>
   )
 
-  // The avatar and the name both open the same card, each anchored to itself. Mounted on first
+  // The name opens the profile card. Mounted on first
   // open only: the card reads the follower contract, which a feed of bylines shouldn't pay for.
   const withCard = (trigger) => (
     <NativePopover
@@ -167,16 +168,8 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
 
   return (
     <Container {...containerProps} className={clsx(styles.profile, linkBox && styles['profile--linked'], 'flex', className)} style={avatarBox}>
-      {linkBox ? <span className={styles.imageWrapper}>{picture}</span> : hoverCard ? withCard(
-        <button
-          type="button"
-          className={styles.imageWrapper}
-          onClick={(e) => e.stopPropagation()}
-          aria-label={`Open profile card for ${profile.name}`}
-        >
-          {picture}
-        </button>
-      ) : (
+      {/* Only the name opens the card; the picture always links straight to the profile */}
+      {linkBox ? <span className={styles.imageWrapper}>{picture}</span> : (
         <Link
           href={profileHref}
           prefetch={false}
@@ -279,7 +272,7 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref, networkI
   const cardName = profile.fullName || profile.name || displayName
   const cardHandle = profile.username || shortAddress(creator)
 
-  const { data: isFollowingData, refetch: refetchIsFollowing } = useReadContract({
+  const { data: isFollowingData, isLoading: isFollowStateLoading, refetch: refetchIsFollowing } = useReadContract({
     address: followerSystemAddress,
     abi: followerSystemAbi,
     functionName: 'isFollowing',
@@ -288,7 +281,7 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref, networkI
   })
   const isFollowingTarget = Boolean(isFollowingData)
 
-  const { data: followerCountData, refetch: refetchFollowerCount } = useReadContract({
+  const { data: followerCountData, isLoading: isFollowerCountLoading, refetch: refetchFollowerCount } = useReadContract({
     address: followerSystemAddress,
     abi: followerSystemAbi,
     functionName: 'followerCount',
@@ -340,20 +333,26 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref, networkI
 
       {profile.description && <p className={styles.hoverCard__bio}>{profile.description}</p>}
 
-      <span className={styles.hoverCard__followers}>
-        {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(followerCountData ?? 0))} followers
-      </span>
+      {/* Shimmers until the contract answers, so neither the count nor the Follow label flips
+          from a default to the real value in front of the reader */}
+      {isFollowerCountLoading ? (
+        <Shimmer className={styles.hoverCard__followersShimmer} />
+      ) : (
+        <span className={styles.hoverCard__followers}>
+          {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(followerCountData ?? 0))} followers
+        </span>
+      )}
 
       {!isSelf && (
         <div className={styles.hoverCard__actions}>
-          <button
+          {isFollowStateLoading ? <Shimmer className={styles.hoverCard__btnShimmer} /> : <button
             type="button"
             className={clsx(styles.hoverCard__btn, !isFollowingTarget && styles['hoverCard__btn--primary'])}
             onClick={handleFollow}
             disabled={isSigning || isConfirming}
           >
             {isSigning ? 'Confirm Wallet...' : isConfirming ? 'Confirming...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
-          </button>
+          </button>}
           {tunnelTarget && (
             <a className={styles.hoverCard__btn} href={tunnelChatUrl(tunnelTarget)} target="_blank" rel="noopener noreferrer">
               Message
