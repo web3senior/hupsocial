@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useConnection } from 'wagmi'
-import { HouseIcon, PaperPlaneTiltIcon, PlayCircleIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
+import { ChatCircleIcon, HouseIcon, PlayCircleIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
 import { toast } from '@/components/NextToast'
@@ -123,7 +123,7 @@ export default function Footer() {
       {
         name: 'Chat',
         action: () => (isChatOpen ? minimizeChat() : openChat()),
-        icon: PaperPlaneTiltIcon,
+        icon: ChatCircleIcon,
         isActive: isChatOpen,
         hasDot: chatUnread > 0,
       },

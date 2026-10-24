@@ -19,7 +19,6 @@ import {
   MagnifyingGlassIcon,
   MicrophoneIcon,
   PaperclipIcon,
-  PaperPlaneTiltIcon,
   PlayIcon,
   ShieldCheckIcon,
   XIcon,
@@ -524,7 +523,7 @@ export default function ChatDock({ embedded = false }) {
           {...embedDrag.pillProps}
         >
           <span className={styles.pill__icon}>
-            <PaperPlaneTiltIcon size={22} />
+            <ChatCircleIcon size={22} />
             {badge}
           </span>
           <span className={styles.pill__label}>Chat</span>

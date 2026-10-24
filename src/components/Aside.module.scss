@@ -273,7 +273,7 @@
   padding: 0 0.75rem 0 0.375rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background-color: var(--gray-50);
+  background-color: var(--surface);
 
   @media (hover: hover) and (pointer: fine) {
     &:hover {
@@ -691,9 +691,4 @@
 
 :global([data-theme='dark']) .aside.aside__drawer {
   background-color: var(--background);
-}
-
-:global([data-theme='dark']) .aside__profile,
-:global([data-theme='terminal']) .aside__profile {
-  background-color: var(--surface-muted);
 }
