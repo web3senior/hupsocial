@@ -9,6 +9,8 @@ import clsx from 'clsx'
 import { useConnection } from 'wagmi'
 import { CONTRACTS, appChains } from '@/config/contracts'
 import CreateMarketDialog from '@/components/CreateMarketDialog'
+import DropsHero from '@/components/DropsHero'
+import Profile from '@/components/Profile'
 import HowPredictWorks from './HowPredictWorks'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import { marketStatus, parseJsonArray, toRelative } from '@/lib/predict'
@@ -18,7 +20,12 @@ import styles from './PredictDirectory.module.scss'
 
 const PAGE_SIZE = 25
 
-const fetcher = (url) => fetch(url).then((res) => res.json())
+const fetcher = async (url) => {
+  const response = await fetch(url)
+  const payload = await response.json()
+  if (!response.ok || payload.success === false) throw new Error(payload.error || 'Could not load markets')
+  return payload
+}
 
 const shortWallet = (wallet) => (wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : '')
 
@@ -72,6 +79,7 @@ export default function PredictDirectory() {
     data: pages,
     isLoading,
     isValidating,
+    error,
     size,
     setSize,
     mutate,
@@ -80,8 +88,8 @@ export default function PredictDirectory() {
   })
 
   const markets = useMemo(() => (pages ?? []).flatMap((page) => page?.data ?? []), [pages])
-  const featured = pages?.[0]?.meta?.featured ?? []
-  const showFeaturedStrip = scope === 'open' && featured.length > 0
+  const featured = useMemo(() => pages?.[0]?.meta?.featured ?? [], [pages])
+  const showFeaturedStrip = scope === 'open' && !search && featured.length > 0
   // The API keeps featured rows in the main list too — drop them here so a market
   // never renders both in the strip and directly below it
   const listMarkets = useMemo(() => {
@@ -95,63 +103,88 @@ export default function PredictDirectory() {
   const renderCard = (market, inFeaturedStrip = false) => {
     const status = marketStatus(market)
     const outcomes = parseJsonArray(market.outcome_labels)
+    const judges = [...new Set(parseJsonArray(market.judges).filter((judge) => typeof judge === 'string' && judge).map((judge) => judge.toLowerCase()))]
+    const marketHref = `/predict/${market.network_id}/${market.market_id}`
 
     return (
-      <Link
-        key={`${inFeaturedStrip ? 'featured-' : ''}${market.network_id}-${market.market_id}`}
-        href={`/predict/${market.network_id}/${market.market_id}`}
-        className={clsx(
-          styles.directory__card,
-          Boolean(Number(market.featured)) && !inFeaturedStrip ? styles['directory__card--featured'] : null
-        )}
-      >
-        <div className={styles.directory__cardTop}>
-          <span className={clsx(styles.directory__badge, styles[`directory__badge--${status.key}`])}>{status.label}</span>
-          {Boolean(Number(market.featured)) && <StarIcon size={14} weight="fill" className={styles.directory__star} />}
-          {market.category_label && (
-            <span className={styles.directory__categoryTag}>
-              {market.category_emoji ? `${market.category_emoji} ` : ''}
-              {market.category_label}
-            </span>
+      <div key={`${inFeaturedStrip ? 'featured-' : ''}${market.network_id}-${market.market_id}`} className={styles.directory__tile}>
+        <Link
+          href={marketHref}
+          className={clsx(
+            styles.directory__card,
+            Boolean(Number(market.featured)) && !inFeaturedStrip ? styles['directory__card--featured'] : null
           )}
-          <span className={styles.directory__network}>{chainName(market.network_id)}</span>
-        </div>
-
-        <div className={styles.directory__cardBody}>
-          {market.image_cid && (
-            <img
-              className={styles.directory__thumb}
-              src={resolveStorageImageUrl(market.image_cid, { width: 128 }) || market.image_cid}
-              alt=""
-            />
-          )}
-          <div className={styles.directory__cardMain}>
-            <h3 className={styles.directory__title}>{market.title || 'Untitled market'}</h3>
-
-            <p className={styles.directory__meta}>
-              <span>{market.display_name || shortWallet(market.wallet_address)}</span>
-              <span>{toRelative(market.opened_at)}</span>
-              {status.key === 'open' && <span>closes {toRelative(market.betting_deadline)}</span>}
-              {status.key === 'upcoming' && <span>opens {toRelative(market.betting_opens_at)}</span>}
-            </p>
-
-            <p className={styles.directory__stats}>
-              <MarketVolume market={market} />
-              <span className={styles.directory__outcomes}>
-                <UsersIcon size={12} />
-                {market.bettor_count ?? 0} {Number(market.bettor_count) === 1 ? 'bettor' : 'bettors'}
-              </span>
-              <span className={styles.directory__outcomes}>{outcomes.length || market.outcome_count} outcomes</span>
-              {status.key === 'resolved' && market.winning_outcome !== null && (
-                <span className={styles.directory__winner}>
-                  <ScalesIcon size={12} />
-                  {outcomes[Number(market.winning_outcome)]?.label || `Outcome #${Number(market.winning_outcome) + 1}`}
-                </span>
-              )}
-            </p>
+        >
+          <div className={styles.directory__artwork}>
+            {market.image_cid ? (
+              <img src={resolveStorageImageUrl(market.image_cid, { width: 640 }) || market.image_cid} alt="" loading="lazy" />
+            ) : (
+              <ChartLineUpIcon size={48} weight="duotone" aria-hidden="true" />
+            )}
+            <span className={styles.directory__artworkNetwork}>{chainName(market.network_id)}</span>
           </div>
-        </div>
-      </Link>
+          <div className={styles.directory__cardTop}>
+            <span className={clsx(styles.directory__badge, styles[`directory__badge--${status.key}`])}>{status.label}</span>
+            {Boolean(Number(market.featured)) && <StarIcon size={14} weight="fill" className={styles.directory__star} />}
+            {market.category_label && (
+              <span className={styles.directory__categoryTag}>
+                {market.category_emoji ? `${market.category_emoji} ` : ''}
+                {market.category_label}
+              </span>
+            )}
+          </div>
+
+          <div className={styles.directory__cardBody}>
+            <div className={styles.directory__cardMain}>
+              <h3 className={styles.directory__title}>{market.title || 'Untitled market'}</h3>
+
+              {outcomes.length > 0 && (
+                <div className={styles.directory__outcomePreview}>
+                  {outcomes.slice(0, 2).map((outcome, index) => (
+                    <span key={index}>{typeof outcome === 'string' ? outcome : outcome.label || `Outcome ${index + 1}`}</span>
+                  ))}
+                  {outcomes.length > 2 && <small>+{outcomes.length - 2} more</small>}
+                </div>
+              )}
+
+              <p className={styles.directory__meta}>
+                <span>{market.display_name || shortWallet(market.wallet_address)}</span>
+                {status.key === 'open' && <span>closes {toRelative(market.betting_deadline)}</span>}
+                {status.key === 'upcoming' && <span>opens {toRelative(market.betting_opens_at)}</span>}
+              </p>
+
+              <p className={styles.directory__stats}>
+                <MarketVolume market={market} />
+                <span className={styles.directory__outcomes}>
+                  <UsersIcon size={12} />
+                  {market.bettor_count ?? 0} {Number(market.bettor_count) === 1 ? 'bettor' : 'bettors'}
+                </span>
+                <span className={styles.directory__outcomes}>{outcomes.length || market.outcome_count} outcomes</span>
+                {status.key === 'resolved' && market.winning_outcome !== null && (
+                  <span className={styles.directory__winner}>
+                    <ScalesIcon size={12} />
+                    {outcomes[Number(market.winning_outcome)]?.label || `Outcome #${Number(market.winning_outcome) + 1}`}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </Link>
+        {judges.length > 0 && (
+          <div className={styles.directory__judges} role="group" aria-label="Market judges">
+            {judges.slice(0, 3).map((judge) => (
+              <span key={judge} className={styles.directory__judge}>
+                <Profile creator={judge} networkId={market.network_id} variant="imageOnly" size={26} fingerprint={false} linkBox hoverCard={false} />
+              </span>
+            ))}
+            {judges.length > 3 && (
+              <Link href={marketHref} className={styles.directory__moreJudges} aria-label={`View all ${judges.length} judges`}>
+                +{judges.length - 3}
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
     )
   }
 
@@ -173,14 +206,24 @@ export default function PredictDirectory() {
 
   return (
     <div className={styles.directory}>
+      <DropsHero
+        title="Create a market. Back your prediction."
+        action={
+          <button type="button" onClick={() => dialogRef.current?.open()}>
+            <PlusIcon size={16} />
+            New market
+          </button>
+        }
+      >
+        Explore outcome pools across networks. Judges resolve the result.
+      </DropsHero>
       <div className={styles.directory__toolbar}>
-        <div className={styles.directory__toggle} role="tablist" aria-label="Market scope">
+        <div className={styles.directory__toggle} role="group" aria-label="Market scope">
           {scopes.map((option) => (
             <button
               key={option.key}
               type="button"
-              role="tab"
-              aria-selected={scope === option.key}
+              aria-pressed={scope === option.key}
               className={clsx(styles.directory__toggleButton, scope === option.key ? styles['directory__toggleButton--active'] : null)}
               onClick={() => setScope(option.key)}
               // data-label feeds the hidden bold ::after that reserves the active width,
@@ -208,11 +251,6 @@ export default function PredictDirectory() {
           </select>
         )}
 
-        <button type="button" className={styles.directory__createButton} onClick={() => dialogRef.current?.open()}>
-          <PlusIcon size={14} />
-          New market
-        </button>
-
         {/* Full-width basis pushes search + help onto their own row under the tabs */}
         <div className={styles.directory__searchRow}>
           <div className={styles.directory__search}>
@@ -232,11 +270,10 @@ export default function PredictDirectory() {
       </div>
 
       {categories.length > 0 && (
-        <div className={styles.directory__categories} role="tablist" aria-label="Filter by category">
+        <div className={styles.directory__categories} role="group" aria-label="Filter by category">
           <button
             type="button"
-            role="tab"
-            aria-selected={category === ''}
+            aria-pressed={category === ''}
             className={clsx(styles.directory__categoryChip, category === '' ? styles['directory__categoryChip--active'] : null)}
             onClick={() => setCategory('')}
           >
@@ -246,8 +283,7 @@ export default function PredictDirectory() {
             <button
               key={entry.slug}
               type="button"
-              role="tab"
-              aria-selected={category === entry.slug}
+              aria-pressed={category === entry.slug}
               className={clsx(styles.directory__categoryChip, category === entry.slug ? styles['directory__categoryChip--active'] : null)}
               // Chips toggle: clicking the active category clears the filter
               onClick={() => setCategory((current) => (current === entry.slug ? '' : entry.slug))}
@@ -259,26 +295,38 @@ export default function PredictDirectory() {
         </div>
       )}
 
-      {isLoading && <PageLoader />}
+      {isLoading && <PageLoader label="Loading markets" />}
 
-      {!isLoading && listMarkets.length === 0 && !showFeaturedStrip && (
-        <div className={styles.directory__empty}>
-          <ChartLineUpIcon size={32} />
-          <p>{search ? `No markets match “${search}”.` : emptyCopy[scope]}</p>
+      {error && (
+        <div className={styles.directory__empty} role="alert">
+          <p>Could not load markets. Please try again.</p>
+          <button type="button" className={styles.directory__loadMore} onClick={() => mutate()}>Try again</button>
         </div>
       )}
 
-      {showFeaturedStrip && (
+      {!isLoading && !error && listMarkets.length === 0 && !showFeaturedStrip && (
+        <div className={styles.directory__empty}>
+          <ChartLineUpIcon size={32} />
+          <p>{scope === 'mine' && !address ? 'Connect your wallet to see your markets.' : search ? `No markets match “${search}”.` : emptyCopy[scope]}</p>
+        </div>
+      )}
+
+      {!isLoading && showFeaturedStrip && (
         <section className={styles.directory__featuredStrip} aria-label="Featured markets">
           <h2>
             <StarIcon size={14} weight="fill" />
             Featured
           </h2>
-          {featured.map((market) => renderCard(market, true))}
+          <div className={styles.directory__grid}>{featured.map((market) => renderCard(market, true))}</div>
         </section>
       )}
 
-      {listMarkets.map((market) => renderCard(market))}
+      {!isLoading && listMarkets.length > 0 && (
+        <section className={styles.directory__section} aria-label="Markets">
+          <h2>{scopes.find((option) => option.key === scope)?.label || 'My'} markets</h2>
+          <div className={styles.directory__grid}>{listMarkets.map((market) => renderCard(market))}</div>
+        </section>
+      )}
 
       {hasMore && (
         <button type="button" className={styles.directory__loadMore} onClick={() => setSize(size + 1)} disabled={isValidating}>

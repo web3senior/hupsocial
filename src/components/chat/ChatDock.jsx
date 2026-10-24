@@ -2010,10 +2010,10 @@ function Quote({ reply, onJump }) {
       <Profile
         creator={reply.sender}
         variant="fullWithoutTime"
-        size={16}
+        size={18}
         hoverCard={false}
         fingerprint={false}
-        className={clsx(styles.run__profile, styles.quote__name)}
+        className={clsx(styles.quote__profile, styles.quote__name)}
       />
       <span className={styles.quote__text}>{quoteText(reply)}</span>
     </div>
@@ -2317,10 +2317,10 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
             <Profile
               creator={replyTo.sender}
               variant="fullWithoutTime"
-              size={16}
+              size={18}
               hoverCard={false}
               fingerprint={false}
-              className={clsx(styles.run__profile, styles.staged__name)}
+              className={clsx(styles.quote__profile, styles.staged__name)}
             />
             <span className={styles.staged__text}>{quoteText(replyTo)}</span>
           </div>
