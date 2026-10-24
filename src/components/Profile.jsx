@@ -10,14 +10,14 @@ import { toRelativeTime } from '@/lib/dateHelper'
 import { config, CONTRACTS } from '@/config/wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { isSolanaNetworkId, solanaChainFor } from '@/config/solana'
-import { addressTag, sameAddress, shortAddress } from '@/lib/address'
+import { addressTag, isEvmAddress, sameAddress, shortAddress } from '@/lib/address'
+import { tunnelChatUrl } from '@/lib/tunnel'
+import { getAddress } from 'viem'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
-import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
 import AgentBadge from './ui/AgentBadge'
 import Avatar from './ui/Avatar'
 import PremiumBadge from './ui/PremiumBadge'
-import ProfilePortfolio from './ProfilePortfolio'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
 import NativePopover from './ui/NativePopover'
 import clsx from 'clsx'
@@ -34,10 +34,6 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
 
   // Derived check for layout variations sharing the full metadata sub-row
   const isFullLike = variant === 'full' || variant === 'fullWithoutTime' || variant === 'stacked'
-
-  // A card lays the identity out in a column under the picture, where the handle reads as the
-  // second line of the same label rather than a mark trailing the name
-  const handleUnderName = variant === 'stacked' || variant === 'nameAndUsername'
 
   // The picture's laid-out size, handed to the stylesheet so the shimmer that stands in for it
   // reserves the same box and the fingerprint keeps its proportion. Only `imageOnly` surfaces
@@ -63,11 +59,11 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
   // The address can be absent when the profile fetch failed, so fall back to the
   // creator prop — an upstream hiccup must not take the whole list down with it.
   //
-  // A claimed username retires that discriminator: it exists only because display names are
-  // neither unique nor chosen, and the handle on the line below is both.
+  // A claimed username is the name itself: it is unique and chosen, so it needs no discriminator
+  // and no second `@handle` beside it.
   const displayName = useMemo(() => {
+    if (profile?.username) return profile.username
     if (profile?.fullName) return profile.fullName
-    if (profile?.username) return profile.name
     const walletAddress = profile?.wallet_address || creator
     return walletAddress ? `${profile?.name}#${addressTag(walletAddress)}` : profile?.name
   }, [profile, creator])
@@ -96,7 +92,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 16, height: 16 }} />
               <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 16, height: 16 }} />
             </div>
-            {(isFullLike || handleUnderName) && <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 10 }} />}
+            {isFullLike && <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 10 }} />}
           </div>
         )}
       </div>
@@ -128,6 +124,38 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
     </>
   )
 
+  // The avatar and the name both open the same card, each anchored to itself. Mounted on first
+  // open only: the card reads the follower contract, which a feed of bylines shouldn't pay for.
+  const withCard = (trigger) => (
+    <NativePopover
+      trigger={trigger}
+      openOnHover
+      placement="bottom-start"
+      onToggle={(e) => {
+        if (e.newState === 'open') setPopoverOpened(true)
+      }}
+    >
+      {() => (popoverOpened ? (
+        <ProfileHoverCard creator={creator} profile={profile} displayName={displayName} profileHref={profileHref} networkId={networkId} />
+      ) : null)}
+    </NativePopover>
+  )
+
+  // Hover-only prefetch: visible links re-prefetch on every router cache invalidation,
+  // which looped the chat's sender names into a render per link per second
+  const nameLink = (
+    <Link
+      href={profileHref}
+      prefetch={false}
+      className={styles.name}
+      onClick={(e) => e.stopPropagation()}
+      onMouseEnter={() => creator && router.prefetch(profileHref)}
+      onFocus={() => creator && router.prefetch(profileHref)}
+    >
+      {displayName}
+    </Link>
+  )
+
   const Container = linkBox ? Link : 'div'
   const containerProps = linkBox ? {
     href: profileHref,
@@ -139,26 +167,15 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
 
   return (
     <Container {...containerProps} className={clsx(styles.profile, linkBox && styles['profile--linked'], 'flex', className)} style={avatarBox}>
-      {linkBox ? <span className={styles.imageWrapper}>{picture}</span> : hoverCard ? (
-        <NativePopover
-          trigger={
-            <button
-              type="button"
-              className={styles.imageWrapper}
-              onClick={(e) => e.stopPropagation()}
-              aria-label={`Open profile card for ${profile.name}`}
-            >
-              {picture}
-            </button>
-          }
-          openOnHover
-          placement="bottom-start"
-          onToggle={(e) => {
-            if (e.newState === 'open') setPopoverOpened(true)
-          }}
+      {linkBox ? <span className={styles.imageWrapper}>{picture}</span> : hoverCard ? withCard(
+        <button
+          type="button"
+          className={styles.imageWrapper}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Open profile card for ${profile.name}`}
         >
-          {() => (popoverOpened ? <ProfileHoverCard creator={creator} profile={profile} networkId={networkId} /> : null)}
-        </NativePopover>
+          {picture}
+        </button>
       ) : (
         <Link
           href={profileHref}
@@ -176,18 +193,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
       {variant !== 'imageOnly' && (
         <div className={clsx(styles.nameColumn, 'flex flex-column align-items-start justify-content-center')}>
           <div className={styles.nameRow}>
-            {/* Hover-only prefetch: visible links re-prefetch on every router cache invalidation,
-                which looped the chat's sender names into a render per link per second */}
-            {linkBox ? <span className={styles.name}>{displayName}</span> : <Link
-              href={profileHref}
-              prefetch={false}
-              className={styles.name}
-              onClick={(e) => e.stopPropagation()}
-              onMouseEnter={() => creator && router.prefetch(profileHref)}
-              onFocus={() => creator && router.prefetch(profileHref)}
-            >
-              {displayName}
-            </Link>}
+            {linkBox ? <span className={styles.name}>{displayName}</span> : hoverCard ? withCard(nameLink) : nameLink}
             {/* Straight after the name, the way a paid mark is read everywhere else. It is a
                 claim about the account, not about the post's chain, so it takes no chain colour. */}
             <PremiumBadge premium={profile.premium} />
@@ -205,22 +211,16 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
                 <Image alt={`Universal Profile`} src={UPlogo} width={14} height={14} />
               </div>
             )}
-            {/* On the name's own line, after the marks and before the time: a handle is part of
-                how an account is named, not a second fact about it. */}
-            {profile.username && !handleUnderName && <span className={styles.handle}>{`@${profile.username}`}</span>}
-            {/* Timestamp remains completely exclusive to the standard 'full' layout variant.
-                The separator only appears between two words — after a handle, never after a mark. */}
+            {/* Timestamp remains completely exclusive to the standard 'full' layout variant. */}
             {/* Relative time is read off two clocks when the byline is server-rendered — a post
                 seconds old can say "12s" in the HTML and "14s" at hydration — so React must not
                 treat that text as a mismatch and re-render the whole boundary over it */}
             {variant === 'full' && createdAt && (
               <small className={styles.createdAt} suppressHydrationWarning>
-                {profile.username && !handleUnderName ? `· ${toRelativeTime(createdAt)}` : toRelativeTime(createdAt)}
+                {toRelativeTime(createdAt)}
               </small>
             )}
           </div>
-
-          {handleUnderName && profile.username && <span className={styles.handle}>{`@${profile.username}`}</span>}
 
           {/* The address stays under the name whether or not a handle sits beside it: a name is
               chosen and a handle is claimed, but this is the account itself. */}
@@ -261,28 +261,23 @@ export const CommunityBadge = ({ badge, size = 'sm', iconOnly = false, linked = 
   )
 }
 
-// Popup shown when the avatar is hovered (tapped, on pointers without hover) — mirrors the
-// follow/follower affordances on the full profile page, scoped to the post's own chain
-// instead of whichever chain the wallet is currently connected to.
-const ProfileHoverCard = ({ creator, profile, networkId }) => {
+// Popup shown when the avatar or name is hovered (tapped, on pointers without hover): who the
+// account is, and the two things a reader does next — follow it or message it. Follows are read
+// on the post's own chain instead of whichever chain the wallet is currently connected to.
+const ProfileHoverCard = ({ creator, profile, displayName, profileHref, networkId }) => {
   const { address, isConnected } = useConnection()
   const [fallbackChain] = getActiveChain()
   const targetNetworkId = networkId || fallbackChain?.id
   const followerSystemAddress = CONTRACTS[`chain${targetNetworkId}`]?.followerSystem
   const isSelf = sameAddress(address, creator)
-  const [copied, setCopied] = useState(false)
 
-  const truncatedAddress = shortAddress(creator)
+  // Same target the profile page's Message button opens
+  const tunnelTarget = profile.tunnelAddress ?? (isEvmAddress(creator) ? getAddress(creator.toLowerCase()) : null)
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(creator)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      toast(`Could not copy the address`, `error`)
-    }
-  }
+  // The byline already names the account by its handle, so the card leads with the chosen name
+  // and keeps the handle as the line under it
+  const cardName = profile.fullName || profile.name || displayName
+  const cardHandle = profile.username || shortAddress(creator)
 
   const { data: isFollowingData, refetch: refetchIsFollowing } = useReadContract({
     address: followerSystemAddress,
@@ -330,43 +325,41 @@ const ProfileHoverCard = ({ creator, profile, networkId }) => {
   }
 
   return (
-    <div className={clsx(styles.hoverCard, 'flex flex-column align-items-start gap-050')} onClick={(e) => e.stopPropagation()}>
-      <Profile
-        creator={creator}
-        networkId={networkId}
-        variant="compact"
-        size={48}
-        hoverCard={false}
-        className={styles.hoverCard__profile}
-      />
-
-      {creator && (
-        <button
-          type="button"
-          className={styles.hoverCard__copy}
-          onClick={handleCopy}
-          title={`Copy ${creator}`}
-          aria-label={`Copy the wallet address ${creator}`}
-        >
-          <code className={styles.address}>{truncatedAddress}</code>
-          {copied ? <CheckIcon size={12} weight="bold" /> : <CopyIcon size={12} />}
-        </button>
-      )}
+    <div className={styles.hoverCard} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.hoverCard__header}>
+        <div className={styles.hoverCard__identity}>
+          <Link href={profileHref} prefetch={false} className={styles.hoverCard__name}>
+            {cardName}
+          </Link>
+          <span className={styles.hoverCard__handle}>{cardHandle}</span>
+        </div>
+        <Link href={profileHref} prefetch={false} className={styles.hoverCard__avatar} aria-label={`Open the profile of ${cardName}`}>
+          <Avatar className="rounded-full" alt={cardName} src={profile.profileImage} size={72} />
+        </Link>
+      </div>
 
       {profile.description && <p className={styles.hoverCard__bio}>{profile.description}</p>}
 
-      {/* Public holdings, headlined on the post's own chain — the card is opened from a post, so
-          the balance worth showing first is the one on the network that post lives on */}
-      <ProfilePortfolio address={creator} networkId={targetNetworkId} />
-
-      <button type="button" className={styles.hoverCard__followers}>
+      <span className={styles.hoverCard__followers}>
         {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(followerCountData ?? 0))} followers
-      </button>
+      </span>
 
       {!isSelf && (
-        <button type="button" className={styles.hoverCard__followBtn} onClick={handleFollow} disabled={isSigning || isConfirming}>
-          {isSigning ? 'Confirm Wallet...' : isConfirming ? 'Confirming...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
-        </button>
+        <div className={styles.hoverCard__actions}>
+          <button
+            type="button"
+            className={clsx(styles.hoverCard__btn, !isFollowingTarget && styles['hoverCard__btn--primary'])}
+            onClick={handleFollow}
+            disabled={isSigning || isConfirming}
+          >
+            {isSigning ? 'Confirm Wallet...' : isConfirming ? 'Confirming...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
+          </button>
+          {tunnelTarget && (
+            <a className={styles.hoverCard__btn} href={tunnelChatUrl(tunnelTarget)} target="_blank" rel="noopener noreferrer">
+              Message
+            </a>
+          )}
+        </div>
       )}
     </div>
   )
