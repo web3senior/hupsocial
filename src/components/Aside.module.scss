@@ -299,9 +299,9 @@
   width: 100%;
   min-height: 48px;
   margin-top: 0.75rem;
-  border: 1px solid var(--app-accent);
-  background-color: var(--app-accent);
-  color: var(--app-accent-text);
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  color: var(--text);
   font-weight: 600;
 
   .linkText {
@@ -314,7 +314,7 @@
   }
 
   &:hover {
-    background-color: color-mix(in srgb, var(--app-accent) 90%, black);
+    background-color: var(--surface-muted);
   }
 }
 
