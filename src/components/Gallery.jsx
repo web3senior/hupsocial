@@ -4,9 +4,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import { ArrowLeftIcon, ArrowRightIcon, CornersOutIcon, PauseIcon, PlayIcon, SparkleIcon, SpeakerHighIcon, SpeakerSlashIcon, XIcon } from '@phosphor-icons/react'
 import styles from './Gallery.module.scss'
+import NativeDialog from '@/components/ui/NativeDialog'
 import useMediaZoom from '@/hooks/useMediaZoom'
 import { primaryGateway } from '@/lib/ipfsGateways'
-import { lockPageScroll, unlockPageScroll } from '@/lib/scrollLock'
 import { resolveIPFSUrl, resolveIPFSImageUrl, resolveStorageStreamUrls } from '@/lib/storageHelper'
 import { DEFAULT_SOUND_PREFS, loadSoundPrefs, saveSoundPrefs } from '@/lib/soundPrefs'
 import { useAutoplayPreference } from '@/hooks/useAutoplayPreference'
@@ -108,6 +108,7 @@ export default function MediaGallery({ data = [] }) {
   }
 
   // Lightbox Carousel (native scroll-snap)
+  const lightboxDialogRef = useRef(null)
   const lightboxRef = useRef(null)
   const lightboxScrollRef = useRef(null)
   const lightboxSlideRefs = useRef([])
@@ -177,6 +178,15 @@ export default function MediaGallery({ data = [] }) {
     }
   }
 
+  /* The lightbox is a NativeDialog so it renders in the top layer — as a fixed overlay inside
+     the post it was trapped by any transformed ancestor (the post column) and covered only that
+     box. The dialog also owns the page-scroll lock and Escape. Declared before the effect below
+     so the strip is laid out (not display: none) by the time it scrolls to the opened slide. */
+  useEffect(() => {
+    if (isLightboxOpen) lightboxDialogRef.current?.open()
+    else lightboxDialogRef.current?.close()
+  }, [isLightboxOpen])
+
   // Jump to the opened slide instantly, then track index as the user swipes
   useEffect(() => {
     if (!isLightboxOpen) return
@@ -243,14 +253,6 @@ export default function MediaGallery({ data = [] }) {
     setRevealedItems((prev) => ({ ...prev, [index]: true }))
   }
 
-  // Lock the page scroller while the lightbox is open. Shared with every modal through
-  // lib/scrollLock.js — it is refcounted, so a lightbox opened from inside a dialog
-  // doesn't unlock the page out from under the dialog on close.
-  useEffect(() => {
-    if (!isLightboxOpen) return
-    lockPageScroll()
-    return unlockPageScroll
-  }, [isLightboxOpen])
 
   /* One player at a time. Opening the lightbox silences every inline card — otherwise the
      card keeps running (audibly, once unmuted) underneath the modal — and only the slide
@@ -276,7 +278,10 @@ export default function MediaGallery({ data = [] }) {
     setSelectedIndex(index)
   }
 
-  const closeLightbox = () => {
+  const closeLightbox = () => lightboxDialogRef.current?.close()
+
+  // Every close path (X, backdrop, Escape) ends in the dialog's close event
+  const handleLightboxClosed = () => {
     /* Carry the position (and whether it was running) back to the inline card, so closing
        the modal continues the same video rather than restarting it or leaving two running. */
     if (selectedIndex !== null) {
@@ -565,8 +570,20 @@ export default function MediaGallery({ data = [] }) {
       )}
 
       {/* Lightbox Overlay */}
-      {selectedIndex !== null && (
-        <div className={styles.lightbox} ref={lightboxRef} onClick={(e) => { e.stopPropagation(); closeLightbox() }}>
+      <NativeDialog
+        ref={lightboxDialogRef}
+        className={styles.lightbox}
+        aria-label="Media viewer"
+        /* React re-dispatches these up the tree, where the post card or a parent dialog would act on them */
+        onClick={(e) => e.stopPropagation()}
+        onCancel={(e) => e.stopPropagation()}
+        onClose={(e) => {
+          e.stopPropagation()
+          handleLightboxClosed()
+        }}
+      >
+      {isLightboxOpen && (
+        <div className={styles.lightbox__body} ref={lightboxRef} onClick={closeLightbox}>
           <button className={styles.closeBtn} onClick={(e) => { e.stopPropagation(); closeLightbox() }} aria-label={`Close fullscreen view`}>
             <XIcon size={20} />
           </button>
@@ -616,6 +633,7 @@ export default function MediaGallery({ data = [] }) {
           )}
         </div>
       )}
+      </NativeDialog>
     </div>
   )
 }
