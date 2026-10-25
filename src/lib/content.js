@@ -63,6 +63,14 @@ export function getMediaItems(metadata) {
   return mediaItem?.data?.items || [];
 }
 
+// A thread rides in its first post's content: `parts` holds parts 2…N as { elements }, so the
+// whole thread is one pin and one transaction. Bounded so the pinned JSON stays a sane size.
+export const MAX_THREAD_PARTS = 25;
+
+export function getThreadParts(content) {
+  return Array.isArray(content?.parts) ? content.parts.slice(0, MAX_THREAD_PARTS - 1) : [];
+}
+
 export function isQuotePost(content) {
   const metadata = parseMetadata(content.metadata);
 

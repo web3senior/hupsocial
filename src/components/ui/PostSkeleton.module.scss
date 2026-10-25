@@ -35,8 +35,10 @@
     border-radius: 50%;
   }
 
-  // The chain badge, ringed in the page background so it reads as sitting on the avatar
-  &__avatar-badge {
+  // The chain badge, ringed in the page background so it reads as sitting on the avatar.
+  // Scoped under the avatar so it outranks the global .shimmer's position: relative — the
+  // two load in a different order in production, and a tie there drops the badge into flow.
+  &__avatar > &__avatar-badge {
     position: absolute;
     right: -2px;
     bottom: -2px;

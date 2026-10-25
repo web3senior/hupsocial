@@ -169,6 +169,7 @@ export function buildPostSheet(node) {
     element.style.maxHeight = 'none'
     element.style.webkitLineClamp = 'unset'
     element.style.overflow = 'visible'
+    element.style.maskImage = 'none'
     element.removeAttribute('data-collapsed')
   }
   for (const button of clone.querySelectorAll('[data-show-more]')) button.remove()

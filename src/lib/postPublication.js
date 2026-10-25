@@ -130,8 +130,8 @@ const settleTransaction = async ({ networkId, txHash, signature }) => {
  *   and is rewritten onto the existing row by an edit.
  * @param {'post'|'reply'|'edit'} [submission.kind] Picks the wording and where the result is shown.
  * @param {string|number} [submission.parentId] The replied-to post, for `reply` submissions.
- * @param {object} [submission.copy] Overrides some of the kind's wording — a thread names the
- *   part in flight, where the kind's own copy would call every part "your post".
+ * @param {object} [submission.copy] Overrides some of the kind's wording — a thread says it is
+ *   a thread, where the kind's own copy would call it "your post".
  * @param {string} [submission.txHash] EVM transaction, wallet-signed or relayed.
  * @param {string} [submission.signature] Solana signature — the cluster equivalent of txHash.
  * @param {object} [submission.recovery] `{ props, state }` for putting this exact composer back

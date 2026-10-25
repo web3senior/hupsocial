@@ -97,11 +97,13 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
 
   const parentPost = parentId && sameId(parentState.forParentId, parentId) ? parentState.post : null
 
-  // A thread the author published in one go ({ part: 1, of: N } on the root): parts 2…N are
-  // drawn under it as one piece, joined by the reply line, instead of competing with everyone
-  // else's replies for a place in the list. A repost's row carries none of its original's content.
+  // A thread published before parts rode in the post itself ({ part: 1, of: N } on the root, no
+  // content.parts): parts 2…N are separate replies, drawn under it as one piece, joined by the
+  // reply line, instead of competing with everyone else's replies for a place in the list. A
+  // thread that carries its parts is drawn by Post itself. A repost's row carries none of its
+  // original's content.
   const threadMarker = Number(post?.is_repost) > 0 ? null : post?.content?.thread
-  const isThreadRoot = Number(threadMarker?.part) === 1 && Number(threadMarker?.of) > 1
+  const isThreadRoot = Number(threadMarker?.part) === 1 && Number(threadMarker?.of) > 1 && !post?.content?.parts
   const [threadState, setThreadState] = useState({ forId: null, parts: [] })
 
   useEffect(() => {
