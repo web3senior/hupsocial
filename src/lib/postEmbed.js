@@ -11,7 +11,7 @@
  * nothing clickable but its own outbound links. That is what makes this one path safe to hand
  * `frame-ancestors *` in next.config.mjs, where the rest of the app refuses to be framed.
  */
-import { resolveStorageUrl, resolveStorageImageUrl } from './storageHelper'
+import { resolveStorageUrl, resolveStorageImageUrl, resolveAvatarImageUrl, resolveStorageGatewayUrl } from './storageHelper'
 import { getPostPermalink } from './postMarkdown'
 
 // Mirrors the placeholder the card and the markdown route render for sealed community content —
@@ -169,6 +169,29 @@ const externalLink = (href, className, inner, extra = '') =>
 const remoteImage = (src, className, alt = '', style = '') =>
   `<img class="${className}" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" referrerpolicy="no-referrer"${style ? ` style="${style}"` : ''} />`
 
+/* Steps an avatar to the next URL in its data-fallback list on error, and stops at the last.
+   Inline rather than in the resize script: a lazy image can fail before that script has run. */
+const AVATAR_ONERROR =
+  "var n=(this.dataset.fallback||'').split(' ').filter(Boolean);if(n.length){this.src=n.shift();this.dataset.fallback=n.join(' ')}else{this.onerror=null}"
+
+/**
+ * A profile picture with the same three stages Avatar.jsx runs: the sharp proxy, then the
+ * gateway direct, then the bundled default. The proxy alone left a broken image whenever its
+ * gateways could not produce the CID — the app recovered, the embed did not.
+ */
+function avatarImage(src, size, className, origin) {
+  const chain = [
+    ...new Set(
+      [resolveAvatarImageUrl(src, size), resolveStorageGatewayUrl(src), FALLBACK_AVATAR]
+        .map((url) => absolutize(url, origin))
+        .filter(Boolean),
+    ),
+  ]
+  const [first, ...rest] = chain
+  const fallback = rest.length ? ` data-fallback="${escapeHtml(rest.join(' '))}" onerror="${AVATAR_ONERROR}"` : ''
+  return `<img class="${className}" src="${escapeHtml(first)}" alt="" width="${size}" height="${size}" loading="lazy"${fallback} />`
+}
+
 function renderPreviewMedia(media, origin, { href, sensitive } = {}) {
   const items = (Array.isArray(media) ? media : []).slice(0, MEDIA_LIMIT)
   if (!items.length) return ''
@@ -312,7 +335,6 @@ function renderQuotedPost(quoted, origin) {
 
   const permalink = getPostPermalink(item, origin)
   const posted = formatEmbedDate(item.created_at)
-  const avatar = absolutize(resolveStorageImageUrl(item.profile_image, { width: 96 }), origin) || `${trimOrigin(origin)}${FALLBACK_AVATAR}`
   const body = getEmbedBodyText(item).trim()
 
   const meta = []
@@ -325,7 +347,7 @@ function renderQuotedPost(quoted, origin) {
     externalLink(
       permalink,
       'hup-embed__card-author',
-      `<img class="hup-embed__card-avatar" src="${escapeHtml(avatar)}" alt="" width="32" height="32" loading="lazy" /><span class="hup-embed__card-identity"><span class="hup-embed__card-name">${escapeHtml(getAuthorName(item))}</span></span>`,
+      `${avatarImage(item.profile_image, 32, 'hup-embed__card-avatar', origin)}<span class="hup-embed__card-identity"><span class="hup-embed__card-name">${escapeHtml(getAuthorName(item))}</span></span>`,
     ),
     '</header>',
     body ? `<p class="hup-embed__card-text">${renderBody(body)}</p>` : '',
@@ -533,7 +555,6 @@ export function renderPostEmbedDocument(item, { origin = '', theme = 'auto', rep
   const permalink = getPostPermalink(item, origin)
   const author = getAuthorName(item)
   const posted = formatEmbedDate(item?.created_at)
-  const avatar = absolutize(resolveStorageImageUrl(item?.profile_image, { width: 96 }), origin) || `${trimOrigin(origin)}${FALLBACK_AVATAR}`
 
   const body = getEmbedBodyText(item).trim()
   const media = renderMedia(item, origin)
@@ -554,7 +575,7 @@ export function renderPostEmbedDocument(item, { origin = '', theme = 'auto', rep
   const article = [
     repostedBy ? `<small class="hup-embed__repost">Reposted by ${escapeHtml(repostedBy)}</small>` : '',
     '<header class="hup-embed__header">',
-    `<img class="hup-embed__avatar" src="${escapeHtml(avatar)}" alt="" width="40" height="40" loading="lazy" />`,
+    avatarImage(item?.profile_image, 40, 'hup-embed__avatar', origin),
     '<span class="hup-embed__identity">',
     `<span class="hup-embed__name">${escapeHtml(author)}</span>`,
     metaParts.length ? `<span class="hup-embed__meta">${metaParts.join(' · ')}</span>` : '',
