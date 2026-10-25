@@ -7,10 +7,11 @@
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
   width: min(400px, calc(100vw - 6px - 2em - 2px - 2rem));
 
+  flex-direction: column;
+  gap: 0.85rem;
+
   &[open] {
     display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
   }
 
   &__header {

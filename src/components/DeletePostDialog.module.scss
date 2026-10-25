@@ -8,11 +8,11 @@ $danger: #ff3040;
   background: var(--surface);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
   overflow: hidden;
+  flex-direction: column;
+  width: min(340px, calc(100vw - 2rem));
 
   &[open] {
     display: flex;
-    flex-direction: column;
-    width: min(340px, calc(100vw - 2rem));
   }
 
   &__body {

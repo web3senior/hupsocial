@@ -7,12 +7,13 @@
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
   width: min(400px, calc(100vw - 6px - 2em - 2px));
 
+  flex-direction: column;
+  max-height: calc(100dvh - 2rem);
+
   // Layout belongs to the consumer; without this the root falls back to the UA's display:block
   // and the dialog scrolls against its own max-height as well as the body's.
   &[open] {
     display: flex;
-    flex-direction: column;
-    max-height: calc(100dvh - 2rem);
   }
 
   &__head {

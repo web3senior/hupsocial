@@ -18,6 +18,13 @@ import styles from './NativeDialog.module.scss'
  * (default, fade + 2px lift) or 'zoom' (soft scale-in, scale-out on close).
  * `onExited` fires once the closing animation has finished — unmount
  * from there, not from onClose, or the exit never plays.
+ *
+ * Consumer styles: put ONLY `display` under `&[open]`. close() drops the
+ * [open] attribute before the exit animation runs; `display` is held through
+ * the fade by allow-discrete, but anything else keyed on [open] (flex-direction,
+ * gap, width, max-height…) snaps back instantly and the dialog visibly falls
+ * apart while fading out. Layout props on the base selector are inert while
+ * closed, since the closed dialog is display:none anyway.
  */
 const NativeDialog = forwardRef(function NativeDialog(
   { children, className, lightDismiss = false, appear = 'rise', onExited, onClick, ...rest },

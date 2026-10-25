@@ -1115,9 +1115,10 @@
   padding: 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 
+  flex-direction: column;
+
   &[open] {
     display: flex;
-    flex-direction: column;
   }
 
   // Scrolls under the shared DialogHeader, which stays pinned
@@ -1142,9 +1143,10 @@
   padding: 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 
+  flex-direction: column;
+
   &[open] {
     display: flex;
-    flex-direction: column;
   }
 
   // Header comes from the shared DialogHeader component — no per-modal header styles here
