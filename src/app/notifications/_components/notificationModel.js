@@ -50,6 +50,8 @@ export const ACTION_META = {
   post_received_comment: { icon: ChatCircleIcon, tone: 'reply', weight: 'fill', group: 'none', verb: 'replied to your post', previewFrom: 'child' },
   post_received_quote: { icon: QuotesIcon, tone: 'reply', weight: 'fill', group: 'none', verb: 'quoted your post', previewFrom: 'child' },
   post_mentioned: { icon: AtIcon, tone: 'reply', weight: 'bold', group: 'none', verb: 'mentioned you', previewFrom: 'entity' },
+  // A reply under a post that mentioned you: the entity is that post, the preview is the reply
+  post_mention_received_comment: { icon: ChatCircleIcon, tone: 'reply', weight: 'fill', group: 'none', verb: 'replied to a post you were mentioned in', previewFrom: 'child' },
   user_received_follow: { icon: UserPlusIcon, tone: 'follow', weight: 'fill', group: 'action', verb: 'followed you' },
   post_received_tip: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', group: 'none', verb: 'tipped your post', previewFrom: 'entity' },
   nft_sold: { icon: StorefrontIcon, tone: 'money', weight: 'fill', group: 'none', verb: 'bought your NFT' },

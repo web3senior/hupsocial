@@ -121,6 +121,7 @@ const ACTIVITY_LABELS = {
   post_received_repost: 'reposts',
   post_received_quote: 'quotes',
   post_mentioned: 'mentions',
+  post_mention_received_comment: 'replies to posts you were mentioned in',
   post_received_tip: 'tips',
   user_received_follow: 'new followers',
   nft_sold: 'NFT sales',
