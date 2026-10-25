@@ -1180,35 +1180,26 @@ const ReportModal = ({ item, setShowReportModal }) => {
 const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
   const router = useRouter()
   const { address } = useActiveWallet()
-  const [fetchedQuotedPost, setFetchedQuotedPost] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    let cancelled = false
-
-    getPostById(networkId, quoteId, address)
-      .then((res) => {
-        if (cancelled) return
-        const post = Array.isArray(res?.data) ? res.data[0] : res?.data
-        setFetchedQuotedPost(post || null)
-      })
-      .catch(() => {
-        if (!cancelled) setFetchedQuotedPost(null)
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [networkId, quoteId, address])
+  // Same SWR recipe as the repost original in Post: the cache survives unmounts, so a feed
+  // restored from useFeedCacheStore repaints the quote card in its first frame instead of
+  // collapsing it while it refetches — which left a blank gap inside the card's reserved height.
+  const quotedKey = getPostStatsKey({ id: quoteId, network_id: networkId }, address)
+  const { data: fetchedQuotedPost, isLoading } = useSWR(
+    quotedKey,
+    async () => {
+      const res = await getPostById(networkId, quoteId, address)
+      const post = Array.isArray(res?.data) ? res.data[0] : res?.data
+      return post ?? null
+    },
+    { revalidateIfStale: false, keepPreviousData: true }
+  )
 
   // Same in-place decryption the main card gets — a quoted encrypted post renders readable for
   // members instead of the locked placeholder. Called before the early returns (hook rules).
-  const quotedPost = useDecryptedCommunityItem(fetchedQuotedPost)
+  const quotedPost = useDecryptedCommunityItem(fetchedQuotedPost ?? null)
 
-  if (isLoading) return null
+  if (isLoading && !fetchedQuotedPost) return null
 
   if (!quotedPost) {
     return <div className={clsx(styles.post__quoteCard, styles.post__quoteCard_unavailable)}>Original post unavailable</div>
