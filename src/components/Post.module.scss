@@ -71,6 +71,13 @@
     padding: 10px;
   }
 
+  // Hidden the moment its owner confirms the delete, while the transaction is still in flight.
+  // Hidden rather than unmounted so the menu's receipt watcher stays alive; the attribute selector
+  // outranks the `.flex` utility on the same element.
+  &[data-removed='true'] {
+    display: none;
+  }
+
   &[data-content='false'] {
     .post {
       &__main {

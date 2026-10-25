@@ -184,14 +184,17 @@ export function trackPostPublication({
   recovery = null,
   onIndexed = null,
   onAbandoned = null,
+  ghostId: earlyGhostId = null,
 }) {
   const copy = { ...(COPY[kind] ?? COPY.post), ...copyOverride }
   // A handle the author already closed takes no update, so a fresh card stands in for it
   const handle = openHandle?.update(copy.pending, 'loading') ? openHandle : toast(copy.pending, 'loading')
+  const ghostStore = usePendingPostStore.getState()
 
   // Nothing to poll for — better a card that expires than one that spins forever
   if (!networkId || !author || !metadata) {
     handle.update(copy.slow, 'info')
+    if (earlyGhostId) ghostStore.removePendingPost(earlyGhostId)
     return
   }
 
@@ -201,15 +204,20 @@ export function trackPostPublication({
   // so neither has anywhere to put one. The payload is the plaintext the composer kept for its
   // own recovery, and its media was pinned before the transaction was sent — the ghost shows the
   // real post, not a placeholder.
+  //
+  // A composer that closed at the tap already put its ghost up (`ghostId`), before anything was
+  // pinned: that card is taken over in place — same id, same timestamp — so it never blinks out
+  // and back between the tap and the transaction.
+  const adopted = earlyGhostId ? ghostStore.pending.find((entry) => entry.id === earlyGhostId) : null
   const ghost =
     kind === 'post' && recovery?.state?.content
       ? {
-          id: `${networkId}:${metadata}`,
+          id: earlyGhostId ?? `${networkId}:${metadata}`,
           networkId: Number(networkId),
           author,
           metadata,
           content: recovery.state.content,
-          createdAt: Math.floor(Date.now() / 1000),
+          createdAt: adopted?.createdAt ?? Math.floor(Date.now() / 1000),
           status: 'publishing',
           resolvedKey: null,
           // A thread's first part: drawn as publishing until releaseGhost, whatever the feed holds
@@ -217,8 +225,8 @@ export function trackPostPublication({
         }
       : null
 
-  const ghostStore = usePendingPostStore.getState()
   if (ghost) ghostStore.addPendingPost(ghost)
+  else if (earlyGhostId) ghostStore.removePendingPost(earlyGhostId)
   const dropGhost = () => {
     if (ghost) ghostStore.removePendingPost(ghost.id)
   }

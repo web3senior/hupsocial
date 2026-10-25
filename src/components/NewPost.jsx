@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useConnection, usePublicClient, useSignMessage, useSignTypedData, useSwitchChain, useWriteContract } from 'wagmi'
+import { useConnection, usePublicClient, useSignMessage, useSignTypedData, useSwitchChain } from 'wagmi'
+import { signTypedData, writeContract } from 'wagmi/actions'
 import { isSessionActive } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { formatWait } from '@/config/gasless'
@@ -12,6 +13,8 @@ import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
 import { continueThread, threadPartCopy } from '@/lib/threadPublication'
+import { useComposerStore } from '@/stores/useComposerStore'
+import { usePendingPostStore } from '@/stores/usePendingPostStore'
 import { useProfile } from '@/hooks/useProfile'
 import useMyCommunities from '@/hooks/useMyCommunities'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -137,6 +140,27 @@ const getDraftStorageKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}
 // pointing at it. The other attachments have the same shape and the same gap.
 const getAttachmentDraftKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-attachments`
 
+// A thread's parts after the first, as an array of the same { elements } content the first part
+// keeps in getDraftStorageKey — beside it, not inside it, for the same reason as the attachments
+const getThreadDraftKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-thread`
+
+const loadThreadDraft = () => {
+  if (typeof window === 'undefined') return []
+  try {
+    const parsed = JSON.parse(localStorage.getItem(getThreadDraftKey()) || '[]')
+    return Array.isArray(parsed) ? parsed.filter((content) => Array.isArray(content?.elements)) : []
+  } catch {
+    return []
+  }
+}
+
+// Every draft slot a plain post owns, emptied together once that post has gone out
+const clearPostDrafts = () => {
+  localStorage.removeItem(getDraftStorageKey())
+  localStorage.removeItem(getAttachmentDraftKey())
+  localStorage.removeItem(getThreadDraftKey())
+}
+
 const loadAttachmentDraft = () => {
   if (typeof window === 'undefined') return null
   try {
@@ -216,6 +240,9 @@ const getMaxSizeMb = (mediaType, isPremium = false) =>
 
 const getMediaPreviewSrc = (item) =>
   item.localUrl || (item.type === 'image' ? resolveIPFSImageUrl(item.cid, { width: 800 }) : resolveIPFSUrl(item.cid))
+
+// Unix seconds, for timestamps taken in handlers (the ghost card's), kept out of the component body
+const nowSeconds = () => Math.floor(Date.now() / 1000)
 
 // What leaves the composer — as a draft or as the post payload. A tile still uploading (or one
 // that failed) has no cid and nothing to say offchain; a restored draft could not resume it anyway.
@@ -505,12 +532,20 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   const [postContent, setPostContent] = useState(() => initialPostContent)
   // The parts after the first, each with the same { text, media } content as the first. Each goes
   // onchain as a reply to the part before it once that one is indexed (lib/threadPublication); a
-  // recovered thread comes back with what was left.
+  // recovered thread comes back with what was left, and a refreshed one with what the draft kept —
+  // under the same rule as the first part's draft (getInitialPostContent): a plain post with
+  // nothing handed in.
   // initialHtml seeds a part's editor once and never changes, so React never rewrites the DOM the
   // author is typing into; `content` mirrors that DOM from then on
-  const [threadParts, setThreadParts] = useState(() =>
-    (restoreState?.thread ?? []).map((content) => ({ id: newUploadId(), content, initialHtml: markdownToEditorHtml(content.elements[0].data.text) }))
-  )
+  const [threadParts, setThreadParts] = useState(() => {
+    const hasPrefill = Boolean(normalizePrefillValue(text) || normalizePrefillValue(url))
+    const draftThread = actionType === 'post' && !restoreState && !hasPrefill ? loadThreadDraft() : []
+    return (restoreState?.thread ?? draftThread).map((content) => ({
+      id: newUploadId(),
+      content,
+      initialHtml: markdownToEditorHtml(content.elements[0]?.data?.text ?? ''),
+    }))
+  })
   // The part the cursor is in, null for the first. The one tool row follows it, and every editor
   // handler below acts on it: focusing a part makes editorRef and historyRef point at that part's.
   const [activePartId, setActivePartId] = useState(null)
@@ -659,9 +694,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   const { chainId: activeChainId } = useActiveChain()
   // The Solana wallet sits beside the EVM one; a submission bound for a Solana cluster signs with it
   const solanaWallet = useSolanaWallet()
-  // Only the signature is awaited in here. What the chain does with the transaction afterwards is
-  // watched by lib/postPublication, which outlives this component — see finishSubmission.
-  const { isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
+  // A new post, thread, reply or quote closes the composer the moment Post is tapped; uploading,
+  // moderation, pinning and the signature all finish behind it. Everything from there on is
+  // written to outlive this component: wagmi/actions rather than hook callbacks (a hook's
+  // onSuccess never fires once its component is gone), and the uploads it waits on are not
+  // aborted by the unmount. Set once the submission has been handed over like that.
+  const backgroundRef = useRef(false)
+  // The toast and the ghost card a backgrounded submission opened at the tap, which the tracker
+  // in lib/postPublication takes over once there is a transaction to watch
+  const publishHandleRef = useRef(null)
+  const earlyGhostIdRef = useRef(null)
 
   // Which community this submission belongs to, if any: an explicit community composer target
   // (posting from a community page), the replied-to post's community, or the quoted post's
@@ -739,7 +781,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   // keeps writing, the toolbar stays live, and Post waits for the last transfer itself
   const hasPendingUploads = allMediaItems.some(isTransferring)
   const hasFailedUploads = allMediaItems.some((item) => item.status === 'failed')
-  const isBusy = isSigning || isSubmitting
+  const isBusy = isSubmitting
   const hasPostBody =
     postText.trim().length > 0 ||
     mediaItems.length > 0 ||
@@ -1006,7 +1048,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   // Callers unmount the composer on close, so tell them only once the zoom-out has played
   // (NativeDialog's onExited). A dialog that never opened (the wallet gate) has no exit
   // animation and hands back at once.
+  // Once only: a backgrounded submission closes at the tap and would close again on its hash,
+  // and a second onClose from a recovered composer could clear a newer recovery than its own
+  const closedRef = useRef(false)
   const finishClose = useCallback(() => {
+    if (closedRef.current) return
+    closedRef.current = true
     close?.()
     onClose?.()
   }, [close, onClose])
@@ -1727,8 +1774,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       // Same slot, same rule as the persist effects below: a recovered composer neither writes
       // the draft nor clears it, because by now it may belong to a different post
       if (actionType === 'post' && !restoreState) {
-        localStorage.removeItem(getDraftStorageKey())
-        localStorage.removeItem(getAttachmentDraftKey())
+        clearPostDrafts()
       }
 
       // Handed to a module-scope tracker, not awaited here: the composer unmounts on the next
@@ -1749,21 +1795,24 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       // A thread's later parts are replies to this one, so they can only start once it has an id.
       // The whole thread shares one toast, and a new post's ghost card holds its place in the feed
       // until the last part lands — the feed shows the thread once, whole.
+      // A backgrounded submission already opened both at the tap; the tracker takes them over.
       const thread = pending?.thread
       const threadCopy = thread ? threadPartCopy(thread.start, thread.total) : null
-      const threadHandle = thread ? toast(threadCopy.pending, 'loading') : null
-      const ghostId = thread && pending.kind === 'post' ? `${pending.networkId}:${pending.metadata}` : null
+      const earlyGhostId = earlyGhostIdRef.current
+      const handle = publishHandleRef.current ?? (thread ? toast(threadCopy.pending, 'loading') : null)
+      const ghostId = pending?.kind === 'post' ? (earlyGhostId ?? `${pending.networkId}:${pending.metadata}`) : null
       const onFirstIndexed = thread
         ? (found) => {
             onIndexed?.(found)
-            if (found?.id) continueThread({ ...thread, parent: found, handle: threadHandle, ghostId })
+            if (found?.id) continueThread({ ...thread, parent: found, handle, ghostId })
           }
         : onIndexed
       if (pending) {
         trackPostPublication({
           ...pending,
           copy: threadCopy,
-          handle: threadHandle,
+          handle,
+          ghostId: earlyGhostId,
           settles: !thread,
           txHash,
           signature,
@@ -1771,7 +1820,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
         })
       }
 
-      handleClose()
+      if (!backgroundRef.current) handleClose()
     },
     [actionType, handleClose, hupTask, onConfirmed, restoreState]
   )
@@ -1795,7 +1844,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
         owner: address,
         functionName,
         args,
-        signTypedDataAsync,
+        // The action, not the hook: this may resolve after the composer has closed
+        signTypedDataAsync: (request) => signTypedData(config, request),
         useSessionKey: session.active,
       })
     } catch (err) {
@@ -1892,8 +1942,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
 
     // The post is out of the draft slot the moment it is recorded — same rule as finishSubmission
     if (actionType === 'post' && !restoreState) {
-      localStorage.removeItem(getDraftStorageKey())
-      localStorage.removeItem(getAttachmentDraftKey())
+      clearPostDrafts()
     }
 
     toast(`Scheduled for ${formatWillSend(scheduledAt)}. It goes onchain then, even if you're offline.`, 'success')
@@ -1933,6 +1982,66 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       return
     }
 
+    // What comes back if anything after the tap stops the submission: the plaintext as written.
+    // A tile still uploading has no cid to come back with yet, so only finished ones do until the
+    // uploads settle (below, where this is replaced by the full payload).
+    const startPart = restoreState?.threadStart ?? 1
+    const totalParts = startPart + threadBodies.length
+    let recoveryState = {
+      content: getSerializablePostContent(postContent),
+      allowComments,
+      thread: threadBodies.map((part) => getSerializablePostContent(part.content)),
+      threadStart: startPart,
+      pickedCommunity: canPickCommunity ? pickedCommunity : null,
+    }
+    const recoveryProps = { actionType, existingPost, replyTarget, quoteTarget, communityTarget: communityTargetProp, onConfirmed }
+
+    // Ends a submission that will not go out. In an open composer a toast says why; once the
+    // composer has closed, the publishing toast turns into that message and the composer comes
+    // back holding everything that was written. `message` null: the reason was already shown.
+    const bail = (message, extraState = null) => {
+      if (!backgroundRef.current) {
+        if (message) toast(message, 'error')
+        return
+      }
+      if (!message) publishHandleRef.current?.dismiss()
+      else if (!publishHandleRef.current?.update(message, 'error')) toast(message, 'error')
+      if (earlyGhostIdRef.current) usePendingPostStore.getState().removePendingPost(earlyGhostIdRef.current)
+      useComposerStore.getState().restoreComposer({ props: recoveryProps, state: { ...recoveryState, ...extraState } })
+    }
+
+    // Everything left can take a while (uploads, moderation, the pin, the signature), and none of
+    // it needs the composer open. A new post, thread, reply or quote closes now: its toast and,
+    // for a post, its ghost card show it going out. An edit rewrites a card already on screen and
+    // a schedule settles in here, so both keep the composer until they are done.
+    if (actionType !== 'edit' && !isScheduled) {
+      publishHandleRef.current = toast(
+        totalParts > 1 ? threadPartCopy(startPart, totalParts).pending : isComment ? 'Publishing your reply…' : 'Publishing your post…',
+        'loading'
+      )
+      if (!isComment) {
+        earlyGhostIdRef.current = `draft:${newUploadId()}`
+        usePendingPostStore.getState().addPendingPost({
+          id: earlyGhostIdRef.current,
+          networkId: Number(targetChainId),
+          author: signerAddress,
+          metadata: null,
+          content: { ...recoveryState.content, thread: totalParts > 1 ? { part: 1, of: totalParts } : undefined },
+          createdAt: nowSeconds(),
+          status: 'publishing',
+          resolvedKey: null,
+          held: totalParts > 1,
+        })
+      }
+      // Out of the draft slot now, not on the hash: a composer opened meanwhile must start empty
+      // rather than offer the same words again. A failure brings them back through the recovery.
+      if (actionType === 'post' && !restoreState) {
+        clearPostDrafts()
+      }
+      backgroundRef.current = true
+      handleClose()
+    }
+
     setIsSubmitting(true)
     try {
       // Checked before anything is pinned: a schedule that cannot be taken should cost nothing
@@ -1953,7 +2062,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       const pendingIds = allMediaItems.filter(isTransferring).map((item) => item.uploadId)
       const uploaded = await Promise.all(pendingIds.map((uploadId) => uploadsRef.current.get(uploadId)?.promise ?? null))
       if (uploaded.some((result) => !result)) {
-        toast('An attachment failed to upload — retry or remove it', 'error')
+        bail(backgroundRef.current ? 'An attachment failed to upload — add it again' : 'An attachment failed to upload — retry or remove it')
         return
       }
 
@@ -2038,6 +2147,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
         }
       })
 
+      // From here a failure brings back the whole payload, attachments and uploaded media included
+      recoveryState = { ...recoveryState, content: serializableContent, thread: threadContents }
+
       // A sealed envelope carries the marker in the clear as well: the server has to find the
       // parts without the community key. It says only "part 2 of 3", nothing of what was written.
       const withThreadMarker = (sealed, content) => (sealed?.encrypted && content.thread ? { ...sealed, thread: content.thread } : sealed)
@@ -2055,13 +2167,20 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       // Block tier (CSAM, explicit sexual imagery) has no override — pinning it to IPFS
       // would make the platform itself the host
       if (verdicts.some((moderation) => moderation?.blocked)) {
-        toast('This content can’t be published on Hup.', 'error')
+        bail('This content can’t be published on Hup.')
         return
       }
-      if (verdicts.some((moderation) => moderation?.flagged)) {
+      // A composer that came back over a flag already carries the author's answer
+      if (verdicts.some((moderation) => moderation?.flagged) && !restoreState?.moderationAccepted) {
         // Advisory, never a gate — the author always keeps the final say. Flagged posts are
         // still labeled by the indexer (moderation_flagged) so clients can blur or collapse them.
         const categories = [...new Set(verdicts.flatMap((moderation) => (moderation?.flagged ? moderation.categories || [] : [])))]
+        // The warning lives in the composer, which has closed: it comes back to ask, and posting
+        // from it again is the author saying yes
+        if (backgroundRef.current) {
+          bail(`Flagged as sensitive${categories.length ? ` (${categories.join(', ')})` : ''}. Post again to publish it anyway.`, { moderationAccepted: true })
+          return
+        }
         const proceed = await new Promise((resolve) => {
           moderationDecisionRef.current = false
           setModerationWarning({ categories, resolve })
@@ -2075,12 +2194,15 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       let contentForUpload = serializableContent
       if (communityContext && actionType !== 'edit') {
         contentForUpload = withThreadMarker(await sealForCommunity(serializableContent), serializableContent)
-        if (contentForUpload === null) return
+        if (contentForUpload === null) {
+          bail(null)
+          return
+        }
       }
 
       if (sealsReply) {
         if (!taskSealKey) {
-          toast('This sealed task is not funded yet, so your reply cannot be sealed. Try again once it is.', 'error')
+          bail('This sealed task is not funded yet, so your reply cannot be sealed. Try again once it is.')
           return
         }
         const envelope = await sealSubmission(stripAttachments(serializableContent), taskSealKey)
@@ -2113,7 +2235,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
           return { metadata: cid, content }
         })
       )
-      if (threadPins.includes(null)) return
+      if (threadPins.includes(null)) {
+        bail(null)
+        return
+      }
 
       // The metadata URI is the one handle on this submission that works everywhere: it exists
       // before the transaction is sent (so the relayed path has it too), it is what the indexer
@@ -2162,7 +2287,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
 
       // The wallet handing back a hash is where the composer's job ends. Whether that transaction
       // succeeds is settled by lib/postPublication, long after this dialog has gone.
-      const submitOnchain = (request) => writeContract(request, { onSuccess: (txHash) => finishSubmission({ txHash }) })
+      // Awaited through the action, not a hook's onSuccess: the composer may be long gone by the
+      // time the wallet answers, and a rejection has to reach the catch below
+      const submitOnchain = async (request) => finishSubmission({ txHash: await writeContract(config, request) })
 
       if (actionType === 'edit') {
         // Edits must go back to the chain the post already lives on — the wallet's active chain
@@ -2175,7 +2302,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
           finishSubmission({ txHash: relayedHash })
           return
         }
-        submitOnchain({
+        await submitOnchain({
           abi,
           address: postContractAddress,
           functionName: 'update',
@@ -2192,7 +2319,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
           finishSubmission({ txHash: relayedHash })
           return
         }
-        submitOnchain({
+        await submitOnchain({
           abi,
           address: targetContractAddress,
           functionName: 'create',
@@ -2209,7 +2336,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
           finishSubmission({ txHash: relayedHash })
           return
         }
-        submitOnchain({
+        await submitOnchain({
           abi,
           address: targetContractAddress,
           functionName: 'create',
@@ -2229,7 +2356,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
           finishSubmission({ txHash: relayedHash })
           return
         }
-        submitOnchain({
+        await submitOnchain({
           abi,
           address: postContractAddress,
           functionName: 'create',
@@ -2239,16 +2366,13 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       }
     } catch (error) {
       console.error(error)
-      toast(error.message || 'Unable to create post', 'error')
+      // A declined signature, a relay that turned it down or a pin that failed all end the same
+      // way: said in one sentence, and with the composer back if it had already closed
+      bail(describeWalletError(error, { fallback: error?.shortMessage || error?.message || 'Unable to create post' }))
     } finally {
       setIsSubmitting(false)
     }
   }
-
-  useEffect(() => {
-    if (!submitError) return
-    toast(describeWalletError(submitError, { fallback: 'Transaction rejected' }), 'error')
-  }, [submitError])
 
   // Every part's tiles, so closing the composer revokes the previews of all of them
   useEffect(() => {
@@ -2290,6 +2414,18 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
     }
   }, [persistsDraft, postContent])
 
+  // And the thread's later parts. Empty parts are kept: "Add to thread" with nothing typed yet is
+  // still where the author left off. No parts at all clears the slot.
+  useEffect(() => {
+    if (!persistsDraft) return
+    try {
+      if (threadParts.length) localStorage.setItem(getThreadDraftKey(), JSON.stringify(threadParts.map((part) => getSerializablePostContent(part.content))))
+      else localStorage.removeItem(getThreadDraftKey())
+    } catch (error) {
+      console.error('Failed to save thread draft:', error)
+    }
+  }, [persistsDraft, threadParts])
+
   // Same idea for the attached poll, kept in its own key (see getAttachmentDraftKey)
   useEffect(() => {
     if (!persistsDraft) return
@@ -2304,9 +2440,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   useEffect(() => {
     const uploads = uploadsRef.current
     return () => {
-      /* A closed composer has no tile to hand a cid to — stop the transfers with it */
-      uploads.forEach(({ controller }) => controller.abort())
-      uploads.clear()
+      /* A closed composer has no tile to hand a cid to — stop the transfers with it. Unless the
+         post went out with the composer's close: its submission is still waiting on them. */
+      if (!backgroundRef.current) {
+        uploads.forEach(({ controller }) => controller.abort())
+        uploads.clear()
+      }
       mediaItemsRef.current.forEach((item) => {
         if (item.localUrl) URL.revokeObjectURL(item.localUrl)
       })
@@ -2960,13 +3099,13 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
               </span>
             )}
             <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit || isThreadOverLimit || isWrongChain || hasFailedUploads}>
-              {/* No confirming state: the composer closes as soon as the transaction is sent, so
-                  the only wait left in here is the author's own signature */}
+              {/* Only an edit or a schedule waits in here — anything new closes at the tap and
+                  finishes behind the composer — so these are the only busy labels left */}
               {isSubmitting && hasPendingUploads
                 ? 'Uploading...'
                 : isSubmitting && isScheduled
                   ? 'Scheduling...'
-                  : isSigning
+                  : isSubmitting
                     ? 'Signing...'
                     : actionType === 'edit' ? 'Update' : isComment ? 'Reply' : isScheduled ? 'Schedule' : 'Post'}
             </button>

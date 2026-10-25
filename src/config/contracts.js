@@ -61,8 +61,8 @@ baseSepolia.rpcUrls = {
   default: { http: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'] },
 }
 
-// Same failure on the mainnets these testnets mirror: mainnet.base.org refuses our calls exactly
-// as sepolia.base.org does, and a server read there comes back empty with no error anyone sees —
+// Same failure on the mainnets these testnets mirror: a default endpoint that refuses our calls
+// makes a server read come back empty with no error anyone sees —
 // a token page showed a name from the price feed and no supply, because every chain read had
 // silently failed. Pinned first, with each chain's own defaults kept behind it, so this can only
 // add a working endpoint and never remove one.
@@ -70,7 +70,7 @@ mainnet.rpcUrls = {
   ...mainnet.rpcUrls,
   default: { http: ['https://ethereum-rpc.publicnode.com', ...mainnet.rpcUrls.default.http] },
 }
-base.rpcUrls = { ...base.rpcUrls, default: { http: ['https://base-rpc.publicnode.com', ...base.rpcUrls.default.http] } }
+// Base keeps its own default (mainnet.base.org): base-rpc.publicnode.com stopped answering
 arbitrum.rpcUrls = {
   ...arbitrum.rpcUrls,
   default: { http: ['https://arbitrum-one-rpc.publicnode.com', ...arbitrum.rpcUrls.default.http] },

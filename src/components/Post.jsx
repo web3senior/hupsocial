@@ -154,6 +154,8 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const repostedPostId = isRepost ? Number(item.is_repost) : null
   const [showEditModal, setShowEditModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(null)
+  // Set as soon as the owner confirms a delete, cleared again if the delete fails
+  const [isRemoved, setIsRemoved] = useState(false)
   const sectionRef = useRef(null)
 
   // Original post behind a repost row. Feed rows arrive with the original
@@ -274,6 +276,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         data-content={showContent ? true : false}
         data-commentable={item.allow_comment ? true : false}
         data-has-comments={hasCommentBelow ? true : false}
+        data-removed={isRemoved}
       >
         {isRepost && <RepostLabel walletAddress={item.wallet_address} />}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
@@ -324,7 +327,14 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               </div>
             )}
 
-            <Nav item={item} setShowEditModal={setShowEditModal} setShowReportModal={setShowReportModal} tipPost={displayItem || item} onTip={actionsSet.has('tip') ? setShowTipModal : undefined} />
+            <Nav
+              item={item}
+              setShowEditModal={setShowEditModal}
+              setShowReportModal={setShowReportModal}
+              tipPost={displayItem || item}
+              onTip={actionsSet.has('tip') ? setShowTipModal : undefined}
+              onRemovedChange={setIsRemoved}
+            />
           </div>
         </header>
 
@@ -637,7 +647,7 @@ const PostDocumentActions = ({ item, close }) => {
   )
 }
 
-const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip }) => {
+const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRemovedChange }) => {
   const postIsArticle = (() => {
     try {
       const content = typeof item?.content === 'string' ? JSON.parse(item.content) : item?.content
@@ -656,13 +666,19 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip }) => 
   const { setCurrentPost } = usePostStore()
   const { address, isConnected } = useConnection()
   const { data: hash, isPending, mutate: writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({
     hash,
   })
   const publicClient = usePublicClient()
   const { signTypedDataAsync } = useSignTypedData()
   const sellPopoverRef = useRef(null)
   const deleteDialogRef = useRef(null)
+  // One loading toast follows the delete from confirm to receipt, then morphs into the outcome
+  const deleteToastRef = useRef(null)
   // Buyers who have paid and are still waiting for their key. Named in the menu because the escrow
   // is reclaimable after 24h, so "Sell" alone gives the seller no reason to open the dialog in time.
   const [pendingGrants, setPendingGrants] = useState(0)
@@ -716,6 +732,34 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip }) => 
     }
   }
 
+  /**
+   * Hides the post and opens the loading toast the rest of the delete resolves.
+   */
+  const startOptimisticDelete = () => {
+    onRemovedChange?.(true)
+    deleteToastRef.current = toast('Deleting post…', 'loading')
+  }
+
+  /**
+   * Resolves the delete toast — falling back to a fresh one if the user closed it — and puts the
+   * post back when the delete did not go through.
+   * @param {string} message What to tell the user.
+   * @param {'success'|'error'} type The outcome.
+   */
+  const finishDelete = (message, type) => {
+    if (type !== 'success') onRemovedChange?.(false)
+    if (!deleteToastRef.current?.update(message, type)) toast(message, type)
+    deleteToastRef.current = null
+    setIsDeleting(false)
+  }
+
+  useEffect(() => {
+    if (!deleteToastRef.current || (!isConfirmed && !receiptError)) return
+    // Mirrors wagmi's receipt state into the toast and the parent's hidden flag
+    finishDelete(...(isConfirmed ? ['Post deleted onchain', 'success'] : [shortTxError(receiptError, 'Could not delete the post'), 'error']))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConfirmed, receiptError])
+
   const deletePost = async (e, id) => {
     e.stopPropagation()
 
@@ -729,6 +773,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip }) => 
       }
 
       setIsDeleting(true)
+      startOptimisticDelete()
       try {
         const networkId = Number(item.network_id)
         await sendHupAction({
@@ -736,12 +781,10 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip }) => 
           signer,
           instructions: [hupInstruction.delete({ networkId, actor: signer.account.address, id })],
         })
-        toast('Post deleted onchain', 'success')
+        finishDelete('Post deleted onchain', 'success')
       } catch (err) {
         console.error('Delete failed:', err)
-        toast(shortTxError(err, 'Could not delete the post'), 'error')
-      } finally {
-        setIsDeleting(false)
+        finishDelete(shortTxError(err, 'Could not delete the post'), 'error')
       }
       return
     }
@@ -760,13 +803,15 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip }) => 
 
     try {
       setIsDeleting(true)
+      startOptimisticDelete()
 
       if (await tryGaslessDelete(id)) {
-        toast('Post deleted onchain', 'success')
-        setIsDeleting(false)
+        finishDelete('Post deleted onchain', 'success')
         return
       }
 
+      deleteToastRef.current?.update('Confirm the delete in your wallet…', 'loading')
+      // The receipt effect above resolves the toast once the transaction lands
       writeContract(
         {
           abi,
@@ -775,12 +820,13 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip }) => 
           args: [address, id],
         },
         {
-          onError: () => setIsDeleting(false),
+          onSuccess: () => deleteToastRef.current?.update('Deleting post…', 'loading'),
+          onError: (err) => finishDelete(shortTxError(err, 'Could not delete the post'), 'error'),
         }
       )
     } catch (err) {
       console.error('Delete failed:', err)
-      setIsDeleting(false)
+      finishDelete(shortTxError(err, 'Could not delete the post'), 'error')
     }
   }
 
