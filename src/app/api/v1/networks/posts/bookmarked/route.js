@@ -60,7 +60,6 @@ export async function GET(request) {
             AND (child.content_type = 1 OR child.is_comment IS NOT NULL))
         ) as total_comments,
         (SELECT COUNT(*) FROM post_views WHERE post_id = p.id AND network_id = p.network_id) as total_views,
-        (SELECT COUNT(*) FROM post_bookmarks WHERE post_id = p.id AND network_id = p.network_id) as total_bookmarks,
         (SELECT COUNT(*) FROM user_reports WHERE post_id = p.id AND network_id = p.network_id AND status = 'actioned') as actioned_reports,
         (SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND network_id = p.network_id AND liker_address = ? AND is_active = 1)) as has_liked
       FROM post_bookmarks b

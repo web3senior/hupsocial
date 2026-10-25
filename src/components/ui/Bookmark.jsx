@@ -10,12 +10,9 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
 import { getPostById } from '@/lib/api'
 import { getBookmarkFoldersKey } from '@/lib/savedPostsKey'
-import Counter from './Counter'
 import { openConnect } from '@/lib/connectDialog'
 import NativePopover from './NativePopover'
 import postStyles from '../Post.module.scss'
-
-const countFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 
 const foldersFetcher = async (url) => {
   const res = await fetch(url)
@@ -56,7 +53,6 @@ export const Bookmark = ({ post }) => {
 
       return {
         isBookmarked: freshPost.is_bookmarked === true || freshPost.is_bookmarked === 1,
-        bookmarkCount: Number(freshPost.total_bookmarks) || 0,
         folderId: freshPost.folder_id ?? null,
         isProcessing: false,
       }
@@ -64,7 +60,6 @@ export const Bookmark = ({ post }) => {
       console.error('Failed to sync bookmark state via API:', error)
       return {
         isBookmarked: post.is_bookmarked === 1 || post.is_bookmarked === true,
-        bookmarkCount: Number(post.total_bookmarks) || 0,
         folderId: post.folder_id ?? null,
         isProcessing: false,
       }
@@ -74,11 +69,10 @@ export const Bookmark = ({ post }) => {
   const { data: interactionState, mutate } = useSWR(cacheKey, fetcher, {
     fallbackData: {
       isBookmarked: post.is_bookmarked === 1 || post.is_bookmarked === true,
-      bookmarkCount: Number(post.total_bookmarks) || 0,
       folderId: post.folder_id ?? null,
       isProcessing: false,
     },
-    // The feed row already carries is_bookmarked/total_bookmarks; without this
+    // The feed row already carries is_bookmarked/folder_id; without this
     // flag every mounted card refetches its own post row on page load.
     // Bookmark actions revalidate explicitly via mutate().
     revalidateOnMount: false,
@@ -98,7 +92,7 @@ export const Bookmark = ({ post }) => {
     const previousData = interactionState
 
     try {
-      mutate({ isBookmarked: true, bookmarkCount: previousData.bookmarkCount + 1, folderId, isProcessing: true }, { revalidate: false })
+      mutate({ isBookmarked: true, folderId, isProcessing: true }, { revalidate: false })
 
       const res = await fetch(`/api/v1/networks/${post.network_id}/${post.id}/bookmark`, {
         method: 'POST',
@@ -123,7 +117,7 @@ export const Bookmark = ({ post }) => {
 
     try {
       mutate(
-        { isBookmarked: false, bookmarkCount: Math.max(0, previousData.bookmarkCount - 1), folderId: null, isProcessing: true },
+        { isBookmarked: false, folderId: null, isProcessing: true },
         { revalidate: false }
       )
 
@@ -221,14 +215,12 @@ export const Bookmark = ({ post }) => {
 
   const isLoading = interactionState.isProcessing
   const iconWeight = interactionState.isBookmarked ? 'fill' : 'regular'
-  const bookmarkCount = interactionState.bookmarkCount
 
   const savedOn = post?.bookmarked_at
     ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(post.bookmarked_at))
     : null
 
   const ownLabel = savedOn ? `Saved on ${savedOn}` : interactionState.isBookmarked ? 'Saved' : 'Save'
-  const tooltip = bookmarkCount > 0 ? `${ownLabel} · ${countFormat.format(bookmarkCount)} saved` : ownLabel
 
   if (!isMounted) return null
 
@@ -243,7 +235,7 @@ export const Bookmark = ({ post }) => {
         }
       }}
       trigger={
-        <Tooltip content={tooltip} placement="bottom" size="compact" hoverOnly>
+        <Tooltip content={ownLabel} placement="bottom" size="compact" hoverOnly>
           <button
             data-action="bookmark"
             data-saved={interactionState.isBookmarked ? 'true' : undefined}
@@ -251,7 +243,6 @@ export const Bookmark = ({ post }) => {
             aria-label={interactionState.isBookmarked ? 'Manage saved post' : 'Save post'}
           >
             <BookmarkIcon width={17} height={17} weight={iconWeight} />
-            {bookmarkCount > 0 && <Counter value={bookmarkCount} />}
           </button>
         </Tooltip>
       }
