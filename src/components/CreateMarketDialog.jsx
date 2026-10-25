@@ -10,6 +10,7 @@ import { TIP_TOKENS } from '@/lib/tokens'
 import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { uploadFileToIPFS, uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
+import { MIN_ANSWER_GAP } from '@/lib/predict'
 import predictAbi from '@/abis/HupPredict.json'
 import { toast } from '@/components/NextToast'
 import { PlusIcon, StarIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
@@ -23,12 +24,17 @@ const LUKSO_CHAIN_IDS = [42]
 const MAX_OUTCOMES = 16
 const MAX_JUDGES = 8
 
-// Default deadline one week out, formatted for a datetime-local input in the viewer's zone
-const defaultDeadline = () => {
-  const date = new Date(Date.now() + 7 * 24 * 3600 * 1000)
+// Formats a unix-ms instant for a datetime-local input in the viewer's zone
+const toLocalInput = (ms) => {
+  const date = new Date(ms)
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
   return date.toISOString().slice(0, 16)
 }
+
+// Default deadline one week out
+const defaultDeadline = () => toLocalInput(Date.now() + 7 * 24 * 3600 * 1000)
+
+const toUnix = (local) => Math.floor(new Date(local).getTime() / 1000)
 
 // The market id only exists onchain — pull it out of the receipt's MarketCreated event so
 // the caller (e.g. the post composer) can attach the market it just created
@@ -63,6 +69,9 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
   const [outcomeLabels, setOutcomeLabels] = useState(['', ''])
   const [opensLocal, setOpensLocal] = useState('')
   const [deadlineLocal, setDeadlineLocal] = useState(defaultDeadline)
+  // When the real-world answer becomes known — betting must close MIN_ANSWER_GAP before it, or
+  // anyone can wait and bet on a result they already know
+  const [answerLocal, setAnswerLocal] = useState('')
   // The creator renders as an explicit, removable first judge instead of invisible
   // default behavior; extra judges are typed below it
   const [includeSelfAsJudge, setIncludeSelfAsJudge] = useState(true)
@@ -145,6 +154,9 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
 
   const isBusy = isPending || isConfirming || isUploading || isSubmittingBurner || isImageUploading
 
+  const answerUnix = answerLocal ? toUnix(answerLocal) : NaN
+  const closesTooLate = Number.isFinite(answerUnix) && toUnix(deadlineLocal) > answerUnix - MIN_ANSWER_GAP
+
   useEffect(() => {
     if (!submitError) return
     toast(submitError.shortMessage || submitError.message || 'Transaction rejected', 'error')
@@ -213,9 +225,18 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
       return
     }
 
-    const deadlineUnix = Math.floor(new Date(deadlineLocal).getTime() / 1000)
+    const deadlineUnix = toUnix(deadlineLocal)
     if (!Number.isFinite(deadlineUnix) || deadlineUnix <= Math.floor(Date.now() / 1000) + 300) {
       toast('The betting deadline must be at least a few minutes in the future', 'error')
+      return
+    }
+
+    if (!Number.isFinite(answerUnix)) {
+      toast('Set when the answer becomes known', 'error')
+      return
+    }
+    if (closesTooLate) {
+      toast('Betting must close at least 1 hour before the answer is known', 'error')
       return
     }
 
@@ -259,6 +280,7 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
         description: description.trim(),
         outcomes: labels.map((label) => ({ label })),
         image,
+        resolvesAt: answerUnix,
         ...(category ? { category } : {}),
       }, address))
     } catch (err) {
@@ -451,10 +473,31 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
           </label>
 
           <label>
+            <span>Answer known at</span>
+            <input type="datetime-local" value={answerLocal} onChange={(e) => setAnswerLocal(e.target.value)} disabled={isBusy} required />
+            <small>When the real-world result is decided — the match ends, the vote closes, the week is over.</small>
+          </label>
+
+          <label>
             <span>Betting closes</span>
             <input type="datetime-local" value={deadlineLocal} onChange={(e) => setDeadlineLocal(e.target.value)} disabled={isBusy} required />
             <small>After this time no new bets are accepted. If no judge resolves within the resolve window after it, everyone can reclaim their stake.</small>
           </label>
+
+          {closesTooLate && (
+            <div className={styles.marketDialog__tokenWarning}>
+              <WarningIcon size={14} />
+              <span>Betting closes too close to the answer — late bettors could bet on a result they already know.</span>
+              <button
+                type="button"
+                className={styles.marketDialog__switchChain}
+                onClick={() => setDeadlineLocal(toLocalInput((answerUnix - MIN_ANSWER_GAP) * 1000))}
+                disabled={isBusy}
+              >
+                Close 1h before
+              </button>
+            </div>
+          )}
 
           <fieldset className={styles.marketDialog__list}>
             <legend>Judges</legend>

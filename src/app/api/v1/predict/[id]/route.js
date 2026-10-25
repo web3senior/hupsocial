@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
+import { lateBetCutoff } from '@/lib/predict'
 
 export const runtime = 'nodejs'
 
@@ -59,6 +60,15 @@ export async function GET(request, { params }) {
       [networkId, marketId],
     )
     await fulfillUniversalProfiles(recentBets, pool)
+
+    // Bets in the final stretch before betting ended — surfaced to judges, who can cancel
+    // instead of resolving if they were placed on an already-known result
+    const [[lateBets]] = await pool.execute(
+      `SELECT COUNT(*) AS total, COUNT(DISTINCT bettor) AS bettors, CAST(COALESCE(SUM(amount), 0) AS CHAR) AS amount
+       FROM market_bets
+       WHERE network_id = ? AND market_id = ? AND bet_at >= ?`,
+      [networkId, marketId, lateBetCutoff(market)],
+    )
 
     const [bettorCounts] = await pool.execute(
       `SELECT outcome, COUNT(DISTINCT bettor) AS bettors
@@ -120,6 +130,11 @@ export async function GET(request, { params }) {
         recentBets,
         bettorCounts,
         participantCount: Number(participants?.total ?? 0),
+        lateBets: {
+          count: Number(lateBets?.total ?? 0),
+          bettors: Number(lateBets?.bettors ?? 0),
+          amount: lateBets?.amount ?? '0',
+        },
         holders,
         position,
         claim,

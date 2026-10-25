@@ -10,7 +10,7 @@ import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { canSessionPayGas, isSessionActive, isSessionUnusableError, writeWithBurnerSession } from '@/lib/burnerSession'
 import { shortTxError } from '@/lib/utils'
-import { marketStatus, outcomeColor, parseJsonArray, toRelative } from '@/lib/predict'
+import { isLateBet, lateBetCutoff, marketStatus, outcomeColor, parseJsonArray, toRelative } from '@/lib/predict'
 import { resolveStorageImageUrl } from '@/lib/storageHelper'
 import useStakeToken, { formatStake } from '@/hooks/useStakeToken'
 import predictAbi from '@/abis/HupPredict.json'
@@ -69,6 +69,7 @@ export default function MarketDetail({ networkId, marketId }) {
   const holders = detail?.data?.holders ?? []
   const recentBets = detail?.data?.recentBets ?? []
   const participantCount = detail?.data?.participantCount ?? 0
+  const lateBets = detail?.data?.lateBets ?? { count: 0, bettors: 0, amount: '0' }
 
   const { symbol, decimals } = useStakeToken(chainId, market?.token, Boolean(Number(market?.is_token_lsp7)))
 
@@ -248,6 +249,10 @@ export default function MarketDetail({ networkId, marketId }) {
   // Pending judges see an accept prompt; any listed judge can step down while unsettled
   const canConfirmJudging = isListedJudge && !isConfirmedJudge && ['upcoming', 'open', 'awaiting'].includes(status.key)
   const canRenounceJudging = isListedJudge && ['upcoming', 'open', 'awaiting'].includes(status.key)
+  // The contract weighs a last-second stake like an early one, so the final stretch is called
+  // out to bettors, and judges get the tally to decide between resolving and canceling
+  const inLateWindow = status.key === 'open' && mountedAt >= lateBetCutoff(market)
+  const showLateReview = (canResolve || canCancel) && isConfirmedJudge && lateBets.count > 0
 
   return (
     <div className={`${styles.market} animate fade`}>
@@ -337,6 +342,23 @@ export default function MarketDetail({ networkId, marketId }) {
           </p>
         )}
         {status.key === 'open' && <p className={styles.market__deadline}>Betting closes {toRelative(market.betting_deadline)}</p>}
+        {inLateWindow && (
+          <div className={styles.market__lateNotice}>
+            <WarningIcon size={14} />
+            <span>Final stretch — bets placed now are flagged as late, and judges can cancel if the result was already known.</span>
+          </div>
+        )}
+        {showLateReview && (
+          <div className={styles.market__lateNotice}>
+            <WarningIcon size={14} />
+            <span>
+              {new Intl.NumberFormat().format(lateBets.count)} late {lateBets.count === 1 ? 'bet' : 'bets'} (
+              {formatStake(lateBets.amount, decimals) ?? '…'} {symbol} from {new Intl.NumberFormat().format(lateBets.bettors)}{' '}
+              {lateBets.bettors === 1 ? 'bettor' : 'bettors'}) came in during the final stretch. If the outcome was already known
+              when they were placed, cancel and refund everyone instead of resolving.
+            </span>
+          </div>
+        )}
         {status.key === 'awaiting' && refundEligibleAt && Number(refundEligibleAt) > 0 && !refundsUnlockable && (
           <p className={styles.market__deadline}>If no judge resolves, refunds unlock {toRelative(Number(refundEligibleAt))}</p>
         )}
@@ -717,6 +739,11 @@ export default function MarketDetail({ networkId, marketId }) {
                   </strong>{' '}
                   on <strong>{outcomes[Number(bet.outcome)]?.label || `#${Number(bet.outcome) + 1}`}</strong>
                 </span>
+                {isLateBet(bet.bet_at, market) && (
+                  <span className={styles.market__lateChip} title="Placed in the final stretch before betting closed">
+                    late
+                  </span>
+                )}
                 <span className={styles.market__personMeta}>{toRelative(bet.bet_at)}</span>
               </div>
             ))}

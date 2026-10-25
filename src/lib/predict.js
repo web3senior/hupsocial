@@ -29,6 +29,28 @@ export const marketStatus = (market) => {
   return { key: 'refunding', label: 'Refunds open' }
 }
 
+/** Betting must close at least this long before the answer is known — no betting on a known result. */
+export const MIN_ANSWER_GAP = 3600
+
+// The contract weighs every stake equally regardless of timing, so bets in the final stretch
+// are flagged for bettors and judges: one hour, or the last 10% of a shorter betting window
+const LATE_BET_WINDOW = 3600
+
+/** Effective end of betting: the early close when betting was closed, else the deadline. */
+export const bettingEndsAt = (market) =>
+  Number(market.closed_at) > 0 ? Number(market.closed_at) : Number(market.betting_deadline)
+
+/** Unix second from which a bet on this market counts as late. */
+export const lateBetCutoff = (market) => {
+  const endsAt = bettingEndsAt(market)
+  const startsAt = Number(market.betting_opens_at) > 0 ? Number(market.betting_opens_at) : Number(market.opened_at)
+  const duration = Math.max(0, endsAt - startsAt)
+  return endsAt - Math.min(LATE_BET_WINDOW, Math.floor(duration * 0.1))
+}
+
+/** Whether a bet landed inside the late window before betting ended. */
+export const isLateBet = (betAt, market) => Number(betAt) >= lateBetCutoff(market) && Number(betAt) <= bettingEndsAt(market)
+
 /** Parses a JSON column that may be null/malformed into an array, never throwing. */
 export const parseJsonArray = (raw) => {
   try {
