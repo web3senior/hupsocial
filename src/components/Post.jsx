@@ -996,6 +996,8 @@ function ThreadMarker({ item, showThreadLink }) {
         <button
           type="button"
           className={styles.post__threadLink}
+          // A copy as image carries the parts themselves, so the way to them stays off it
+          data-capture-ignore
           onClick={(e) => {
             e.stopPropagation()
             setCurrentPost(item)

@@ -459,8 +459,11 @@ export default function HomeFeedTab({
 
     const list = posts?.list ?? []
     const listedKeys = new Set(list.map(postKey))
+    // The poll's queue too: a held thread part the indexer has not named yet still has to stay
+    // out of the pill, or the author is told their own half-published thread is a new post.
+    const candidates = newPostsQueue.length ? [...list, ...newPostsQueue] : list
     const rowByMetadata = (entry) =>
-      list.find(
+      candidates.find(
         (item) =>
           item.metadata === entry.metadata &&
           Number(item.network_id) === Number(entry.networkId) &&
@@ -477,10 +480,16 @@ export default function HomeFeedTab({
       return !(rowKey && listedKeys.has(rowKey))
     })
     return { ghostPosts: ghosts, heldKeys: held }
-  }, [pendingPosts, posts.list, feedMode, networkId])
+  }, [pendingPosts, posts.list, newPostsQueue, feedMode, networkId])
   const visiblePosts = useMemo(
     () => (heldKeys.size ? (posts?.list ?? []).filter((item) => !heldKeys.has(postKey(item))) : posts?.list),
     [posts.list, heldKeys]
+  )
+  // A held row is the author's own thread mid-publish, already drawn as its ghost — not news.
+  // Once the thread is released, the authored-post pull surfaces it the ordinary way.
+  const pillCount = useMemo(
+    () => (heldKeys.size ? newPostsQueue.filter((item) => !heldKeys.has(postKey(item))).length : newPostsQueue.length),
+    [newPostsQueue, heldKeys]
   )
 
   const lastAuthoredNonceRef = useRef(authoredPostNonce)
@@ -495,9 +504,9 @@ export default function HomeFeedTab({
       <PageTitle name={title} changeDocumentTitle={changeDocumentTitle} spacer={false} showInHeader={false} />
 
       <div className={clsx('__container')} data-width={containerWidth}>
-        {newPostsQueue.length > 0 && (
+        {pillCount > 0 && (
           <button className={clsx(styles['new-posts'])} onClick={handleMergeNewPosts}>
-            Show {newPostsQueue.length} post{newPostsQueue.length > 1 ? 's' : ''}
+            Show {pillCount} post{pillCount > 1 ? 's' : ''}
           </button>
         )}
 

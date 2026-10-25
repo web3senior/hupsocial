@@ -138,9 +138,12 @@ function replaceCanvases(node, clone) {
  * A deep, inert copy of a post card, ready to be shown in the copy dialog and rasterized from
  * there. Not attached to anything: the caller mounts it.
  * @param {HTMLElement} node The post's root element.
+ * @param {Object} [options]
+ * @param {boolean} [options.connectBelow] Keeps the thread line running down to the next card,
+ *   for a part of a thread with another part under it in the same picture.
  * @returns {HTMLElement}
  */
-export function buildPostSheet(node) {
+export function buildPostSheet(node, { connectBelow = false } = {}) {
   const clone = node.cloneNode(true)
 
   /* Before anything is removed, while the two trees still line up index for index */
@@ -151,9 +154,9 @@ export function buildPostSheet(node) {
   for (const property of INHERITED_TYPOGRAPHY) clone.style[property] = computed[property]
 
   /* The thread line down the left edge runs 5rem past the bottom of the card, to meet the
-     comments underneath it. A copy is one card on its own — the line would trail off the edge
-     of the picture pointing at nothing. */
-  clone.setAttribute('data-has-comments', 'false')
+     comments underneath it. A lone card has nothing under it in the picture — the line would
+     trail off the edge pointing at nothing — so only a part with the next one below keeps it. */
+  clone.setAttribute('data-has-comments', connectBelow ? 'true' : 'false')
 
   for (const selector of STRIP_SELECTORS) {
     for (const element of clone.querySelectorAll(selector)) element.remove()

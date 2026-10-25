@@ -5,8 +5,10 @@ import { createPortal } from 'react-dom'
 import { DownloadSimpleIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { toast } from '@/components/NextToast'
+import { getPostThread } from '@/lib/api'
 import { buildPostSheet } from '@/lib/postCaptureSheet'
 import { SAVED, copySheetImage, saveSheetImage } from '@/lib/postImage'
+import Post from './Post'
 import HupMark from './ui/HupMark'
 import NativeDialog from './ui/NativeDialog'
 import ToggleSwitch from './ui/ToggleSwitch'
@@ -38,6 +40,15 @@ const BACKGROUNDS = [
 const MIN_CARD_PX = 320
 const MAX_CARD_PX = 600
 
+/* The same row the post page gives a thread's parts, so their counters match the first part's */
+const PART_ACTIONS = ['like', 'comment', 'repost', 'tip', 'view', 'share', 'bookmark']
+
+/** Whether the post is the first part of a thread its author published in one go. */
+function isThreadRoot(item) {
+  const marker = item?.content?.thread
+  return Number(item?.is_repost) > 0 ? false : Number(marker?.part) === 1 && Number(marker?.of) > 1
+}
+
 /**
  * "Copy as image": the post exactly as it renders, on a sheet the reader can set before copying.
  *
@@ -57,6 +68,10 @@ export default function CopyPostImageDialog({ item, node, onClose }) {
   const frameRef = useRef(null)
   const sheetRef = useRef(null)
   const cardRef = useRef(null)
+  const rootRef = useRef(null)
+  const partsRef = useRef(null)
+  const sourceRef = useRef(null)
+  const [threadParts, setThreadParts] = useState([])
 
   const [theme, setTheme] = useState('auto')
   const [background, setBackground] = useState(BACKGROUNDS[0].id)
@@ -72,12 +87,55 @@ export default function CopyPostImageDialog({ item, node, onClose }) {
   /* The clone is built once. Everything the controls change — theme, sheet colour, whether the
      counters show — is a property of the sheet around it, so none of them rebuild the card. */
   useEffect(() => {
-    const host = cardRef.current
-    if (!host || !node) return
+    const card = cardRef.current
+    const host = rootRef.current
+    if (!card || !host || !node) return
 
-    host.style.width = `${Math.min(Math.max(node.offsetWidth, MIN_CARD_PX), MAX_CARD_PX)}px`
-    host.replaceChildren(buildPostSheet(node))
-  }, [node])
+    card.style.width = `${Math.min(Math.max(node.offsetWidth, MIN_CARD_PX), MAX_CARD_PX)}px`
+    host.replaceChildren(buildPostSheet(node, { connectBelow: threadParts.length > 0 }))
+  }, [node, threadParts.length])
+
+  /* A thread is copied whole. Outside the post page its other parts are not on screen to clone,
+     so they are fetched, rendered off-screen as the cards they are, and cloned from there */
+  useEffect(() => {
+    if (!isThreadRoot(item)) return undefined
+    let cancelled = false
+    getPostThread(item.network_id, item.id)
+      .then((parts) => {
+        if (!cancelled) setThreadParts(parts)
+      })
+      .catch(() => {
+        /* The first part is still a copy on its own */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [item])
+
+  /* The off-screen cards fill in as their profiles and counters arrive, so the clones follow them */
+  useEffect(() => {
+    const source = sourceRef.current
+    const host = partsRef.current
+    if (!source || !host || !threadParts.length) return undefined
+
+    let frame = 0
+    const sync = () => {
+      frame = 0
+      const cards = [...source.querySelectorAll(':scope > div > section[data-content]')]
+      host.replaceChildren(...cards.map((card, index) => buildPostSheet(card, { connectBelow: index < cards.length - 1 })))
+    }
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(sync)
+    }
+
+    sync()
+    const observer = new MutationObserver(schedule)
+    observer.observe(source, { subtree: true, childList: true, attributes: true, characterData: true })
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(frame)
+    }
+  }, [threadParts])
 
   /* A card is wider than this dialog, so the preview is scaled to fit. The picture is not:
      captureElement states the layout size outright, which is what keeps the copy full size. */
@@ -172,7 +230,10 @@ export default function CopyPostImageDialog({ item, node, onClose }) {
                 data-metrics={showMetrics ? 'true' : 'false'}
                 style={{ background: sheetBackground.value }}
               >
-                <div className={styles.copyImage__card} ref={cardRef} />
+                <div className={styles.copyImage__card} ref={cardRef}>
+                  <div ref={rootRef} />
+                  <div ref={partsRef} />
+                </div>
                 <div className={styles.copyImage__brand}>
                   <HupMark size={16} />
                 </div>
@@ -180,6 +241,17 @@ export default function CopyPostImageDialog({ item, node, onClose }) {
             </div>
           </div>
         </div>
+
+        {/* The thread's other parts as live cards, never seen: only their clones above are */}
+        {threadParts.length > 0 && (
+          <div className={styles.copyImage__source} ref={sourceRef} aria-hidden="true" inert>
+            {threadParts.map((part) => (
+              <div key={part.id}>
+                <Post item={part} chainId={part.network_id} actions={PART_ACTIONS} />
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className={styles.copyImage__controls}>
           <div className={styles.copyImage__row}>

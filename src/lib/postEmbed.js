@@ -360,6 +360,46 @@ function renderQuotedPost(quoted, origin) {
     .join('\n')
 }
 
+/** "2/5" for a part of a thread its author published in one go, as the card counts them. */
+function renderThreadCount(item) {
+  const part = Number(item?.content?.thread?.part)
+  const of = Number(item?.content?.thread?.of)
+  if (!part || !(of > 1)) return ''
+  return `<span class="hup-embed__count">${part}/${of}</span>`
+}
+
+/**
+ * Parts 2…N under the first, the way the post page draws them: each its own avatar on a rail
+ * that runs on to the next, its time a link to that part's own page.
+ */
+function renderThreadParts(parts, origin) {
+  if (!parts?.length) return ''
+
+  const items = parts.map((part) => {
+    const posted = formatEmbedDate(part.created_at)
+    const body = getEmbedBodyText(part).trim()
+    const time = posted.label
+      ? `<a class="hup-embed__meta" href="${escapeHtml(getPostPermalink(part, origin))}" target="_blank" rel="noopener noreferrer"><time datetime="${escapeHtml(posted.iso)}">${escapeHtml(posted.label)}</time></a>`
+      : ''
+
+    return [
+      '<li class="hup-embed__part">',
+      avatarImage(part.profile_image, 32, 'hup-embed__part-avatar', origin),
+      '<div class="hup-embed__part-main">',
+      `<span class="hup-embed__part-head"><span class="hup-embed__name">${escapeHtml(getAuthorName(part))}</span>${time}</span>`,
+      body ? `<p class="hup-embed__body">${renderBody(body)}</p>` : '',
+      renderMedia(part, origin),
+      renderThreadCount(part),
+      '</div>',
+      '</li>',
+    ]
+      .filter(Boolean)
+      .join('\n')
+  })
+
+  return `<ol class="hup-embed__thread">\n${items.join('\n')}\n</ol>`
+}
+
 /** Canonical URL of a post's embed document. */
 export function getPostEmbedUrl(item, origin = '', { theme = 'auto' } = {}) {
   const url = `${getPostPermalink(item, origin)}/embed`
@@ -465,6 +505,15 @@ a:hover{text-decoration:underline}
 .hup-embed__stats strong{color:var(--hup-text);font-weight:600}
 .hup-embed__cta{font-size:.8125rem;font-weight:600;white-space:nowrap}
 .hup-embed--fallback{align-items:flex-start;gap:.5rem}
+.hup-embed__count{font-size:.8125rem;color:var(--hup-muted);font-variant-numeric:tabular-nums}
+.hup-embed__thread{display:flex;flex-direction:column;margin:0;padding:0;list-style:none}
+.hup-embed__part{position:relative;display:grid;grid-template-columns:32px minmax(0,1fr);column-gap:.625rem;padding-top:.875rem}
+.hup-embed__part:not(:last-child)::before{content:'';position:absolute;left:15px;top:calc(.875rem + 36px);bottom:calc(4px - .875rem);width:2px;border-radius:1px;background:var(--hup-border)}
+.hup-embed__part-avatar{width:32px;height:32px;border-radius:999px;object-fit:cover;background:var(--hup-surface)}
+.hup-embed__part-main{display:flex;flex-direction:column;align-items:flex-start;gap:.375rem;min-width:0}
+.hup-embed__part-main>.hup-embed__media{align-self:stretch}
+.hup-embed__part-head{display:flex;align-items:baseline;gap:.5rem;min-width:0;max-width:100%}
+.hup-embed__part-head a.hup-embed__meta{flex-shrink:0}
 .hup-embed__card{display:flex;flex-direction:column;gap:.5rem;margin:0;padding:.75rem;border:1px solid var(--hup-border);border-radius:12px;background:var(--hup-surface);color:var(--hup-text)}
 .hup-embed__card--unavailable{font-size:.8125rem;color:var(--hup-muted)}
 .hup-embed__card-header{display:flex;align-items:center;gap:.5rem;min-width:0}
@@ -550,9 +599,13 @@ ${body}
  *   (lib/linkPreviewServer shape), rendered as the card the feed shows under the text.
  * @param {{ item?: Object }} [options.quoted] The post `content.quoteOf` points at; `item`
  *   absent means the original is gone or withheld.
+ * @param {Object[]} [options.threadParts] Parts 2…N when `item` is the first part of a thread.
  * @returns {string} A complete HTML document.
  */
-export function renderPostEmbedDocument(item, { origin = '', theme = 'auto', repostedBy = null, linkPreview = null, quoted = null } = {}) {
+export function renderPostEmbedDocument(
+  item,
+  { origin = '', theme = 'auto', repostedBy = null, linkPreview = null, quoted = null, threadParts = [] } = {},
+) {
   const resolvedTheme = normalizeEmbedTheme(theme)
   const permalink = getPostPermalink(item, origin)
   const author = getAuthorName(item)
@@ -587,6 +640,8 @@ export function renderPostEmbedDocument(item, { origin = '', theme = 'auto', rep
     media,
     renderLinkPreview(linkPreview, origin),
     renderQuotedPost(quoted, origin),
+    renderThreadCount(item),
+    renderThreadParts(threadParts, origin),
     '<footer class="hup-embed__footer">',
     `<ul class="hup-embed__stats">${stats}</ul>`,
     `<a class="hup-embed__cta" href="${escapeHtml(permalink)}" target="_blank" rel="noopener noreferrer">View on Hup ↗</a>`,

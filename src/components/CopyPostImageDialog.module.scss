@@ -116,6 +116,16 @@
     border-radius: 16px;
   }
 
+  // A thread's other parts, rendered as live cards to be cloned onto the sheet. Out of view and
+  // out of the flow rather than display: none, which would leave them nothing to lay out
+  &__source {
+    position: fixed;
+    top: 0;
+    left: -10000px;
+    width: 600px;
+    pointer-events: none;
+  }
+
   // The mark sits on the sheet under the card, never over it — the card's own bottom-right
   // corner already belongs to the bookmark and share icons
   &__brand {

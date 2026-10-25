@@ -224,6 +224,12 @@
         }
       }
     }
+
+    // The open post's text and actions run the full width under its avatar, so the line would
+    // cut through them; it starts under the action row and only bridges to the next part
+    &[data-content='true'] .post__main:before {
+      top: 100%;
+    }
   }
 
   // "1/3 · Show thread" under the text of a thread's part

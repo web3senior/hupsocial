@@ -10,7 +10,7 @@
  * what it will and will not render is a security boundary: deleted and moderated posts get the
  * fallback card, and sealed community content renders the same lock placeholder the feed shows.
  */
-import { getPostById, getProfile } from '@/lib/api'
+import { getPostById, getPostThread, getProfile } from '@/lib/api'
 import { previewableLink } from '@/lib/linkPreview'
 import { resolveLinkPreview } from '@/lib/linkPreviewServer'
 import {
@@ -64,6 +64,22 @@ async function loadQuoted(networkId, row) {
   }
 }
 
+// Parts 2…N when the row is the first part of a thread, so the embed reads as the whole thread
+// the way the post page draws it. A withheld part ends the thread there, as a deleted one does
+// in the thread route; a failed fetch leaves the first part standing alone.
+async function loadThreadParts(networkId, row) {
+  const marker = row?.content?.thread
+  if (Number(marker?.part) !== 1 || !(Number(marker?.of) > 1)) return []
+  try {
+    const parts = await getPostThread(networkId, row.id)
+    const withheld = parts.findIndex(isWithheld)
+    return withheld === -1 ? parts : parts.slice(0, withheld)
+  } catch (error) {
+    console.warn('[GET_POST_EMBED_THREAD]:', networkId, row.id, error?.message)
+    return []
+  }
+}
+
 // The author the way the card's Profile component shows them: the same profile API useProfile
 // reads (Universal Profile first, then the users table), so the embed cannot paint a picture or
 // name the app has since replaced. The row's own columns stay as the fallback when it fails.
@@ -110,10 +126,11 @@ export async function GET(request, { params }) {
     if (!target) return unavailable('The original post is no longer available on Hup.')
     if (isWithheld(row) || isWithheld(target)) return unavailable('This post is no longer available on Hup.')
 
-    const [linkPreview, quoted, author] = await Promise.all([
+    const [linkPreview, quoted, author, threadParts] = await Promise.all([
       loadLinkPreview(target),
       loadQuoted(networkId, target),
       withAuthorProfile(target),
+      loadThreadParts(networkId, target),
     ])
     if (quoted?.item) quoted.item = await withAuthorProfile(quoted.item)
 
@@ -123,6 +140,8 @@ export async function GET(request, { params }) {
       repostedBy: isRepost ? row.display_name || row.wallet_address : null,
       linkPreview,
       quoted,
+      // Every part is the author's own, so each carries the profile the first part resolved
+      threadParts: threadParts.map((part) => ({ ...part, display_name: author.display_name, profile_image: author.profile_image })),
     })
 
     return new Response(document, {

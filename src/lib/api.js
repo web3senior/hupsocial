@@ -544,6 +544,22 @@ export const getPostById = async (networkId, postId, viewerAddress = null) => {
   const data = await response.json()
   return data
 }
+
+/**
+ * Parts 2…N of a thread its author published in one go, in order; empty for any other post.
+ * @param {number|string} networkId
+ * @param {number|string} postId The thread's first part.
+ * @returns {Promise<Object[]>} Post rows.
+ */
+export const getPostThread = async (networkId, postId) => {
+  const isServer = typeof window === 'undefined'
+  const baseUrl = isServer ? (process.env.NEXT_PUBLIC_BASE_URL || 'https://localhost:3000').replace(/\/+$/, '') : ''
+
+  const response = await fetch(`${baseUrl}/api/v1/networks/${networkId}/${postId}/thread`, { next: { revalidate: 30 } })
+  if (!response.ok) throw new Error('Thread fetch failed')
+  const body = await response.json()
+  return Array.isArray(body?.data) ? body.data : []
+}
 // getCommunityById lived here and self-fetched /api/v1/networks/communities/[id] over HTTP. The
 // only caller was the community detail page, which runs on the server next to the database and now
 // calls fetchCommunityRow() in lib/communityRows directly instead.

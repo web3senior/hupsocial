@@ -310,7 +310,12 @@ export default function ChatDock({ embedded = false }) {
 
   const hidden = !isClient
 
-  const { data: chatMe, mutate: mutateChatMe } = useSWR(token ? ['chat-me', token] : null, () => fetchChatMe(token), {
+  // The room's data loads the first time the reader opens it, not on every page behind a
+  // minimized pill; once opened it stays loaded so reopening lands where they left
+  const [hasOpened, setHasOpened] = useState(false)
+  if (isOpen && !hidden && !hasOpened) setHasOpened(true)
+
+  const { data: chatMe, mutate: mutateChatMe } = useSWR(token && hasOpened ? ['chat-me', token] : null, () => fetchChatMe(token), {
     revalidateOnFocus: false,
     onError: (error) => {
       if (isChatUnauthorized(error)) clearChatToken(me)
@@ -537,9 +542,9 @@ export default function ChatDock({ embedded = false }) {
         </button>
       )}
 
-      {/* Mounted once and kept across close/open, so reopening lands exactly where the reader
-          left instead of refetching and re-scrolling; hidden, it neither polls nor marks seen */}
-      {!roomPending && (
+      {/* Mounted on first open and kept across close/open, so reopening lands exactly where the
+          reader left instead of refetching and re-scrolling; hidden, it neither polls nor marks seen */}
+      {!roomPending && hasOpened && (
         <div className={styles.dock__room} hidden={!isOpen}>
           <Room
             active={isOpen}
