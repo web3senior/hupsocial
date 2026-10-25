@@ -473,8 +473,15 @@
       }
 
       // Icon inherits currentColor: themed base color (Globals.scss per-theme var)
+      // The paper plane runs corner to corner of its box where the other glyphs sit inside
+      // theirs, so at the shared 20px it reads a size up. Scaled rather than resized so the
+      // button keeps the row's 1:1 halo.
+      &[data-action='share'] > svg {
+        scale: 0.88;
+      }
+
       &[data-action='tip'] {
-        color: var(--color-icon-muted, var(--black-600));
+        // Inherits the row's --text like its siblings; a fixed grey here vanished in dark mode
         // --tip-earned-color comes from Globals.scss so drop earnings can wear the same green
 
         // The post has taken real money: the amount leaves the grey counter row and becomes

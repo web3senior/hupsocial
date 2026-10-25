@@ -41,8 +41,9 @@ function trimOrigin(origin) {
 }
 
 /**
- * Media CIDs resolve to relative proxy paths (`/api/ipfs/file`). An embed is
- * always read from another origin, so every asset URL has to carry one.
+ * Media CIDs resolve to relative proxy paths (`/api/ipfs/file`). With an origin they are made
+ * absolute; without one they stay relative, which is what the embed route wants — its document
+ * is framed from its own public URL, so relative paths already resolve against Hup.
  */
 function absolutize(url, origin) {
   if (!url || typeof url !== 'string') return null
@@ -540,7 +541,8 @@ ${body}
  * The document the snippet frames.
  * @param {Object} item Post row as returned by the posts API (content already parsed).
  * @param {Object} [options]
- * @param {string} [options.origin] Absolute origin used for links and assets.
+ * @param {string} [options.origin] Absolute origin used for links and assets; empty keeps them
+ *   relative to the document.
  * @param {'auto'|'light'|'dark'} [options.theme] Resolved colour scheme.
  * @param {string} [options.repostedBy] Display name or wallet of the reposter, when the embedded
  *   row was a repost and this document renders the original it points at.

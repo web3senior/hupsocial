@@ -10,7 +10,7 @@
  * what it will and will not render is a security boundary: deleted and moderated posts get the
  * fallback card, and sealed community content renders the same lock placeholder the feed shows.
  */
-import { getPostById } from '@/lib/api'
+import { getPostById, getProfile } from '@/lib/api'
 import { previewableLink } from '@/lib/linkPreview'
 import { resolveLinkPreview } from '@/lib/linkPreviewServer'
 import {
@@ -64,9 +64,33 @@ async function loadQuoted(networkId, row) {
   }
 }
 
+// The author the way the card's Profile component shows them: the same profile API useProfile
+// reads (Universal Profile first, then the users table), so the embed cannot paint a picture or
+// name the app has since replaced. The row's own columns stay as the fallback when it fails.
+async function withAuthorProfile(row) {
+  if (!row?.wallet_address) return row
+  try {
+    const profile = (await getProfile(row.wallet_address))?.data
+    if (!profile) return row
+    return {
+      ...row,
+      display_name: profile.name || row.display_name,
+      profile_image: profile.profileImage || row.profile_image,
+    }
+  } catch (error) {
+    console.warn('[GET_POST_EMBED_PROFILE]:', row.wallet_address, error?.message)
+    return row
+  }
+}
+
 export async function GET(request, { params }) {
   const { networkId, postId } = await params
-  const { origin, searchParams } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  // Left empty so links and assets stay relative to the framed document's own public URL.
+  // request.url is the address the app server was reached on, which behind the production
+  // proxy is its internal one (https://localhost:3000) — absolute URLs built from it broke
+  // every image for readers.
+  const origin = ''
   const theme = normalizeEmbedTheme(searchParams.get('theme'))
 
   const unavailable = (message) =>
@@ -86,9 +110,14 @@ export async function GET(request, { params }) {
     if (!target) return unavailable('The original post is no longer available on Hup.')
     if (isWithheld(row) || isWithheld(target)) return unavailable('This post is no longer available on Hup.')
 
-    const [linkPreview, quoted] = await Promise.all([loadLinkPreview(target), loadQuoted(networkId, target)])
+    const [linkPreview, quoted, author] = await Promise.all([
+      loadLinkPreview(target),
+      loadQuoted(networkId, target),
+      withAuthorProfile(target),
+    ])
+    if (quoted?.item) quoted.item = await withAuthorProfile(quoted.item)
 
-    const document = renderPostEmbedDocument(target, {
+    const document = renderPostEmbedDocument(author, {
       origin,
       theme,
       repostedBy: isRepost ? row.display_name || row.wallet_address : null,
