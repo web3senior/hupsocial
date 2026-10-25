@@ -158,7 +158,9 @@ export default function MarketDetail({ networkId, marketId }) {
   /**
    * Sends a HupPredict write through the burner session when active, else the wallet.
    * `direct: true` skips the session entirely — resolve and confirmJudging require the
-   * judge's own signature onchain, so only the real wallet can send them.
+   * judge's own signature onchain, so only the real wallet can send them. Claims are
+   * always direct too: moving funds out must be signed by the wallet, never the session key.
+   * Any write that carries `value` (a featured upgrade) is direct for the same reason.
    */
   const submitTx = async (functionName, args, actionLabel, { direct = false, value = 0n } = {}) => {
     if (!address) {
@@ -170,7 +172,7 @@ export default function MarketDetail({ networkId, marketId }) {
       return
     }
 
-    const session = direct
+    const session = direct || value > 0n
       ? { active: false }
       : await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
 
@@ -416,7 +418,9 @@ export default function MarketDetail({ networkId, marketId }) {
               type="button"
               className={styles['market__action--claim']}
               onClick={() =>
-                submitTx('claim', [address, BigInt(marketId)], status.key === 'resolved' ? 'Winnings claimed' : 'Refund claimed')
+                submitTx('claim', [address, BigInt(marketId)], status.key === 'resolved' ? 'Winnings claimed' : 'Refund claimed', {
+                  direct: true,
+                })
               }
               disabled={isBusy || isWrongChain}
             >
@@ -429,7 +433,7 @@ export default function MarketDetail({ networkId, marketId }) {
             <button
               type="button"
               className={styles['market__action--claim']}
-              onClick={() => submitTx('claimCreatorFees', [address, market.token], 'Creator earnings claimed')}
+              onClick={() => submitTx('claimCreatorFees', [address, market.token], 'Creator earnings claimed', { direct: true })}
               disabled={isBusy || isWrongChain}
               // The ledger spans every market the creator settled in this stake token
               title="Your accrued creator fees across all your resolved markets in this token"

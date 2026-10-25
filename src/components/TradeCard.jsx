@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useConnection, usePublicClient, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { useConnection, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { erc20Abi, formatUnits, hexToString, isAddress, zeroAddress } from 'viem'
 import clsx from 'clsx'
 import { CaretUpDownIcon, InfoIcon, XIcon } from '@phosphor-icons/react'
@@ -11,7 +11,6 @@ import Tooltip from '@/components/ui/Tooltip'
 import { CONTRACTS } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { formatBps, splitSalePrice } from '@/lib/tradeFee'
 import { handleBrokenImage } from '@/lib/utils'
 import tradeAbi from '@/abis/HupTrade.json'
@@ -128,14 +127,12 @@ export const lsp7Abi = [
  * surfaces that already present the NFT (the listing detail page's media column).
  */
 const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false }) => {
-  const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isOfferOpen, setIsOfferOpen] = useState(false)
   const { address } = useConnection()
   const lastActionRef = useRef(null)
 
   const chainId = Number(listing?.chainId)
-  const publicClient = usePublicClient({ chainId })
   const chainInfo = appChains.find((c) => c.id === chainId)
   const tradeAddress = CONTRACTS[`chain${chainId}`]?.trade || null
   const offersAddress = CONTRACTS[`chain${chainId}`]?.offers || null
@@ -254,7 +251,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
-  const isBusy = isPending || isConfirming || isBurnerBusy
+  const isBusy = isPending || isConfirming
 
   useEffect(() => {
     if (!submitError) return
@@ -318,32 +315,7 @@ const TradeCard = ({ listing, referral, showDetailsLink = true, compact = false 
 
     const args = [address, listingId, referralArg]
 
-    // Route through the burner session key if one's active — same convenience TipModal gets,
-    // skipping the wallet popup. Approve/authorizeOperator stays wagmi-only regardless.
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
-
-    if (session.active) {
-      setIsBurnerBusy(true)
-      try {
-        await writeWithBurnerSession({
-          chain: chainInfo,
-          contractAddress: tradeAddress,
-          abi: tradeAbi,
-          functionName: 'buy',
-          args: isNativePrice ? [...args, { value: price }] : args,
-        })
-
-        toast('NFT purchased — it now belongs to you', 'success')
-        refetchListing()
-        refetchPurchasable()
-      } catch (err) {
-        toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-      } finally {
-        setIsBurnerBusy(false)
-      }
-      return
-    }
-
+    // Buying moves funds, so it is always the connected wallet — never the session key
     lastActionRef.current = 'buy'
     writeContract({
       abi: tradeAbi,

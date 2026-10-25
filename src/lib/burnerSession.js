@@ -219,8 +219,19 @@ export const sendRawWithBurnerSession = async ({ chain, to, data }) => {
  * Resolves once the transaction is mined by default. Callers that close their UI the moment
  * the node accepts the transaction and track the receipt themselves (optimistic flows like
  * TipModal) pass `waitForReceipt: false` to get the response back at the hash instead.
+ *
+ * Never carries value: the session key is a gas float, not a wallet. Buying, paying fees,
+ * claiming or otherwise moving funds must be signed by the connected wallet, so an overrides
+ * object with a non-zero `value` throws code 'SESSION_FUNDS_FORBIDDEN' before signing.
  */
 export const writeWithBurnerSession = async ({ chain, contractAddress, abi, functionName, args, password = null, waitForReceipt = true }) => {
+  const overrides = args?.at(-1)
+  if (overrides && typeof overrides === 'object' && 'value' in overrides && BigInt(overrides.value ?? 0) > 0n) {
+    const err = new Error('Payments are signed by your wallet, not the session key')
+    err.code = 'SESSION_FUNDS_FORBIDDEN'
+    throw err
+  }
+
   // Retrieve signer (decrypts key asynchronously if needed)
   const burnerSigner = await getBurnerSigner(chain, password)
 
@@ -244,7 +255,7 @@ export const writeWithBurnerSession = async ({ chain, contractAddress, abi, func
 export const isSessionUnusableError = (err) => {
   if (!err) return false
   // A cancelled vault unlock, and the coded throws from this file
-  if (err.code === 4001 || ['INSUFFICIENT_FUNDS', 'NO_SESSION_KEY', 'VAULT_LOCKED', 'WRONG_PIN'].includes(err.code)) return true
+  if (err.code === 4001 || ['INSUFFICIENT_FUNDS', 'NO_SESSION_KEY', 'VAULT_LOCKED', 'WRONG_PIN', 'SESSION_FUNDS_FORBIDDEN'].includes(err.code)) return true
 
   const message = [err.shortMessage, err.message, err.info?.error?.message, err.error?.message].filter(Boolean).join(' ').toLowerCase()
 

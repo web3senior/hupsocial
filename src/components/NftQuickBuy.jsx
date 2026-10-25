@@ -5,9 +5,7 @@ import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteC
 import { erc20Abi, zeroAddress } from 'viem'
 import clsx from 'clsx'
 import { CONTRACTS } from '@/config/wagmi'
-import { appChains } from '@/config/contracts'
 import { formatStake } from '@/hooks/useStakeToken'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
 import { lsp7Abi } from '@/components/TradeCard'
 import tradeAbi from '@/abis/HupTrade.json'
 import { toast } from '@/components/NextToast'
@@ -34,7 +32,6 @@ const STATUS_ACTIVE = 1
 export default function NftQuickBuy({ listing, variant = 'overlay' }) {
   // idle → (tap) checking → approve | confirm | buying; done and gone are terminal
   const [phase, setPhase] = useState('idle')
-  const [isBurnerBusy, setIsBurnerBusy] = useState(false)
   const [confirmPrice, setConfirmPrice] = useState(null)
   const { address } = useConnection()
   const liveRef = useRef(null)
@@ -42,13 +39,12 @@ export default function NftQuickBuy({ listing, variant = 'overlay' }) {
 
   const chainId = Number(listing.network_id)
   const publicClient = usePublicClient({ chainId })
-  const chainInfo = appChains.find((c) => c.id === chainId)
   const tradeAddress = CONTRACTS[`chain${chainId}`]?.trade || null
   const listingId = listing.listing_id ? BigInt(listing.listing_id) : null
 
   const { data: hash, isPending, mutate: writeContract, error: submitError } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
-  const isBusy = phase === 'checking' || isPending || isConfirming || isBurnerBusy
+  const isBusy = phase === 'checking' || isPending || isConfirming
 
   useEffect(() => {
     if (!submitError) return
@@ -70,34 +66,12 @@ export default function NftQuickBuy({ listing, variant = 'overlay' }) {
   const isSeller = Boolean(address && listing.wallet_address && address.toLowerCase() === listing.wallet_address.toLowerCase())
   if (Number(listing.status) !== STATUS_ACTIVE || isSeller || !tradeAddress || !listingId) return null
 
-  const runBuy = async (live) => {
+  const runBuy = (live) => {
     const isNativePrice = !live.token || live.token === zeroAddress
     // The grid has no repost context, so no referral rides along
     const args = [address, listingId, zeroAddress]
 
-    // Burner session skips the wallet popup, same as TradeCard; approvals stay wagmi-only
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
-    if (session.active) {
-      setIsBurnerBusy(true)
-      try {
-        await writeWithBurnerSession({
-          chain: chainInfo,
-          contractAddress: tradeAddress,
-          abi: tradeAbi,
-          functionName: 'buy',
-          args: isNativePrice ? [...args, { value: live.price }] : args,
-        })
-        toast('NFT purchased — it now belongs to you', 'success')
-        setPhase('done')
-      } catch (err) {
-        toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-        setPhase('confirm')
-      } finally {
-        setIsBurnerBusy(false)
-      }
-      return
-    }
-
+    // Buying moves funds, so it is always the connected wallet — never the session key
     lastActionRef.current = 'buy'
     // A rejected wallet popup lands back here — retries skip straight to buying
     setPhase('confirm')
@@ -212,7 +186,7 @@ export default function NftQuickBuy({ listing, variant = 'overlay' }) {
 
   let label = 'Buy'
   if (phase === 'checking') label = 'Checking…'
-  else if (isPending || isConfirming || isBurnerBusy) label = 'Confirming…'
+  else if (isPending || isConfirming) label = 'Confirming…'
   else if (phase === 'approve') label = `Approve ${listing.symbol || 'token'}`
   else if (phase === 'confirm') label = confirmPrice ? `Buy ${confirmPrice} ${listing.symbol || ''}`.trim() : 'Buy'
   else if (phase === 'done') label = 'Bought'

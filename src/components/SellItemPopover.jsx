@@ -569,8 +569,12 @@ const SellItemPopover = forwardRef(function SellItemPopover({ item, onPendingCou
     // Route through the burner session key if one's active, mirroring Like.jsx's pattern —
     // skips the wallet popup. writeWithBurnerSession awaits its own confirmation, so the
     // success side effects that the isConfirmed effect runs for the wagmi path are replayed
-    // manually here before returning.
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+    // manually here before returning. A new listing's fee moves funds, so a paid listItem
+    // always goes through the connected wallet instead.
+    const session =
+      hasListing || (listingFeeValue ?? 0n) === 0n
+        ? await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+        : { active: false }
 
     if (session.active) {
       setIsSubmittingBurner(true)

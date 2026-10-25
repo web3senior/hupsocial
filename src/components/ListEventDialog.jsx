@@ -151,9 +151,13 @@ const ListEventDialog = forwardRef(function ListEventDialog({ onListed }, ref) {
 
     const args = [address, BigInt(startUnix), BigInt(endUnix), featured, cid]
 
-    // Burner session skips the wallet popup (the burner must hold the listing fee); it
-    // awaits its own confirmation, so the wagmi isConfirmed side effects replay manually.
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+    // Burner session skips the wallet popup for free listings only — a listing fee moves funds,
+    // so it is always paid from the connected wallet. The session write awaits its own
+    // confirmation, so the wagmi isConfirmed side effects replay manually.
+    const session =
+      totalFee === 0n
+        ? await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+        : { active: false }
 
     if (session.active) {
       setIsSubmittingBurner(true)

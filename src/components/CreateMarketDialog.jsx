@@ -271,7 +271,11 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
     // An empty judge list defaults to the creator judging their own market (onchain too)
     const args = [address, tokenAddress, isTokenLsp7, BigInt(opensUnix), BigInt(deadlineUnix), labels.length, featured, judges, cid]
 
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+    // A featured fee moves funds, so only an unfeatured market may go through the session key
+    const session =
+      featuredValue === 0n
+        ? await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+        : { active: false }
 
     if (session.active) {
       setIsSubmittingBurner(true)

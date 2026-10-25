@@ -5,7 +5,7 @@ import { formatEther } from 'viem'
 import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
-import { getStoredBurner, isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import { isSessionActive, isSessionUnusableError, writeWithBurnerSession } from '@/lib/burnerSession'
 import { uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import appsAbi from '@/abis/HupApps.json'
 import { toast } from '@/components/NextToast'
@@ -170,50 +170,37 @@ const ListAppDialog = forwardRef(function ListAppDialog({ categories = [], app =
     const functionName = isEdit ? 'updateApp' : 'registerApp'
     const args = isEdit ? [address, BigInt(app.appId), Number(categoryId), cid] : [address, Number(categoryId), featured, cid]
 
-    // Burner session skips the wallet popup (the burner must hold the listing fee); it
-    // awaits its own confirmation, so the wagmi isConfirmed side effects replay manually.
-    const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+    // Burner session skips the wallet popup for free listings and edits only — a listing fee
+    // moves funds, so it is always paid from the connected wallet. The session write awaits
+    // its own confirmation, so the wagmi isConfirmed side effects replay manually.
+    const session =
+      totalFee === 0n
+        ? await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
+        : { active: false }
 
     if (session.active) {
-      // The burner pays the listing fee out of its own balance. When it can't cover it, fall
-      // through to the main wallet instead of surfacing a raw node error after the upload.
-      let burnerCanPay = true
-      if (totalFee > 0n) {
-        const burnerAddress = getStoredBurner()?.address
-        const burnerBalance = burnerAddress ? await publicClient?.getBalance({ address: burnerAddress }).catch(() => null) : null
-        // Balance must cover fee + gas; an unknown balance still tries the burner first
-        if (burnerBalance != null && burnerBalance <= totalFee) burnerCanPay = false
-      }
+      setIsSubmittingBurner(true)
+      try {
+        await writeWithBurnerSession({
+          chain: chainInfo,
+          contractAddress: appsAddress,
+          abi: appsAbi,
+          functionName,
+          args,
+        })
 
-      if (burnerCanPay) {
-        setIsSubmittingBurner(true)
-        try {
-          await writeWithBurnerSession({
-            chain: chainInfo,
-            contractAddress: appsAddress,
-            abi: appsAbi,
-            functionName,
-            args: [...args, { value: totalFee }],
-          })
-
-          toast(successMessage, 'success')
-          dialogRef.current?.close()
-          onListed?.()
+        toast(successMessage, 'success')
+        dialogRef.current?.close()
+        onListed?.()
+        return
+      } catch (err) {
+        // An empty or locked session never reached the mempool — send it from the wallet
+        if (!isSessionUnusableError(err)) {
+          toast(err.message || 'Transaction rejected or encountered an error.', 'error')
           return
-        } catch (err) {
-          // The pre-check can miss gas costs or a stale balance — recover the same way
-          if (!/insufficient (balance|funds)/i.test(err?.message || '')) {
-            toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-            return
-          }
-          burnerCanPay = false
-        } finally {
-          setIsSubmittingBurner(false)
         }
-      }
-
-      if (!burnerCanPay) {
-        toast(`Your session wallet can't cover the ${formatEther(totalFee)} ${currencySymbol} fee — confirm with your main wallet instead.`, 'info')
+      } finally {
+        setIsSubmittingBurner(false)
       }
     }
 
