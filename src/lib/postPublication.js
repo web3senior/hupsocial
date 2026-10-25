@@ -71,12 +71,16 @@ export const releaseGhost = (ghostId, resolvedKey) => {
   usePostStore.getState().notifyAuthoredPost()
 }
 
-const lookupPost = async ({ networkId, author, metadata }) => {
+// `txHash` keeps an older post with the same pinned content (same words, same author, same CID)
+// from answering for this one — without it, a thread posted twice chained its new parts onto the
+// first copy's. Edits pass none: the row they rewrite keeps the hash it was created with.
+const lookupPost = async ({ networkId, author, metadata, txHash }) => {
   const params = new URLSearchParams({
     network_id: String(networkId),
     wallet_address: author,
     metadata,
   })
+  if (txHash) params.set('tx_hash', txHash)
 
   const response = await fetch(`/api/v1/networks/posts/lookup?${params}`, { cache: 'no-store' })
   if (!response.ok) return null
@@ -225,7 +229,7 @@ export function trackPostPublication({
     const tick = async () => {
       let found = null
       try {
-        found = await lookupPost({ networkId, author, metadata })
+        found = await lookupPost({ networkId, author, metadata, txHash: kind === 'edit' ? null : txHash })
       } catch (error) {
         // A dropped request is just a slower poll, never the end of the wait
         console.warn('Post indexing check failed:', error.message)

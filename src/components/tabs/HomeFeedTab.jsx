@@ -42,6 +42,10 @@ const AUTHORED_MERGE_MAX_SCROLL_PX = 200
 // "Who to follow" sits after this post, once, and only when another post follows it.
 const SUGGESTIONS_AFTER_INDEX = 4
 
+// How far a row's block time may sit before its ghost's own clock and still be that ghost's
+// post — the browser and the chain never quite agree on the time
+const GHOST_MATCH_SKEW_S = 60
+
 // Post ids are per network — every chain's HupCommunity numbers its own posts from 1 — so a
 // cross-network feed routinely holds two different posts with the same id. Identity is the pair.
 const postKey = (post) => `${post.network_id}:${post.id}`
@@ -442,7 +446,9 @@ export default function HomeFeedTab({
   //
   // A feed refresh can bring the row in before the indexer lookup has named it, so the row's
   // metadata (the pinned URI both share) counts as the handover too — otherwise ghost and row
-  // sit there side by side. A thread's first part is the exception: its ghost keeps publishing
+  // sit there side by side. Only a row from around the ghost's own time counts: the same words
+  // posted again pin to the same URI, and the older copy is not this post. A thread's first
+  // part is the exception: its ghost keeps publishing
   // until the last part lands, and the row it already resolved to stays out of the list until then.
   const { ghostPosts, heldKeys } = useMemo(() => {
     const held = new Set()
@@ -453,10 +459,17 @@ export default function HomeFeedTab({
 
     const list = posts?.list ?? []
     const listedKeys = new Set(list.map(postKey))
-    const keyByMetadata = new Map(list.filter((item) => item.metadata).map((item) => [`${item.network_id}:${item.metadata}`, postKey(item)]))
+    const rowByMetadata = (entry) =>
+      list.find(
+        (item) =>
+          item.metadata === entry.metadata &&
+          Number(item.network_id) === Number(entry.networkId) &&
+          Date.parse(item.created_at) >= (entry.createdAt - GHOST_MATCH_SKEW_S) * 1000
+      )
     const ghosts = pendingPosts.filter((entry) => {
       if (feedMode === 'network' && Number(entry.networkId) !== Number(networkId)) return false
-      const rowKey = entry.resolvedKey ?? keyByMetadata.get(`${entry.networkId}:${entry.metadata}`)
+      const matched = entry.resolvedKey ? null : rowByMetadata(entry)
+      const rowKey = entry.resolvedKey ?? (matched ? postKey(matched) : null)
       if (entry.held && entry.status === 'publishing' && rowKey) {
         held.add(rowKey)
         return true

@@ -3,6 +3,11 @@
  * @description Answers a single question — "has the indexer written this submission yet?" — for
  * one author's post, keyed by the metadata URI it was published with. The composer polls this
  * after a receipt so it can hold a loading toast until the post really exists in the feed tables.
+ *
+ * The metadata alone does not name one post: a pin is addressed by its content, so the same
+ * author posting the same words twice gets the same URI both times, and an older row would answer
+ * for a submission that has not landed yet. `tx_hash`, when the caller has one, pins the answer to
+ * the transaction it actually sent.
  */
 
 import { NextResponse } from 'next/server'
@@ -16,6 +21,7 @@ export async function GET(request) {
     const networkId = Number(searchParams.get('network_id'))
     const walletAddress = searchParams.get('wallet_address')
     const metadata = searchParams.get('metadata')
+    const txHash = searchParams.get('tx_hash')
 
     if (!networkId || !walletAddress || !metadata) {
       return NextResponse.json(
@@ -28,12 +34,14 @@ export async function GET(request) {
     // `posts`, so the probe stays inside one author's rows instead of scanning the table for an
     // unindexed `metadata`. Both columns are utf8mb4_general_ci, so a checksummed address from
     // the indexer still matches a lowercase one from the client without LOWER() killing the index.
+    // Without a hash, the newest matching row is the likeliest to be this submission.
     const [rows] = await pool.execute(
       `SELECT id, network_id, is_comment, is_deleted
        FROM posts
-       WHERE wallet_address = ? AND network_id = ? AND metadata = ?
+       WHERE wallet_address = ? AND network_id = ? AND metadata = ?${txHash ? ' AND tx_hash = ?' : ''}
+       ORDER BY id DESC
        LIMIT 1`,
-      [walletAddress, networkId, metadata]
+      [walletAddress, networkId, metadata, ...(txHash ? [txHash] : [])]
     )
 
     const row = rows[0]
