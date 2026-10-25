@@ -1,6 +1,7 @@
 'use client'
 
 import BackLink from '@/components/ui/BackLink'
+import Shimmer from '@/components/ui/Shimmer'
 import { postHeaderProps } from './postHeader'
 import styles from './PostTitleRow.module.scss'
 
@@ -21,7 +22,11 @@ export default function PostTitleRow({ post, networkId }) {
       <BackLink href={backHref} label={backLabel} className={styles['post-title__back']} />
       <div className={styles['post-title__heading']}>
         <h1 className={styles['post-title__name']}>Post</h1>
-        {subtitle && <p className={styles['post-title__subtitle']}>{subtitle}</p>}
+        {/* Always rendered: the line holds its height before the count arrives, so the title
+            does not re-centre and nudge the card when it does */}
+        <p className={styles['post-title__subtitle']}>
+          {subtitle === null ? <Shimmer className={styles['post-title__shimmer']} /> : subtitle}
+        </p>
       </div>
     </div>
   )

@@ -11,6 +11,7 @@ import Comments from '@/components/Comments'
 import PostTippers from './PostTippers'
 import ThreadBar from './ThreadBar'
 import { DEFAULT_COMMENTS_SORT } from '@/lib/commentsRequest'
+import { THREAD_PROGRESS_EVENT } from '@/lib/postPublication'
 import ReplyBar from './ReplyBar'
 import PostTitleRow from './PostTitleRow'
 import { usePostStore } from '@/stores/usePostStore'
@@ -103,6 +104,18 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
   const threadMarker = Number(post?.is_repost) > 0 ? null : post?.content?.thread
   const isThreadRoot = Number(threadMarker?.part) === 1 && Number(threadMarker?.of) > 1
   const [threadState, setThreadState] = useState({ forId: null, parts: [] })
+  // Bumped as the author's own thread lands part by part (lib/threadPublication), so a page
+  // opened on part one mid-publish fills in the rest instead of stopping at what it first found
+  const [threadRevision, setThreadRevision] = useState(0)
+
+  useEffect(() => {
+    if (!isThreadRoot) return
+    const onProgress = (event) => {
+      if (sameId(event.detail?.rootId, resolvedPostId) && sameId(event.detail?.networkId, resolvedNetworkId)) setThreadRevision((n) => n + 1)
+    }
+    window.addEventListener(THREAD_PROGRESS_EVENT, onProgress)
+    return () => window.removeEventListener(THREAD_PROGRESS_EVENT, onProgress)
+  }, [resolvedNetworkId, resolvedPostId, isThreadRoot])
 
   useEffect(() => {
     if (!isThreadRoot) return
@@ -112,7 +125,7 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
       .then((body) => { if (!cancelled && Array.isArray(body?.data)) setThreadState({ forId: resolvedPostId, parts: body.data }) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [resolvedNetworkId, resolvedPostId, address, isThreadRoot])
+  }, [resolvedNetworkId, resolvedPostId, address, isThreadRoot, threadRevision])
 
   const threadParts = isThreadRoot && sameId(threadState.forId, resolvedPostId) ? threadState.parts : []
   // Only part 2 replies to the root directly — the list below would show it twice

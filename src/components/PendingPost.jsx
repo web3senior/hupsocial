@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import clsx from 'clsx'
-import { BookmarkSimpleIcon, ChartBarIcon, ChatCircleIcon, CoinsIcon, HeartIcon, RepeatIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { BookmarkSimpleIcon, ChartBarIcon, ChatCircleIcon, HeartIcon, PiggyBankIcon, RepeatIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import Profile from '@/components/Profile'
 import MediaGallery from '@/components/Gallery'
 import { renderMarkdown } from '@/lib/markdown'
@@ -32,6 +32,10 @@ export default function PendingPost({ entry }) {
   const text = getElement(content, 'text')?.data?.text || ''
   const media = getElement(content, 'media')?.data?.items || []
   const hasAttachment = useMemo(() => ATTACHMENT_KEYS.some((key) => content?.[key]), [content])
+  // A thread's first part stands for the whole thread until its last part lands, so it counts
+  // the part in flight — part 1 until lib/threadPublication moves it on
+  const threadOf = Number(content?.thread?.of)
+  const threadPart = entry.progress?.part ?? (threadOf > 1 && status === 'publishing' ? 1 : null)
 
   return (
     <article className={clsx(styles['pending-post'], 'flex flex-column')} aria-hidden="true" data-status={status}>
@@ -49,6 +53,12 @@ export default function PendingPost({ entry }) {
         )}
 
         {hasAttachment && <div className={clsx(styles['pending-post__attachment'], 'shimmer')} />}
+
+        {threadPart && (
+          <p className={styles['pending-post__progress']}>
+            Publishing thread · {threadPart}/{threadOf}
+          </p>
+        )}
       </div>
 
       {/* Every counter starts empty on a post this new, so the live bar looks the same — these
@@ -66,7 +76,7 @@ export default function PendingPost({ entry }) {
               <RepeatIcon width={20} height={20} />
             </button>
             <button type="button" tabIndex={-1} data-action="tip">
-              <CoinsIcon width={18} height={18} />
+              <PiggyBankIcon width={18} height={18} />
             </button>
             <button type="button" tabIndex={-1} data-action="view">
               <ChartBarIcon width={17} height={17} />

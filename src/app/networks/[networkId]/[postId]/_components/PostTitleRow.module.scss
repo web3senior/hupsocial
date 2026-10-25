@@ -59,9 +59,17 @@
   }
 
   &__subtitle {
+    display: flex;
+    align-items: center;
+    min-height: 1.25em;
     margin: 0;
     color: var(--text-muted);
     font-size: var(--font-size-13);
     line-height: 1.25;
+  }
+
+  &__shimmer {
+    width: 4.5em;
+    height: 0.85em;
   }
 }

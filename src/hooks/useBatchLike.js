@@ -154,9 +154,10 @@ export const useBatchLike = () => {
       // client pinned to the basket's own chain
       const targetPublicClient = getPublicClient(config, { chainId: numericChainId }) ?? publicClient
 
-      // Only the wallet write path needs the wallet on the basket's chain — the relay and
-      // the burner session both sign locally against the pinned chain definition. Switching
-      // lazily means a fully sponsored send never opens a network-switch prompt at all.
+      // Only the wallet write path needs the wallet on the basket's chain here — the burner
+      // session signs locally, and a wallet-signed relay request switches inside
+      // relayHupAction. Switching lazily means a session-signed sponsored send never opens a
+      // network-switch prompt at all.
       let walletOnTargetChain = walletChainId === numericChainId
 
       const ensureWalletChain = async () => {

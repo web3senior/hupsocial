@@ -79,6 +79,14 @@
     margin-top: 0.5rem;
   }
 
+  // "Publishing thread · 2/5" — where the live card puts its own "1/5"
+  &__progress {
+    margin: 0.25rem 0 0;
+    color: var(--post-muted, var(--gray-400));
+    font-size: var(--system-13-font-size);
+    font-variant-numeric: tabular-nums;
+  }
+
   // Stands in for a quote, poll, listing or market card until the real one can be resolved by id
   &__attachment {
     height: 96px;

@@ -52,6 +52,25 @@ const COPY = {
   },
 }
 
+// Fired as each part of a thread lands, so a post page already showing the thread's first part
+// can fetch the parts it has not drawn yet
+export const THREAD_PROGRESS_EVENT = 'hup:thread-progress'
+
+/**
+ * Hands a held ghost over to its indexed row and pulls the feed — what an ordinary post does the
+ * moment it is indexed. A thread holds its first part's ghost until every part has landed (or
+ * the thread stops), so the feed shows the thread once, whole.
+ * @param {string} ghostId The ghost's `networkId:metadata` id.
+ * @param {string} resolvedKey The indexed row's `network_id:id`.
+ */
+export const releaseGhost = (ghostId, resolvedKey) => {
+  if (!ghostId) return
+  const ghostStore = usePendingPostStore.getState()
+  ghostStore.updatePendingPost(ghostId, { status: 'indexed', resolvedKey, progress: null })
+  window.setTimeout(() => ghostStore.removePendingPost(ghostId), GHOST_HANDOVER_MS)
+  usePostStore.getState().notifyAuthoredPost()
+}
+
 const lookupPost = async ({ networkId, author, metadata }) => {
   const params = new URLSearchParams({
     network_id: String(networkId),
@@ -130,8 +149,13 @@ const settleTransaction = async ({ networkId, txHash, signature }) => {
  *   and is rewritten onto the existing row by an edit.
  * @param {'post'|'reply'|'edit'} [submission.kind] Picks the wording and where the result is shown.
  * @param {string|number} [submission.parentId] The replied-to post, for `reply` submissions.
- * @param {object} [submission.copy] Overrides some of the kind's wording — a thread names the
+ * @param {object} [submission.copy] Overrides some of the kind's wording — a thread counts the
  *   part in flight, where the kind's own copy would call every part "your post".
+ * @param {object} [submission.handle] A toast already open for this submission. A thread passes
+ *   one handle from part to part, so the author watches one card count up instead of a stack.
+ * @param {boolean} [submission.settles] False for every part of a thread but the last: once
+ *   indexed, the toast stays loading on `copy.done`, and a first part's ghost stays publishing
+ *   until releaseGhost hands it over with the thread whole.
  * @param {string} [submission.txHash] EVM transaction, wallet-signed or relayed.
  * @param {string} [submission.signature] Solana signature — the cluster equivalent of txHash.
  * @param {object} [submission.recovery] `{ props, state }` for putting this exact composer back
@@ -139,6 +163,8 @@ const settleTransaction = async ({ networkId, txHash, signature }) => {
  * @param {Function} [submission.onIndexed] Runs once the post is actually readable. This is the
  *   composer callers pass as `onConfirmed`, and it must never fire for a submission the indexer
  *   never saw.
+ * @param {Function} [submission.onAbandoned] Runs when the wait ends without the post: it reverted,
+ *   or the indexer never answered. A thread uses it to stop holding its first part's ghost.
  */
 export function trackPostPublication({
   networkId,
@@ -147,13 +173,17 @@ export function trackPostPublication({
   kind = 'post',
   parentId = null,
   copy: copyOverride = null,
+  handle: openHandle = null,
+  settles = true,
   txHash = null,
   signature = null,
   recovery = null,
   onIndexed = null,
+  onAbandoned = null,
 }) {
   const copy = { ...(COPY[kind] ?? COPY.post), ...copyOverride }
-  const handle = toast(copy.pending, 'loading')
+  // A handle the author already closed takes no update, so a fresh card stands in for it
+  const handle = openHandle?.update(copy.pending, 'loading') ? openHandle : toast(copy.pending, 'loading')
 
   // Nothing to poll for — better a card that expires than one that spins forever
   if (!networkId || !author || !metadata) {
@@ -173,10 +203,13 @@ export function trackPostPublication({
           id: `${networkId}:${metadata}`,
           networkId: Number(networkId),
           author,
+          metadata,
           content: recovery.state.content,
           createdAt: Math.floor(Date.now() / 1000),
           status: 'publishing',
           resolvedKey: null,
+          // A thread's first part: drawn as publishing until releaseGhost, whatever the feed holds
+          held: !settles,
         }
       : null
 
@@ -199,12 +232,15 @@ export function trackPostPublication({
       }
 
       if (found) {
-        handle.update(copy.done, 'success')
+        handle.update(copy.done, settles ? 'success' : 'loading')
+        const resolvedKey = `${networkId}:${found.id}`
         // Handed over rather than dropped: the feed keeps drawing the ghost until the row it
         // names is actually in the list, so the refresh below swaps one for the other with
-        // nothing blank in between.
-        if (ghost) {
-          ghostStore.updatePendingPost(ghost.id, { status: 'indexed', resolvedKey: `${networkId}:${found.id}` })
+        // nothing blank in between. A held ghost only learns its row — the feed keeps that row
+        // out of sight while the ghost is still publishing — and waits for releaseGhost.
+        if (ghost && !settles) ghostStore.updatePendingPost(ghost.id, { resolvedKey })
+        else if (ghost) {
+          ghostStore.updatePendingPost(ghost.id, { status: 'indexed', resolvedKey })
           window.setTimeout(dropGhost, GHOST_HANDOVER_MS)
         }
         // A reply belongs to a post page's comment list, not the home feed — so it refreshes the
@@ -212,7 +248,7 @@ export function trackPostPublication({
         // is_comment is the parent the indexer actually recorded, which beats the composer's own
         // idea of what was replied to; parentId only stands in if an older row left it null.
         if (kind === 'reply') revealReply({ networkId, parentId: found.is_comment ?? parentId })
-        else usePostStore.getState().notifyAuthoredPost()
+        else if (settles) usePostStore.getState().notifyAuthoredPost()
         onIndexed?.(found)
         return
       }
@@ -222,6 +258,7 @@ export function trackPostPublication({
         // The indexer is behind, not busy: the post surfaces on its own with the next refresh,
         // and a ghost that outlives the wait is a card that never resolves.
         dropGhost()
+        onAbandoned?.()
         return
       }
 
@@ -240,6 +277,7 @@ export function trackPostPublication({
       handle.update(copy.failed, 'error')
       // Nothing landed, so nothing may keep sitting at the top of the feed
       dropGhost()
+      onAbandoned?.()
       // The composer comes back holding everything that was written: the content was pinned
       // before the transaction was ever sent, so a second attempt costs only the signature
       useComposerStore.getState().restoreComposer(recovery)

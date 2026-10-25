@@ -1746,18 +1746,25 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
             if (found?.id) requestTaskFunding({ networkId: Number(pending?.networkId), postId: String(found.id), terms })
           }
         : onConfirmed
-      // A thread's later parts are replies to this one, so they can only start once it has an id
+      // A thread's later parts are replies to this one, so they can only start once it has an id.
+      // The whole thread shares one toast, and a new post's ghost card holds its place in the feed
+      // until the last part lands — the feed shows the thread once, whole.
       const thread = pending?.thread
+      const threadCopy = thread ? threadPartCopy(thread.start, thread.total) : null
+      const threadHandle = thread ? toast(threadCopy.pending, 'loading') : null
+      const ghostId = thread && pending.kind === 'post' ? `${pending.networkId}:${pending.metadata}` : null
       const onFirstIndexed = thread
         ? (found) => {
             onIndexed?.(found)
-            if (found?.id) continueThread({ ...thread, parent: found })
+            if (found?.id) continueThread({ ...thread, parent: found, handle: threadHandle, ghostId })
           }
         : onIndexed
       if (pending) {
         trackPostPublication({
           ...pending,
-          copy: thread ? threadPartCopy(thread.start, thread.total) : null,
+          copy: threadCopy,
+          handle: threadHandle,
+          settles: !thread,
           txHash,
           signature,
           onIndexed: onFirstIndexed,

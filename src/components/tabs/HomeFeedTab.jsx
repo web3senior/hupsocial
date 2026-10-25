@@ -439,18 +439,36 @@ export default function HomeFeedTab({
   // being drawn the moment the row it resolved to is actually in this feed — that is the handover,
   // and doing it per feed means a tab that has not refreshed yet keeps its ghost instead of
   // blanking because some other tab got there first.
-  const ghostPosts = useMemo(() => {
-    if (pendingPosts.length === 0) return []
+  //
+  // A feed refresh can bring the row in before the indexer lookup has named it, so the row's
+  // metadata (the pinned URI both share) counts as the handover too — otherwise ghost and row
+  // sit there side by side. A thread's first part is the exception: its ghost keeps publishing
+  // until the last part lands, and the row it already resolved to stays out of the list until then.
+  const { ghostPosts, heldKeys } = useMemo(() => {
+    const held = new Set()
+    if (pendingPosts.length === 0) return { ghostPosts: [], heldKeys: held }
     // Only feeds a plain new post belongs in: the bazaar and NFT tabs list posts by what they
     // carry, which nothing can know before the post is indexed.
-    if (feedMode !== 'foryou' && feedMode !== 'network') return []
+    if (feedMode !== 'foryou' && feedMode !== 'network') return { ghostPosts: [], heldKeys: held }
 
-    const listedKeys = new Set((posts?.list ?? []).map(postKey))
-    return pendingPosts.filter((entry) => {
+    const list = posts?.list ?? []
+    const listedKeys = new Set(list.map(postKey))
+    const keyByMetadata = new Map(list.filter((item) => item.metadata).map((item) => [`${item.network_id}:${item.metadata}`, postKey(item)]))
+    const ghosts = pendingPosts.filter((entry) => {
       if (feedMode === 'network' && Number(entry.networkId) !== Number(networkId)) return false
-      return !(entry.resolvedKey && listedKeys.has(entry.resolvedKey))
+      const rowKey = entry.resolvedKey ?? keyByMetadata.get(`${entry.networkId}:${entry.metadata}`)
+      if (entry.held && entry.status === 'publishing' && rowKey) {
+        held.add(rowKey)
+        return true
+      }
+      return !(rowKey && listedKeys.has(rowKey))
     })
+    return { ghostPosts: ghosts, heldKeys: held }
   }, [pendingPosts, posts.list, feedMode, networkId])
+  const visiblePosts = useMemo(
+    () => (heldKeys.size ? (posts?.list ?? []).filter((item) => !heldKeys.has(postKey(item))) : posts?.list),
+    [posts.list, heldKeys]
+  )
 
   const lastAuthoredNonceRef = useRef(authoredPostNonce)
   useEffect(() => {
@@ -500,13 +518,13 @@ export default function HomeFeedTab({
             {ghostPosts.map((entry) => (
               <section key={entry.id} className={styles.post}>
                 <PendingPost entry={entry} />
-                {posts?.list?.length > 0 && <hr />}
+                {visiblePosts?.length > 0 && <hr />}
               </section>
             ))}
 
             {postsLoaded === 0 && (loadError ? <FeedError onRetry={handleRetry} /> : <PostSkeletonGrid count={14} />)}
 
-            {posts?.list?.map((item, i) => (
+            {visiblePosts?.map((item, i) => (
               <Fragment key={postKey(item)}>
                 <section
                   // What the scroll restore anchors to and measures; see useFeedScrollRestore.
@@ -524,9 +542,9 @@ export default function HomeFeedTab({
                   onTouchStart={() => handlePostPrefetch(item)}
                 >
                   <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} />
-                  {i < posts.list.length - 1 && <hr />}
+                  {i < visiblePosts.length - 1 && <hr />}
                 </section>
-                {showSuggestions && i === SUGGESTIONS_AFTER_INDEX && i < posts.list.length - 1 && <WhoToFollow />}
+                {showSuggestions && i === SUGGESTIONS_AFTER_INDEX && i < visiblePosts.length - 1 && <WhoToFollow />}
               </Fragment>
             ))}
           </div>

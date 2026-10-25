@@ -19,9 +19,11 @@
  */
 
 import { ethers } from 'ethers'
+import { getConnection, switchChain } from 'wagmi/actions'
 import hupAbi from '@/abi/post.json'
 import pollsAbi from '@/abis/HupPolls.json'
 import { CONTRACTS } from '@/config/contracts'
+import { config } from '@/config/wagmi'
 import { formatWait, gaslessBucketFor, gaslessPolicyFor, isGaslessChainId } from '@/config/gasless'
 import { getBurnerSignerSilent } from '@/lib/burnerSession'
 import { createRelaySubmissionQueue, retryRelayNonce } from './relaySubmission.mjs'
@@ -325,6 +327,11 @@ export const signHupForwardRequest = async ({
     // callers may hand the action to the wallet as an ordinary transaction.
     const code = await publicClient.getCode({ address: owner }).catch(() => null)
     if (isContractAccountCode(code)) throw unsupported('Smart account wallets need an active session key for gasless actions', 'RELAY_NEEDS_SESSION')
+
+    // Wallets refuse typed data whose domain chainId is not their active chain — MetaMask
+    // answers with a bare -32603 "internal error" — so the wallet follows the request's chain
+    // first. The session path signs locally and never needs this.
+    if (getConnection(config).chainId !== chainId) await switchChain(config, { chainId })
 
     from = owner
     sign = (domain, message) =>
