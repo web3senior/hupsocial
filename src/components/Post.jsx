@@ -82,6 +82,7 @@ import { txExplorerUrl } from '@/lib/explorer'
 import { shortTxError } from '@/lib/utils'
 import CommentAction from './ui/CommentAction'
 import Repost from './ui/Repost'
+import Tip from './ui/Tip'
 import View from './ui/View'
 import Bookmark from './ui/Bookmark'
 import Share from './ui/Share'
@@ -485,12 +486,14 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-between`}
           >
             <div className={clsx(styles.post__actions__group, styles['post__actions__group--primary'], 'flex flex-row align-items-center')}>
-              {/* Threads order: like, comment, repost, share */}
+              {/* Threads order: like, comment, repost, share — with tip slotted before share */}
               {actionsSet.has('like') && <Like post={displayItem || item} />}
 
               {actionsSet.has('comment') && <CommentAction post={commentTarget} onComment={setShowCommentModal} />}
 
               {actionsSet.has('repost') && <Repost post={displayItem || item} onQuote={() => setShowQuoteModal(displayItem || item)} />}
+
+              {actionsSet.has('tip') && <Tip post={displayItem || item} onTip={setShowTipModal} />}
 
               {/* captureRef: the card copies itself, exactly as it is on screen */}
               {actionsSet.has('share') && <Share item={displayItem || item} captureRef={sectionRef} />}
