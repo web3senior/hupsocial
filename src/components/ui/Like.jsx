@@ -1,5 +1,7 @@
 'use client'
 
+import Tooltip from './Tooltip'
+
 import { useEffect, useMemo, useRef } from 'react'
 import clsx from 'clsx'
 import { HeartIcon } from '@phosphor-icons/react'
@@ -409,21 +411,23 @@ export const Like = ({ post, onUpdate }) => {
 
   return (
     <div className={clsx('flex', 'align-items-center', 'gap-050')}>
-      <button title={likeLabel}
-        data-action="like"
-        data-liked={isLiked ? 'true' : undefined}
-        data-queued={!isLiked && isQueued ? 'true' : undefined}
-        disabled={isLoading}
-        className={clsx('like-button', isLoading && 'processing', isQueued && 'queued')}
-        onClick={handleLikeInteraction}
-        aria-label={isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
-      >
-        {/* The optimistic heart is the pending feedback — no loader swap, so the
-            icon and counter never jump while the tx settles */}
-        <HeartIcon width={18} height={18} color={heartColor} weight={heartWeight} />
+      <Tooltip content={likeLabel} placement="bottom" size="compact" hoverOnly>
+        <button
+          data-action="like"
+          data-liked={isLiked ? 'true' : undefined}
+          data-queued={!isLiked && isQueued ? 'true' : undefined}
+          disabled={isLoading}
+          className={clsx('like-button', isLoading && 'processing', isQueued && 'queued')}
+          onClick={handleLikeInteraction}
+          aria-label={isLiked ? 'Unlike post' : isQueued ? 'Remove from batch queue' : 'Add to batch'}
+        >
+          {/* The optimistic heart is the pending feedback — no loader swap, so the
+              icon and counter never jump while the tx settles */}
+          <HeartIcon width={18} height={18} color={heartColor} weight={heartWeight} />
 
-        {displayedLikeCount > 0 && <Counter value={displayedLikeCount} />}
-      </button>
+          {displayedLikeCount > 0 && <Counter value={displayedLikeCount} />}
+        </button>
+      </Tooltip>
     </div>
   )
 }

@@ -1,0 +1,196 @@
+// Threads' "Post activity" sheet. Shell, header and summary rows come from DialogSheet; this
+// file owns the preview card and the people list, whose hairlines run to the sheet's edge.
+.activity {
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  &__preview {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  &__previewText {
+    margin: 0;
+    color: var(--foreground);
+    font-size: 15px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    // A glance at the post, not the post: three lines, then it trails off
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__summary {
+    display: flex;
+    flex-direction: column;
+
+    > * {
+      border-bottom: 1px solid var(--border);
+    }
+  }
+
+  // DialogSheet's rows are sized for connector tiles (a 40px icon box the glyph stretches to fill,
+  // a large label); Threads' summary rows are a plain 22px glyph and body-size text
+  &__stat {
+    min-height: 48px;
+    padding-inline: 0.25rem;
+    gap: 0.875rem;
+
+    > span:first-child {
+      width: 22px;
+      height: 22px;
+      border-radius: 0;
+      background: none;
+    }
+
+    [class*='row__name'] {
+      font-size: 15px;
+      font-weight: 400;
+    }
+  }
+
+  &__count {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--foreground);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__people {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__loading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+  }
+
+  &__skeleton {
+    height: 48px;
+    border-radius: 12px;
+  }
+
+  &__sentinel {
+    height: 1px;
+  }
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+
+  &__identity {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__profile {
+    max-width: 100%;
+  }
+
+  // What they did, pinned to the corner of their picture (a 32px avatar at the row's start)
+  &__badge {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--surface);
+    border-radius: 50%;
+    color: #ffffff;
+    pointer-events: none;
+
+    &--like {
+      background-color: #ff3040;
+    }
+
+    &--tip {
+      background-color: var(--tip-earned-color, #21c95e);
+    }
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex: none;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  &__tip {
+    color: var(--tip-earned-color, #21c95e);
+    font-weight: 600;
+  }
+
+  &__follow {
+    flex: none;
+    min-width: 96px;
+    height: 34px;
+    padding: 0 1rem;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background-color: var(--foreground);
+    color: var(--background);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.12s ease;
+
+    &:hover:not(:disabled) {
+      opacity: 0.85;
+    }
+
+    &:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--app-accent);
+      outline-offset: 2px;
+    }
+
+    // Already followed: the outlined, quieter state, as on Threads
+    &--following {
+      border-color: var(--border);
+      background-color: transparent;
+      color: var(--foreground);
+    }
+  }
+
+  &__followShimmer {
+    flex: none;
+    width: 96px;
+    height: 34px;
+    border-radius: 10px;
+  }
+}

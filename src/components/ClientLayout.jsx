@@ -19,6 +19,7 @@ import ComposerRecovery from './ComposerRecovery'
 import TaskFundingHost from './TaskFundingHost'
 import ScheduledPostsRunner from './ScheduledPostsRunner'
 import ChatDock from './chat/ChatDock'
+import PostOverlayHost from './PostOverlayHost'
 import { WalletConnectDialog } from './ConnectWallet'
 import OfflineBanner from './ui/OfflineBanner'
 import { Providers } from '@/app/providers'
@@ -59,7 +60,10 @@ export default function ClientLayout({ children }) {
         <Header />
         <div className={clsx(styles.shell, pathname === '/' && styles['shell--home'])}>
           <Aside inLayoutGrid />
-          <main className={clsx(styles.main, styles['main--grid'], pathname === '/' && styles['main--home'])}>{children}</main>
+          <main className={clsx(styles.main, styles['main--grid'], pathname === '/' && styles['main--home'])}>
+            {/* Lets a feed open a post in place, X-style, with no server roundtrip */}
+            <PostOverlayHost>{children}</PostOverlayHost>
+          </main>
         </div>
         <Footer />
         {/* Removed because it appeas in Universal profile app too. TODO: add a condition later */}

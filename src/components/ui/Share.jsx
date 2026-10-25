@@ -1,8 +1,10 @@
 'use client'
 
+import Tooltip from './Tooltip'
+
 import { cloneElement, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowSquareOutIcon, EnvelopeSimpleIcon, ImageIcon, LinkSimpleIcon, PaperPlaneRightIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, EnvelopeSimpleIcon, ImageIcon, LinkSimpleIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { toast } from '@/components/NextToast'
 import CopyPostImageDialog from '@/components/CopyPostImageDialog'
@@ -148,9 +150,11 @@ export const Share = ({
           if (!event.defaultPrevented) open()
         },
       }) : (
-        <button title="Share" type="button" data-action="share" aria-label="Share post" aria-haspopup="dialog" onClick={open}>
-          <PaperPlaneRightIcon width={17} height={17} />
-        </button>
+        <Tooltip content="Share" placement="bottom" size="compact" hoverOnly>
+          <button type="button" data-action="share" aria-label="Share post" aria-haspopup="dialog" onClick={open}>
+            <UploadSimpleIcon width={17} height={17} />
+          </button>
+        </Tooltip>
       )}
       {mounted && createPortal(
         <NativeDialog

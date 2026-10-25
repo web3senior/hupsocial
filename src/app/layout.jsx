@@ -1,15 +1,9 @@
-import { Geist_Mono, Inter } from 'next/font/google'
+import { Geist_Mono } from 'next/font/google'
 import ClientLayout from '../components/ClientLayout'
 import ServiceWorkerRegistry from '../components/ServiceWorkerRegistry'
 import InternalLinkRouter from '../components/InternalLinkRouter'
 import './Globals.scss'
 import './../styles/Global.scss'
-
-const inter = Inter({
-  variable: '--font-inter',
-  subsets: ['latin'],
-  display: 'swap',
-})
 
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
@@ -118,7 +112,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${inter.variable} ${geistMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={geistMono.variable} suppressHydrationWarning>
       <body>
         <ServiceWorkerRegistry />
         <InternalLinkRouter />

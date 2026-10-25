@@ -32,6 +32,8 @@ export async function GET(request) {
     const search = searchParams.get('search')?.trim()
     const creatorAddress = searchParams.get('creator_address')
     const viewerAddress = searchParams.get('viewer_address')
+    // The composer's community picker: only the communities this wallet stands inside of
+    const memberAddress = searchParams.get('member_address')
 
     // Cross-network directory mode: `contracts` is a comma-separated list of
     // `networkId:contractAddress` pairs (the client's current deployments). It replaces the
@@ -104,6 +106,17 @@ export async function GET(request) {
       // The public directory hides archived communities; a creator looking up their own
       // (via creator_address) can still see theirs regardless of status
       whereClause += ` AND c.is_active = 1`
+    }
+    if (memberAddress) {
+      // Members, moderators, the creator and the DAO governor — everyone canPost() can let through.
+      // Banned rows are out whatever else they say. The finer check (can_post, announcement-only
+      // communities) is the client's, from the `viewer` object attached below.
+      whereClause += ` AND (LOWER(c.creator_address) = ? OR LOWER(c.governor_address) = ? OR EXISTS (
+        SELECT 1 FROM community_members m
+         WHERE m.network_id = c.network_id AND m.contract_address = c.contract_address AND m.community_id = c.id
+           AND LOWER(m.wallet_address) = ? AND m.is_banned = 0 AND (m.is_member = 1 OR m.is_moderator = 1)))`
+      const member = memberAddress.toLowerCase()
+      whereParams.push(member, member, member)
     }
     // LIKE's own wildcards are escaped, so a search for "50%" or "dev_ops" means those
     // characters rather than "anything here"

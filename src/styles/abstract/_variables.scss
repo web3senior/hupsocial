@@ -328,16 +328,17 @@ $secondary-color: #9e481d;
   // Don't add sibling sans tokens; the old --font-family-system / --ff-sans / --ff-segoe
   // duplicates were removed on purpose.
   //
-  // --font-inter is declared by next/font in app/layout.jsx and self-hosted, and already carries
-  // its own metric-adjusted fallback for the paint before the file lands.
-  // The inline fallback inside var() matters: an undefined custom property with no fallback
-  // invalidates the whole font-family declaration rather than just skipping that one entry.
+  // The platform's own UI font, the way Threads renders: SF Pro on Apple, Segoe UI on Windows,
+  // Roboto on Android. Nothing to download, so text paints in its final face on the first frame.
+  // The named fonts back system-ui up where it resolves oddly (some CJK Windows locales map it to
+  // a CJK face for Latin text). Body uses this token directly (Globals.scss); there is no
+  // self-hosted webfont any more.
   // Emoji fonts must stay AFTER the generic sans-serif: Apple Color Emoji's cmap covers
   // U+0020, so if it precedes a font that resolves, iOS renders every word space with the
   // emoji-width space glyph (huge gaps between words). Per-character fallback still reaches
   // the emoji fonts for actual emoji.
 
-  --font-sans:   system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+  --font-sans:   system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
   --font-mono: "InputMono-Regular", monospace;
   --font-family-serif: ui-serif, New York Small, New York, Georgia, Times New Roman, Times, serif;
   --font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;

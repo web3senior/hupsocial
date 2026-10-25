@@ -7,10 +7,13 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, BankIcon, CalendarDotsIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, ToolboxIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, BankIcon, CalendarDotsIcon, CaretDownIcon, CaretRightIcon, UsersThreeIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, ToolboxIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
+import { continueThread, threadPartCopy } from '@/lib/threadPublication'
+import { useProfile } from '@/hooks/useProfile'
+import useMyCommunities from '@/hooks/useMyCommunities'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useActiveChain } from '@/hooks/useActiveChain'
 import useVisualViewport from '@/hooks/useVisualViewport'
@@ -28,6 +31,7 @@ import { MENTION_LINK_PATTERN, mentionLabel, mentionMarkdown } from '@/lib/menti
 import styles from '@/components/NewPost.module.scss'
 import NativeDialog from '@/components/ui/NativeDialog'
 import NativePopover from '@/components/ui/NativePopover'
+import DialogHeader from '@/components/ui/DialogHeader'
 import NetworkSelect from '@/components/ui/NetworkSelect'
 import GifPicker from '@/components/GifPicker'
 import EmojiPicker from '@/components/EmojiPicker'
@@ -63,7 +67,7 @@ import Profile from './Profile'
 import MediaGallery from './Gallery'
 import MentionPicker from './MentionPicker'
 import clsx from 'clsx'
-import { resolveIPFSUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
+import { resolveIPFSUrl, resolveIPFSImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS as uploadToIPFS, withAuthor } from '@/lib/ipfs'
 import { captureVideoPoster } from '@/lib/videoPoster'
 import { shortUploadError } from '@/lib/uploadErrors'
@@ -407,9 +411,63 @@ const restoreCaretState = (editor, caret) => {
   selection.addRange(range)
 }
 
+// ■■■ [Thread Parts] ■■■
+
+// The key the first part's undo history is parked under while a later part is active
+const MAIN_PART = 'main'
+
+// Every part's picture, and the column the rail runs down — the stylesheet reads the width
+// from --rail-avatar-size, so the two cannot drift apart
+const RAIL_AVATAR_SIZE = 40
+// The faded "Add to thread" picture, centered in that same column
+const ADD_PART_AVATAR_SIZE = 22
+
+const partText = (part) => part.content.elements[0].data.text
+const partMedia = (part) => part.content.elements[1].data.items
+const partHasBody = (part) => partText(part).trim().length > 0 || partMedia(part).length > 0
+
+const withMediaItems = (content, update) => ({
+  ...content,
+  elements: content.elements.map((element, index) =>
+    index === 1 ? { ...element, data: { ...element.data, items: update(element.data.items) } } : element
+  ),
+})
+
+const seedHistory = (editor) => ({ stack: [{ html: editor.innerHTML, caret: getCaretState(editor) }], index: 0, timer: null, restoring: false })
+
+const placeCaretAtEnd = (editor) => {
+  if (!editor) return
+  editor.focus()
+  const range = document.createRange()
+  range.selectNodeContents(editor)
+  range.collapse(false)
+  const selection = window.getSelection()
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
+// A community's logo in the picker. The generic glyph holds the slot until the image arrives and
+// stays if it never does — a slow gateway must not leave a hole where the row's picture should be
+const CommunityLogo = ({ src }) => {
+  const [status, setStatus] = useState('loading')
+  if (!src || status === 'failed') return <UsersThreeIcon size={20} />
+  return (
+    <>
+      {status === 'loading' && <UsersThreeIcon size={20} />}
+      <img
+        className={clsx(styles.community__logo, status === 'loading' && styles['community__logo--loading'])}
+        src={resolveStorageImageUrl(src, { width: 64 })}
+        alt=""
+        onLoad={() => setStatus('loaded')}
+        onError={() => setStatus('failed')}
+      />
+    </>
+  )
+}
+
 // ■■■ [Main Component] ■■■
 
-export default function NewPost({ text = '', url = '', seedFiles = null, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget = null, onConfirmed, restoreState = null, article: articleSeed = null, proposal: proposalSeed = null }) {
+export default function NewPost({ text = '', url = '', seedFiles = null, startWithGif = false, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget: communityTargetProp = null, onConfirmed, restoreState = null, article: articleSeed = null, proposal: proposalSeed = null }) {
   const mounted = useClientMounted()
   // Raises this composer's video ceiling; the presign route enforces the same number.
   const { isPremium } = usePremium()
@@ -428,6 +486,14 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
   const isComment = actionType === 'comment'
   const isQuote = actionType === 'quote' && Boolean(quoteTarget)
+
+  // A plain post can be sent into one of the author's communities from the byline, the slot
+  // Threads gives "Community or topic". Picked or handed in by a community page, it is the same
+  // target from here on: chain, sealing, contract and recovery all follow communityTarget.
+  // Restored with the composer it failed in, so a retry lands in the same community.
+  const [pickedCommunity, setPickedCommunity] = useState(() => restoreState?.pickedCommunity ?? null)
+  const canPickCommunity = actionType === 'post' && !communityTargetProp
+  const communityTarget = communityTargetProp ?? (canPickCommunity ? pickedCommunity : null)
   // Both replies and quotes preview the post they target with the same card
   const previewTarget = isComment ? replyTarget : isQuote ? quoteTarget : null
   const previewTargetText = useMemo(() => getReplyTargetText(previewTarget), [previewTarget])
@@ -437,6 +503,18 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     : ''
 
   const [postContent, setPostContent] = useState(() => initialPostContent)
+  // The parts after the first, each with the same { text, media } content as the first. Each goes
+  // onchain as a reply to the part before it once that one is indexed (lib/threadPublication); a
+  // recovered thread comes back with what was left.
+  // initialHtml seeds a part's editor once and never changes, so React never rewrites the DOM the
+  // author is typing into; `content` mirrors that DOM from then on
+  const [threadParts, setThreadParts] = useState(() =>
+    (restoreState?.thread ?? []).map((content) => ({ id: newUploadId(), content, initialHtml: markdownToEditorHtml(content.elements[0].data.text) }))
+  )
+  // The part the cursor is in, null for the first. The one tool row follows it, and every editor
+  // handler below acts on it: focusing a part makes editorRef and historyRef point at that part's.
+  const [activePartId, setActivePartId] = useState(null)
+  const activePartRef = useRef(null)
   const [allowComments, setAllowComments] = useState(() => restoreState?.allowComments ?? true)
   // When the post goes out, as unix seconds, or null for right now (see SchedulePostDialog)
   const [scheduledAt, setScheduledAt] = useState(null)
@@ -547,7 +625,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const [moderationWarning, setModerationWarning] = useState(null)
   const moderationDialogRef = useRef(null)
   const moderationDecisionRef = useRef(false)
+  // The active part's editor — every editing handler reads this one. mainEditorRef is the first
+  // part's, which is also the active one until a later part takes focus (see activatePart).
   const editorRef = useRef(null)
+  const mainEditorRef = useRef(null)
   // Where the caret last sat inside the editor. A selection that leaves the contenteditable is
   // gone — the emoji picker's search field takes focus, and with it the range an insertion needs —
   // so the last in-editor caret is kept here and restored when the text arrives.
@@ -648,10 +729,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
   const postText = postContent.elements[0].data.text
   const mediaItems = postContent.elements[1].data.items
+  // The part the tool row acts on — a part removed while active falls back to the first
+  const activeContent = (activePartId && threadParts.find((part) => part.id === activePartId)?.content) || postContent
+  const activeText = activeContent.elements[0].data.text
+  const activeMediaItems = activeContent.elements[1].data.items
+  // Every tile in the thread, the first part's and each later one's
+  const allMediaItems = [...mediaItems, ...threadParts.flatMap((part) => part.content.elements[1].data.items)]
   // Uploads run behind their tiles and gate nothing but Esc and the final submit — the author
   // keeps writing, the toolbar stays live, and Post waits for the last transfer itself
-  const hasPendingUploads = mediaItems.some(isTransferring)
-  const hasFailedUploads = mediaItems.some((item) => item.status === 'failed')
+  const hasPendingUploads = allMediaItems.some(isTransferring)
+  const hasFailedUploads = allMediaItems.some((item) => item.status === 'failed')
   const isBusy = isSigning || isSubmitting
   const hasPostBody =
     postText.trim().length > 0 ||
@@ -695,8 +782,108 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // Only a plain post or a quote can wait for a later time: a reply belongs to a live thread, a
   // community post is sealed for one room's key, and Solana has no relayer path to hold it in
   // A task post is funded once it is indexed, so it has to go out now
-  const canSchedule = (actionType === 'post' || isQuote) && !communityTarget && !isSolanaTarget && !hupTask && canScheduleOn(targetChainId)
+  // A thread neither: its later parts need the earlier ones' ids, which a held signature can't know
+  const canSchedule =
+    (actionType === 'post' || isQuote) && !communityTarget && !isSolanaTarget && !hupTask && threadParts.length === 0 && canScheduleOn(targetChainId)
   const isScheduled = canSchedule && Boolean(scheduledAt)
+  // Anything new can grow into a thread. An edit rewrites one post that already exists, and a
+  // sealed task reply is one submission to the task owner, not a conversation.
+  const canThread = actionType !== 'edit' && !sealsReply && !isScheduled
+  // Empty parts are dropped at submit rather than refused, as Threads does
+  const threadBodies = canThread ? threadParts.filter(partHasBody) : []
+  const isThreadOverLimit = canThread && threadParts.some((part) => partText(part).length > MAX_POST_LENGTH)
+  // Threads greys "Add to thread" until the part above it says something
+  const lastPart = threadParts[threadParts.length - 1]
+  const canAddPart = lastPart ? partHasBody(lastPart) : hasPostBody
+  const { profile: signerProfile } = useProfile(signerAddress || null)
+  // Only the communities this wallet can post in; none at all and the picker never shows
+  const { communities: myCommunities } = useMyCommunities(canPickCommunity ? address : null)
+  const showCommunityPicker = canPickCommunity && (myCommunities.length > 0 || Boolean(pickedCommunity))
+  // A task is keyed to a post outside any community, and a community post can't be held for
+  // later — so either one settles the question before the picker is opened
+  const isCommunityPickLocked = Boolean(hupTask) || isScheduled
+  const signerName = signerProfile?.username || signerProfile?.name || ''
+
+  // Writes one part's content; null is the first part
+  const setPartContent = (partId, update) => {
+    if (!partId) setPostContent(update)
+    else setThreadParts((parts) => parts.map((part) => (part.id === partId ? { ...part, content: update(part.content) } : part)))
+  }
+
+  // Each later part's editor, and the parked undo history of every editor that isn't active
+  const partEditorsRef = useRef(new Map())
+  const partHistoriesRef = useRef(new Map())
+  // The part just added, focused once its editor has mounted
+  const pendingFocusRef = useRef(null)
+
+  // Hands the editor handlers to another part. The outgoing part's pending undo step is flushed
+  // first: it reads editorRef, which is about to point somewhere else.
+  const activatePart = (partId) => {
+    if (activePartRef.current === partId) return
+    const editor = partId ? partEditorsRef.current.get(partId) : mainEditorRef.current
+    if (!editor) return
+    const outgoing = historyRef.current
+    if (outgoing.timer) {
+      clearTimeout(outgoing.timer)
+      pushHistorySnapshot()
+    }
+    partHistoriesRef.current.set(activePartRef.current ?? MAIN_PART, outgoing)
+    editorRef.current = editor
+    historyRef.current = partHistoriesRef.current.get(partId ?? MAIN_PART) ?? seedHistory(editor)
+    lastCaretRef.current = null
+    activePartRef.current = partId
+    setActivePartId(partId)
+    setMention(null)
+  }
+
+  // Ref callback with a cleanup (React 19): files the editor under its part and catches
+  // context-menu undo, which arrives as beforeinput — same as on the first part's editor
+  const registerPartEditor = (partId) => (editor) => {
+    partEditorsRef.current.set(partId, editor)
+    const handleBeforeInput = (event) => {
+      if (event.inputType === 'historyUndo') {
+        event.preventDefault()
+        undoEdit()
+      } else if (event.inputType === 'historyRedo') {
+        event.preventDefault()
+        redoEdit()
+      }
+    }
+    editor.addEventListener('beforeinput', handleBeforeInput)
+    return () => {
+      editor.removeEventListener('beforeinput', handleBeforeInput)
+      if (partEditorsRef.current.get(partId) === editor) partEditorsRef.current.delete(partId)
+    }
+  }
+
+  const addThreadPart = () => {
+    if (!canAddPart) return
+    const id = newUploadId()
+    pendingFocusRef.current = id
+    setThreadParts((parts) => [...parts, { id, content: createPostContent(), initialHtml: '' }])
+  }
+
+  useEffect(() => {
+    const id = pendingFocusRef.current
+    const editor = id && partEditorsRef.current.get(id)
+    if (!editor) return
+    pendingFocusRef.current = null
+    editor.focus()
+  }, [threadParts])
+
+  // A part takes its uploads with it, and hands the cursor to the part above
+  const removeThreadPart = (id) => {
+    const index = threadParts.findIndex((part) => part.id === id)
+    if (index === -1) return
+    partMedia(threadParts[index]).forEach(releaseMediaItem)
+    if (activePartRef.current === id) {
+      const previousId = threadParts[index - 1]?.id ?? null
+      activatePart(previousId)
+      placeCaretAtEnd(previousId ? partEditorsRef.current.get(previousId) : mainEditorRef.current)
+    }
+    partHistoriesRef.current.delete(id)
+    setThreadParts((parts) => parts.filter((part) => part.id !== id))
+  }
 
   // Relay reads (forwarder nonce, account code) must hit the chain the submission lands on
   const targetPublicClient = usePublicClient({ chainId: targetChainId || undefined })
@@ -883,8 +1070,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
   const dismissMention = useCallback(() => setMention(null), [])
 
+  // Lands in whichever part is being typed into — focus activated it before the first keystroke
   const updateTextContent = (nextText) => {
-    setPostContent((prevContent) => {
+    setPartContent(activePartRef.current, (prevContent) => {
       const nextElements = [...prevContent.elements]
       nextElements[0] = {
         ...nextElements[0],
@@ -971,27 +1159,16 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // Show the modal dialog and initialize the editor once the component mounts —
   // callers keep the mount = open / unmount = close contract
   useEffect(() => {
-    if (!mounted || isWalletMissing || !editorRef.current) return
+    if (!mounted || isWalletMissing || !mainEditorRef.current) return
     dialogRef.current?.open()
-    editorRef.current.innerHTML = markdownToEditorHtml(postText)
-    editorRef.current.focus()
-    // Move cursor to end
-    const range = document.createRange()
-    const sel = window.getSelection()
-    range.selectNodeContents(editorRef.current)
-    range.collapse(false)
-    sel.removeAllRanges()
-    sel.addRange(range)
+    const editor = mainEditorRef.current
+    editorRef.current = editor
+    editor.innerHTML = markdownToEditorHtml(postText)
+    placeCaretAtEnd(editor)
 
     // Seed the undo history with the initial content and catch context-menu
     // undo/redo, which arrives as beforeinput instead of a keydown
-    const editor = editorRef.current
-    historyRef.current = {
-      stack: [{ html: editor.innerHTML, caret: getCaretState(editor) }],
-      index: 0,
-      timer: null,
-      restoring: false,
-    }
+    historyRef.current = seedHistory(editor)
     const handleBeforeInput = (event) => {
       if (event.inputType === 'historyUndo') {
         event.preventDefault()
@@ -1091,7 +1268,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
     if (imageItem) {
       event.preventDefault()
-      if (mediaItems.length >= MAX_MEDIA_ITEMS) {
+      if (activeMediaItems.length >= MAX_MEDIA_ITEMS) {
         toast(`Maximum ${MAX_MEDIA_ITEMS} media items reached`, 'error')
         return
       }
@@ -1102,12 +1279,19 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         toast(`File size error. Maximum size is ${MAX_MEDIA_SIZE_MB}MB`, 'error')
         return
       }
+      // Pinned before the probe: the image belongs to the part it was pasted into
+      const partId = activePartRef.current
       const dimensions = await getMediaDimensions(file, 'image')
-      attachFile(file, 'image', {
-        alt: `Hup asset image | ${postText.slice(0, 30)}...`,
-        width: dimensions.width,
-        height: dimensions.height,
-      })
+      attachFile(
+        file,
+        'image',
+        {
+          alt: `Hup asset image | ${activeText.slice(0, 30)}...`,
+          width: dimensions.width,
+          height: dimensions.height,
+        },
+        partId
+      )
       return
     }
 
@@ -1203,18 +1387,23 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     []
   )
 
+  // Found by upload id wherever its tile sits, so a transfer keeps reporting to its own part
+  // whichever part the author has moved on to. Parts without the tile keep their identity.
   const updateMediaItem = (uploadId, update) => {
-    setPostContent((prevContent) => {
-      const nextElements = [...prevContent.elements]
-      const mediaElement = nextElements[1]
-      nextElements[1] = {
-        ...mediaElement,
-        data: {
-          ...mediaElement.data,
-          items: mediaElement.data.items.map((item) => (item.uploadId === uploadId ? update(item) : item)),
-        },
-      }
-      return { ...prevContent, elements: nextElements }
+    const apply = (content) =>
+      content.elements[1].data.items.some((item) => item.uploadId === uploadId)
+        ? withMediaItems(content, (items) => items.map((item) => (item.uploadId === uploadId ? update(item) : item)))
+        : content
+    setPostContent(apply)
+    setThreadParts((parts) => {
+      let changed = false
+      const next = parts.map((part) => {
+        const content = apply(part.content)
+        if (content === part.content) return part
+        changed = true
+        return { ...part, content }
+      })
+      return changed ? next : parts
     })
   }
 
@@ -1293,7 +1482,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
   // Every attachment starts as a tile with a blob-URL preview and no cid, and the upload runs
   // behind it — nothing in the composer waits for the bytes
-  const attachFile = (file, mediaType, meta) => {
+  const attachFile = (file, mediaType, meta, partId = activePartRef.current) => {
     const uploadId = newUploadId()
     const item = {
       uploadId,
@@ -1311,15 +1500,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       status: 'uploading',
       progress: 0,
     }
-    setPostContent((prevContent) => {
-      const nextElements = [...prevContent.elements]
-      const mediaElement = nextElements[1]
-      nextElements[1] = {
-        ...mediaElement,
-        data: { ...mediaElement.data, items: [...mediaElement.data.items, item] },
-      }
-      return { ...prevContent, elements: nextElements }
-    })
+    setPartContent(partId, (prevContent) => withMediaItems(prevContent, (items) => [...items, item]))
     startUpload(uploadId, file, mediaType)
   }
 
@@ -1353,7 +1534,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   }
 
   const triggerFileInput = (type) => {
-    if (mediaItems.length >= MAX_MEDIA_ITEMS) {
+    if (activeMediaItems.length >= MAX_MEDIA_ITEMS) {
       toast(`Maximum ${MAX_MEDIA_ITEMS} media items reached`, 'error')
       return
     }
@@ -1405,7 +1586,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   const ingestFiles = async (files, expectedType) => {
     if (!files.length) return
 
-    const remainingSlots = MAX_MEDIA_ITEMS - mediaItems.length
+    // Pinned up front: the probes below await, and the files belong to the part that asked for them
+    const partId = activePartRef.current
+    const remainingSlots = MAX_MEDIA_ITEMS - activeMediaItems.length
     if (remainingSlots <= 0) {
       toast(`Maximum ${MAX_MEDIA_ITEMS} media items reached`, 'error')
       return
@@ -1440,13 +1623,18 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         getMediaDimensions(file, mediaType),
         detectAiProvenance(file),
       ])
-      attachFile(file, mediaType, {
-        alt: `Hup asset ${mediaType} | ${postText.slice(0, 30)}...`,
-        width: dimensions.width,
-        height: dimensions.height,
-        duration: mediaType !== 'image' ? (dimensions.duration || 0) : undefined,
-        aiGenerated: provenance.aiGenerated,
-      })
+      attachFile(
+        file,
+        mediaType,
+        {
+          alt: `Hup asset ${mediaType} | ${activeText.slice(0, 30)}...`,
+          width: dimensions.width,
+          height: dimensions.height,
+          duration: mediaType !== 'image' ? (dimensions.duration || 0) : undefined,
+          aiGenerated: provenance.aiGenerated,
+        },
+        partId
+      )
     }
   }
 
@@ -1457,7 +1645,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   }
 
   const openGifPicker = () => {
-    if (mediaItems.length >= MAX_MEDIA_ITEMS) {
+    if (activeMediaItems.length >= MAX_MEDIA_ITEMS) {
       toast(`Maximum ${MAX_MEDIA_ITEMS} media items reached`, 'error')
       return
     }
@@ -1467,11 +1655,13 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
   // A picked GIF flows through the same IPFS pipeline as uploaded files, so the
   // feed renders it like any other image and the post never depends on Giphy's CDN
   const handleGifSelect = async (gif) => {
-    if (mediaItems.length >= MAX_MEDIA_ITEMS) {
+    if (activeMediaItems.length >= MAX_MEDIA_ITEMS) {
       toast(`Maximum ${MAX_MEDIA_ITEMS} media items reached`, 'error')
       return
     }
 
+    // The picker took focus but left the active part alone; pin it before the download awaits
+    const partId = activePartRef.current
     try {
       const response = await fetch(gif.full.url)
       if (!response.ok) throw new Error('GIF download failed')
@@ -1483,52 +1673,41 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       }
 
       const file = new File([blob], `giphy-${gif.id}.gif`, { type: 'image/gif' })
-      attachFile(file, 'image', {
-        alt: gif.title || 'GIF',
-        width: gif.full.width || undefined,
-        height: gif.full.height || undefined,
-      })
+      attachFile(
+        file,
+        'image',
+        {
+          alt: gif.title || 'GIF',
+          width: gif.full.width || undefined,
+          height: gif.full.height || undefined,
+        },
+        partId
+      )
     } catch (error) {
       console.error('Trouble adding GIF:', error)
       toast(shortUploadError(error, 'Error adding GIF'), 'error')
     }
   }
 
-  const handleRemoveMedia = (itemIndex) => {
-    const item = mediaItems[itemIndex]
+  // Lets go of a tile's preview and, mid-transfer, its upload — nobody will reference what it pins
+  function releaseMediaItem(item) {
     if (item?.localUrl) URL.revokeObjectURL(item.localUrl)
     if (item?.uploadId) {
-      /* Removing a tile mid-transfer cancels the transfer — nobody will reference what it pins */
       uploadsRef.current.get(item.uploadId)?.controller.abort()
       uploadsRef.current.delete(item.uploadId)
     }
-    setPostContent((prevContent) => {
-      const nextElements = [...prevContent.elements]
-      const mediaElement = nextElements[1]
-      nextElements[1] = {
-        ...mediaElement,
-        data: { ...mediaElement.data, items: mediaElement.data.items.filter((_, index) => index !== itemIndex) },
-      }
-      return { ...prevContent, elements: nextElements }
-    })
   }
 
-  const toggleSpoiler = (itemIndex) => {
-    setPostContent((prevContent) => {
-      const nextElements = prevContent.elements.map((element, elementIndex) => {
-        if (elementIndex !== 1) return element
-        return {
-          ...element,
-          data: {
-            ...element.data,
-            items: element.data.items.map((item, index) =>
-              index === itemIndex ? { ...item, spoiler: !item.spoiler } : item
-            ),
-          },
-        }
-      })
-      return { ...prevContent, elements: nextElements }
-    })
+  const handleRemoveMedia = (itemIndex, partId = null) => {
+    const items = partId ? partMedia(threadParts.find((part) => part.id === partId)) : mediaItems
+    releaseMediaItem(items[itemIndex])
+    setPartContent(partId, (prevContent) => withMediaItems(prevContent, (current) => current.filter((_, index) => index !== itemIndex)))
+  }
+
+  const toggleSpoiler = (itemIndex, partId = null) => {
+    setPartContent(partId, (prevContent) =>
+      withMediaItems(prevContent, (items) => items.map((item, index) => (index === itemIndex ? { ...item, spoiler: !item.spoiler } : item)))
+    )
   }
 
   useEffect(() => {
@@ -1567,7 +1746,23 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
             if (found?.id) requestTaskFunding({ networkId: Number(pending?.networkId), postId: String(found.id), terms })
           }
         : onConfirmed
-      if (pending) trackPostPublication({ ...pending, txHash, signature, onIndexed })
+      // A thread's later parts are replies to this one, so they can only start once it has an id
+      const thread = pending?.thread
+      const onFirstIndexed = thread
+        ? (found) => {
+            onIndexed?.(found)
+            if (found?.id) continueThread({ ...thread, parent: found })
+          }
+        : onIndexed
+      if (pending) {
+        trackPostPublication({
+          ...pending,
+          copy: thread ? threadPartCopy(thread.start, thread.total) : null,
+          txHash,
+          signature,
+          onIndexed: onFirstIndexed,
+        })
+      }
 
       handleClose()
     },
@@ -1722,11 +1917,11 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     }
 
     if (!hasPostBody) {
-      editorRef.current?.focus()
+      placeCaretAtEnd(mainEditorRef.current)
       return
     }
 
-    if (isTextOverLimit) {
+    if (isTextOverLimit || isThreadOverLimit) {
       toast(`Post is too long. Maximum ${MAX_POST_LENGTH} characters`, 'error')
       return
     }
@@ -1748,7 +1943,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
 
       // Tiles still uploading are collected here rather than gating the button: the author
       // finished writing while the bytes moved, and Post simply waits for the last of them
-      const pendingIds = mediaItems.filter(isTransferring).map((item) => item.uploadId)
+      const pendingIds = allMediaItems.filter(isTransferring).map((item) => item.uploadId)
       const uploaded = await Promise.all(pendingIds.map((uploadId) => uploadsRef.current.get(uploadId)?.promise ?? null))
       if (uploaded.some((result) => !result)) {
         toast('An attachment failed to upload — retry or remove it', 'error')
@@ -1809,26 +2004,60 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         const existingContent = getContentPayload(existingPost)
         if (existingContent?.quoteOf) serializableContent.quoteOf = existingContent.quoteOf
         if (existingContent?.communityId) serializableContent.communityId = existingContent.communityId
+        if (existingContent?.thread) serializableContent.thread = existingContent.thread
       }
 
-      const moderationRes = await fetch('/api/moderation/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: serializableContent }),
+      // Every part of a thread says where it sits — { part, of } — which is how the post page
+      // tells the author's thread apart from a later reply to themselves and draws it as one
+      // piece. Ids can't go in: none exist yet when the parts are pinned. Set (or cleared) on
+      // every new submission, so a recovered composer whose parts were removed loses the marker.
+      // A part that failed mid-thread comes back as its own composer (lib/threadPublication), and
+      // numbers on from where the thread broke rather than starting over at 1
+      const threadStart = restoreState?.threadStart ?? 1
+      const threadTotal = threadStart + threadBodies.length
+      if (actionType !== 'edit') serializableContent.thread = threadTotal > 1 ? { part: threadStart, of: threadTotal } : undefined
+
+      // The rest of a thread goes through the same checks as the first part, all of it before
+      // anything is signed — a later part can't be stopped once part one is out. Built without
+      // touching state: the text element is copied, not rewritten in place.
+      const threadContents = threadBodies.map((part, partIndex) => {
+        const content = getSerializablePostContent(withUploadResults(part.content, uploaded))
+        return {
+          ...content,
+          elements: content.elements.map((element, index) =>
+            index === 0 ? { ...element, data: { ...element.data, text: stripLoneSurrogates(element.data.text) } } : element
+          ),
+          thread: { part: threadStart + partIndex + 1, of: threadTotal },
+        }
       })
-      const moderation = await moderationRes.json().catch(() => ({}))
+
+      // A sealed envelope carries the marker in the clear as well: the server has to find the
+      // parts without the community key. It says only "part 2 of 3", nothing of what was written.
+      const withThreadMarker = (sealed, content) => (sealed?.encrypted && content.thread ? { ...sealed, thread: content.thread } : sealed)
+
+      const verdicts = await Promise.all(
+        [serializableContent, ...threadContents].map(async (content) => {
+          const moderationRes = await fetch('/api/moderation/check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content }),
+          })
+          return moderationRes.json().catch(() => ({}))
+        })
+      )
       // Block tier (CSAM, explicit sexual imagery) has no override — pinning it to IPFS
       // would make the platform itself the host
-      if (moderation?.blocked) {
+      if (verdicts.some((moderation) => moderation?.blocked)) {
         toast('This content can’t be published on Hup.', 'error')
         return
       }
-      if (moderation?.flagged) {
+      if (verdicts.some((moderation) => moderation?.flagged)) {
         // Advisory, never a gate — the author always keeps the final say. Flagged posts are
         // still labeled by the indexer (moderation_flagged) so clients can blur or collapse them.
+        const categories = [...new Set(verdicts.flatMap((moderation) => (moderation?.flagged ? moderation.categories || [] : [])))]
         const proceed = await new Promise((resolve) => {
           moderationDecisionRef.current = false
-          setModerationWarning({ categories: moderation.categories || [], resolve })
+          setModerationWarning({ categories, resolve })
         })
         setModerationWarning(null)
         if (!proceed) return
@@ -1838,7 +2067,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       // (moderation must see plaintext) and before upload. null = blocked (toast already shown).
       let contentForUpload = serializableContent
       if (communityContext && actionType !== 'edit') {
-        contentForUpload = await sealForCommunity(serializableContent)
+        contentForUpload = withThreadMarker(await sealForCommunity(serializableContent), serializableContent)
         if (contentForUpload === null) return
       }
 
@@ -1865,6 +2094,20 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         return
       }
 
+      // Every later part is pinned now, sealed and stamped exactly like the first, so all that is
+      // left once the composer closes is one transaction per part
+      const threadPins = await Promise.all(
+        threadContents.map(async (content) => {
+          let partForUpload = communityContext ? withThreadMarker(await sealForCommunity(content), content) : content
+          if (partForUpload === null) return null
+          if (!partForUpload.encrypted) partForUpload = withAuthor(partForUpload, signerAddress)
+          const { cid } = await uploadObjectToIPFS(partForUpload)
+          if (!cid) throw new Error('CID not found')
+          return { metadata: cid, content }
+        })
+      )
+      if (threadPins.includes(null)) return
+
       // The metadata URI is the one handle on this submission that works everywhere: it exists
       // before the transaction is sent (so the relayed path has it too), it is what the indexer
       // stores verbatim, and an edit rewrites it onto the row it already has.
@@ -1878,9 +2121,30 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
         // the author has already moved on. The content is the plaintext payload, never the sealed
         // one — a community post has to come back editable, not as ciphertext.
         recovery: {
-          props: { actionType, existingPost, replyTarget, quoteTarget, communityTarget, onConfirmed },
-          state: { content: serializableContent, allowComments },
+          props: { actionType, existingPost, replyTarget, quoteTarget, communityTarget: communityTargetProp, onConfirmed },
+          state: {
+            content: serializableContent,
+            allowComments,
+            thread: threadContents,
+            threadStart,
+            pickedCommunity: canPickCommunity ? pickedCommunity : null,
+          },
         },
+        // What lib/threadPublication needs to send the later parts once this one is indexed. The
+        // Solana signer is captured while the wallet is in hand; the composer is gone by then.
+        thread: threadPins.length
+          ? {
+              parts: threadPins,
+              start: threadStart,
+              total: threadTotal,
+              networkId: targetChainId,
+              owner: signerAddress,
+              chain: targetChain,
+              publicClient: targetPublicClient,
+              solanaSigner: isSolanaTarget ? solanaWallet.getSigner() : null,
+              allowComments,
+            }
+          : null,
       }
 
       if (isSolanaTarget) {
@@ -1979,9 +2243,10 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     toast(describeWalletError(submitError, { fallback: 'Transaction rejected' }), 'error')
   }, [submitError])
 
+  // Every part's tiles, so closing the composer revokes the previews of all of them
   useEffect(() => {
-    mediaItemsRef.current = mediaItems
-  }, [mediaItems])
+    mediaItemsRef.current = [...mediaItems, ...threadParts.flatMap(partMedia)]
+  }, [mediaItems, threadParts])
 
   // Files handed over by the OS share sheet (app/share/page.jsx) attach themselves once the
   // composer mounts. Guarded by a ref, not the dependency list: ingesting uploads to IPFS,
@@ -1991,6 +2256,17 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     seededRef.current = true
     ingestFiles(Array.from(seedFiles), null)
   }, [seedFiles]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // An entry point that already chose "GIF" (the post page's reply bar) lands in the picker
+  // rather than making the user find the same button a second time. Waits for the composer's own
+  // dialog (opened by the mount effect above, declared earlier so it runs first) — a picker shown
+  // before it would sit under the composer in the top layer. Once only, like seedFiles.
+  const gifStartedRef = useRef(false)
+  useEffect(() => {
+    if (!startWithGif || gifStartedRef.current || !dialogRef.current?.isOpen()) return
+    gifStartedRef.current = true
+    gifPickerRef.current?.open()
+  }, [startWithGif, mounted, isWalletMissing])
 
   // A recovered composer never touches the draft keys. It is the second composer on screen
   // whenever the author started writing again while the transaction was in flight, and there is
@@ -2030,6 +2306,187 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
     }
   }, [])
 
+  // One part's tiles — the first part's or a later one's, so remove and spoiler know which
+  const renderMedia = (items, partId) => (
+    <>
+      {items.some((item) => item.type !== 'audio') && (
+        <div className={styles.mediaGrid}>
+          {items.map((item, index) => {
+            if (item.type === 'audio') return null
+            const mediaSrc = getMediaPreviewSrc(item)
+            const isUploadingItem = isTransferring(item)
+            const isFailedItem = item.status === 'failed'
+            const percent = Math.floor((item.progress || 0) * 100)
+            return (
+              <figure
+                key={`${item.uploadId || item.cid || item.localUrl || index}`}
+                className={clsx(styles.mediaItem, {
+                  [styles['mediaItem--uploading']]: isUploadingItem,
+                  [styles['mediaItem--failed']]: isFailedItem,
+                })}
+              >
+                {item.type === 'image' ? (
+                  <img src={mediaSrc} alt={item.alt || ''} className={item.spoiler ? styles.spoiler : undefined} />
+                ) : (
+                  <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
+                )}
+                {isUploadingItem && (
+                  <span className={styles.mediaItem__badge}>
+                    {item.status === 'optimizing' ? `Optimizing ${percent}%` : `${percent}%`}
+                  </span>
+                )}
+                {isFailedItem && (
+                  <span className={clsx(styles.mediaItem__badge, styles['mediaItem__badge--failed'])}>Upload failed</span>
+                )}
+                {isUploadingItem && (
+                  <div
+                    className={styles.mediaItem__progress}
+                    role="progressbar"
+                    aria-label="Upload progress"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={percent}
+                  >
+                    <span className={styles.mediaItem__progressBar} style={{ width: `${percent}%` }} />
+                  </div>
+                )}
+                {/* Actions sit under the media, always visible — there is no hover on a phone */}
+                <figcaption>
+                  {isFailedItem ? (
+                    <button type="button" onClick={() => retryUpload(item.uploadId)}>
+                      <ArrowClockwiseIcon size={14} />
+                      <span>Retry</span>
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => toggleSpoiler(index, partId)}>
+                      <XIcon size={14} />
+                      <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
+                    </button>
+                  )}
+                  <button type="button" onClick={() => handleRemoveMedia(index, partId)}>
+                    <TrashIcon size={14} />
+                    <span>{isUploadingItem ? 'Cancel' : 'Remove'}</span>
+                  </button>
+                </figcaption>
+              </figure>
+            )
+          })}
+        </div>
+      )}
+
+      {items.some((item) => item.type === 'audio') && (
+        <div className={styles.audioList}>
+          {items.map((item, index) => {
+            if (item.type !== 'audio') return null
+            const mediaSrc = getMediaPreviewSrc(item)
+            return (
+              <div
+                key={`${item.uploadId || item.cid || item.localUrl || index}`}
+                className={clsx(styles.audioListItem, {
+                  [styles['audioListItem--uploading']]: item.status === 'uploading',
+                  [styles['audioListItem--failed']]: item.status === 'failed',
+                })}
+              >
+                <audio src={mediaSrc} controls />
+                {item.status === 'uploading' && (
+                  <span className={styles.audioListItem__status}>{Math.floor((item.progress || 0) * 100)}%</span>
+                )}
+                {item.status === 'failed' && (
+                  <button type="button" className={styles.audioRemoveButton} onClick={() => retryUpload(item.uploadId)} aria-label="Retry upload">
+                    <ArrowClockwiseIcon size={14} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={styles.audioRemoveButton}
+                  onClick={() => handleRemoveMedia(index, partId)}
+                  aria-label={item.status === 'uploading' ? 'Cancel upload' : 'Remove audio'}
+                >
+                  <TrashIcon size={14} />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+
+  // The one tool row, drawn under whichever part has the cursor, as in Threads. A part removed
+  // while active leaves activeContent on the first part, and the row with it.
+  const toolbarPartId = activeContent === postContent ? null : activePartId
+  const toolbar = (
+    <div className={styles.toolbar} aria-label="Post tools">
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => triggerFileInput('image')} title="Image" aria-label="Add image" disabled={isBusy}>
+        <ImageIcon size={20} />
+      </button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => triggerFileInput('video')} title="Video" aria-label="Add video" disabled={isBusy}>
+        <MonitorPlayIcon size={20} />
+      </button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={openGifPicker} title="GIF" aria-label="Add GIF" disabled={isBusy}>
+        <GifIcon size={20} />
+      </button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => triggerFileInput('audio')} title="Audio" aria-label="Add audio" disabled={isBusy}>
+        <MicrophoneIcon size={20} />
+      </button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('strong')} title="Bold" aria-label="Bold" disabled={isBusy}>
+        <TextBIcon size={20} />
+      </button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('em')} title="Italic" aria-label="Italic" disabled={isBusy}>
+        <TextItalicIcon size={20} />
+      </button>
+      <EmojiPicker onSelect={insertTextAtCaret} disabled={isBusy} />
+      {/* Attachments are one-per-thread objects (a poll, a task, a listing): first part only */}
+      {!toolbarPartId && attachOptions.length > 0 && (
+        <NativePopover
+          placement="top-start"
+          className={styles.attachPanel}
+          trigger={
+            <button
+              type="button"
+              className={styles.attachTrigger}
+              onMouseDown={(e) => e.preventDefault()}
+              title="Attach"
+              aria-label="Attach something to this post"
+              disabled={isBusy}
+            >
+              <PlusIcon size={14} weight="bold" />
+              <span>Attach</span>
+            </button>
+          }
+        >
+          {({ close }) => (
+            <ul className={styles.attachMenu}>
+              {attachOptions.map((option) => {
+                const Icon = option.icon
+                return (
+                  <li key={option.key}>
+                    <button
+                      type="button"
+                      className={styles.attachMenu__item}
+                      disabled={isBusy || option.attached}
+                      onClick={() => {
+                        close()
+                        openAttachment(option.key)
+                      }}
+                    >
+                      <Icon size={20} />
+                      <span className={styles.attachMenu__text}>
+                        <span className={styles.attachMenu__label}>{option.label}</span>
+                        <span className={styles.attachMenu__hint}>{option.hint}</span>
+                      </span>
+                      {option.attached && <CheckIcon size={16} weight="bold" />}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </NativePopover>
+      )}
+    </div>
+  )
+
   if (!mounted) return null
 
   return (
@@ -2047,22 +2504,20 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       onClose={(e) => e.stopPropagation()}
       onExited={finishClose}
     >
-      <header className={styles.header}>
-        <button type="button" className={styles.header__close} onClick={handleClose} aria-label="Close composer">
-          <XIcon size={20} />
-        </button>
-        {(actionType === 'edit' || isComment || isQuote || Boolean(communityTarget)) && (
-          <span className={styles.header__context}>
-            {actionType === 'edit'
-              ? 'Edit post'
-              : isComment
-                ? 'Reply'
-                : isQuote
-                  ? 'Quote post'
-                  : `Posting to ${communityTarget.name || 'community'}`}
-          </span>
-        )}
-      </header>
+      <DialogHeader
+        onCancel={handleClose}
+        // Where the post lands, top right — only while no edit, reply, quote or community has fixed it
+        actions={isChainPinned ? null : <NetworkSelect placement="bottom-end" />}
+        title={
+          actionType === 'edit'
+            ? 'Edit post'
+            : isComment
+              ? 'Reply'
+              : isQuote
+                ? 'Quote post'
+                : 'New post'
+        }
+      />
 
       {isScheduled && (
         <button type="button" className={styles.scheduleLine} onClick={() => scheduleDialogRef.current?.open()} disabled={isBusy}>
@@ -2106,7 +2561,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
       <form className={styles.form} onSubmit={handleCreatePost}>
         <input ref={fileInputRef} type="file" onChange={handleFileSelect} className={styles.fileInput} />
 
-        <div ref={composerRef} className={styles.composer}>
+        <div ref={composerRef} className={styles.composer} style={{ '--rail-avatar-size': `${RAIL_AVATAR_SIZE}px` }}>
           {previewTarget && (
             <div className={styles.replyContext}>
               <Profile variant="fullWithoutTime" creator={previewTarget.wallet_address} networkId={previewTarget.network_id} />
@@ -2130,25 +2585,105 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
           )}
 
           <div className={styles.composerRow}>
-            <Profile variant="imageOnly" size={40} creator={signerAddress} className={styles.composerAvatar} />
+            {/* The avatar column carries the thread's rail down to "Add to thread", as Threads does */}
+            <div className={styles.rail}>
+              <Profile variant="imageOnly" size={RAIL_AVATAR_SIZE} creator={signerAddress} className={styles.composerAvatar} />
+              {canThread && <span className={styles.rail__line} aria-hidden="true" />}
+            </div>
 
             <div className={styles.composerBody}>
-              {!isChainPinned && (
-                <div className={styles.audience}>
-                  <NetworkSelect placement="bottom-start" />
-                </div>
-              )}
+              {/* Who is writing, then a community of theirs in the slot Threads gives "Community
+                  or topic". The chain lives in the header. */}
+              <div className={styles.byline}>
+                {signerName && <span className={styles.byline__name}>{signerName}</span>}
+                {signerName && (showCommunityPicker || communityTargetProp) && (
+                  <CaretRightIcon size={14} className={styles.byline__caret} aria-hidden="true" />
+                )}
+                {showCommunityPicker && (
+                  <NativePopover
+                    placement="bottom-start"
+                    className={styles.attachPanel}
+                    trigger={
+                      <button
+                        type="button"
+                        className={clsx(styles.community, pickedCommunity && styles['community--picked'])}
+                        onMouseDown={(e) => e.preventDefault()}
+                        disabled={isBusy || isCommunityPickLocked}
+                        title={isCommunityPickLocked ? 'Scheduled and task posts go to your feed' : undefined}
+                      >
+                        <UsersThreeIcon size={16} weight={pickedCommunity ? 'fill' : 'regular'} aria-hidden="true" />
+                        <span className={styles.community__name}>{pickedCommunity?.name || 'Community'}</span>
+                        <CaretDownIcon size={12} aria-hidden="true" />
+                      </button>
+                    }
+                  >
+                    {({ close }) => (
+                      <ul className={styles.attachMenu} aria-label="Post to a community">
+                        <li>
+                          <button
+                            type="button"
+                            className={styles.attachMenu__item}
+                            onClick={() => {
+                              setPickedCommunity(null)
+                              close()
+                            }}
+                          >
+                            <GlobeHemisphereWestIcon size={20} />
+                            <span className={styles.attachMenu__text}>
+                              <span className={styles.attachMenu__label}>No community</span>
+                              <span className={styles.attachMenu__hint}>Post to your followers</span>
+                            </span>
+                            {!pickedCommunity && <CheckIcon size={16} weight="bold" />}
+                          </button>
+                        </li>
+                        {myCommunities.map((row) => {
+                          const isPicked =
+                            pickedCommunity && Number(pickedCommunity.networkId) === Number(row.network_id) && String(pickedCommunity.communityId) === String(row.id)
+                          const chainName = appChains.find((chain) => chain.id === Number(row.network_id))?.name
+                          return (
+                            <li key={`${row.network_id}:${row.id}`}>
+                              <button
+                                type="button"
+                                className={styles.attachMenu__item}
+                                onClick={() => {
+                                  setPickedCommunity({ communityId: row.id, networkId: Number(row.network_id), name: row.name })
+                                  close()
+                                }}
+                              >
+                                <CommunityLogo src={row.logo_url} />
+                                <span className={styles.attachMenu__text}>
+                                  <span className={styles.attachMenu__label}>{row.name}</span>
+                                  {chainName && <span className={styles.attachMenu__hint}>{chainName}</span>}
+                                </span>
+                                {isPicked && <CheckIcon size={16} weight="bold" />}
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </NativePopover>
+                )}
+                {/* A community page's composer: fixed, so a label rather than a picker */}
+                {!showCommunityPicker && communityTargetProp && (
+                  <span className={clsx(styles.community, styles['community--picked'])}>
+                    <UsersThreeIcon size={16} weight="fill" aria-hidden="true" />
+                    <span className={styles.community__name}>{communityTargetProp.name || 'Community'}</span>
+                  </span>
+                )}
+              </div>
 
               <div
-                ref={editorRef}
+                ref={mainEditorRef}
                 contentEditable
                 suppressContentEditableWarning
                 className={clsx(styles.editor, { [styles.editor_comment]: isComment })}
+                onFocus={() => activatePart(null)}
                 onInput={handleEditorInput}
                 onKeyDown={handleEditorKeyDown}
                 onBlur={dismissMention}
                 onPaste={handlePaste}
-                data-placeholder={isComment ? 'Post your reply' : isQuote ? 'Add a comment' : "What's happening?"}
+                data-placeholder={isComment ? 'Post your reply' : isQuote ? 'Add a comment' : "What's new?"}
               />
 
               <MentionPicker
@@ -2277,215 +2812,147 @@ export default function NewPost({ text = '', url = '', seedFiles = null, close, 
                 </div>
               )}
 
-              {mediaItems.some((item) => item.type !== 'audio') && (
-                <div className={styles.mediaGrid}>
-                  {mediaItems.map((item, index) => {
-                    if (item.type === 'audio') return null
-                    const mediaSrc = getMediaPreviewSrc(item)
-                    const isUploadingItem = isTransferring(item)
-                    const isFailedItem = item.status === 'failed'
-                    const percent = Math.floor((item.progress || 0) * 100)
-                    return (
-                      <figure
-                        key={`${item.uploadId || item.cid || item.localUrl || index}`}
-                        className={clsx(styles.mediaItem, {
-                          [styles['mediaItem--uploading']]: isUploadingItem,
-                          [styles['mediaItem--failed']]: isFailedItem,
-                        })}
-                      >
-                        {item.type === 'image' ? (
-                          <img src={mediaSrc} alt={item.alt || ''} className={item.spoiler ? styles.spoiler : undefined} />
-                        ) : (
-                          <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
-                        )}
-                        {isUploadingItem && (
-                          <span className={styles.mediaItem__badge}>
-                            {item.status === 'optimizing' ? `Optimizing ${percent}%` : `${percent}%`}
-                          </span>
-                        )}
-                        {isFailedItem && (
-                          <span className={clsx(styles.mediaItem__badge, styles['mediaItem__badge--failed'])}>Upload failed</span>
-                        )}
-                        {isUploadingItem && (
-                          <div
-                            className={styles.mediaItem__progress}
-                            role="progressbar"
-                            aria-label="Upload progress"
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-valuenow={percent}
-                          >
-                            <span className={styles.mediaItem__progressBar} style={{ width: `${percent}%` }} />
-                          </div>
-                        )}
-                        {/* Actions sit under the media, always visible — there is no hover on a phone */}
-                        <figcaption>
-                          {isFailedItem ? (
-                            <button type="button" onClick={() => retryUpload(item.uploadId)}>
-                              <ArrowClockwiseIcon size={14} />
-                              <span>Retry</span>
-                            </button>
-                          ) : (
-                            <button type="button" onClick={() => toggleSpoiler(index)}>
-                              <XIcon size={14} />
-                              <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
-                            </button>
-                          )}
-                          <button type="button" onClick={() => handleRemoveMedia(index)}>
-                            <TrashIcon size={14} />
-                            <span>{isUploadingItem ? 'Cancel' : 'Remove'}</span>
-                          </button>
-                        </figcaption>
-                      </figure>
-                    )
-                  })}
-                </div>
-              )}
+              {renderMedia(mediaItems, null)}
 
-              {mediaItems.some((item) => item.type === 'audio') && (
-                <div className={styles.audioList}>
-                  {mediaItems.map((item, index) => {
-                    if (item.type !== 'audio') return null
-                    const mediaSrc = getMediaPreviewSrc(item)
-                    return (
-                      <div
-                        key={`${item.uploadId || item.cid || item.localUrl || index}`}
-                        className={clsx(styles.audioListItem, {
-                          [styles['audioListItem--uploading']]: item.status === 'uploading',
-                          [styles['audioListItem--failed']]: item.status === 'failed',
-                        })}
-                      >
-                        <audio src={mediaSrc} controls />
-                        {item.status === 'uploading' && (
-                          <span className={styles.audioListItem__status}>{Math.floor((item.progress || 0) * 100)}%</span>
-                        )}
-                        {item.status === 'failed' && (
-                          <button type="button" className={styles.audioRemoveButton} onClick={() => retryUpload(item.uploadId)} aria-label="Retry upload">
-                            <ArrowClockwiseIcon size={14} />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className={styles.audioRemoveButton}
-                          onClick={() => handleRemoveMedia(index)}
-                          aria-label={item.status === 'uploading' ? 'Cancel upload' : 'Remove audio'}
-                        >
-                          <TrashIcon size={14} />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+              {/* Under the text it acts on — the footer keeps only the settings and Post */}
+              {!toolbarPartId && toolbar}
             </div>
           </div>
+
+          {canThread &&
+            threadParts.map((part, index) => (
+              <div key={part.id} className={clsx(styles.composerRow, styles['composerRow--part'])}>
+                <div className={styles.rail}>
+                  <Profile variant="imageOnly" size={RAIL_AVATAR_SIZE} creator={signerAddress} className={styles.composerAvatar} />
+                  <span className={styles.rail__line} aria-hidden="true" />
+                </div>
+                <div className={styles.composerBody}>
+                  <div className={styles.byline}>
+                    {signerName && <span className={styles.byline__name}>{signerName}</span>}
+                    <button
+                      type="button"
+                      className={styles.part__remove}
+                      onClick={() => removeThreadPart(part.id)}
+                      aria-label={`Remove part ${index + 2} of the thread`}
+                      disabled={isBusy}
+                    >
+                      <XIcon size={16} />
+                    </button>
+                  </div>
+                  {/* The same editor as the first part — formatting, mentions, paste, undo — and
+                      the same handlers, which follow focus through activatePart */}
+                  <div
+                    ref={registerPartEditor(part.id)}
+                    contentEditable
+                    suppressContentEditableWarning
+                    dangerouslySetInnerHTML={{ __html: part.initialHtml }}
+                    role="textbox"
+                    aria-multiline="true"
+                    aria-label={`Part ${index + 2} of the thread`}
+                    className={clsx(styles.editor, styles['editor--part'])}
+                    onFocus={() => activatePart(part.id)}
+                    onInput={handleEditorInput}
+                    onKeyDown={(e) => {
+                      // Backspace in an empty part takes the part away, the way Threads does
+                      if (e.key === 'Backspace' && !partHasBody(part)) {
+                        e.preventDefault()
+                        removeThreadPart(part.id)
+                        return
+                      }
+                      handleEditorKeyDown(e)
+                    }}
+                    onBlur={dismissMention}
+                    onPaste={handlePaste}
+                    data-placeholder="Say more..."
+                  />
+                  {partText(part).length > MAX_POST_LENGTH && (
+                    <span className={clsx(styles.charCount, styles['charCount--over'])}>
+                      {partText(part).length}/{MAX_POST_LENGTH}
+                    </span>
+                  )}
+                  {renderMedia(partMedia(part), part.id)}
+                  {toolbarPartId === part.id && toolbar}
+                </div>
+              </div>
+            ))}
+
+          {canThread && (
+            <button type="button" className={styles.addPart} onClick={addThreadPart} disabled={isBusy || !canAddPart}>
+              <span className={styles.addPart__avatar}>
+                {/* A placeholder, not a byline: no hover card, no fingerprint */}
+                <Profile variant="imageOnly" size={ADD_PART_AVATAR_SIZE} creator={signerAddress} hoverCard={false} fingerprint={false} />
+              </span>
+              <span>Add to thread</span>
+            </button>
+          )}
         </div>
 
-        {/* The one reply setting, worded as the scope it grants rather than as a switch */}
-        {!isComment && (
-          <button
-            type="button"
-            className={styles.replyControl}
-            aria-pressed={allowComments}
-            onClick={() => setAllowComments((value) => !value)}
-          >
-            {allowComments ? <GlobeHemisphereWestIcon size={16} weight="fill" /> : <LockSimpleIcon size={16} weight="fill" />}
-            <span>{allowComments ? 'Everyone can reply' : 'Replies are turned off'}</span>
-          </button>
-        )}
-
         <footer className={styles.footer}>
-          <div className={styles.toolbar} aria-label="Post tools">
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => triggerFileInput('image')} title="Image" aria-label="Add image" disabled={isBusy}>
-              <ImageIcon size={20} />
-            </button>
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => triggerFileInput('video')} title="Video" aria-label="Add video" disabled={isBusy}>
-              <MonitorPlayIcon size={20} />
-            </button>
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={openGifPicker} title="GIF" aria-label="Add GIF" disabled={isBusy}>
-              <GifIcon size={20} />
-            </button>
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => triggerFileInput('audio')} title="Audio" aria-label="Add audio" disabled={isBusy}>
-              <MicrophoneIcon size={20} />
-            </button>
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('strong')} title="Bold" aria-label="Bold" disabled={isBusy}>
-              <TextBIcon size={20} />
-            </button>
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('em')} title="Italic" aria-label="Italic" disabled={isBusy}>
-              <TextItalicIcon size={20} />
-            </button>
-            <EmojiPicker onSelect={insertTextAtCaret} disabled={isBusy} />
-            {canSchedule && (
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => scheduleDialogRef.current?.open()}
-                title="Schedule"
-                aria-label="Schedule post"
-                aria-pressed={isScheduled}
-                disabled={isBusy}
-              >
-                <CalendarDotsIcon size={20} />
-              </button>
-            )}
-            {attachOptions.length > 0 && (
-              <NativePopover
-                placement="top-start"
-                className={styles.attachPanel}
-                trigger={
-                  <button
-                    type="button"
-                    className={styles.attachTrigger}
-                    onMouseDown={(e) => e.preventDefault()}
-                    title="Attach"
-                    aria-label="Attach something to this post"
-                    disabled={isBusy}
-                  >
-                    <PlusIcon size={14} weight="bold" />
-                    <span>Attach</span>
-                  </button>
-                }
-              >
-                {({ close }) => (
-                  <ul className={styles.attachMenu}>
-                    {attachOptions.map((option) => {
-                      const Icon = option.icon
-                      return (
-                        <li key={option.key}>
-                          <button
-                            type="button"
-                            className={styles.attachMenu__item}
-                            disabled={isBusy || option.attached}
-                            onClick={() => {
-                              close()
-                              openAttachment(option.key)
-                            }}
-                          >
-                            <Icon size={20} />
-                            <span className={styles.attachMenu__text}>
-                              <span className={styles.attachMenu__label}>{option.label}</span>
-                              <span className={styles.attachMenu__hint}>{option.hint}</span>
-                            </span>
-                            {option.attached && <CheckIcon size={16} weight="bold" />}
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </NativePopover>
-            )}
-          </div>
+          {/* Settings that change how the post behaves rather than what it says */}
+          {(!isComment || canSchedule) && (
+            <NativePopover
+              placement="top-start"
+              className={styles.attachPanel}
+              trigger={
+                <button type="button" className={styles.optionsTrigger} onMouseDown={(e) => e.preventDefault()} disabled={isBusy}>
+                  <SlidersHorizontalIcon size={20} />
+                  <span>Post options</span>
+                </button>
+              }
+            >
+              {({ close }) => (
+                <ul className={styles.attachMenu}>
+                  {!isComment && (
+                    <li>
+                      {/* The one reply setting, worded as the scope it grants rather than as a switch */}
+                      <button
+                        type="button"
+                        className={styles.attachMenu__item}
+                        aria-pressed={allowComments}
+                        onClick={() => setAllowComments((value) => !value)}
+                      >
+                        {allowComments ? <GlobeHemisphereWestIcon size={20} /> : <LockSimpleIcon size={20} />}
+                        <span className={styles.attachMenu__text}>
+                          <span className={styles.attachMenu__label}>{allowComments ? 'Everyone can reply' : 'Replies are turned off'}</span>
+                          <span className={styles.attachMenu__hint}>Tap to {allowComments ? 'turn replies off' : 'let everyone reply'}</span>
+                        </span>
+                      </button>
+                    </li>
+                  )}
+                  {canSchedule && (
+                    <li>
+                      <button
+                        type="button"
+                        className={styles.attachMenu__item}
+                        onClick={() => {
+                          close()
+                          scheduleDialogRef.current?.open()
+                        }}
+                      >
+                        <CalendarDotsIcon size={20} />
+                        <span className={styles.attachMenu__text}>
+                          <span className={styles.attachMenu__label}>Schedule</span>
+                          <span className={styles.attachMenu__hint}>{isScheduled ? `Sends on ${formatWillSend(scheduledAt)}` : 'Pick when it goes out'}</span>
+                        </span>
+                        {isScheduled && <CheckIcon size={16} weight="bold" />}
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </NativePopover>
+          )}
 
           <div className={styles.footerActions}>
             {/* Hidden while busy: the freed width keeps "Signing..." from wrapping the toolbar.
                 Hidden on an empty composer too — a 0/5000 nobody needs costs the tool row width */}
-            {!isBusy && postText.length > 0 && (
-              <span className={clsx(styles.charCount, { [styles['charCount--over']]: isTextOverLimit })}>
-                {postText.length}/{MAX_POST_LENGTH}
+            {/* Counts the part being written, the same one the tool row sits under */}
+            {!isBusy && activeText.length > 0 && (
+              <span className={clsx(styles.charCount, { [styles['charCount--over']]: activeText.length > MAX_POST_LENGTH })}>
+                {activeText.length}/{MAX_POST_LENGTH}
               </span>
             )}
-            <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit || isWrongChain || hasFailedUploads}>
+            <button type="submit" className={styles.postButton} disabled={isBusy || !hasPostBody || isTextOverLimit || isThreadOverLimit || isWrongChain || hasFailedUploads}>
               {/* No confirming state: the composer closes as soon as the transaction is sent, so
                   the only wait left in here is the author's own signature */}
               {isSubmitting && hasPendingUploads

@@ -192,10 +192,13 @@ const NativePopover = forwardRef(function NativePopover({
       onBeforeToggle?.(e)
     }
 
+    // An open panel consumes the Esc that closes it. Hidden here in the capture phase, it is gone
+    // by the time the browser routes the close request, which then lands on the modal dialog
+    // underneath — one Esc took the whole composer down with its Attach menu.
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        try { node.hidePopover() } catch { /* not open */ }
-      }
+      if (e.key !== 'Escape' || !node.matches(':popover-open')) return
+      e.preventDefault()
+      node.hidePopover()
     }
 
     // Scroll never re-anchors an open panel: absolute panels ride the page natively,
@@ -309,7 +312,8 @@ const NativePopover = forwardRef(function NativePopover({
     el.showPopover()
   }
 
-  useImperativeHandle(ref, () => ({ open, close }), [open, close])
+  // `reposition` lets a panel whose content changes size (a drill-in menu) re-anchor itself
+  useImperativeHandle(ref, () => ({ open, close, reposition }), [open, close, reposition])
 
   const triggerProps = {
     popoverTarget: popoverId,

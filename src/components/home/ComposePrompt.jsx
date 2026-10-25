@@ -30,7 +30,11 @@ export default function ComposePrompt() {
           posts under it share one avatar column */}
       <Avatar className={styles.prompt__avatar} src={isConnected ? profile?.profileImage : null} size={38} />
       <button type="button" className={styles.prompt__field} onClick={handleCompose}>
-        What&apos;s happening?
+        What&apos;s new?
+      </button>
+      {/* Threads' outlined Post button; it opens the same composer as the field */}
+      <button type="button" className={styles.prompt__post} onClick={handleCompose}>
+        Post
       </button>
     </div>
   )

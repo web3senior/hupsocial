@@ -1,20 +1,20 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useConnection, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useReadContract } from 'wagmi'
 import { useProfile } from '@/hooks/useProfile'
+import { useFollowState } from '@/hooks/useFollowState'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { config, CONTRACTS } from '@/config/wagmi'
 import { getActiveChain } from '@/lib/communication'
 import { isSolanaNetworkId, solanaChainFor } from '@/config/solana'
-import { addressTag, isEvmAddress, sameAddress, shortAddress } from '@/lib/address'
+import { addressTag, isEvmAddress, shortAddress } from '@/lib/address'
 import { tunnelChatUrl } from '@/lib/tunnel'
 import { getAddress } from 'viem'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
-import { toast } from '@/components/NextToast'
 import AgentBadge from './ui/AgentBadge'
 import Avatar from './ui/Avatar'
 import PremiumBadge from './ui/PremiumBadge'
@@ -22,11 +22,11 @@ import Shimmer from './ui/Shimmer'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
 import NativePopover from './ui/NativePopover'
 import clsx from 'clsx'
+import { CaretRightIcon, UsersThreeIcon } from '@phosphor-icons/react'
 import UPlogo from '@/../public/up.png'
-import { openConnect } from '@/lib/connectDialog'
 import styles from './Profile.module.scss'
 
-export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, fingerprint = true, linkBox = false, onNavigate, className, fallback }) {
+export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, fingerprint = true, linkBox = false, onNavigate, className, fallback, tag = null, community = null }) {
   const router = useRouter()
   // `fallback` is the name and picture a post row already carries (profileFallbackFromRow):
   // the byline paints with it at once and the fetched profile replaces it
@@ -204,6 +204,24 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
                 <Image alt={`Universal Profile`} src={UPlogo} width={14} height={14} />
               </div>
             )}
+            {/* Where the post was published — "name › community", as Threads bylines a community
+                post. `community` is { name, href }; the account's own marks stay beside its name. */}
+            {community?.name && (
+              <>
+                <CaretRightIcon size={12} className={styles.communityCaret} aria-hidden="true" />
+                {linkBox ? (
+                  <span className={styles.community}>
+                    <UsersThreeIcon size={14} weight="fill" aria-hidden="true" />
+                    <span className={styles.community__name}>{community.name}</span>
+                  </span>
+                ) : (
+                  <Link href={community.href} className={styles.community} onClick={(e) => e.stopPropagation()} title={community.name}>
+                    <UsersThreeIcon size={14} weight="fill" aria-hidden="true" />
+                    <span className={styles.community__name}>{community.name}</span>
+                  </Link>
+                )}
+              </>
+            )}
             {/* Timestamp remains completely exclusive to the standard 'full' layout variant. */}
             {/* Relative time is read off two clocks when the byline is server-rendered — a post
                 seconds old can say "12s" in the HTML and "14s" at hydration — so React must not
@@ -213,6 +231,8 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
                 {toRelativeTime(createdAt)}
               </small>
             )}
+            {/* A role in the thread at hand ("Author" on a reply from whoever started it) */}
+            {tag && <small className={styles.tag}>· {tag}</small>}
           </div>
 
           {/* The address stays under the name whether or not a handle sits beside it: a name is
@@ -258,28 +278,8 @@ export const CommunityBadge = ({ badge, size = 'sm', iconOnly = false, linked = 
 // account is, and the two things a reader does next — follow it or message it. Follows are read
 // on the post's own chain instead of whichever chain the wallet is currently connected to.
 const ProfileHoverCard = ({ creator, profile, displayName, profileHref, networkId }) => {
-  const { address, isConnected } = useConnection()
   const [fallbackChain] = getActiveChain()
-  const targetNetworkId = networkId || fallbackChain?.id
-  const followerSystemAddress = CONTRACTS[`chain${targetNetworkId}`]?.followerSystem
-  const isSelf = sameAddress(address, creator)
-
-  // Same target the profile page's Message button opens
-  const tunnelTarget = profile.tunnelAddress ?? (isEvmAddress(creator) ? getAddress(creator.toLowerCase()) : null)
-
-  // The byline already names the account by its handle, so the card leads with the chosen name
-  // and keeps the handle as the line under it
-  const cardName = profile.fullName || profile.name || displayName
-  const cardHandle = profile.username || shortAddress(creator)
-
-  const { data: isFollowingData, isLoading: isFollowStateLoading, refetch: refetchIsFollowing } = useReadContract({
-    address: followerSystemAddress,
-    abi: followerSystemAbi,
-    functionName: 'isFollowing',
-    args: [address, creator],
-    query: { enabled: !!followerSystemAddress && !!address && !!creator && !isSelf },
-  })
-  const isFollowingTarget = Boolean(isFollowingData)
+  const followerSystemAddress = CONTRACTS[`chain${networkId || fallbackChain?.id}`]?.followerSystem
 
   const { data: followerCountData, isLoading: isFollowerCountLoading, refetch: refetchFollowerCount } = useReadContract({
     address: followerSystemAddress,
@@ -289,32 +289,26 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref, networkI
     query: { enabled: !!followerSystemAddress && !!creator },
   })
 
-  const { data: hash, isPending: isSigning, mutate: writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
+  const {
+    isSelf,
+    isFollowing: isFollowingTarget,
+    isLoading: isFollowStateLoading,
+    isBusy,
+    isSigning,
+    toggle,
+  } = useFollowState(creator, networkId, { onConfirmed: refetchFollowerCount })
 
-  useEffect(() => {
-    if (isConfirmed) {
-      refetchIsFollowing()
-      refetchFollowerCount()
-    }
-  }, [isConfirmed, refetchIsFollowing, refetchFollowerCount])
+  // Same target the profile page's Message button opens
+  const tunnelTarget = profile.tunnelAddress ?? (isEvmAddress(creator) ? getAddress(creator.toLowerCase()) : null)
+
+  // The byline already names the account by its handle, so the card leads with the chosen name
+  // and keeps the handle as the line under it
+  const cardName = profile.fullName || profile.name || displayName
+  const cardHandle = profile.username || shortAddress(creator)
 
   const handleFollow = (e) => {
     e.stopPropagation()
-    if (!isConnected) {
-      if (!openConnect()) toast(`Please connect wallet`, `error`)
-      return
-    }
-    if (!followerSystemAddress) {
-      toast(`Follow system isn't deployed on this network yet`, `warning`)
-      return
-    }
-    writeContract({
-      address: followerSystemAddress,
-      abi: followerSystemAbi,
-      functionName: isFollowingTarget ? 'unfollow' : 'follow',
-      args: [creator],
-    })
+    toggle()
   }
 
   return (
@@ -349,9 +343,9 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref, networkI
             type="button"
             className={clsx(styles.hoverCard__btn, !isFollowingTarget && styles['hoverCard__btn--primary'])}
             onClick={handleFollow}
-            disabled={isSigning || isConfirming}
+            disabled={isBusy}
           >
-            {isSigning ? 'Confirm Wallet...' : isConfirming ? 'Confirming...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
+            {isSigning ? 'Confirm Wallet...' : isBusy ? 'Confirming...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
           </button>}
           {tunnelTarget && (
             <a className={styles.hoverCard__btn} href={tunnelChatUrl(tunnelTarget)} target="_blank" rel="noopener noreferrer">

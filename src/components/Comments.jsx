@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Post from '@/components/Post'
+import { ChatCircleIcon } from '@phosphor-icons/react'
+import { PostCard } from '@/components/Post'
 import CommentSkeletonList from '@/components/ui/CommentSkeleton'
 import { usePostStore } from '@/stores/usePostStore'
-import { useCommentsCacheStore, commentsCacheKey } from '@/stores/useCommentsCacheStore'
+import { useCommentsCacheStore, commentsCacheKey, commentsThreadKey } from '@/stores/useCommentsCacheStore'
+import { DEFAULT_COMMENTS_SORT } from '@/lib/commentsRequest'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import styles from './comments.module.scss'
 
@@ -20,14 +22,24 @@ function readThread(key, viewer) {
 // fetch effect back out, without anything having to reach into a ref mid-render.
 const appliedKey = (cacheKey, viewer, nonce) => `${cacheKey}|${viewer}|${nonce}`
 
-export default function Comments({ networkId, postId, viewerAddress }) {
+/**
+ * A post's replies, Threads-style: each reply carries its own latest answer nested under a
+ * connector (PostCard), with a way into the rest when there are more.
+ * @param {Object} props
+ * @param {'top'|'latest'} [props.sort] Order of the replies; each order is cached on its own.
+ * @param {string|null} [props.threadAuthor] Wallet that started the thread, tagged "Author".
+ * @param {Array<string|number>|null} [props.hiddenIds] Replies already drawn elsewhere on the page
+ *   (the author's own thread, under the post) and left out of the list.
+ */
+export default function Comments({ networkId, postId, viewerAddress, sort = DEFAULT_COMMENTS_SORT, threadAuthor = null, hiddenIds = null }) {
   const router = useRouter()
   const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const fetchComments = useCommentsCacheStore((state) => state.fetchComments)
 
-  const cacheKey = commentsCacheKey(networkId, postId)
+  const cacheKey = commentsCacheKey(networkId, postId, sort)
   const viewer = viewerAddress ?? null
-  const threadNonce = useCommentsCacheStore((state) => state.threadNonces[cacheKey] ?? 0)
+  // Kept per thread, not per order: a reply landing makes every ordering stale
+  const threadNonce = useCommentsCacheStore((state) => state.threadNonces[commentsThreadKey(networkId, postId)] ?? 0)
 
   // Thread from an earlier visit this session, if any. Safe to read in an
   // initializer: the store is in-memory, so it's always empty during SSR
@@ -57,7 +69,7 @@ export default function Comments({ networkId, postId, viewerAddress }) {
 
     let cancelled = false
 
-    fetchComments(networkId, postId, viewer)
+    fetchComments(networkId, postId, viewer, sort)
       .then((list) => {
         if (cancelled) return
         appliedRef.current = params
@@ -74,43 +86,72 @@ export default function Comments({ networkId, postId, viewerAddress }) {
     return () => {
       cancelled = true
     }
-  }, [networkId, postId, viewer, cacheKey, fetchComments, threadNonce])
+  }, [networkId, postId, viewer, sort, cacheKey, fetchComments, threadNonce])
 
   if (thread.isLoading) return <CommentSkeletonList count={3} />
 
+  // Filtered at render, not in the cache: the cached thread stays whole for every other reader
+  const hidden = hiddenIds?.length ? new Set(hiddenIds.map(String)) : null
+  const list = hidden ? thread.list.filter((comment) => !hidden.has(String(comment.id))) : thread.list
+
   return (
     <div className={styles.commentsList}>
-      {thread.list.length === 0 ? (
-        <p className={styles.commentsList__empty}>No comments yet. Start the conversation!</p>
+      {list.length === 0 ? (
+        <div className={styles.commentsList__empty}>
+          <ChatCircleIcon className={styles.commentsList__emptyIcon} size={28} aria-hidden="true" />
+          <p className={styles.commentsList__emptyText}>No replies yet</p>
+        </div>
       ) : (
-        thread.list.map((comment, i) => (
-          <section key={comment.id} className={styles.commentsList__item}
-           onPointerDown={rememberCardPointerDown}
-           onClick={(e) => {
-             if (isTextSelectionDrag(e)) return
-             // Seed the store so the detail route paints this comment instantly
-             setCurrentPost(comment)
-             router.push(`/networks/${networkId}/${comment.id}`)
-           }}
-           onMouseEnter={() => router.prefetch(`/networks/${networkId}/${comment.id}`)}
-           onTouchStart={() => router.prefetch(`/networks/${networkId}/${comment.id}`)}
-          >
-            <Post
-              item={comment}
-              networkName={comment.network_name}
-              actions={[
-                'like',
-                comment.allow_comment ? 'comment' : null,
-                'repost',
-                'view',
-                'share',
-                'tip',
-                'bookmark',
-              ].filter(Boolean)} // Simplified actions matrix for reply nodes
-            />
-            {i < thread.list.length - 1 && <hr className={styles.commentsList__divider} />}
-          </section>
-        ))
+        list.map((comment, i) => {
+          const openComment = () => {
+            // Seed the store so the detail route paints this comment instantly
+            setCurrentPost(comment)
+            router.push(`/networks/${networkId}/${comment.id}`)
+          }
+          // PostCard already shows one answer under the reply; the rest are behind "Show replies"
+          const hiddenReplies = Number(comment.total_comments || 0) - 1
+
+          return (
+            <section key={comment.id} className={styles.commentsList__item}
+             onPointerDown={rememberCardPointerDown}
+             onClick={(e) => {
+               if (isTextSelectionDrag(e)) return
+               openComment()
+             }}
+             onMouseEnter={() => router.prefetch(`/networks/${networkId}/${comment.id}`)}
+             onTouchStart={() => router.prefetch(`/networks/${networkId}/${comment.id}`)}
+            >
+              <PostCard
+                item={comment}
+                chainId={networkId}
+                networkName={comment.network_name}
+                threadAuthor={threadAuthor}
+                actions={[
+                  'like',
+                  comment.allow_comment ? 'comment' : null,
+                  'repost',
+                  'view',
+                  'share',
+                  'tip',
+                  'bookmark',
+                ].filter(Boolean)} // Simplified actions matrix for reply nodes
+              />
+              {hiddenReplies > 0 && (
+                <button
+                  type="button"
+                  className={styles.commentsList__more}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openComment()
+                  }}
+                >
+                  Show replies
+                </button>
+              )}
+              {i < list.length - 1 && <hr className={styles.commentsList__divider} />}
+            </section>
+          )
+        })
       )}
     </div>
   )

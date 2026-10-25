@@ -16,7 +16,7 @@ import abi from '@/abi/post.json'
 import { getActiveChain } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
 import Profile from '@/components/Profile'
-import { CommentIcon, ShareIcon, TipIcon } from '@/components/Icons'
+import { CommentIcon, ShareIcon } from '@/components/Icons'
 import { openConnect } from '@/lib/connectDialog'
 import MediaGallery from './Gallery'
 import {
@@ -24,6 +24,7 @@ import {
   ChartLineDownIcon,
   ClipboardTextIcon,
   CodeIcon,
+  CoinsIcon,
   DotsThreeIcon,
   EyeIcon,
   FlagIcon,
@@ -36,7 +37,6 @@ import {
   SparkleIcon,
   TagIcon,
   TrashSimpleIcon,
-  UsersIcon,
 } from '@phosphor-icons/react'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { isSessionActive } from '@/lib/burnerSession'
@@ -131,7 +131,7 @@ function useDecryptedCommunityItem(item) {
 // `authorFallback`: paint the byline from the row's own name and picture before the profile
 // fetch answers. Only the post page's own post opts in — its row is read with the handle, so the
 // name line will not change when the profile lands; feed rows are not, and would flip.
-export default function Post({ item, showContent, actions, chainId, hasCommentBelow = false, authorFallback = false }) {
+export default function Post({ item, showContent, actions, chainId, hasCommentBelow = false, authorFallback = false, threadAuthor = null }) {
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
   const [showQuoteModal, setShowQuoteModal] = useState(null)
@@ -275,19 +275,6 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         data-has-comments={hasCommentBelow ? true : false}
       >
         {isRepost && <RepostLabel walletAddress={item.wallet_address} />}
-        {displayItem?.community_name && (
-          <Link
-            href={`/communities/${displayItem.network_id}/${displayItem.community_id}`}
-            className={styles.post__communityBadge}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <UsersIcon size={13} />
-            <span>Posted in</span>
-            <span className={styles.post__communityName} title={displayItem.community_name}>
-              {displayItem.community_name}
-            </span>
-          </Link>
-        )}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
           <Profile
             size={38}
@@ -295,6 +282,14 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
             createdAt={displayItem?.created_at}
             networkId={displayItem?.network_id}
             fallback={authorFallback ? profileFallbackFromRow(displayItem) : undefined}
+            // A reply from whoever started the thread says so, as Threads marks it
+            tag={threadAuthor && sameAddress(displayItem?.wallet_address, threadAuthor) ? 'Author' : null}
+            // "name › community" in the byline, where Threads names the community a post went to
+            community={
+              displayItem?.community_name
+                ? { name: displayItem.community_name, href: `/communities/${displayItem.network_id}/${displayItem.community_id}` }
+                : null
+            }
           />
 
           <div
@@ -360,6 +355,8 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
                   baseClassName={styles.post__content}
                 />
               )}
+
+              <ThreadMarker item={displayItem} showThreadLink={!showContent} />
 
               {/* The first link's own content — an X post with its media, a YouTube player or an
                   Open Graph card — resolved live from the text. Hidden when the post carries its
@@ -486,7 +483,6 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
             className={`${styles.post__actions} flex flex-row align-items-center justify-content-between`}
           >
             <div className={clsx(styles.post__actions__group, styles['post__actions__group--primary'], 'flex flex-row align-items-center')}>
-              {/* Threads order: like, comment, repost, share — with tip slotted before share */}
               {actionsSet.has('like') && <Like post={displayItem || item} />}
 
               {actionsSet.has('comment') && <CommentAction post={commentTarget} onComment={setShowCommentModal} />}
@@ -495,12 +491,12 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
               {actionsSet.has('tip') && <Tip post={displayItem || item} onTip={setShowTipModal} />}
 
-              {/* captureRef: the card copies itself, exactly as it is on screen */}
-              {actionsSet.has('share') && <Share item={displayItem || item} captureRef={sectionRef} />}
+              {actionsSet.has('view') && <View post={item} />}
             </div>
             <div className={clsx(styles.post__actions__group, 'flex align-items-center')}>
-              {actionsSet.has('view') && <View post={item} />}
               {actionsSet.has('bookmark') && <Bookmark post={displayItem || item} />}
+              {/* captureRef: the card copies itself, exactly as it is on screen */}
+              {actionsSet.has('share') && <Share item={displayItem || item} captureRef={sectionRef} />}
             </div>
           </div>
         </footer>
@@ -831,7 +827,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip }) => 
               )}
               {onTip && (
                 <MenuItem
-                  icon={<TipIcon />}
+                  icon={<CoinsIcon size={20} />}
                   label="Tip creator"
                   description="Send a tip to support this creator"
                   onClick={(event) => {
@@ -925,7 +921,41 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip }) => 
   )
 }
 
-export function PostCard({ item, actions, chainId, networkName }) {
+/**
+ * "2/3" on a part of a thread its author published in one go, as Threads counts them. On the
+ * first part, wherever it stands alone (a feed), it also offers the rest — the post page draws
+ * every part under the first one.
+ */
+function ThreadMarker({ item, showThreadLink }) {
+  const router = useRouter()
+  const { setCurrentPost } = usePostStore()
+  const part = Number(item?.content?.thread?.part)
+  const of = Number(item?.content?.thread?.of)
+  if (!part || !(of > 1)) return null
+
+  return (
+    <div className={styles.post__thread}>
+      <span className={styles.post__threadCount}>
+        {part}/{of}
+      </span>
+      {showThreadLink && part === 1 && (
+        <button
+          type="button"
+          className={styles.post__threadLink}
+          onClick={(e) => {
+            e.stopPropagation()
+            setCurrentPost(item)
+            router.push(`/networks/${item.network_id}/${item.id}`)
+          }}
+        >
+          Show thread
+        </button>
+      )}
+    </div>
+  )
+}
+
+export function PostCard({ item, actions, chainId, networkName, threadAuthor = null }) {
   const router = useRouter()
   const { setCurrentPost } = usePostStore()
   const { address } = useActiveWallet()
@@ -967,7 +997,7 @@ export function PostCard({ item, actions, chainId, networkName }) {
 
   return (
     <div className={styles.postCard}>
-      <Post item={item} actions={actions} chainId={chainId} networkName={networkName} hasCommentBelow={hasCommentBelow} />
+      <Post item={item} actions={actions} chainId={chainId} networkName={networkName} hasCommentBelow={hasCommentBelow} threadAuthor={threadAuthor} />
       {shouldFetch &&
         (isLastCommentLoading ? (
           <LastCommentShimmer />
@@ -982,6 +1012,7 @@ export function PostCard({ item, actions, chainId, networkName }) {
               item={lastComment}
               actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']}
               chainId={chainId}
+              threadAuthor={threadAuthor}
             />
           </div>
         ) : null)}

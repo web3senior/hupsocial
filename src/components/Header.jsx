@@ -1,11 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { ArrowLeftIcon } from '@phosphor-icons/react'
+import { usePathname } from 'next/navigation'
 import { ConnectWallet } from '@/components/ConnectWallet'
-import { useCanGoBack } from '@/hooks/useCanGoBack'
+import BackLink from '@/components/ui/BackLink'
 import { usePageTitleStore } from '@/stores/usePageTitleStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { Menu } from './Icons'
@@ -13,6 +11,8 @@ import clsx from 'clsx'
 import styles from './Header.module.scss'
 
 const DESKTOP_QUERY = '(min-width: 768px)'
+// /networks/{networkId}/{postId}, the post page — not the network list or a network's own page
+const POST_ROUTE = /^\/networks\/[^/]+\/[^/]+\/?$/
 
 // The page's bordered shell: the first wide container in <main> that draws a side border
 const findPageShell = (main) =>
@@ -74,8 +74,6 @@ const useTitleCell = (isActive, pathname) => {
 
 export default function Header() {
   const pathname = usePathname()
-  const router = useRouter()
-  const canGoBack = useCanGoBack(pathname)
   const title = usePageTitleStore((state) => state.title)
   const subtitle = usePageTitleStore((state) => state.subtitle)
   const back = usePageTitleStore((state) => state.back)
@@ -83,23 +81,16 @@ export default function Header() {
   const isMobileMenuOpen = useSidebarStore((state) => state.isMobileMenuOpen)
   const openMobileMenu = useSidebarStore((state) => state.openMobileMenu)
 
-  // The feed's own heading row is home's top bar, so there the header is just Connect floating over it
-  const isBare = pathname === '/'
+  // The feed's own heading row is home's top bar, so there the header is just Connect floating over
+  // it. A post page is the same: its title row (PostTitleRow) sits in the header's strip on a
+  // desktop and needs the clicks. Matched by path so a post opened in place gets it too.
+  const isBare = pathname === '/' || POST_ROUTE.test(pathname ?? '')
   const hasTitle = Boolean(title || back)
   const cell = useTitleCell(hasTitle, pathname)
 
   const cellStyle = cell && {
     '--title-cell-left': `${cell.left}px`,
     '--title-cell-width': `${cell.width}px`,
-  }
-
-  // Back returns to the page the reader came from; the href is only for a first page of the
-  // visit, and for a new-tab click.
-  const backLabel = canGoBack ? 'Back' : back?.label
-  const handleBack = (event) => {
-    if (!canGoBack || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-    event.preventDefault()
-    router.back()
   }
 
   return (
@@ -121,11 +112,7 @@ export default function Header() {
         // that shell instead.
         <div className={clsx(styles.header__bar, cell && styles['header__bar--cell'])} style={cellStyle || undefined}>
           <div className={clsx('__container', styles.header__inner)} data-width={cell ? undefined : width || undefined}>
-            {back && (
-              <Link href={back.href} className={styles.back} aria-label={backLabel} title={backLabel} onClick={handleBack}>
-                <ArrowLeftIcon size={20} aria-hidden="true" />
-              </Link>
-            )}
+            {back && <BackLink href={back.href} label={back.label} className={styles.back} />}
             {title && (
               <div className={clsx(styles.header__heading, back && styles['header__heading--start'])}>
                 <h1 className={styles.header__title}>

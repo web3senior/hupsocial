@@ -12,6 +12,7 @@ import { useClientMounted } from '@/hooks/useClientMount'
 import { PostCard } from '@/components/Post'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
 import FeedError from '@/components/ui/FeedError'
+import { openPost } from '@/stores/usePostOverlayStore'
 import { openConnect } from '@/lib/connectDialog'
 import styles from '@/app/page.module.scss'
 
@@ -92,7 +93,7 @@ export default function FollowingFeedTab() {
   }, [isFetching, hasMore, page, activeChain, address])
 
   const handlePostClick = (item) => {
-    router.push(`/networks/${item.network_id}/${item.id}`)
+    openPost(item, router)
   }
 
   if (!mounted) return null

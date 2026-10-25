@@ -16,6 +16,21 @@ const TrendingFeedTab = dynamic(() => import('@/components/tabs/TrendingFeedTab'
 const StatusFeedTab = dynamic(() => import('@/components/tabs/StatusFeedTab'))
 const PollsTab = dynamic(() => import('@/components/tabs/PollsTab'))
 
+// A refresh of home starts at the top: the reader asked for a fresh feed, not their old place.
+// The browser's own restoration would put them back mid-feed over posts that have since changed.
+// Runs once per document as this chunk loads, before the browser restores. Only the reload entry
+// is affected — restoration is handed back on load, so back/forward keep their positions.
+if (typeof window !== 'undefined' && performance.getEntriesByType('navigation')[0]?.type === 'reload') {
+  window.history.scrollRestoration = 'manual'
+  window.scrollTo({ top: 0, behavior: 'instant' })
+  const restore = () => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    window.history.scrollRestoration = 'auto'
+  }
+  if (document.readyState === 'complete') restore()
+  else window.addEventListener('load', restore, { once: true })
+}
+
 export default function Page() {
   const tabs = useHomeTabsStore((state) => state.tabs)
   const resolvedTabs = useMemo(() => resolveTabs(tabs), [tabs])

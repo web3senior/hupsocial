@@ -1,9 +1,16 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 // Raised by a back/forward traversal, consumed by the route change it causes.
 let traversed = false
+
+// Module-level rather than per instance: the header's back arrow is always mounted, but a page
+// can mount its own (the post page's title row) after the route changed. Each route is judged
+// once and every instance reads that verdict, so a late mount still knows where it came from
+// and two instances never race to consume `traversed`.
+let lastPathname = null
+let verdict = { pathname: null, canGoBack: false }
 
 if (typeof window !== 'undefined') {
   window.addEventListener('popstate', () => {
@@ -24,15 +31,17 @@ if (typeof window !== 'undefined') {
  */
 export function useCanGoBack(pathname) {
   const [canGoBack, setCanGoBack] = useState(false)
-  const lastPathnameRef = useRef(null)
 
   useEffect(() => {
-    const arrivedByPush = lastPathnameRef.current !== null && lastPathnameRef.current !== pathname && !traversed
-    lastPathnameRef.current = pathname
-    traversed = false
+    if (verdict.pathname !== pathname) {
+      const arrivedByPush = lastPathname !== null && lastPathname !== pathname && !traversed
+      lastPathname = pathname
+      traversed = false
 
-    const index = window.navigation?.currentEntry?.index
-    setCanGoBack(typeof index === 'number' ? index > 0 : arrivedByPush)
+      const index = window.navigation?.currentEntry?.index
+      verdict = { pathname, canGoBack: typeof index === 'number' ? index > 0 : arrivedByPush }
+    }
+    setCanGoBack(verdict.canGoBack)
   }, [pathname])
 
   return canGoBack

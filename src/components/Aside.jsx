@@ -5,11 +5,9 @@ import useSWR from 'swr'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useTheme } from 'next-themes'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import clsx from 'clsx'
-import { ArticleIcon, BookIcon, BugIcon, CalendarDotsIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, EqualsIcon, FadersHorizontalIcon, GasPumpIcon, GearIcon, HardDrivesIcon, HeadCircuitIcon, HeartIcon, MoonIcon, PaletteIcon, PlusIcon, QuestionIcon, RobotIcon, SunIcon, TerminalWindowIcon, XIcon } from '@phosphor-icons/react'
-import { CircleIcon, SealCheckIcon, StackIcon, UserIcon } from '@phosphor-icons/react'
+import { CircleIcon, EqualsIcon, PlusIcon, UserIcon, XIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
 import { toast } from '@/components/NextToast'
@@ -23,12 +21,11 @@ import { usePostStore } from '@/stores/usePostStore'
 import { openConnect } from '@/lib/connectDialog'
 import BatchLikeTrigger from './BatchLikeTrigger'
 import Hupi from './hupi/Hupi'
-import NativePopover from './ui/NativePopover'
+import MoreMenu from './MoreMenu'
 import NativeDialog from './ui/NativeDialog'
 import Tooltip from './ui/Tooltip'
 import NavBadge from './ui/NavBadge'
 import Avatar from './ui/Avatar'
-import { GitHub } from './Icons'
 import styles from './Aside.module.scss'
 
 // A visible tab revalidates on focus and on every client-side navigation, so its tick only has to
@@ -60,13 +57,6 @@ const NAV_BADGES = {
   new: { label: 'NEW', background: 'var(--new-badge-background)', color: 'var(--new-badge-color)' },
   'new-orange': { label: 'NEW', background: 'var(--new-orange-badge-background)', color: 'var(--new-orange-badge-color)' },
 }
-
-const themeOptions = [
-  { id: 'system', icon: <FadersHorizontalIcon size={16} /> },
-  { id: 'dark', icon: <MoonIcon size={16} /> },
-  { id: 'light', icon: <SunIcon size={16} /> },
-  { id: 'terminal', icon: <TerminalWindowIcon size={16} /> },
-]
 
 // Captions for the groups that follow each store divider — the expanded rail labels its
 // sections instead of drawing a rule between them.
@@ -211,7 +201,6 @@ export default function Aside({ inLayoutGrid = false }) {
   const { address, isConnected } = useActiveWallet()
   const canCompose = isConnected
   const mounted = useClientMounted()
-  const { theme, setTheme } = useTheme()
 
   const getNavItems = useSidebarStore((state) => state.getNavItems)
   const claimLegacyBatch = useSidebarStore((state) => state.claimLegacyBatch)
@@ -280,8 +269,6 @@ export default function Aside({ inLayoutGrid = false }) {
       : [{ id: 'primary', items: [profileItem] }]
   }, [navLinks, profileItem])
 
-  // Network information pages share their prefix with post details.
-  const isNetworksActive = /^\/networks(?:\/[^/]+)?\/?$/.test(pathname ?? '')
   const isMobileLayout = !isWideScreen
   const isExpanded = isMobileLayout || (!isTablet && isMenuOpen)
   const isCompact = !isExpanded
@@ -369,163 +356,7 @@ export default function Aside({ inLayoutGrid = false }) {
 
   const isMoreActive = MORE_NAV_ITEMS_SCHEMA.some((item) => isActiveItem(pathname, item))
 
-  const renderMoreMenu = (trigger, placement) => (
-    <NativePopover trigger={trigger} placement={placement} type="auto">
-      {({ close }) => (
-        <div className={styles.popoverContent}>
-          <ul className="flex flex-column gap-050">
-            {MORE_NAV_ITEMS_SCHEMA.map((item) => {
-              const Icon = item.icon
-              const isActive = isActiveItem(pathname, item)
-              return (
-                <li key={item.id}>
-                  <Link href={item.path} onClick={close} className={clsx('flex align-items-center gap-050', isActive && styles.linkActive)} aria-current={isActive ? 'page' : undefined}>
-                    <Icon size={16} weight={isActive ? 'fill' : 'regular'} />
-                    <span>{item.name}</span>
-                  </Link>
-                </li>
-              )
-            })}
-            <li>
-              <Link href="/settings" onClick={close} className="flex align-items-center gap-050">
-                <GearIcon size={16} />
-                <span>Settings</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/compose/article" onClick={close} className="flex align-items-center gap-050">
-                <ArticleIcon size={16} />
-                <span>Write an article</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/liked" onClick={close} className="flex align-items-center gap-050">
-                <HeartIcon size={16} />
-                <span>Liked</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/scheduled" onClick={close} className="flex align-items-center gap-050">
-                <CalendarDotsIcon size={16} />
-                <span>Scheduled posts</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/gas" onClick={close} className="flex align-items-center gap-050">
-                <GasPumpIcon size={16} />
-                <span>Gas tank</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/premium" onClick={close} className="flex align-items-center gap-050" aria-current={pathname === '/premium' ? 'page' : undefined}>
-                <SealCheckIcon size={16} />
-                <span>Premium</span>
-              </Link>
-            </li>
-            <li>
-              <div className={styles.themeWrapper}>
-                <div className="flex align-items-center gap-050">
-                  <PaletteIcon size={16} />
-                  <span>Theme</span>
-                </div>
-                <div className={clsx(styles.themeItems, 'grid grid--fit grid--gap-025')} style={{ '--data-width': '30px' }}>
-                  {themeOptions.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      aria-pressed={theme === option.id}
-                      onClick={() => setTheme(option.id)}
-                      className={clsx(theme === option.id && styles.active)}
-                    >
-                      {option.icon}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </li>
-            <li>
-              <Link href="/networks" onClick={close} className="flex align-items-center gap-050" aria-current={isNetworksActive ? 'page' : undefined}>
-                <StackIcon size={16} weight={isNetworksActive ? 'fill' : 'regular'} />
-                <span>Networks</span>
-              </Link>
-            </li>
-            <li>
-              <a
-                href="https://docs.hup.social"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={close}
-                className="flex align-items-center gap-050"
-              >
-                <BookIcon size={16} />
-                <span>Documentation</span>
-              </a>
-            </li>
-            <li>
-              <a
-                href="/llms.txt"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={close}
-                className="flex align-items-center gap-050"
-              >
-                <RobotIcon size={16} />
-                <span>llms.txt</span>
-              </a>
-            </li>
-            <li>
-              <Link href="/agents" onClick={close} className="flex align-items-center gap-050">
-                <HeadCircuitIcon size={16} />
-                <span>AI agents</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                <ChatCenteredDotsIcon size={16} />
-                <span>Send feedback</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                <BugIcon size={16} />
-                <span>Report a problem</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/status" onClick={close} className={clsx('flex', 'align-items-center', 'gap-050')}>
-                <HardDrivesIcon size={16} />
-                <span>System status</span>
-              </Link>
-            </li>
-            <li>
-              <Link href="/install" onClick={close} className="flex align-items-center gap-050">
-                <DownloadSimpleIcon size={16} />
-                <span>Install {process.env.NEXT_PUBLIC_NAME}</span>
-              </Link>
-            </li>
-            <li>
-              <a
-                href="https://github.com/web3senior/hupsocial"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={close}
-                className="flex align-items-center gap-050"
-              >
-                <GitHub />
-                <span>GitHub</span>
-              </a>
-            </li>
-            <li>
-              <Link href="/help" onClick={close} className="flex align-items-center gap-050">
-                <QuestionIcon size={16} />
-                <span>Help</span>
-              </Link>
-            </li>
-          </ul>
-        </div>
-      )}
-    </NativePopover>
-  )
+  const renderMoreMenu = (trigger, placement) => <MoreMenu trigger={trigger} placement={placement} />
 
   const SidebarSurface = isMobileLayout ? NativeDialog : 'aside'
   const surfaceProps = isMobileLayout ? {
@@ -561,7 +392,7 @@ export default function Aside({ inLayoutGrid = false }) {
                   <button type="button" className={clsx(styles.header__button, isMoreActive && styles['header__button--active'])} aria-label="More">
                     <EqualsIcon size={20} aria-hidden="true" />
                   </button>,
-                  'bottom-end'
+                  'bottom-start'
                 )}
 
                 {isMobileLayout && (

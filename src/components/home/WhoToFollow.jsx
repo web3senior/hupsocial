@@ -24,7 +24,7 @@ const SUGGESTIONS_ENDPOINT = '/api/v1/users/suggested'
 // A carousel wants more than a screen's worth; the route caps at 10
 const SUGGESTION_COUNT = 10
 const SKELETON_COUNT = 4
-const AVATAR_SIZE = 120
+const AVATAR_SIZE = 80
 
 const fetchSuggestions = async (viewer) => {
   const params = new URLSearchParams({ limit: String(SUGGESTION_COUNT) })

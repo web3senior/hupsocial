@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
+import { parsePostContent, postRowSelect } from '@/lib/postRowQuery'
 
 export const runtime = 'nodejs'
 
@@ -18,6 +19,10 @@ export async function GET(request, { params }) {
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20', 10), 1), 100)
     const offset = (page - 1) * limit
     const lastOnly = searchParams.get('last') === 'true'
+    // 'top' ranks the thread the way Threads does — most liked, then most replied, oldest first
+    // among ties; anything else keeps the chronological order. `last` (the newest-reply preview)
+    // ignores it.
+    const sortTop = !lastOnly && searchParams.get('sort') === 'top'
     const viewerAddress = searchParams.get('viewer_address')
     const contractAddress = searchParams.get('contract_address')?.toLowerCase() || null
 
@@ -33,68 +38,13 @@ export async function GET(request, { params }) {
     queryParams.push(lastOnly ? 1 : limit + 1, lastOnly ? 0 : offset)
 
     const query = `
-      SELECT
-        p.*,
-        u.name as display_name,
-        u.profileImage as profile_image,
-        n.name as network_name,
-        n.explorer_url,
-        (
-          SELECT COUNT(*)
-          FROM post_likes pl
-          WHERE pl.post_id = p.id
-            AND pl.network_id = p.network_id
-            AND pl.contract_address <=> p.contract_address
-            AND pl.is_active = 1
-        ) as total_likes,
-        (
-          (SELECT COUNT(*) FROM posts child WHERE child.is_comment = p.id AND child.network_id = p.network_id
-            AND child.contract_address <=> p.contract_address AND child.is_deleted = 0)
-          + (SELECT COUNT(*) FROM posts child WHERE child.network_id = p.network_id
-            AND child.contract_address <=> p.contract_address AND child.parent_id = p.id
-            AND child.parent_id <> 0 AND child.is_deleted = 0
-            AND NOT (child.is_comment <=> p.id)
-            AND (child.content_type = 1 OR child.is_comment IS NOT NULL))
-        ) as total_comments,
-        (
-          SELECT COUNT(*)
-          FROM posts reposter
-          WHERE reposter.network_id = p.network_id
-            AND reposter.is_deleted = 0
-            AND reposter.is_repost = p.id
-        ) + (
-          SELECT COUNT(*)
-          FROM posts q
-          WHERE q.network_id = p.network_id
-            AND q.is_deleted = 0
-            AND CASE WHEN JSON_VALID(q.content) THEN JSON_UNQUOTE(JSON_EXTRACT(q.content, '$.quoteOf')) = CAST(p.id AS CHAR) ELSE 0 END
-        ) as total_reposts,
-        (
-          SELECT COUNT(*)
-          FROM post_views pv
-          WHERE pv.post_id = p.id
-            AND pv.network_id = p.network_id
-        ) as total_views,
-        ${viewerAddress ? `(
-          SELECT EXISTS(
-            SELECT 1
-            FROM post_likes pl
-            WHERE pl.post_id = p.id
-              AND pl.network_id = p.network_id
-              AND pl.contract_address <=> p.contract_address
-              AND pl.liker_address = ?
-              AND pl.is_active = 1
-          )
-        )` : '0'} as has_liked
-      FROM posts p
-      LEFT JOIN users u ON p.wallet_address = u.wallet_address
-      JOIN networks n ON p.network_id = n.id
+      ${postRowSelect(Boolean(viewerAddress))}
       WHERE p.network_id = ?
         AND p.is_deleted = 0
         AND (p.content_type = 1 OR p.is_comment IS NOT NULL)
         AND (NULLIF(p.parent_id, 0) = ? OR p.is_comment = ?)
         ${contractAddress ? 'AND p.contract_address = ?' : ''}
-      ORDER BY p.created_at ${lastOnly ? 'DESC' : 'ASC'}, p.id ${lastOnly ? 'DESC' : 'ASC'}
+      ORDER BY ${sortTop ? 'total_likes DESC, total_comments DESC, ' : ''}p.created_at ${lastOnly ? 'DESC' : 'ASC'}, p.id ${lastOnly ? 'DESC' : 'ASC'}
       LIMIT ? OFFSET ?
     `
 
@@ -112,23 +62,12 @@ export async function GET(request, { params }) {
       data: commentsToSend.map((comment) => ({
         ...comment,
         is_liked: Boolean(comment.has_liked),
-        content: parseIPFSContent(comment.content),
+        content: parsePostContent(comment.content),
       })),
       nextPage,
     })
   } catch (error) {
     console.error('[GET_COMMENTS_ERROR]:', error.message)
     return NextResponse.json({ success: false, error: 'Failed to fetch comments' }, { status: 500 })
-  }
-}
-
-/**
- * Helper to safely handle IPFS JSON data stored in the DB.
- */
-function parseIPFSContent(content) {
-  try {
-    return JSON.parse(content)
-  } catch (e) {
-    return content
   }
 }

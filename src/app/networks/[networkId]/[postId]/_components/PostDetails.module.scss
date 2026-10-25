@@ -21,8 +21,11 @@
     color: var(--page-text);
     border: 1px solid var(--page-border);
     box-shadow: var(--card-elevation, var(--page-shadow));
-    border-radius: var(--page-border-radius);
-    overflow: hidden;
+    // Threads' thread card: rounder than the app's other page shells
+    border-radius: 32px;
+    // clip, not hidden: hidden makes this a scroll container, which pins ReplyBar's sticky
+    // to the card instead of the viewport
+    overflow: clip;
 
     @media (max-width: 640px) {
       border: none;
@@ -55,7 +58,8 @@
   position: relative;
 
   // Parent shown above a comment for thread context — clickable back to its own page
-  &__parent {
+  &__parent,
+  &__threadPart {
     cursor: pointer;
   }
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import Tooltip from './Tooltip'
+
 import { useState } from 'react'
 import { BookmarkSimpleIcon as BookmarkIcon, CheckIcon, PlusIcon, XCircleIcon } from '@phosphor-icons/react'
 import useSWR, { useSWRConfig } from 'swr'
@@ -241,16 +243,17 @@ export const Bookmark = ({ post }) => {
         }
       }}
       trigger={
-        <button
-          title={tooltip}
-          data-action="bookmark"
-          data-saved={interactionState.isBookmarked ? 'true' : undefined}
-          disabled={isLoading}
-          aria-label={interactionState.isBookmarked ? 'Manage saved post' : 'Save post'}
-        >
-          <BookmarkIcon width={17} height={17} weight={iconWeight} />
-          {bookmarkCount > 0 && <Counter value={bookmarkCount} />}
-        </button>
+        <Tooltip content={tooltip} placement="bottom" size="compact" hoverOnly>
+          <button
+            data-action="bookmark"
+            data-saved={interactionState.isBookmarked ? 'true' : undefined}
+            disabled={isLoading}
+            aria-label={interactionState.isBookmarked ? 'Manage saved post' : 'Save post'}
+          >
+            <BookmarkIcon width={17} height={17} weight={iconWeight} />
+            {bookmarkCount > 0 && <Counter value={bookmarkCount} />}
+          </button>
+        </Tooltip>
       }
     >
       {({ close }) => (

@@ -32,8 +32,8 @@ const isActivePath = (pathname, path) => {
 
 export default function Footer() {
   const mounted = useClientMounted()
-  // One UI hides the bar the moment you browse downward and hands it back on the way up
-  const [isHidden, setIsHidden] = useState(false)
+  // The bar dims to a faint outline the moment you browse downward and returns on the way up
+  const [isDimmed, setIsDimmed] = useState(false)
   const pathname = usePathname()
   const { address, isConnected } = useConnection()
 
@@ -67,7 +67,7 @@ export default function Footer() {
       // Hold the anchor through sub-threshold moves so a slow drag still accumulates into one
       if (Math.abs(delta) < SCROLL_JITTER) return
 
-      setIsHidden(delta > 0 && y > SCROLL_REVEAL_ZONE)
+      setIsDimmed(delta > 0 && y > SCROLL_REVEAL_ZONE)
       lastY = y
     }
 
@@ -86,7 +86,7 @@ export default function Footer() {
 
   // A new route starts at the top, so the bar owes the user a clean slate
   useEffect(() => {
-    setIsHidden(false)
+    setIsDimmed(false)
   }, [pathname])
 
   // Home link double-duty: scrolled down -> back to top, already at top -> pull fresh posts
@@ -140,7 +140,7 @@ export default function Footer() {
 
   return (
     // The open room is seated above the bar and closes from it, so the bar stays while it is open
-    <footer className={clsx(styles.footer, isHidden && !isChatOpen && styles['footer--hidden'])}>
+    <footer className={clsx(styles.footer, isDimmed && !isChatOpen && styles['footer--dimmed'])}>
       <nav className={styles['footer__bar']} aria-label="Mobile Navigation">
         <ul className={styles['footer__list']}>
           {navLinks.map((item, index) => {
@@ -148,16 +148,12 @@ export default function Footer() {
             // While the room is open it owns the screen, so only the Chat tab reads as selected
             const isActive = item.path ? !isChatOpen && isActivePath(pathname, item.path) : Boolean(item.isActive)
 
-            // One UI keeps the same outline glyph in both states and only thickens the
-            // selected one — the pill and the brighter label carry the rest
+            // Filled icons mark the active tab. Names live on aria-label / title.
             const itemContent = (
-              <>
-                <span className={styles['footer__icon']} data-icon={item.name}>
-                  <Icon size={24} weight={isActive ? 'bold' : 'regular'} />
-                  {item.hasDot && <span className={styles['footer__dot']} aria-hidden="true" />}
-                </span>
-                <span className={styles['footer__label']}>{item.name}</span>
-              </>
+              <span className={styles['footer__icon']} data-icon={item.name}>
+                <Icon size={24} weight={isActive ? 'fill' : 'regular'} />
+                {item.hasDot && <span className={styles['footer__dot']} aria-hidden="true" />}
+              </span>
             )
 
             // Render functional action wrapper if item triggers component modals (like New Post)
@@ -169,6 +165,7 @@ export default function Footer() {
                     className={clsx(styles['footer__link'], isActive && styles['footer__link--active'])}
                     onClick={item.action}
                     aria-label={item.hasDot ? `${item.name}, unread messages` : item.name}
+                    title={item.name}
                     aria-pressed={item.isActive === undefined ? undefined : isActive}
                   >
                     {itemContent}
@@ -184,6 +181,8 @@ export default function Footer() {
                   href={item.path}
                   className={clsx(styles['footer__link'], isActive && styles['footer__link--active'])}
                   aria-current={isActive ? 'page' : undefined}
+                  aria-label={item.hasDot ? `${item.name}, unread messages` : item.name}
+                  title={item.name}
                   onClick={(event) => {
                     closeChatOnNavigate()
                     if (item.path === '/') handleHomeLinkClick(event)

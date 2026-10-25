@@ -8,8 +8,8 @@ dialog.newPost {
   max-height: calc(100vh - 96px);
   /* iOS Safari: 100vh includes the collapsed URL-bar area; dvh tracks the visible viewport */
   max-height: calc(100dvh - 96px);
-  /* Anchored near the top of the viewport, not vertically centered */
-  margin: 48px auto auto;
+  /* Centered in the viewport, as Threads opens its composer */
+  margin: auto;
   padding: 0;
   border: 0;
   overflow: hidden;
@@ -27,41 +27,6 @@ dialog.newPost {
   button,
   select {
     font: inherit;
-  }
-}
-
-/* ■■■ [Header] ■■■ */
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 52px;
-  padding: 6px 16px 6px 8px;
-  flex-shrink: 0;
-
-  &__close {
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--text);
-    border-radius: 999px;
-    cursor: pointer;
-    touch-action: manipulation;
-
-    &:hover {
-      background: var(--hover);
-    }
-  }
-
-  &__context {
-    color: var(--network-color-primary, var(--color-primary));
-    font-size: 0.9rem;
-    font-weight: 700;
   }
 }
 
@@ -179,8 +144,7 @@ dialog.newPost {
 .composer {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 4px 16px 8px;
+  padding: 16px 16px 4px;
 
   /* Crucial: Allows the content area to scroll independently; basis `auto` (not 0%)
      so Safari keeps the content-driven height — see .form */
@@ -234,15 +198,34 @@ dialog.newPost {
 
 /* ■■■ [Writing Row — avatar rail left, everything the author writes right] ■■■ */
 
+/* No gap between rows: the rail runs through each row's full height, so the line from one
+   avatar reaches the next without a break */
 .composerRow {
   display: flex;
   gap: 12px;
 }
 
 .composerAvatar {
-  align-self: flex-start;
   flex-shrink: 0;
-  padding-top: 2px;
+}
+
+/* Avatar column. Its line stretches to the bottom of the row, which is what draws the thread */
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  /* Set from NewPost's RAIL_AVATAR_SIZE, the size every part's Profile picture is drawn at */
+  width: var(--rail-avatar-size);
+
+  &__line {
+    flex: 1;
+    width: 2px;
+    min-height: 12px;
+    margin: 6px 0 2px;
+    background: var(--border);
+    border-radius: 1px;
+  }
 }
 
 .composerBody {
@@ -250,24 +233,94 @@ dialog.newPost {
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  padding-bottom: 12px;
 }
 
-/* The chain the post lands on, in the slot X gives its audience pill */
-.audience {
-  align-self: flex-start;
-  margin-bottom: 8px;
+/* "name › network", in the line Threads gives "name › Community or topic" */
+.byline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 24px;
+
+  &__name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  &__caret {
+    flex-shrink: 0;
+    color: var(--text-muted);
+  }
+}
+
+/* The community slot: muted "Community" until one is picked, then its name in the accent
+   colour, as Threads marks a community post */
+.community {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 8px;
+
+  &:is(button) {
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--hover);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &--picked {
+    color: var(--network-color-primary, var(--color-primary));
+  }
+
+  &__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__logo {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    object-fit: cover;
+    border-radius: 999px;
+
+    /* Out of the row while the glyph stands in — a global img rule outranks [hidden] */
+    &--loading {
+      display: none;
+    }
+  }
 }
 
 .editor {
   display: block;
   width: 100%;
-  min-height: 120px;
-  padding: 8px 0;
+  min-height: 1.4em;
+  padding: 2px 0 6px;
   color: var(--text);
   background: transparent;
   border: 0;
   outline: none;
-  font-size: 1.25rem;
+  font-size: 1rem;
   line-height: 1.4;
   word-break: break-word;
   white-space: pre-wrap;
@@ -477,51 +530,116 @@ dialog.newPost {
   filter: blur(10px);
 }
 
-/* ■■■ [Reply Scope & Footer] ■■■ */
+/* ■■■ [Thread Parts] ■■■ */
 
-.replyControl {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  margin: 4px 12px;
-  padding: 6px 8px;
-  border: 0;
-  background: transparent;
-  color: var(--network-color-primary, var(--color-primary));
-  font-size: 0.85rem;
-  font-weight: 700;
-  border-radius: 999px;
-  cursor: pointer;
+/* A later part's editor is the first part's .editor; it only never claims the phone sheet's
+   spare height, which belongs to the first part */
+.editor.editor--part {
+  flex: 0 0 auto;
+}
 
-  &:hover {
-    background: var(--hover);
+.part {
+  &__remove {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 999px;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+      background: var(--hover);
+    }
   }
 }
+
+/* The faded "Add to thread" row closing the rail: a small avatar in the 40px column, the
+   prompt where the text would start */
+.addPart {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 2px 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+
+  &__avatar {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: var(--rail-avatar-size);
+    opacity: 0.6;
+  }
+
+  &:hover:not(:disabled) {
+    color: var(--text);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+/* ■■■ [Footer] ■■■ */
 
 .footer {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-top: auto;
-  padding: 8px 16px 12px 8px;
-  border-top: 1px solid var(--border);
+  padding: 8px 16px 16px 10px;
   flex-shrink: 0;
-  // Never wraps: the toolbar inside takes the squeeze by scrolling, so Post stays on this line
   flex-wrap: nowrap;
 }
 
-/* Icon-only attach row pinned beside Post — titles carry the labels the icons dropped.
-   One line, always: the row grows with every attachment type a chain gains, and wrapping it
-   pushed Post onto a second line and shifted the whole footer. It scrolls sideways instead,
-   the same way the cashtag strip does, so Post keeps its seat at the end of the row. */
+/* Reply scope and scheduling, behind one labelled menu as in Threads */
+.optionsTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--hover);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* Icon-only tool row under the editor — titles carry the labels the icons dropped.
+   One line, always: the row grows with every attachment type a chain gains, so it scrolls
+   sideways instead of wrapping, the same way the cashtag strip does. */
 .toolbar {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
   gap: 2px;
   min-width: 0;
+  /* Pulls the first glyph's hover circle back so the icon itself lines up with the text */
+  margin-left: -8px;
   overflow-x: auto;
   // A diagonal swipe over the row must not steal the page's scroll
   overscroll-behavior-inline: contain;
@@ -547,7 +665,7 @@ dialog.newPost {
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--network-color-primary, var(--color-primary));
+    color: var(--text-muted);
     border-radius: 999px;
     cursor: pointer;
     // The :active scale makes Chrome promote the button to a compositor layer on first
@@ -555,6 +673,7 @@ dialog.newPost {
     transform: translateZ(0);
 
     &:hover {
+      color: var(--text);
       background: var(--hover);
     }
 
@@ -734,15 +853,15 @@ dialog.newPost {
   }
 
   .composer {
-    gap: 10px;
-    padding: 2px 14px 8px;
+    padding: 12px 14px 4px;
   }
 
   /* The sheet is taller than the content — the writing row claims the free space so a tap
      anywhere in the empty sheet lands in the text. Grow-only (`1 0 auto`): a long post or
      an attached media grid must never be shrunk below its content height, .composer
-     scrolls instead. */
-  .composerRow {
+     scrolls instead. Only while there is no thread: a growing first row would push every
+     later part to the bottom of the sheet. */
+  .composer:not(:has(.composerRow--part)) > .composerRow {
     flex: 1 0 auto;
   }
 
@@ -821,9 +940,4 @@ dialog.newPost {
   svg {
     flex-shrink: 0;
   }
-}
-
-/* The calendar tool lights up while a time is set, so the row itself says the post is scheduled */
-.toolbar > button[aria-pressed='true'] {
-  color: var(--network-color-primary, var(--color-primary));
 }

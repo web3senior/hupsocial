@@ -47,8 +47,18 @@
 // --- Post ---
 .post {
   --post-button-bg: var(--surface-muted);
+  // Threads' type and palette, as tokens so the light and dark blocks at the end of this file can
+  // set them and the terminal theme keeps its own greens. The byline (Profile.module.scss) reads
+  // --post-muted / --post-meta-size with its old values as fallbacks, so only posts change.
+  --post-text: var(--foreground);
+  --post-muted: var(--gray-400);
+  --post-link: var(--blue-500);
+  --post-action: var(--blue-gray-500);
+  --post-meta-size: 15px;
   // Owns its text colour: the post details wrapper paints --text, which dims to 65% white in dark
-  color: var(--foreground);
+  color: var(--post-text);
+  // Threads sets the whole card at 15px: the name inherits it, the time and the body match it
+  font-size: 15px;
 
   -webkit-tap-highlight-color: transparent;
   position: relative;
@@ -180,38 +190,6 @@
     }
   }
 
-  &__communityBadge {
-    font-size: 12px;
-    color: var(--gray-500);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    max-width: 100%;
-    margin-bottom: 4px;
-    padding-left: 0.4rem;
-    text-decoration: none;
-    white-space: nowrap;
-
-    &:hover {
-      color: var(--text);
-      text-decoration: underline;
-    }
-
-    svg {
-      flex: 0 0 auto;
-      opacity: 0.6;
-    }
-  }
-
-  // A community can be named a whole sentence; the badge shows its first few words and the
-  // full name lives in the title, so the line never wraps under the card
-  &__communityName {
-    min-width: 0;
-    max-width: 36ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
   &__header {
     user-select: none;
   }
@@ -238,6 +216,34 @@
           z-index: 0;
         }
       }
+    }
+  }
+
+  // "1/3 · Show thread" under the text of a thread's part
+  &__thread {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    font-size: var(--post-meta-size, var(--system-13-font-size));
+  }
+
+  &__threadCount {
+    color: var(--post-muted, var(--gray-400));
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__threadLink {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--blue-500);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
     }
   }
 
@@ -316,7 +322,8 @@
     &__content {
       overflow: hidden;
       font-family: var(--font-sans) !important;
-      font-size: var(--system-16-font-size);
+      // 15/21, Threads' body text
+      font-size: 15px;
       line-height: 1.4;
       position: relative;
       white-space: pre-wrap;
@@ -339,7 +346,7 @@
       }
 
       a {
-        color: var(--blue-500) !important;
+        color: var(--post-link) !important;
       }
     }
   }
@@ -353,10 +360,12 @@
   }
 
   &__actions {
-    color: var(--black-400);
+    --post-action-color: var(--post-action);
+    color: var(--post-action-color);
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
-    font-size: 0.875rem;
+    // Threads' counts: 13px beside the glyph
+    font-size: 13px;
     font-weight: 400;
     gap: 4px;
     cursor: default;
@@ -408,6 +417,10 @@
         flex: none;
       }
 
+      &[data-action] {
+        color: var(--post-action-color);
+      }
+
       // Keyed on data-action: the menus these buttons open render inside this row with icons of their own size
       &[data-action] > svg {
         width: 20px;
@@ -442,14 +455,47 @@
         }
       }
 
-      // Hover only raises a neutral halo — the icon keeps its resting color, so the row
-      // never flashes a different hue per action. Fine pointers only, so a tap on touch
-      // doesn't leave the pill stuck on.
+      // Fine pointers only, so tapping does not leave a hover halo on touch screens.
       @media (hover: hover) and (pointer: fine) {
         &:hover:before {
           opacity: 1;
           transform: translate(-50%, -50%) scale(1);
           background-color: var(--post-button-bg);
+        }
+
+        &[data-action='like'] {
+          --action-hover-color: #ff007a;
+        }
+
+        &[data-action='repost'] {
+          --action-hover-color: #00ba7c;
+        }
+
+        &[data-action='tip'] {
+          --action-hover-color: #22c55e;
+        }
+
+        &[data-action='comment'],
+        &[data-action='view'] {
+          --action-hover-color: #1d9bf0;
+        }
+
+        &[data-action='like'],
+        &[data-action='repost'],
+        &[data-action='tip'],
+        &[data-action='comment'],
+        &[data-action='view'] {
+          &:hover:not(:disabled) {
+            color: var(--action-hover-color);
+
+            > svg {
+              color: inherit;
+            }
+
+            &:before {
+              background-color: color-mix(in srgb, var(--action-hover-color) 10%, transparent);
+            }
+          }
         }
       }
 
@@ -470,14 +516,6 @@
       // Saved: the counter takes the filled mark's blue
       &[data-action='bookmark'][data-saved='true'] {
         color: var(--blue-500);
-      }
-
-      // Icon inherits currentColor: themed base color (Globals.scss per-theme var)
-      // The paper plane runs corner to corner of its box where the other glyphs sit inside
-      // theirs, so at the shared 20px it reads a size up. Scaled rather than resized so the
-      // button keeps the row's 1:1 halo.
-      &[data-action='share'] > svg {
-        scale: 0.88;
       }
 
       &[data-action='tip'] {
@@ -561,8 +599,21 @@
   }
 }
 
+// Threads' light palette: black text, #999 secondary, its link blue, near-black glyphs
+:global([data-theme='light']) .post {
+  --post-text: #000000;
+  --post-muted: #999999;
+  --post-link: #0095f6;
+  --post-action: #424242;
+}
+
 :global([data-theme='dark']) .post {
   --post-button-bg: #20232a;
+  // Threads' dark palette: off-white text, #777 secondary
+  --post-text: #f3f5f7;
+  --post-muted: #777777;
+  --post-link: #0095f6;
+  --post-action: #cccccc;
 }
 
 :global([data-theme='terminal']) .post {

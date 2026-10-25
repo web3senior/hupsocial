@@ -1,53 +1,61 @@
 @use './../styles/components/responsive' as *;
 
-// Samsung One UI (Gallery) bottom bar: a floating, heavily rounded capsule that hovers
-// over the feed rather than sitting flush on the viewport edge. Every colour resolves
-// from a theme token, so light, dark and terminal all get a bar that belongs to them.
+// Full-width bottom navigation with theme-aware glass and safe-area spacing.
 .footer {
   position: fixed;
   right: 0;
   bottom: 0;
   left: 0;
   z-index: 2;
-  padding: 0 var(--bottom-nav-inset) calc(var(--bottom-nav-inset) + env(safe-area-inset-bottom, 0px));
-  // The strip between the bar and the viewport edges must stay click-through
+  padding: 0;
   pointer-events: none;
   user-select: none;
-
-  // Slides out on the way down, back in on the way up (state lives in Footer.jsx). It is a
-  // pure translate on purpose: an opacity fade would make this element a backdrop root for
-  // the duration and the bar would lose its blur mid-slide.
-  transform: translateY(0);
-  visibility: visible;
-  transition:
-    transform 0.32s cubic-bezier(0.2, 0, 0, 1),
-    visibility 0s;
-
-  @media (prefers-reduced-motion: reduce) {
-    transition-duration: 0.01ms, 0s;
-  }
 
   @include md-up() {
     display: none;
   }
 
-  // Parked just past the viewport edge; visibility only flips once it is fully out, so the
-  // links leave the tab order without the bar disappearing mid-slide.
-  &--hidden {
-    transform: translateY(calc(100% + 8px));
-    visibility: hidden;
-    transition-delay: 0s, 0.32s;
+  // Dimmed on the way down, restored on the way up (state lives in Footer.jsx). The bar never
+  // leaves: its glass and border fade out and the glyphs drop to a faint outline over
+  // the feed, still tappable. Faded per layer rather than with opacity on the footer, which
+  // would make it a backdrop root and drop the blur mid-fade. Touching the bar restores it.
+  &--dimmed:not(:hover):not(:focus-within) {
+    .footer__bar {
+      border-color: transparent;
+      background-color: transparent;
+      backdrop-filter: blur(0) saturate(100%);
+    }
 
-    @media (prefers-reduced-motion: reduce) {
-      transition-delay: 0s, 0s;
+    .footer__link {
+      opacity: 0.45;
+
+      &::before {
+        opacity: 0;
+      }
+    }
+
+    .footer__dot {
+      border-color: transparent;
     }
   }
 
   &__bar {
+    transition:
+      background-color 0.32s ease,
+      border-color 0.32s ease,
+      backdrop-filter 0.32s ease;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition-duration: 0.01ms;
+    }
+
     pointer-events: auto;
-    height: var(--bottom-nav-height);
-    border-radius: calc(var(--bottom-nav-height) / 2);
-    border: 1px solid var(--border);
+    box-sizing: border-box;
+    width: 100%;
+    height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-radius: 0;
+    border-top: 1px solid var(--border);
     // Smoked glass. The alpha is what makes the blur legible: at 88% opaque only a
     // twelfth of the backdrop survives and the bar just reads as a flat slab, so the
     // surface is deliberately kept thin enough for the feed to smear through it.
@@ -56,9 +64,6 @@
     // legacy alias is present, and it already emits the prefix per browser target itself.
     backdrop-filter: blur(28px) saturate(180%);
     overflow: hidden;
-    max-width: 400px;
-    margin: auto;
-    zoom: .9;
 
     // Without a backdrop filter that thin surface would leave the feed legible straight
     // through the bar, so those browsers get a near-solid one instead.
@@ -92,11 +97,13 @@
     gap: 0.25rem;
     padding: 0;
     border: none;
+    border-radius: 0;
     background: transparent;
     color: var(--text-muted);
     cursor: pointer;
     transition:
       color 0.2s ease,
+      opacity 0.32s ease,
       transform 0.12s ease;
 
     // The One UI selection pill. It lives behind the item and grows into place
@@ -106,7 +113,7 @@
       position: absolute;
       z-index: -1;
       inset: 4px 4px;
-      border-radius: 1000px;
+      border-radius: 0;
       background-color: color-mix(in srgb, var(--foreground) 12%, transparent);
       opacity: 0;
       transform: scale(0.72);
@@ -130,11 +137,6 @@
 
   &__link--active {
     color: var(--foreground);
-
-    &::before {
-      opacity: 1;
-      transform: scale(1);
-    }
   }
 
   &__icon {
@@ -157,13 +159,6 @@
     background-color: var(--blue-300);
   }
 
-  &__label {
-    font-size: var(--font-size-12);
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: 0.01em;
-    white-space: nowrap;
-  }
 }
 
 // Compact structural notification dot matching the Aside implementation

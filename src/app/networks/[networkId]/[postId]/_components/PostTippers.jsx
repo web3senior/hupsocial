@@ -7,7 +7,7 @@ import styles from './PostTippers.module.scss'
 
 // Compact ("1.2K") for large amounts, but sub-1 amounts keep their significant digits —
 // compact's 2-fraction-digit rounding would collapse e.g. 0.00005 ETH to "0 ETH".
-const formatTokenAmount = (n) =>
+export const formatTokenAmount = (n) =>
   new Intl.NumberFormat(undefined, n > 0 && n < 1 ? { maximumSignificantDigits: 4 } : { notation: 'compact', maximumFractionDigits: 2 }).format(n)
 
 /**

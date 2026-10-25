@@ -247,7 +247,8 @@
   font-family: var(--font-sans);
   font-size: inherit;
   line-height: var(--profile-text-line-height, var(--system-16-line-height));
-  color: var(--gray-400);
+  // Inside a post card, Post.module.scss supplies Threads' secondary grey
+  color: var(--post-muted, var(--gray-400));
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -259,9 +260,56 @@
   font-weight: 400;
   // The name's line box, so the time sits on the row's baseline instead of floating above it
   line-height: var(--system-16-line-height);
-  font-size: var(--system-13-font-size);
-  color: var(--gray-400);
+  // A post card sets the time at the name's own size, as Threads does; elsewhere it stays small
+  font-size: var(--post-meta-size, var(--system-13-font-size));
+  color: var(--post-muted, var(--gray-400));
   flex-shrink: 0; // The timestamp holds while the name truncates
+  white-space: nowrap;
+}
+
+// Same box and colour as the time it follows, so "4h · Author" reads as one quiet run
+// "› community" after the name. It gives way before the name does: the community truncates first,
+// so a long community name never pushes the author's own name off the line.
+.communityCaret {
+  flex-shrink: 0;
+  color: var(--post-muted, var(--gray-400));
+}
+
+.community {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 0;
+  flex-shrink: 2;
+  font-weight: 600;
+  font-size: var(--post-meta-size, var(--system-13-font-size));
+  color: var(--color-primary);
+  text-decoration: none;
+
+  &:is(a):hover {
+    text-decoration: underline;
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &__name {
+    @extend %clip-clears-descenders;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.tag {
+  padding-left: 0.25rem;
+  font-weight: 400;
+  line-height: var(--system-16-line-height);
+  font-size: var(--post-meta-size, var(--system-13-font-size));
+  color: var(--post-muted, var(--gray-400));
+  flex-shrink: 0;
   white-space: nowrap;
 }
 

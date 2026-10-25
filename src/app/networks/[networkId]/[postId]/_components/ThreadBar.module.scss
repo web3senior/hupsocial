@@ -1,0 +1,79 @@
+// "↓↑ Top ⌄ … View activity ›" between the post and its replies, as Threads draws it
+.thread-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+
+  @media (max-width: 640px) {
+    padding-inline: 10px;
+  }
+
+  &__sort,
+  &__activity {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 36px;
+    padding: 0 0.5rem;
+    margin-inline: -0.5rem;
+    border: none;
+    border-radius: 10px;
+    background: none;
+    font: inherit;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--app-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  &__sort {
+    color: var(--foreground);
+    font-weight: 600;
+  }
+
+  &__activity {
+    color: var(--text-muted);
+  }
+
+  // Layout only: NativePopover's panel is already the card (surface, radius, shadow, padding)
+  &__menu {
+    display: flex;
+    flex-direction: column;
+    min-width: 180px;
+  }
+
+  &__option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 10px;
+    background: none;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 15px;
+    text-align: start;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--hover);
+    }
+
+    &--active {
+      font-weight: 600;
+    }
+  }
+}

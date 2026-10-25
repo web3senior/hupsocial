@@ -2,10 +2,8 @@ import { cache } from 'react'
 import { readPostForPage } from '@/lib/postRows'
 import { commentsPageUrl } from '@/lib/commentsRequest'
 import { summarizePost } from '@/lib/postSummary'
-import PageTitle from '@/components/PageTitle'
 import PreloadFetch from '@/components/PreloadFetch'
 import PostDetails from './_components/PostDetails'
-import { postHeaderProps } from './_components/postHeader'
 import styles from './page.module.scss'
 
 // Deduplicate the read so generateMetadata and Page share one query per render. Straight from
@@ -95,7 +93,8 @@ export default async function Page({ params }) {
   return (
     <>
       {preloads.length > 0 && <PreloadFetch hrefs={preloads} />}
-      <PageTitle name={`Post`} changeDocumentTitle={false} containerWidth={`small`} {...postHeaderProps(post, networkId)} />
+      {/* No PageTitle: the title, back arrow and views are PostTitleRow, above the card, which
+          also clears the fixed header itself */}
       <div className={`${styles.page}`}>
         <PostDetails networkId={networkId} postId={postId} initialPost={post} />
       </div>

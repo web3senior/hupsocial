@@ -1,0 +1,67 @@
+@use '@/styles/components/responsive' as *;
+
+// Sits above the card, on the page background, as Threads' thread title does. The post page
+// renders no PageTitle spacer, so this row clears the fixed header itself — differently per size.
+.post-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  // Desktop: in the header's own strip, centred on the line Connect sits on. Header goes bare on
+  // post routes (transparent, click-through), so the row shows and its back arrow takes clicks.
+  @include md-up() {
+    position: relative;
+    min-height: var(--header-height);
+    padding: 0 4px;
+  }
+
+  // Phones: the header is solid and has the menu button where the arrow would be, so the row
+  // starts below it, as the spacer used to push it
+  @include md-down() {
+    min-height: 64px;
+    margin-top: 4.5rem;
+    padding: 0 10px 8px;
+  }
+
+  &__back {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 1000px;
+    color: var(--foreground);
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--app-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  &__heading {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__name {
+    margin: 0;
+    color: var(--foreground);
+    font-weight: var(--font-weight-bold);
+    font-size: 1.375rem;
+    line-height: 1.2;
+  }
+
+  &__subtitle {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-13);
+    line-height: 1.25;
+  }
+}

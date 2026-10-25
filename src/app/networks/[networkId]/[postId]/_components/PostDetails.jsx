@@ -8,8 +8,11 @@ import { recordPostView } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import Post from '@/components/Post'
 import Comments from '@/components/Comments'
-import PostLikes from './PostLikes'
 import PostTippers from './PostTippers'
+import ThreadBar from './ThreadBar'
+import { DEFAULT_COMMENTS_SORT } from '@/lib/commentsRequest'
+import ReplyBar from './ReplyBar'
+import PostTitleRow from './PostTitleRow'
 import { usePostStore } from '@/stores/usePostStore'
 import styles from './PostDetails.module.scss'
 
@@ -94,24 +97,58 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
 
   const parentPost = parentId && sameId(parentState.forParentId, parentId) ? parentState.post : null
 
+  // A thread the author published in one go ({ part: 1, of: N } on the root): parts 2…N are
+  // drawn under it as one piece, joined by the reply line, instead of competing with everyone
+  // else's replies for a place in the list. A repost's row carries none of its original's content.
+  const threadMarker = Number(post?.is_repost) > 0 ? null : post?.content?.thread
+  const isThreadRoot = Number(threadMarker?.part) === 1 && Number(threadMarker?.of) > 1
+  const [threadState, setThreadState] = useState({ forId: null, parts: [] })
+
+  useEffect(() => {
+    if (!isThreadRoot) return
+    let cancelled = false
+    fetch(`/api/v1/networks/${resolvedNetworkId}/${resolvedPostId}/thread${address ? `?viewer_address=${address}` : ''}`)
+      .then((r) => r.json())
+      .then((body) => { if (!cancelled && Array.isArray(body?.data)) setThreadState({ forId: resolvedPostId, parts: body.data }) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [resolvedNetworkId, resolvedPostId, address, isThreadRoot])
+
+  const threadParts = isThreadRoot && sameId(threadState.forId, resolvedPostId) ? threadState.parts : []
+  // Only part 2 replies to the root directly — the list below would show it twice
+  const threadReplyIds = threadParts.length ? [threadParts[0].id] : null
+
+  const openPost = (row) => {
+    setCurrentPost(row)
+    router.push(`/networks/${resolvedNetworkId}/${row.id}`)
+  }
+
   useEffect(() => {
     if (mounted) recordPostView(resolvedNetworkId, resolvedPostId, address)
   }, [resolvedPostId, resolvedNetworkId, address, mounted])
 
+  // Replies open on Top, as on Threads; the choice holds while this page is up
+  const [sort, setSort] = useState(DEFAULT_COMMENTS_SORT)
+  const isRepost = Number(post?.is_repost) > 0
+  // A repost's thread is its original's
+  const threadId = isRepost ? post.is_repost : resolvedPostId
+
   return (
     <div className={`${styles.post}`}>
+      {/* Above the card, not inside it: Threads titles the thread on the page itself */}
+      <div className={`__container`} data-width={`small`}>
+        <PostTitleRow post={post} networkId={resolvedNetworkId} />
+      </div>
+
       <div className={`__container ${styles.page__container}`} data-width={`small`}>
-        {!post && <div className={`shimmer ${styles.pollShimmer}`} />}
+        {!post &&<div className={`shimmer ${styles.pollShimmer}`} />}
 
         {post && (
           <div className={`${styles.grid} flex flex-column`}>
             {parentPost && (
               <article
                 className={`${styles.post} ${styles.post__parent} animate fade`}
-                onClick={() => {
-                  setCurrentPost(parentPost)
-                  router.push(`/networks/${resolvedNetworkId}/${parentPost.id}`)
-                }}
+                onClick={() => openPost(parentPost)}
                 onMouseEnter={() => router.prefetch(`/networks/${resolvedNetworkId}/${parentPost.id}`)}
               >
                 <Post
@@ -129,23 +166,48 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
                 chainId={resolvedNetworkId}
                 actions={['like', 'comment', 'repost', 'tip', 'view', 'share', 'bookmark']}
                 authorFallback
+                hasCommentBelow={threadParts.length > 0}
               />
-              <hr />
             </article>
+            {/* The rest of the thread, each part its own post (own likes, own replies) and a way
+                into its own page, the line running on from the root to the last part */}
+            {threadParts.map((part, index) => (
+              <article
+                key={part.id}
+                className={clsx(styles.post, styles.post__threadPart, 'animate fade')}
+                onClick={() => openPost(part)}
+                onMouseEnter={() => router.prefetch(`/networks/${resolvedNetworkId}/${part.id}`)}
+              >
+                <Post
+                  item={part}
+                  chainId={resolvedNetworkId}
+                  actions={['like', 'comment', 'repost', 'tip', 'view', 'share', 'bookmark']}
+                  hasCommentBelow={index < threadParts.length - 1}
+                />
+              </article>
+            ))}
           </div>
         )}
 
-        {/* Both mount with the post rather than after a request for it, so on a cold open the
-            thread and the likes and supporters strips are already loading while the post is on screen */}
-        {post && <PostLikes networkId={resolvedNetworkId} postId={post.is_repost > 0 ? post.is_repost : resolvedPostId} />}
+        {/* Mounts with the post rather than after a request for it, so on a cold open the
+            supporters strip and the thread are already loading while the post is on screen.
+            Likes live in View activity (ThreadBar), not under the post. */}
+        {post && <PostTippers networkId={resolvedNetworkId} postId={threadId} />}
 
-        {post && <PostTippers networkId={resolvedNetworkId} postId={post.is_repost > 0 ? post.is_repost : resolvedPostId} />}
+        {/* A repost row carries none of its original's content or counts, so its activity sheet
+            would describe the wrong post — that row keeps only the sort */}
+        {post && <ThreadBar post={isRepost ? null : post} networkId={resolvedNetworkId} sort={sort} onSortChange={setSort} />}
+
+        {post && <ReplyBar post={post} networkId={resolvedNetworkId} />}
 
         {post && (
           <Comments
             networkId={resolvedNetworkId}
-            postId={post.is_repost > 0 ? post.is_repost : resolvedPostId}
+            postId={threadId}
             viewerAddress={address}
+            sort={sort}
+            threadAuthor={isRepost ? null : post.wallet_address}
+            hiddenIds={threadReplyIds}
           />
         )}
       </div>

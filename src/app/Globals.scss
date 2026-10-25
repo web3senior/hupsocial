@@ -45,7 +45,7 @@
   --status-success: #15803d;
   --status-warning: #b45309;
   --status-error: #dc2626;
-  --border: var(--gray-300, #e5e7eb);
+  --border:#e5e7eb;
   --hover: #f3f4f6;
   --tag: var(--gray-50, #f3f4f6);
   // Sweeps DARKER than the base here — a white glint over a #f7f7f8 surface lands
@@ -368,10 +368,7 @@ body {
   // so the overscroll area past the end of the page is painted too.
   // --font-sans is defined in variables.scss; no
   // !important needed, since this is the only font-family declaration on body in the app.
-  // font-family: var(--font-sans);
-  // font-family: Arial, Helvetica, sans-serif;
-  // font-family: var(--font-geist-sans);
-  font-family: var(--font-inter);
+  font-family: var(--font-sans);
   font-size: var(--system-16-font-size);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

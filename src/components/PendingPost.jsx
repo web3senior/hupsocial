@@ -2,10 +2,9 @@
 
 import { useMemo } from 'react'
 import clsx from 'clsx'
-import { BookmarkSimpleIcon, ChartBarIcon, ChatCircleIcon, HeartIcon, RepeatIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { BookmarkSimpleIcon, ChartBarIcon, ChatCircleIcon, CoinsIcon, HeartIcon, RepeatIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import Profile from '@/components/Profile'
 import MediaGallery from '@/components/Gallery'
-import { TipIcon } from '@/components/Icons'
 import { renderMarkdown } from '@/lib/markdown'
 // The action bar is the real one's stylesheet, not a copy of it: the icons have to sit exactly
 // where the live card will put them, or the handover shifts the row under the author's cursor.
@@ -67,7 +66,7 @@ export default function PendingPost({ entry }) {
               <RepeatIcon width={20} height={20} />
             </button>
             <button type="button" tabIndex={-1} data-action="tip">
-              <TipIcon />
+              <CoinsIcon width={18} height={18} />
             </button>
             <button type="button" tabIndex={-1} data-action="view">
               <ChartBarIcon width={17} height={17} />

@@ -3,14 +3,13 @@
 import clsx from 'clsx'
 import { useParams } from 'next/navigation'
 import { useConnection } from 'wagmi'
-import PageTitle from '@/components/PageTitle'
 import Post from '@/components/Post'
 import Comments from '@/components/Comments'
 import CommentSkeletonList from '@/components/ui/CommentSkeleton'
 import { usePostStore } from '@/stores/usePostStore'
 import pageStyles from './page.module.scss'
 import detailStyles from './_components/PostDetails.module.scss'
-import { postHeaderProps } from './_components/postHeader'
+import PostTitleRow from './_components/PostTitleRow'
 
 // Every navigation into this dynamic route pays a server roundtrip, and this
 // boundary is what the user sees during it. The click handlers put the tapped
@@ -28,15 +27,13 @@ export default function Loading() {
 
   return (
     <>
-      <PageTitle
-        name={`Post`}
-        changeDocumentTitle={false}
-        containerWidth={`small`}
-        {...postHeaderProps(cachedMatchesTarget ? currentPost : null, params?.networkId)}
-      />
+      {/* Same as page.jsx: no PageTitle, PostTitleRow is the title and clears the header */}
       <div className={pageStyles.page}>
         {cachedMatchesTarget ? (
           <div className={detailStyles.post}>
+            <div className={`__container`} data-width={`small`}>
+              <PostTitleRow post={currentPost} networkId={params?.networkId} />
+            </div>
             <div className={clsx('__container', detailStyles.page__container)} data-width={`small`}>
               <div className={clsx(detailStyles.grid, 'flex flex-column')}>
                 {/* No entry animation: PostDetails renders this same article without one
@@ -49,7 +46,6 @@ export default function Loading() {
                     chainId={currentPost.network_id || params?.networkId}
                     actions={['like', 'comment', 'repost', 'tip', 'view', 'share', 'bookmark']}
                   />
-                  <hr />
                 </article>
               </div>
               {/* Same cache-first component PostDetails mounts: a thread this session
@@ -65,7 +61,7 @@ export default function Loading() {
             </div>
           </div>
         ) : (
-          <Skeleton />
+          <Skeleton networkId={params?.networkId} />
         )}
       </div>
     </>
@@ -73,9 +69,10 @@ export default function Loading() {
 }
 
 // Fallback for entries without a cached post (direct URL, refresh, expired cache)
-function Skeleton() {
+function Skeleton({ networkId }) {
   return (
     <div className={`__container`} data-width={`small`}>
+      <PostTitleRow post={null} networkId={networkId} />
       <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <section
           style={{

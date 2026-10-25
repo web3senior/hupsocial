@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { commentsPageUrl } from '@/lib/commentsRequest'
+import { commentsPageUrl, DEFAULT_COMMENTS_SORT } from '@/lib/commentsRequest'
 
 // Keep restored threads reasonably fresh; older snapshots still paint instantly
 // but revalidate in the background.
@@ -9,7 +9,12 @@ const COMMENTS_CACHE_TTL_MS = 10 * 60 * 1000
 // thread cannot meaningfully change faster than this.
 const COMMENTS_FRESH_MS = 30 * 1000
 
-export const commentsCacheKey = (networkId, postId) => `${networkId}:${postId}`
+// One thread, whatever its order: what a viewer's reply invalidates and the nonce is kept under
+export const commentsThreadKey = (networkId, postId) => `${networkId}:${postId}`
+
+// One ordering of a thread: what a snapshot is stored under
+export const commentsCacheKey = (networkId, postId, sort = DEFAULT_COMMENTS_SORT) =>
+  `${commentsThreadKey(networkId, postId)}|${sort}`
 
 // Requests in flight, keyed by cache key + viewer. The post route's loading.jsx
 // and PostDetails both mount <Comments> for the same thread back to back, so
@@ -32,8 +37,9 @@ export const useCommentsCacheStore = create((set, get) => ({
 
   invalidateThread: (networkId, postId) =>
     set((state) => {
-      const key = commentsCacheKey(networkId, postId)
-      const { [key]: _stale, ...caches } = state.caches
+      // Every ordering of the thread holds the stale list, so all of them go
+      const key = commentsThreadKey(networkId, postId)
+      const caches = Object.fromEntries(Object.entries(state.caches).filter(([cacheKey]) => !cacheKey.startsWith(`${key}|`)))
       return {
         caches,
         threadNonces: { ...state.threadNonces, [key]: (state.threadNonces[key] ?? 0) + 1 },
@@ -59,15 +65,15 @@ export const useCommentsCacheStore = create((set, get) => ({
 
   // Resolves with the thread and writes it to the cache. Concurrent callers for
   // the same thread share one request.
-  fetchComments: (networkId, postId, address) => {
-    const key = commentsCacheKey(networkId, postId)
+  fetchComments: (networkId, postId, address, sort = DEFAULT_COMMENTS_SORT) => {
+    const key = commentsCacheKey(networkId, postId, sort)
     const requestKey = `${key}|${address ?? null}`
     const pending = inflight.get(requestKey)
     if (pending) return pending
 
     // The same URL the post page preloads for a document load, so the browser can hand this
     // fetch the response it already started on
-    const url = commentsPageUrl(networkId, postId, address)
+    const url = commentsPageUrl(networkId, postId, address, 1, sort)
 
     const request = fetch(url)
       .then((res) => res.json())

@@ -67,6 +67,13 @@ const nextConfig = {
     // sits on its loading.jsx skeleton the way X's timeline does. Also exposes next/offline.
     // Client-side fetch() (the feeds' getPosts) is NOT covered: those keep their own retry state.
     useOffline: true,
+    // Keeps a visited dynamic page (a post, a profile) in the client cache for 30s, so returning
+    // to it — back, forward, or tapping it again — paints from memory instead of waiting on the
+    // server. 30s was Next's own default before 15; long enough to cover a read-and-return, short
+    // enough that counts and replies do not go noticeably stale.
+    staleTimes: {
+      dynamic: 30,
+    },
   },
   async headers() {
     return [

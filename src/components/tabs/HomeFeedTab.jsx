@@ -18,6 +18,7 @@ import { usePostStore } from '@/stores/usePostStore'
 import { usePendingPostStore } from '@/stores/usePendingPostStore'
 import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
 import PageTitle from '@/components/PageTitle'
+import { openPost } from '@/stores/usePostOverlayStore'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
 import FeedError from '@/components/ui/FeedError'
 import styles from '@/app/page.module.scss'
@@ -77,7 +78,6 @@ export default function HomeFeedTab({
   // Rendered at the top of the feed card, above the posts (home passes its compose prompt)
   lead = null,
 }) {
-  const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
   const authoredPostNonce = usePostStore((state) => state.authoredPostNonce)
   const pendingPosts = usePendingPostStore((state) => state.pending)
@@ -165,6 +165,8 @@ export default function HomeFeedTab({
     const handleScroll = () => {
       const scrollElement = document.documentElement
       if (!scrollElement) return
+      // Hidden under a post opened in place (PostOverlayHost): the window is scrolling the post
+      if (containerRef.current && containerRef.current.getClientRects().length === 0) return
 
       const { scrollTop, clientHeight, scrollHeight } = scrollElement
       const SCROLL_THRESHOLD = 300
@@ -341,8 +343,7 @@ export default function HomeFeedTab({
       navigator.vibrate(200)
     }
 
-    setCurrentPost(item)
-    router.push(`/networks/${item.network_id}/${item.id}`)
+    openPost(item, router)
   }
 
   const loadMorePosts = useCallback(async () => {

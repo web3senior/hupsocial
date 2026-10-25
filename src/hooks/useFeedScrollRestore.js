@@ -19,8 +19,12 @@ const findAnchor = (container) => {
   return null
 }
 
+// False while the feed is mounted but hidden, as it is under a post opened in place
+// (PostOverlayHost): the window then scrolls the post, and none of it is the feed's position.
+const isRendered = (container) => container.getClientRects().length > 0
+
 const measureExit = (container) => {
-  if (!container?.isConnected) return null
+  if (!container?.isConnected || !isRendered(container)) return null
 
   const cardHeights = {}
   let anchor = null
@@ -84,6 +88,8 @@ export function useFeedScrollRestore({ containerRef, restore = null, ready = fal
     }
 
     const handleScroll = () => {
+      const container = containerRef.current
+      if (container && !isRendered(container)) return
       lastScrollYRef.current = window.scrollY
       if (!frame) frame = requestAnimationFrame(measure)
     }

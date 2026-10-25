@@ -1,5 +1,7 @@
 'use client'
 
+import Tooltip from './Tooltip'
+
 import { ChatCircleIcon } from '@phosphor-icons/react'
 import { useConnection } from 'wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -37,10 +39,12 @@ export const CommentAction = ({ post, onComment }) => {
   if (!post.allow_comment) return null
 
   return (
-    <button title="Reply" data-action="comment" aria-label="Comment on post" onClick={handleComment}>
-      <ChatCircleIcon width={17} height={17} />
-      {commentCount > 0 && <Counter value={commentCount} />}
-    </button>
+    <Tooltip content="Reply" placement="bottom" size="compact" hoverOnly>
+      <button data-action="comment" aria-label="Comment on post" onClick={handleComment}>
+        <ChatCircleIcon width={17} height={17} />
+        {commentCount > 0 && <Counter value={commentCount} />}
+      </button>
+    </Tooltip>
   )
 }
 
