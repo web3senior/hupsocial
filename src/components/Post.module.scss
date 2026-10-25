@@ -247,24 +247,6 @@
     }
   }
 
-  // Parts 2…N of a thread carried in the post itself, each set off from the one above
-  &__threadParts {
-    display: flex;
-    flex-direction: column;
-    margin: 0.75rem 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  &__threadPart {
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-
-    & + & {
-      margin-top: 0.75rem;
-    }
-  }
-
   // Sized to its label, not stretched across the column, so its focus ring hugs the words
   &__showMore {
     align-self: flex-start;
@@ -367,11 +349,10 @@
         }
       }
 
-      // A whole number of lines, so the clamp never slices a line through its glyphs, with
-      // the last one fading out to read as "continues" rather than as a hard cut
+      // A whole number of lines, so the clamp never slices a line through its glyphs. No fade:
+      // on a one-line post the faded last line is the whole post, and "Show more" says enough
       &_collapsed {
         max-height: 8lh;
-        mask-image: linear-gradient(to bottom, #000 calc(100% - 1lh), transparent);
       }
 
       &_expanded {

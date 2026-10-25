@@ -8,9 +8,6 @@
  * to their own post is a reply, not part of the thread, and only the marker tells the two apart.
  * A part that was deleted ends the chain there, so the page never skips over a hole. Posts from
  * before the marker existed have none, and come back as an empty thread.
- *
- * Legacy: new threads carry parts 2…N in the root's own content.parts (one transaction), and
- * Post draws them without this route. It stays for threads already onchain as reply chains.
  */
 
 import { NextResponse } from 'next/server'

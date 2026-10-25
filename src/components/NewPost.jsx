@@ -11,6 +11,7 @@ import { ArrowClockwiseIcon, ArticleIcon, BankIcon, CalendarDotsIcon, CaretDownI
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
+import { continueThread, threadPartCopy } from '@/lib/threadPublication'
 import { useProfile } from '@/hooks/useProfile'
 import useMyCommunities from '@/hooks/useMyCommunities'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -24,7 +25,7 @@ import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import { hupInstruction, readHupConfig } from '@/lib/solana/hup'
 import { sendHupAction } from '@/lib/solana/relay'
 import SolanaConnectButton from '@/components/ui/SolanaConnectButton'
-import { ContentType, MAX_THREAD_PARTS } from '@/lib/content'
+import { ContentType } from '@/lib/content'
 import { renderMarkdown } from '@/lib/markdown'
 import { MENTION_LINK_PATTERN, mentionLabel, mentionMarkdown } from '@/lib/mentions'
 import styles from '@/components/NewPost.module.scss'
@@ -502,9 +503,9 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
     : ''
 
   const [postContent, setPostContent] = useState(() => initialPostContent)
-  // The parts after the first, each with the same { text, media } content as the first. They ride
-  // in the first part's content as `parts`, so the whole thread is one pin and one transaction; a
-  // recovered thread comes back whole.
+  // The parts after the first, each with the same { text, media } content as the first. Each goes
+  // onchain as a reply to the part before it once that one is indexed (lib/threadPublication); a
+  // recovered thread comes back with what was left.
   // initialHtml seeds a part's editor once and never changes, so React never rewrites the DOM the
   // author is typing into; `content` mirrors that DOM from then on
   const [threadParts, setThreadParts] = useState(() =>
@@ -781,19 +782,19 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   // Only a plain post or a quote can wait for a later time: a reply belongs to a live thread, a
   // community post is sealed for one room's key, and Solana has no relayer path to hold it in
   // A task post is funded once it is indexed, so it has to go out now
-  // A thread can: every part travels in the one pinned payload the held signature covers
+  // A thread neither: its later parts need the earlier ones' ids, which a held signature can't know
   const canSchedule =
-    (actionType === 'post' || isQuote) && !communityTarget && !isSolanaTarget && !hupTask && canScheduleOn(targetChainId)
+    (actionType === 'post' || isQuote) && !communityTarget && !isSolanaTarget && !hupTask && threadParts.length === 0 && canScheduleOn(targetChainId)
   const isScheduled = canSchedule && Boolean(scheduledAt)
   // Anything new can grow into a thread. An edit rewrites one post that already exists, and a
   // sealed task reply is one submission to the task owner, not a conversation.
-  const canThread = actionType !== 'edit' && !sealsReply
+  const canThread = actionType !== 'edit' && !sealsReply && !isScheduled
   // Empty parts are dropped at submit rather than refused, as Threads does
   const threadBodies = canThread ? threadParts.filter(partHasBody) : []
   const isThreadOverLimit = canThread && threadParts.some((part) => partText(part).length > MAX_POST_LENGTH)
   // Threads greys "Add to thread" until the part above it says something
   const lastPart = threadParts[threadParts.length - 1]
-  const canAddPart = (lastPart ? partHasBody(lastPart) : hasPostBody) && threadParts.length < MAX_THREAD_PARTS - 1
+  const canAddPart = lastPart ? partHasBody(lastPart) : hasPostBody
   const { profile: signerProfile } = useProfile(signerAddress || null)
   // Only the communities this wallet can post in; none at all and the picker never shows
   const { communities: myCommunities } = useMyCommunities(canPickCommunity ? address : null)
@@ -1745,7 +1746,23 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
             if (found?.id) requestTaskFunding({ networkId: Number(pending?.networkId), postId: String(found.id), terms })
           }
         : onConfirmed
-      if (pending) trackPostPublication({ ...pending, txHash, signature, onIndexed })
+      // A thread's later parts are replies to this one, so they can only start once it has an id
+      const thread = pending?.thread
+      const onFirstIndexed = thread
+        ? (found) => {
+            onIndexed?.(found)
+            if (found?.id) continueThread({ ...thread, parent: found })
+          }
+        : onIndexed
+      if (pending) {
+        trackPostPublication({
+          ...pending,
+          copy: thread ? threadPartCopy(thread.start, thread.total) : null,
+          txHash,
+          signature,
+          onIndexed: onFirstIndexed,
+        })
+      }
 
       handleClose()
     },
@@ -1987,32 +2004,39 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
         const existingContent = getContentPayload(existingPost)
         if (existingContent?.quoteOf) serializableContent.quoteOf = existingContent.quoteOf
         if (existingContent?.communityId) serializableContent.communityId = existingContent.communityId
-        // An edit rewrites the first part only; the rest of the thread stays as it was
         if (existingContent?.thread) serializableContent.thread = existingContent.thread
-        if (existingContent?.parts) serializableContent.parts = existingContent.parts
       }
 
-      // The rest of a thread is part of this one post: parts 2…N go in `parts`, and the marker
-      // ({ part: 1, of }) is what the feed counts "1/N" from. Built without touching state: the
-      // text element is copied, not rewritten in place. Set (or cleared) on every new submission,
-      // so a recovered composer whose parts were removed loses both.
-      const threadContents = threadBodies.map((part) => {
+      // Every part of a thread says where it sits — { part, of } — which is how the post page
+      // tells the author's thread apart from a later reply to themselves and draws it as one
+      // piece. Ids can't go in: none exist yet when the parts are pinned. Set (or cleared) on
+      // every new submission, so a recovered composer whose parts were removed loses the marker.
+      // A part that failed mid-thread comes back as its own composer (lib/threadPublication), and
+      // numbers on from where the thread broke rather than starting over at 1
+      const threadStart = restoreState?.threadStart ?? 1
+      const threadTotal = threadStart + threadBodies.length
+      if (actionType !== 'edit') serializableContent.thread = threadTotal > 1 ? { part: threadStart, of: threadTotal } : undefined
+
+      // The rest of a thread goes through the same checks as the first part, all of it before
+      // anything is signed — a later part can't be stopped once part one is out. Built without
+      // touching state: the text element is copied, not rewritten in place.
+      const threadContents = threadBodies.map((part, partIndex) => {
         const content = getSerializablePostContent(withUploadResults(part.content, uploaded))
         return {
+          ...content,
           elements: content.elements.map((element, index) =>
             index === 0 ? { ...element, data: { ...element.data, text: stripLoneSurrogates(element.data.text) } } : element
           ),
+          thread: { part: threadStart + partIndex + 1, of: threadTotal },
         }
       })
-      const threadTotal = 1 + threadContents.length
-      if (actionType !== 'edit') {
-        serializableContent.thread = threadTotal > 1 ? { part: 1, of: threadTotal } : undefined
-        serializableContent.parts = threadContents.length ? threadContents : undefined
-      }
 
-      // Each part is checked on its own, as each would be read on its own
+      // A sealed envelope carries the marker in the clear as well: the server has to find the
+      // parts without the community key. It says only "part 2 of 3", nothing of what was written.
+      const withThreadMarker = (sealed, content) => (sealed?.encrypted && content.thread ? { ...sealed, thread: content.thread } : sealed)
+
       const verdicts = await Promise.all(
-        [{ ...serializableContent, parts: undefined }, ...threadContents].map(async (content) => {
+        [serializableContent, ...threadContents].map(async (content) => {
           const moderationRes = await fetch('/api/moderation/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2043,8 +2067,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       // (moderation must see plaintext) and before upload. null = blocked (toast already shown).
       let contentForUpload = serializableContent
       if (communityContext && actionType !== 'edit') {
-        // Sealed whole, parts included: a non-member learns nothing, not even that it is a thread
-        contentForUpload = await sealForCommunity(serializableContent)
+        contentForUpload = withThreadMarker(await sealForCommunity(serializableContent), serializableContent)
         if (contentForUpload === null) return
       }
 
@@ -2071,6 +2094,20 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
         return
       }
 
+      // Every later part is pinned now, sealed and stamped exactly like the first, so all that is
+      // left once the composer closes is one transaction per part
+      const threadPins = await Promise.all(
+        threadContents.map(async (content) => {
+          let partForUpload = communityContext ? withThreadMarker(await sealForCommunity(content), content) : content
+          if (partForUpload === null) return null
+          if (!partForUpload.encrypted) partForUpload = withAuthor(partForUpload, signerAddress)
+          const { cid } = await uploadObjectToIPFS(partForUpload)
+          if (!cid) throw new Error('CID not found')
+          return { metadata: cid, content }
+        })
+      )
+      if (threadPins.includes(null)) return
+
       // The metadata URI is the one handle on this submission that works everywhere: it exists
       // before the transaction is sent (so the relayed path has it too), it is what the indexer
       // stores verbatim, and an edit rewrites it onto the row it already has.
@@ -2089,10 +2126,25 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
             content: serializableContent,
             allowComments,
             thread: threadContents,
+            threadStart,
             pickedCommunity: canPickCommunity ? pickedCommunity : null,
           },
         },
-        copy: threadTotal > 1 ? { pending: `Publishing your ${threadTotal}-part thread…`, done: 'Your thread is live' } : null,
+        // What lib/threadPublication needs to send the later parts once this one is indexed. The
+        // Solana signer is captured while the wallet is in hand; the composer is gone by then.
+        thread: threadPins.length
+          ? {
+              parts: threadPins,
+              start: threadStart,
+              total: threadTotal,
+              networkId: targetChainId,
+              owner: signerAddress,
+              chain: targetChain,
+              publicClient: targetPublicClient,
+              solanaSigner: isSolanaTarget ? solanaWallet.getSigner() : null,
+              allowComments,
+            }
+          : null,
       }
 
       if (isSolanaTarget) {

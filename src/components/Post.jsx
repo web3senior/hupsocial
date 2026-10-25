@@ -42,7 +42,6 @@ import { CONTRACTS, config } from '@/config/wagmi'
 import { isSessionActive } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { renderMarkdown } from '@/lib/markdown'
-import { getThreadParts } from '@/lib/content'
 import { routeInternalLinkClick } from '@/lib/internalLinks'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { postToMarkdown, getPostMarkdownUrl } from '@/lib/postMarkdown'
@@ -359,8 +358,6 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
               )}
 
               <ThreadMarker item={displayItem} showThreadLink={!showContent} />
-
-              {showContent && <ThreadParts item={displayItem} />}
 
               {/* The first link's own content — an X post with its media, a YouTube player or an
                   Open Graph card — resolved live from the text. Hidden when the post carries its
@@ -963,46 +960,6 @@ function ThreadMarker({ item, showThreadLink }) {
         </button>
       )}
     </div>
-  )
-}
-
-/**
- * Parts 2…N of a thread published as one post (content.parts), on the post page. They share the
- * post's footer: likes, replies and reposts are the whole thread's. Reads the decrypted item, so
- * a community thread opens here exactly as its first part does.
- */
-function ThreadParts({ item }) {
-  const parts = getThreadParts(item?.content)
-  if (parts.length === 0) return null
-  const of = parts.length + 1
-
-  return (
-    <ol className={styles.post__threadParts}>
-      {parts.map((part, index) => {
-        const media = part?.elements?.[1]?.data?.items ?? []
-        return (
-          <li key={index} className={styles.post__threadPart}>
-            <PostText
-              sourceText={part?.elements?.[0]?.data?.text || ''}
-              postId={`${item.id}-${index + 2}`}
-              styles={styles}
-              renderMarkdown={renderMarkdown}
-              baseClassName={styles.post__main__content}
-            />
-            {media.length > 0 && (
-              <div className={styles.post__main__media}>
-                <MediaGallery data={media} />
-              </div>
-            )}
-            <div className={styles.post__thread}>
-              <span className={styles.post__threadCount}>
-                {index + 2}/{of}
-              </span>
-            </div>
-          </li>
-        )
-      })}
-    </ol>
   )
 }
 
