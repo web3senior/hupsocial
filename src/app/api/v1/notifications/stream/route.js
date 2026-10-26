@@ -1,69 +1,76 @@
-// ■■■ [Notification Stream Router] ■■■
-import { EventEmitter } from 'events';
+import { isWalletAddress } from '@/lib/address'
+import { subscribeNotifications } from '@/lib/notificationStream'
 
-// Global event bus to communicate between your webhook/indexer route and this stream
-global.notificationEvents = global.notificationEvents || new EventEmitter();
-const eventBus = global.notificationEvents;
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
+// Proxies and load balancers close a silent connection after ~30-60s; a comment line every
+// 25s keeps it open without waking the client's message handler.
+const HEARTBEAT_MS = 25_000
+// How long EventSource waits before reconnecting after the connection drops
+const RETRY_MS = 5000
+
+const encoder = new TextEncoder()
+
+/**
+ * Server-Sent Events feed of new notifications for one wallet, the live half of the toasts
+ * (lib/notificationStream.js holds the ticker). Read access matches GET /api/v1/notifications,
+ * which is already public per wallet.
+ */
 export async function GET(request) {
-    const { searchParams } = new URL(request.url);
-    const walletAddress = searchParams.get('wallet')?.toLowerCase();
+  const { searchParams } = new URL(request.url)
+  const wallet = searchParams.get('wallet')
 
-    if (!walletAddress) {
-        return new Response('Wallet address required', { status: 400 });
-    }
+  if (!isWalletAddress(wallet)) {
+    return new Response('Valid wallet address is required', { status: 400 })
+  }
 
-    // Set up headers for Server-Sent Events
-    const responseStream = new TransformStream();
-    const writer = responseStream.writable.getWriter();
-    const encoder = new TextEncoder();
+  let cleanup = () => {}
 
-    // Define the handler to catch updates from your application backend
-    const handleNotification = (notificationItem) => {
-        const actionableTypes = [
-            'post_received_comment',
-            'post_received_like',
-            'post_received_repost',
-            'post_received_quote',
-            'post_mentioned',
-            'post_mention_received_comment',
-            'user_received_follow'
-        ];
-
-        // Process only valid actions originating from other users
-        if (!actionableTypes.includes(notificationItem.action_type)) return;
-        if (notificationItem.recipient_wallet_address.toLowerCase() === notificationItem.actor_wallet_address.toLowerCase()) return;
-
-        // Ensure the event belongs to this specific connected wallet
-        if (notificationItem.recipient_wallet_address.toLowerCase() === walletAddress) {
-            const payload = {
-                id: notificationItem.id,
-                title: notificationItem.title,
-                message: notificationItem.message,
-                actionUrl: notificationItem.action_url,
-                networkName: notificationItem.data?.network_name || 'LUKSO',
-                createdAt: notificationItem.created_at
-            };
-
-            // SSE requires specific string layout format: "data: {JSON}\n\n"
-            writer.write(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+  const stream = new ReadableStream({
+    start(controller) {
+      const write = (chunk) => {
+        try {
+          controller.enqueue(encoder.encode(chunk))
+        } catch {
+          cleanup()
         }
-    };
+      }
 
-    // Listen to your indexer's events globally
-    eventBus.on('new_notification', handleNotification);
+      write(`retry: ${RETRY_MS}\n: connected\n\n`)
 
-    // Clean up when connection closes or tab is closed
-    request.signal.addEventListener('abort', () => {
-        eventBus.off('new_notification', handleNotification);
-        writer.close();
-    });
+      const unsubscribe = subscribeNotifications(wallet, (notification) => {
+        write(`id: ${notification.id}\nevent: notification\ndata: ${JSON.stringify(notification)}\n\n`)
+      })
+      const heartbeat = setInterval(() => write(': ping\n\n'), HEARTBEAT_MS)
 
-    return new Response(responseStream.readable, {
-        headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache, no-transform',
-            'Connection': 'keep-alive',
-        },
-    });
+      let closed = false
+      cleanup = () => {
+        if (closed) return
+        closed = true
+        clearInterval(heartbeat)
+        unsubscribe()
+        try {
+          controller.close()
+        } catch {
+          /* already closed by the runtime */
+        }
+      }
+
+      request.signal.addEventListener('abort', cleanup, { once: true })
+    },
+    cancel() {
+      cleanup()
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      // nginx buffers proxied responses by default, which would hold every event back
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }

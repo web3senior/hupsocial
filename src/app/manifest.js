@@ -18,13 +18,13 @@ export default function manifest() {
     background_color: '#131313',
     theme_color: '#000000',
     categories: ['social', 'finance'],
+    // The mark is black, so every icon sits on an opaque white tile — a transparent
+    // icon vanishes on dark launchers, taskbars and iOS (which fills alpha with black)
     icons: [
       {
         src: '/icon-192x192.png',
         sizes: '192x192',
         type: 'image/png',
-        // The mark runs edge to edge, so a maskable purpose would crop it — let the
-        // platform letterbox instead
         purpose: 'any',
       },
       {
@@ -32,6 +32,14 @@ export default function manifest() {
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any',
+      },
+      {
+        // Full-bleed tile with the mark inside the 80% safe zone, so Android can
+        // crop it to circle/squircle without clipping the H
+        src: '/maskable-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
       },
     ],
     screenshots: [

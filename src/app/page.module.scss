@@ -60,6 +60,9 @@
     border-top: 0;
     border-radius: 0;
 
+    // Feed tabs fill the bar edge to edge, so the bar carries no padding of its own
+    padding: 0;
+
     @include resp.sm-down {
       border: none;
     }
@@ -69,9 +72,12 @@
       margin-top: 0;
       min-height: var(--header-height);
       display: flex;
-      align-items: center;
-      // Align the heading with the feed card's content edge.
-      padding-inline: 1.25rem;
+      align-items: stretch;
+
+      > * {
+        flex: 1;
+        display: flex;
+      }
     }
   }
 

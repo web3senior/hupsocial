@@ -96,6 +96,33 @@
   word-break: break-word;
 }
 
+// Stretched link: the ::after covers the card so the whole toast is clickable, while the close
+// button (raised above it) stays its own target.
+.toast__message--link {
+  color: inherit;
+  text-decoration: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  &:focus-visible {
+    outline: none;
+
+    &::after {
+      outline: 2px solid var(--toast-tone, currentColor);
+      outline-offset: 2px;
+    }
+  }
+}
+
+.toast:has(.toast__message--link) {
+  cursor: pointer;
+}
+
 // Bleeds through the card padding to the edges; the card stays overflow:
 // visible for the hover bridge, so the footer rounds its own bottom corners.
 .toast__footer {
@@ -114,6 +141,8 @@
 }
 
 .toast__close {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -205,6 +234,43 @@
 // Loading follows the theme foreground like success — the motion, not a hue, is the signal.
 .loading .toast__icon {
   color: var(--foreground, #141414);
+}
+
+// Notification tones, the same hues the notifications feed paints its row icons with
+// (NotificationRow.module.scss), so a toast and the row it leads to read as one thing.
+.toast--like {
+  --toast-tone: var(--liked-color);
+}
+
+.toast--reply {
+  --toast-tone: #1d9bf0;
+}
+
+.toast--repost {
+  --toast-tone: #00ba7c;
+}
+
+.toast--follow {
+  --toast-tone: #7856ff;
+}
+
+.toast--money {
+  --toast-tone: #f0a500;
+}
+
+.toast--market {
+  --toast-tone: #ff7a00;
+}
+
+.toast--like,
+.toast--reply,
+.toast--repost,
+.toast--follow,
+.toast--money,
+.toast--market {
+  .toast__icon {
+    color: var(--toast-tone);
+  }
 }
 
 @keyframes toast-in-up {

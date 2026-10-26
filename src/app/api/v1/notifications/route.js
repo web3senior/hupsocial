@@ -2,6 +2,7 @@ import { ethers } from 'ethers'
 import { isWalletAddress } from '@/lib/address'
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { NOTIFICATION_COLUMNS, serializeNotification } from '@/lib/notificationRows'
 
 const SIG_MAX_AGE_MS = 5 * 60 * 1000
 
@@ -110,30 +111,21 @@ export async function GET(request) {
       where.push('is_read = 0')
     }
 
+    // `after_id` returns only rows newer than the last one a client has shown — the live toasts
+    // catch up with it when the app opens or a tab comes back into view.
+    const afterId = parseInt(searchParams.get('after_id'), 10)
+    if (Number.isSafeInteger(afterId) && afterId > 0) {
+      where.push('id > ?')
+      queryParams.push(afterId)
+    }
+
     // `counts_only=1` skips the row read entirely — the feed uses it to refresh its tab counters
     // after marking notifications read.
     const countsOnly = ['1', 'true'].includes(String(searchParams.get('counts_only')).toLowerCase())
 
     const [rows] = countsOnly ? [[]] : await pool.execute(
       `
-        SELECT
-          id,
-          recipient_wallet_address,
-          actor_wallet_address,
-          action_type,
-          entity_type,
-          entity_id,
-          network_id,
-          block_number,
-          tx_hash,
-          log_index,
-          title,
-          message,
-          action_url,
-          data,
-          is_read,
-          read_at,
-          created_at
+        SELECT ${NOTIFICATION_COLUMNS}
         FROM notifications
         WHERE ${where.join(' AND ')}
         ORDER BY created_at DESC, id DESC
@@ -272,49 +264,7 @@ export async function PATCH(request) {
   }
 }
 
-function serializeNotification(row) {
-  return {
-    id: String(row.id),
-    recipient_wallet_address: row.recipient_wallet_address,
-    actor_wallet_address: row.actor_wallet_address,
-    action_type: row.action_type,
-    entity_type: row.entity_type,
-    entity_id: row.entity_id,
-    network_id: toNullableNumber(row.network_id),
-    block_number: toNullableNumber(row.block_number),
-    tx_hash: row.tx_hash,
-    log_index: toNullableNumber(row.log_index),
-    title: row.title,
-    message: row.message,
-    action_url: row.action_url,
-    data: parseJson(row.data),
-    is_read: Boolean(row.is_read),
-    read_at: toSerializableDate(row.read_at),
-    created_at: toSerializableDate(row.created_at),
-  }
-}
-
-
 function clampNumber(value, min, max, fallback) {
   if (!Number.isFinite(value)) return fallback
   return Math.min(Math.max(value, min), max)
-}
-
-function parseJson(value) {
-  if (!value) return null
-
-  try {
-    return JSON.parse(value)
-  } catch {
-    return null
-  }
-}
-
-function toNullableNumber(value) {
-  return value === null || value === undefined ? null : Number(value)
-}
-
-function toSerializableDate(value) {
-  if (!value) return null
-  return value instanceof Date ? value.toISOString() : value
 }

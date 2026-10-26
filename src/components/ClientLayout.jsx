@@ -18,6 +18,7 @@ import VaultUnlockDialog from './VaultUnlockDialog'
 import ComposerRecovery from './ComposerRecovery'
 import TaskFundingHost from './TaskFundingHost'
 import ScheduledPostsRunner from './ScheduledPostsRunner'
+import LiveNotifications from './LiveNotifications'
 import ChatDock from './chat/ChatDock'
 import PostOverlayHost from './PostOverlayHost'
 import { WalletConnectDialog } from './ConnectWallet'
@@ -84,6 +85,8 @@ export default function ClientLayout({ children }) {
         <TaskFundingHost />
         {/* Asks the relayer for a due scheduled post the moment its author is online */}
         <ScheduledPostsRunner />
+        {/* Toasts likes, reposts, replies and follows as they land, and a catch-up on open */}
+        <LiveNotifications />
         {/* Offchain messenger docked on the right edge; the onchain /chat page hides it */}
         <ChatDock />
       </WagmiContext>

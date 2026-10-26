@@ -89,16 +89,27 @@ export const toast = (message = `Default message`, type, options) => {
     loadingRoot = null
   }
 
-  const text = document.createElement(`span`)
-  text.className = styles['toast__message']
+  // With `href` the message is a real anchor stretched over the whole card, so
+  // InternalLinkRouter routes it client-side and middle-click still opens a tab.
+  const text = document.createElement(opts.href ? `a` : `span`)
+  text.className = clsx(styles['toast__message'], opts.href && styles['toast__message--link'])
   text.textContent = message
+  if (opts.href) text.setAttribute(`href`, opts.href)
 
   // Also the update() path: swaps the variant class and inserts/removes the icon in place,
   // which is what lets a `loading` toast morph into a success/danger one without remounting.
   const applyType = (nextType) => {
     resolvedType = TYPE_ALIASES[nextType] ?? nextType
-    div.className = clsx(styles['toast'], styles[resolvedType])
-    if (resolvedType === 'loading') {
+    div.className = clsx(styles['toast'], styles[resolvedType], opts.tone && styles[`toast--${opts.tone}`])
+    // A caller-supplied React icon (a Phosphor glyph) wins over the variant's built-in SVG
+    if (opts.icon && resolvedType !== 'loading') {
+      if (!loadingRoot) {
+        icon.replaceChildren()
+        loadingRoot = createRoot(icon)
+      }
+      loadingRoot.render(opts.icon)
+      if (!icon.isConnected) div.insertBefore(icon, text)
+    } else if (resolvedType === 'loading') {
       if (!loadingRoot) {
         icon.replaceChildren()
         loadingRoot = createRoot(icon)
@@ -192,6 +203,8 @@ export const toast = (message = `Default message`, type, options) => {
   }
 
   close.addEventListener(`click`, dismiss)
+  // Following the link is the reader acting on the toast, so it goes away with the navigation
+  if (opts.href) text.addEventListener(`click`, dismiss)
   // Hovering the (possibly expanded) stack pauses every toast's timer, not
   // just the hovered card, so nothing expires mid-read.
   container.addEventListener(`mouseenter`, pause)

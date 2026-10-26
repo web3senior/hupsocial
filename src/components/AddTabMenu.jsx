@@ -41,7 +41,6 @@ export default function AddTabMenu() {
       trigger={
         <button type="button" className={styles['add-tab__trigger']} aria-label="Add a feed">
           <PlusIcon size={16} weight="bold" />
-          <span className={styles['add-tab__trigger-label']}>Add feed</span>
         </button>
       }
       onToggle={(e) => {

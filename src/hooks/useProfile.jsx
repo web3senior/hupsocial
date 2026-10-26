@@ -6,7 +6,7 @@ import { getProfile } from '@/lib/api'
 import { isEvmAddress } from '@/lib/address'
 import { AVATAR_MAX_SIZE, resolveAvatarImageUrl, resolveIPFSImageUrl } from '@/lib/storageHelper'
 
-const DEFAULT_USERNAME = 'new-user'
+export const DEFAULT_USERNAME = 'new-user'
 const PROFILE_DEDUPE_MS = 5 * 60_000
 const DEFAULT_PFP = resolveIPFSImageUrl(process.env.NEXT_PUBLIC_DEFAULT_PFP_CID, { width: 512 })
 

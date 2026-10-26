@@ -1,7 +1,7 @@
 // --- Cache configuration ---
 
 // Bump when the strategies below change: activate deletes every cache not listed here.
-const CACHE_VERSION = 'v1'
+const CACHE_VERSION = 'v2'
 const SHELL_CACHE = `hup-shell-${CACHE_VERSION}`
 const ASSET_CACHE = `hup-assets-${CACHE_VERSION}`
 // Holds one incoming OS share between the POST and /share reading it. Listed below so
