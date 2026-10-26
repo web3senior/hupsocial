@@ -74,6 +74,12 @@
 
     img {
       display: block;
+
+      // The mark is a black-filled SVG served as <img>, so it can't read currentColor
+      :global([data-theme='dark']) &,
+      :global([data-theme='terminal']) & {
+        filter: invert(100%);
+      }
     }
   }
 
