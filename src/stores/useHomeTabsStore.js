@@ -9,7 +9,7 @@ import { solanaChainFor } from '@/config/solana'
 // Static schema for non-network tab types. Icons/labels stay out of localStorage
 // (same reasoning as NAV_ITEMS_SCHEMA in useSidebarStore.js) to avoid serialization issues.
 export const TAB_TYPE_SCHEMA = {
-  foryou: { label: 'Home', icon: HouseIcon, description: 'Posts from every network' },
+  foryou: { label: 'For you', icon: HouseIcon, description: 'Posts from every network' },
   following: { label: 'Following', icon: UserCheckIcon, description: 'Only people you follow' },
   trending: { label: 'Trending', icon: FlameIcon, description: 'Most active posts right now' },
   status: { label: 'Status', icon: BroadcastIcon, description: 'Short status updates' },
@@ -17,7 +17,12 @@ export const TAB_TYPE_SCHEMA = {
   polls: { label: 'Polls', icon: ListChecksIcon, description: 'Open polls you can vote on' },
 }
 
-const DEFAULT_TABS = [{ id: 'foryou', type: 'foryou' }]
+// For you and Following always lead the row and can't be removed; added feeds follow them
+const DEFAULT_TABS = [
+  { id: 'foryou', type: 'foryou' },
+  { id: 'following', type: 'following' },
+]
+export const FIXED_TAB_IDS = DEFAULT_TABS.map((tab) => tab.id)
 
 const networkTabId = (chainId) => `net-${chainId}`
 
@@ -52,7 +57,7 @@ export const useHomeTabsStore = create(
       },
 
       removeTab: (id) => {
-        if (id === 'foryou') return
+        if (FIXED_TAB_IDS.includes(id)) return
 
         set((state) => {
           const tabs = state.tabs.filter((tab) => tab.id !== id)
@@ -71,10 +76,13 @@ export const useHomeTabsStore = create(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ tabs: state.tabs, activeTabId: state.activeTabId }),
       // v1 drops the retired search/notifications/profile tab types that
-      // earlier sessions may have persisted.
-      version: 1,
+      // earlier sessions may have persisted. v2 pins For you and Following first.
+      version: 2,
       migrate: (persisted) => {
-        const tabs = (persisted?.tabs ?? DEFAULT_TABS).filter((tab) => tab.type === 'network' || TAB_TYPE_SCHEMA[tab.type])
+        const added = (persisted?.tabs ?? []).filter(
+          (tab) => (tab.type === 'network' || TAB_TYPE_SCHEMA[tab.type]) && !FIXED_TAB_IDS.includes(tab.id),
+        )
+        const tabs = [...DEFAULT_TABS, ...added]
         const activeTabId = tabs.some((tab) => tab.id === persisted?.activeTabId) ? persisted.activeTabId : 'foryou'
         return { ...persisted, tabs, activeTabId }
       },

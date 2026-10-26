@@ -4,8 +4,28 @@
   padding: 4px 20px 16px;
   border-bottom: 1px solid var(--border);
 
+  // Phones dock the capsule to the bottom of the screen, just above the footer nav, so a
+  // reply is one tap away however deep the thread goes. PostDetails pads the page for it
+  // through [data-reply-dock].
   @media (max-width: 640px) {
-    padding-inline: 10px;
+    position: fixed;
+    right: 0;
+    bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    z-index: 2;
+    padding: 8px 10px;
+    border-bottom: 0;
+    pointer-events: none;
+  }
+
+  &__inner {
+    @media (max-width: 640px) {
+      pointer-events: auto;
+      background-color: color-mix(in srgb, var(--surface-muted) 88%, transparent);
+      -webkit-backdrop-filter: blur(16px) saturate(150%);
+      backdrop-filter: blur(16px) saturate(150%);
+      box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+    }
   }
 
   &__inner {

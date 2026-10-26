@@ -1,99 +1,78 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import clsx from 'clsx'
-import { CaretDownIcon, CheckIcon, XIcon } from '@phosphor-icons/react'
-import { useHomeTabsStore, resolveTabs } from '@/stores/useHomeTabsStore'
-import NativePopover from '@/components/ui/NativePopover'
+import { XIcon } from '@phosphor-icons/react'
+import { useHomeTabsStore, resolveTabs, FIXED_TAB_IDS } from '@/stores/useHomeTabsStore'
 import AddTabMenu from './AddTabMenu'
 import styles from './HomeTabStrip.module.scss'
 
-// Threads-style feed heading: the active tab's name is the page title, and tapping it lists
-// the other tabs to switch to. Adding tabs stays with AddTabMenu at the row's end.
+// Feed row: For you and Following lead, the reader's added feeds follow in one horizontal
+// scroller, and AddTabMenu stays pinned at the row's end. An added feed shows its remove
+// button once it is the active one, so the row stays calm.
 export default function HomeTabStrip() {
   const tabs = useHomeTabsStore((state) => state.tabs)
   const resolvedTabs = useMemo(() => resolveTabs(tabs), [tabs])
   const activeTabId = useHomeTabsStore((state) => state.activeTabId)
   const setActiveTab = useHomeTabsStore((state) => state.setActiveTab)
   const removeTab = useHomeTabsStore((state) => state.removeTab)
+  const scrollerRef = useRef(null)
 
-  const activeTab = resolvedTabs.find((tab) => tab.id === activeTabId) ?? resolvedTabs[0]
+  // Keep the active feed in view, e.g. one just added from the menu lands off the right edge
+  useEffect(() => {
+    // Scrolls the row only; scrollIntoView would also move the page and fight feed restoration
+    const scroller = scrollerRef.current
+    const active = scroller?.querySelector('[aria-selected="true"]')?.parentElement
+    if (!active) return
+
+    const start = active.offsetLeft - scroller.offsetLeft
+    const end = start + active.offsetWidth
+    if (start < scroller.scrollLeft) scroller.scrollTo({ left: start, behavior: 'smooth' })
+    else if (end > scroller.scrollLeft + scroller.clientWidth) {
+      scroller.scrollTo({ left: end - scroller.clientWidth, behavior: 'smooth' })
+    }
+  }, [activeTabId, tabs.length])
 
   return (
     <div className={styles['tab-strip']}>
-      <NativePopover
-        placement="bottom-start"
-        type="auto"
-        trigger={
-          <button type="button" className={styles['tab-strip__heading']} aria-label="Switch feed">
-            <TabIcon tab={activeTab} />
-            <h1 className={styles['tab-strip__title']}>{activeTab?.label}</h1>
-            <CaretDownIcon size={16} weight="bold" className={styles['tab-strip__caret']} />
-          </button>
-        }
-      >
-        {({ close }) => (
-          <div className={styles['tab-strip__menu']}>
-            <p className={styles['tab-strip__section']}>Your feeds</p>
-            {resolvedTabs.map((tab) => {
-              const isActive = tab.id === activeTabId
+      <div ref={scrollerRef} className={styles['tab-strip__scroller']} role="tablist" aria-label="Feeds">
+        {resolvedTabs.map((tab) => {
+          const isActive = tab.id === activeTabId
+          const isRemovable = !FIXED_TAB_IDS.includes(tab.id)
 
-              return (
-                <div key={tab.id} className={clsx(styles['tab-strip__item'], isActive && styles['tab-strip__item--active'])}>
-                  <button
-                    type="button"
-                    className={styles['tab-strip__switch']}
-                    aria-current={isActive ? 'true' : undefined}
-                    onClick={() => {
-                      setActiveTab(tab.id)
-                      close()
-                    }}
-                  >
-                    <TabIcon tab={tab} />
-                    <span className={styles['tab-strip__label']}>{tab.label}</span>
-                    {isActive && <CheckIcon size={16} className={styles['tab-strip__check']} />}
-                  </button>
+          return (
+            <div key={tab.id} className={clsx(styles['tab-strip__tab'], isActive && styles['tab-strip__tab--active'])}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className={styles['tab-strip__switch']}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.type === 'network' && tab.chainIcon && (
+                  <span className={styles['tab-strip__chain-icon']}>
+                    <img src={tab.chainIcon} alt="" />
+                  </span>
+                )}
+                <span className={styles['tab-strip__label']}>{tab.label}</span>
+              </button>
 
-                  {tab.id !== 'foryou' && (
-                    <button
-                      type="button"
-                      className={styles['tab-strip__remove']}
-                      aria-label={`Remove ${tab.label} tab`}
-                      onClick={() => removeTab(tab.id)}
-                    >
-                      <XIcon size={14} />
-                    </button>
-                  )}
-                </div>
-              )
-            })}
-
-            {/* Most people never find the add button on their own; point at it from here */}
-            <p className={styles['tab-strip__hint']}>
-              {resolvedTabs.length === 1
-                ? 'Want Following, Trending, Polls or a single network? Tap “Add feed” to pin it here.'
-                : 'Tap “Add feed” to pin more feeds.'}
-            </p>
-          </div>
-        )}
-      </NativePopover>
+              {isActive && isRemovable && (
+                <button
+                  type="button"
+                  className={styles['tab-strip__remove']}
+                  aria-label={`Remove ${tab.label} feed`}
+                  onClick={() => removeTab(tab.id)}
+                >
+                  <XIcon size={12} weight="bold" />
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
       <AddTabMenu />
     </div>
   )
-}
-
-function TabIcon({ tab }) {
-  if (!tab) return null
-
-  if (tab.type === 'network' && tab.chainIcon) {
-    return (
-      <span className={styles['tab-strip__chain-icon']}>
-        <img src={tab.chainIcon} alt="" />
-      </span>
-    )
-  }
-
-  const Icon = tab.icon
-  return Icon ? <Icon size={18} /> : null
 }

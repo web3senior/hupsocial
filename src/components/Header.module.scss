@@ -37,6 +37,46 @@
     }
   }
 
+  // Matches the footer nav: while browsing down the bar thins to its controls over the feed.
+  // Faded per layer rather than with opacity on the header, which would make it a backdrop
+  // root and drop the blur mid-fade. Touching the bar restores it.
+  @include md-down() {
+    transition:
+      background-color 0.2s ease,
+      backdrop-filter 0.2s ease;
+
+    > * {
+      transition: opacity 0.2s ease;
+    }
+
+    &--dimmed:not(:hover):not(:focus-within) {
+      background-color: transparent;
+      -webkit-backdrop-filter: blur(0) saturate(100%);
+      backdrop-filter: blur(0) saturate(100%);
+
+      > * {
+        opacity: 0.45;
+      }
+    }
+  }
+
+  // Centred brand mark on phones when no page title claims the middle
+  &__logo {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    display: none;
+    transform: translate(-50%, -50%);
+
+    @include md-down() {
+      display: inline-flex;
+    }
+
+    img {
+      display: block;
+    }
+  }
+
   // Spans the whole header so percentages inside resolve against the viewport, like <main>'s
   &__bar {
     position: absolute;

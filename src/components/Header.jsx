@@ -1,9 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ConnectWallet } from '@/components/ConnectWallet'
 import BackLink from '@/components/ui/BackLink'
+import { useScrollDim } from '@/hooks/useScrollDim'
+import logo from '@/../public/logo.svg'
 import { usePageTitleStore } from '@/stores/usePageTitleStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { Menu } from './Icons'
@@ -87,6 +91,8 @@ export default function Header() {
   const isBare = pathname === '/' || POST_ROUTE.test(pathname ?? '')
   const hasTitle = Boolean(title || back)
   const cell = useTitleCell(hasTitle, pathname)
+  // Fades with the footer nav while browsing down (phones only, see Header.module.scss)
+  const isDimmed = useScrollDim()
 
   const cellStyle = cell && {
     '--title-cell-left': `${cell.left}px`,
@@ -94,7 +100,7 @@ export default function Header() {
   }
 
   return (
-    <header className={clsx(styles.header, isBare && styles['header--bare'])}>
+    <header className={clsx(styles.header, isBare && styles['header--bare'], isDimmed && styles['header--dimmed'])}>
       <button
         type="button"
         className={styles.menuButton}
@@ -105,6 +111,13 @@ export default function Header() {
       >
         <Menu />
       </button>
+
+      {/* Phones without a page title get the brand mark in the middle; the sidebar has it on desktops */}
+      {!hasTitle && (
+        <Link href="/" className={styles.header__logo} aria-label="Home">
+          <Image src={logo} alt={`${process.env.NEXT_PUBLIC_NAME || 'Hup'} logo`} width={28} height={28} priority />
+        </Link>
+      )}
 
       {hasTitle && (
         // Full-width layer so the container inside centres against the same box as the page's

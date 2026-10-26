@@ -41,10 +41,11 @@
   // the name so the stack still scans name-first.
   &__cta {
     color: var(--text-muted);
-    font-size: 0.5625rem;
-    font-weight: 500;
+    // Tight tracking so the caps read as one word at this size instead of spaced-out letters
+    font-size: 0.5rem;
+    font-weight: 600;
     line-height: 1;
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
     text-transform: uppercase;
     white-space: nowrap;
   }

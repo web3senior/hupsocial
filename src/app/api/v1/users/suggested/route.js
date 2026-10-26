@@ -2,12 +2,14 @@
  * @file api/v1/users/suggested/route.js
  * @description A random handful of accounts for the home feed's "Who to follow", drawn from the
  * leaderboard's top 20: anyone with a name and a picture, never the viewer, never someone they
- * already follow on any chain.
+ * already follow on any chain. The viewer's current chain is also read live from LSP26, so a
+ * follow the indexer hasn't picked up yet doesn't come back as a suggestion.
  */
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { normalizeAddress } from '@/lib/address'
 import { getLeaderboardSnapshot } from '@/lib/leaderboard'
+import { getFollowingAddresses } from '@/lib/followSystem'
 
 export const runtime = 'nodejs'
 
@@ -23,6 +25,7 @@ export async function GET(request) {
   try {
     const viewer = normalizeAddress(request.nextUrl.searchParams.get('viewer'))
     const limit = Math.min(Math.max(Number(request.nextUrl.searchParams.get('limit')) || 3, 1), MAX_LIMIT)
+    const chainId = Number(request.nextUrl.searchParams.get('chain')) || null
 
     // Read as literals rather than joined: users and follows can differ in collation on production.
     const excluded = new Set(viewer ? [viewer] : [])
@@ -32,6 +35,11 @@ export async function GET(request) {
         [viewer],
       )
       for (const row of followed) excluded.add(String(row.followed_address).toLowerCase())
+
+      if (chainId) {
+        const { addresses } = await getFollowingAddresses(chainId, viewer)
+        for (const address of addresses) excluded.add(address)
+      }
     }
 
     // Shared with /api/v1/leaderboard, cache and all, so the feed never pays for its own ranking.

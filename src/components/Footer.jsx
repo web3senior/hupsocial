@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useConnection } from 'wagmi'
@@ -9,19 +9,12 @@ import clsx from 'clsx'
 
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { useScrollDim } from '@/hooks/useScrollDim'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import { useChatDockStore } from '@/stores/useChatDockStore'
 import { openConnect } from '@/lib/connectDialog'
 import styles from './Footer.module.scss'
-
-// Gesture tuning for the auto-hide. Below the jitter floor a scroll is trackpad noise or a
-// rubber-band settle; above the jump ceiling it is not a gesture at all but a restored or
-// anchored position, which must not flick the bar away.
-const SCROLL_JITTER = 8
-const SCROLL_JUMP = 300
-// The bar always shows this close to the top, so a page opens with it in view
-const SCROLL_REVEAL_ZONE = 64
 
 // Helper function synced with Aside to track active sub-routes accurately
 const isActivePath = (pathname, path) => {
@@ -33,7 +26,7 @@ const isActivePath = (pathname, path) => {
 export default function Footer() {
   const mounted = useClientMounted()
   // The bar dims to a faint outline the moment you browse downward and returns on the way up
-  const [isDimmed, setIsDimmed] = useState(false)
+  const isDimmed = useScrollDim()
   const pathname = usePathname()
   const { address, isConnected } = useConnection()
 
@@ -47,47 +40,6 @@ export default function Footer() {
   const openChat = useChatDockStore((state) => state.open)
   const minimizeChat = useChatDockStore((state) => state.minimize)
   const isChatOpen = chatMode !== 'minimized'
-
-  useEffect(() => {
-    let lastY = window.scrollY
-    let frame = 0
-
-    const evaluate = () => {
-      frame = 0
-      const y = window.scrollY
-      const delta = y - lastY
-
-      // A cached feed position replayed on return (tabs/HomeFeedTab) or an anchor jump lands as
-      // one huge delta. Re-anchor on it, but read no intent into it.
-      if (Math.abs(delta) > SCROLL_JUMP) {
-        lastY = y
-        return
-      }
-
-      // Hold the anchor through sub-threshold moves so a slow drag still accumulates into one
-      if (Math.abs(delta) < SCROLL_JITTER) return
-
-      setIsDimmed(delta > 0 && y > SCROLL_REVEAL_ZONE)
-      lastY = y
-    }
-
-    // Scroll fires far faster than paint; collapse a burst into the one frame that shows
-    const handleScroll = () => {
-      if (!frame) frame = requestAnimationFrame(evaluate)
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
-      if (frame) cancelAnimationFrame(frame)
-    }
-  }, [])
-
-  // A new route starts at the top, so the bar owes the user a clean slate
-  useEffect(() => {
-    setIsDimmed(false)
-  }, [pathname])
 
   // Home link double-duty: scrolled down -> back to top, already at top -> pull fresh posts
   const handleHomeLinkClick = (event) => {

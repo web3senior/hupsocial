@@ -26,10 +26,20 @@
     &:hover {
       background: var(--hover);
     }
+
+    // Phones hand the width to the feed row, so the trigger shrinks to a round plus
+    @media (max-width: 640px) {
+      width: 34px;
+      padding: 0;
+    }
   }
 
   &__trigger-label {
     white-space: nowrap;
+
+    @media (max-width: 640px) {
+      display: none;
+    }
   }
 
   &__header {

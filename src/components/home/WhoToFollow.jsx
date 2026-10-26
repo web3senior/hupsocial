@@ -26,9 +26,10 @@ const SUGGESTION_COUNT = 10
 const SKELETON_COUNT = 4
 const AVATAR_SIZE = 80
 
-const fetchSuggestions = async (viewer) => {
+const fetchSuggestions = async (viewer, chainId) => {
   const params = new URLSearchParams({ limit: String(SUGGESTION_COUNT) })
   if (viewer) params.set('viewer', viewer)
+  if (viewer && chainId) params.set('chain', String(chainId))
   const response = await fetch(`${SUGGESTIONS_ENDPOINT}?${params}`)
   if (!response.ok) throw new Error(`Suggestions request failed (${response.status})`)
   const body = await response.json()
@@ -43,7 +44,9 @@ const fetchSuggestions = async (viewer) => {
  */
 export default function WhoToFollow() {
   const { address: viewer } = useActiveWallet()
-  const { data, isLoading } = useSWR(['suggested-users', viewer ?? 'anon'], () => fetchSuggestions(viewer), {
+  const [activeChain] = getActiveChain()
+  const chainId = activeChain?.id
+  const { data, isLoading } = useSWR(['suggested-users', viewer ?? 'anon', chainId], () => fetchSuggestions(viewer, chainId), {
     revalidateOnFocus: false,
     keepPreviousData: true,
   })

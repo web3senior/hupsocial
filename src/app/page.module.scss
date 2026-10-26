@@ -88,6 +88,28 @@
     background-color: color-mix(in srgb, var(--background) 75%, transparent);
     -webkit-backdrop-filter: blur(16px) saturate(150%);
     backdrop-filter: blur(16px) saturate(150%);
+
+    // Fades with the header and footer nav while browsing down (components/Header). Per layer,
+    // not opacity on the bar itself, which would drop the blur mid-fade. Touch restores it.
+    @include resp.md-down {
+      transition:
+        background-color 0.2s ease,
+        backdrop-filter 0.2s ease;
+
+      > * {
+        transition: opacity 0.2s ease;
+      }
+
+      &--dimmed:not(:hover):not(:focus-within) {
+        background-color: transparent;
+        -webkit-backdrop-filter: blur(0) saturate(100%);
+        backdrop-filter: blur(0) saturate(100%);
+
+        > * {
+          opacity: 0.45;
+        }
+      }
+    }
   }
 
   &.home &__container {

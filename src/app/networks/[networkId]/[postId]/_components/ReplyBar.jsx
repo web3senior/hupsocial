@@ -63,7 +63,7 @@ export default function ReplyBar({ post, networkId }) {
 
   return (
     <>
-      <div className={styles['reply-bar']}>
+      <div className={styles['reply-bar']} data-reply-dock>
         <div className={styles['reply-bar__inner']}>
           <Avatar className={styles['reply-bar__avatar']} src={isConnected ? profile?.profileImage : null} size={32} />
 

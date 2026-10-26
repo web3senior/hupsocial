@@ -32,6 +32,11 @@
       filter: none;
       border-radius: unset;
       box-shadow: none;
+
+      // ReplyBar docks over the bottom on phones; leave room so the last reply scrolls clear
+      &:has([data-reply-dock]) {
+        padding-bottom: 76px;
+      }
     }
   }
 

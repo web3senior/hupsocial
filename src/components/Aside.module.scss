@@ -393,6 +393,11 @@
   // each button: the basket stacks one heart per chain, and only the stack needs the offset
   @include md-down() {
     padding-bottom: var(--bottom-nav-space);
+
+    // A post page docks its reply bar over the bottom bar (ReplyBar); stack above that too
+    :global(body:has([data-reply-dock])) & {
+      padding-bottom: calc(var(--bottom-nav-space) + 70px);
+    }
   }
 
   // Element: Shared layout base for all actions

@@ -8,11 +8,11 @@ import { useHomeTabsStore, TAB_TYPE_SCHEMA } from '@/stores/useHomeTabsStore'
 import { allAppChains } from '@/lib/chains'
 import styles from './AddTabMenu.module.scss'
 
-// Feed types offered in the root menu, in display order (Home is always pinned)
-const FEED_TYPES = ['following', 'trending', 'status', 'nft', 'polls']
+// Feed types offered in the root menu, in display order (For you and Following are always pinned)
+const FEED_TYPES = ['trending', 'status', 'nft', 'polls']
 
 /**
- * "Add feed" popover: root menu (Following/Trending/Status/NFTs/Polls/Networks)
+ * "Add feed" popover: root menu (Trending/Status/NFTs/Polls/Networks)
  * and a Networks submenu (one entry per configured chain). Built on the single
  * NativePopover primitive - `view` swaps the rendered menu level instead of
  * nesting native popovers. Feeds already added stay listed with a check so the
@@ -54,7 +54,7 @@ export default function AddTabMenu() {
             <>
               <header className={styles['add-tab__header']}>
                 <p className={styles['add-tab__title']}>Add a feed</p>
-                <p className={styles['add-tab__hint']}>Pinned feeds appear when you tap the title to switch.</p>
+                <p className={styles['add-tab__hint']}>Added feeds join the row beside For you and Following.</p>
               </header>
 
               {FEED_TYPES.map((type) => {
