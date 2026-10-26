@@ -13,22 +13,20 @@ export const getActiveChain = () => {
   const DEFAULT_CHAIN_ID = 42
 
   if (typeof window !== 'undefined') {
-    // Wallet chain is the source of truth when connected
+    // Wallet chain is the source of truth when connected — unless Hup has no contracts there
+    // (coin-only chains like Arbitrum Sepolia), which falls through to the selected chain
     const uid = config.state.current
     const connection = config.state.connections.get(uid)
     const isConnected = config.state.status === 'connected'
     const walletChain = isConnected && connection ? config.chains.find((c) => c.id === connection.chainId) : null
-    if (walletChain) {
-      const baseContracts = CONTRACTS[`chain${walletChain.id}`]
-      if (baseContracts) {
-        const cloned = { ...baseContracts }
-        const override = localStorage.getItem(`hupsocial_forwarder_name_override_${walletChain.id}`)
-        if (override) {
-          cloned.forwarderName = override
-        }
-        return [walletChain, cloned]
+    const walletContracts = walletChain ? CONTRACTS[`chain${walletChain.id}`] : null
+    if (walletContracts) {
+      const cloned = { ...walletContracts }
+      const override = localStorage.getItem(`hupsocial_forwarder_name_override_${walletChain.id}`)
+      if (override) {
+        cloned.forwarderName = override
       }
-      return [walletChain, null]
+      return [walletChain, cloned]
     }
 
     const activeChain = localStorage.getItem(`${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}active-chain`) || DEFAULT_CHAIN_ID.toString()
