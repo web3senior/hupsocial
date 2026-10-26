@@ -16,7 +16,7 @@ const CHAIN_SLUGS = {
   42: 'lukso',
   56: 'bsc',
   143: 'monad',
-  // 1868: 'soneium',
+  1868: 'soneium',
   8453: 'base',
   42161: 'arbitrum',
   42220: 'celo',
@@ -28,7 +28,8 @@ const NATIVE_KEYS = {
   42: 'coingecko:lukso-token-2',
   56: 'coingecko:binancecoin',
   143: 'coingecko:monad',
-  // 1868: 'coingecko:ethereum',
+  295: 'coingecko:hedera-hashgraph',
+  1868: 'coingecko:ethereum',
   4663: 'coingecko:ethereum',
   // Arc pays gas in USDC itself
   5042: 'coingecko:usd-coin',

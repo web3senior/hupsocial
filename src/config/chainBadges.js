@@ -31,7 +31,7 @@ const LABELS = {
   base: 'Base',
   celo: 'Celo',
   lukso: 'LUKSO',
-  // soneium: 'Soneium',
+  soneium: 'Soneium',
   solana: 'Solana',
 }
 

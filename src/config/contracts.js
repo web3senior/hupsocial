@@ -4,7 +4,7 @@
  * instead of config/wagmi, which constructs wallet connectors on evaluation.
  */
 
-import { arbitrum, base, baseSepolia, bsc, /* soneium, */ celo, lukso, mainnet, monad } from 'wagmi/chains'
+import { arbitrum, base, baseSepolia, bsc, celo, hedera, lukso, mainnet, monad, soneium } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
 // Arbitrum Orbit L2, ETH as gas
@@ -76,10 +76,32 @@ arbitrum.rpcUrls = {
   default: { http: ['https://arbitrum-one-rpc.publicnode.com', ...arbitrum.rpcUrls.default.http] },
 }
 celo.rpcUrls = { ...celo.rpcUrls, default: { http: ['https://celo-rpc.publicnode.com', ...celo.rpcUrls.default.http] } }
-// soneium.rpcUrls = { ...soneium.rpcUrls, default: { http: ['https://soneium-rpc.publicnode.com', ...soneium.rpcUrls.default.http] } }
+soneium.rpcUrls = { ...soneium.rpcUrls, default: { http: ['https://soneium-rpc.publicnode.com', ...soneium.rpcUrls.default.http] } }
+
+// Hedera, through the hashio JSON-RPC relay. viem's chain carries no multicall3; it is deployed at
+// the canonical address (probed onchain 2026-10-26).
+hedera.name = 'Hedera'
+hedera.contracts = {
+  ...hedera.contracts,
+  multicall3: { address: '0xcA11bde05977b3631167028862bE2a173976CA11', blockCreated: 0 },
+}
+
+// Native coin decimals inside the EVM, where they differ from the 18 wallets and RPCs speak. Hedera's
+// relay takes weibars (18) on the way in, but msg.value, balances and event amounts are tinybars (8),
+// so an amount a contract compares against msg.value must be passed in tinybars.
+const EVM_NATIVE_DECIMALS = { [hedera.id]: 8 }
+
+const evmNativeScale = (chainId) => 10n ** BigInt(18 - (EVM_NATIVE_DECIMALS[chainId] ?? 18))
+
+/** 18-decimal native amount → the units contracts see on that chain (rounded down). */
+export const toEvmNativeUnits = (chainId, amount) => amount / evmNativeScale(chainId)
+
+/** Contract-side native units → the 18-decimal amount wallets and RPCs carry. */
+export const fromEvmNativeUnits = (chainId, amount) => amount * evmNativeScale(chainId)
 
 // Drives the wagmi `chains` tuple and server-side RPC lookups. L1s first, then L2s.
-export const appChains = [mainnet, lukso, bsc, monad, arc, /* soneium, */ arbitrum, base, celo, robinhood, baseSepolia]
+// Hedera joins once its core set is deployed and confirmed at the chain295 addresses below.
+export const appChains = [mainnet, lukso, bsc, monad, arc, /* hedera, */ soneium, arbitrum, base, celo, robinhood, baseSepolia]
 
 // ''            — not deployed on that chain.
 // hupForwarder  — only where Hup core trusts a different forwarder than `forwarder`.
@@ -395,37 +417,66 @@ export const CONTRACTS = {
     permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
     sushiV2Router: '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506',
   },
-  // chain1868: {
-  //   name: 'soneium',
-  //   forwarder: '',
-  //   hup: '',
-  //   status: '',
-  //   followerSystem: '',
-  //   community: '',
-  //   store: '',
-  //   tipper: '',
-  //   trade: '',
-  //   offers: '',
-  //   events: '',
-  //   predict: '',
-  //   apps: '',
-  //   polls: '',
-  //   fund: '',
-  //   tasks: '',
-  //   premium: '',
-  //   drops: '',
-  //   splits: '',
-  //   nativeGate: '',
-  //   launch: '',
-  //   univ3Router: '',
-  //   univ3Quoter: '',
-  //   wnative: '',
-  //   univ4Router: '',
-  //   univ4PoolManager: '',
-  //   univ4Quoters: [],
-  //   permit2: '',
-  //   sushiV2Router: '',
-  // },
+  chain1868: {
+    name: 'soneium',
+    forwarder: '0x218D9A09134365B843777198ed211a7290bC8596',
+    forwarderName: 'HupChatForwarder',
+    hup: '0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2',
+    status: '0xC09FbaA0aDF928d0Ff41D28c74b3b57Eb9cF27b5',
+    followerSystem: '',
+    community: '',
+    store: '',
+    tipper: '0xfECd93B665518AA84D41fDbD9ECe92E8CbA1906b',
+    trade: '',
+    offers: '',
+    events: '',
+    predict: '',
+    apps: '',
+    polls: '0x5FFb711AD7d061a501a711b3A9E1795daf0c2b5F',
+    fund: '',
+    tasks: '',
+    premium: '',
+    drops: '',
+    splits: '',
+    nativeGate: '',
+    launch: '',
+    univ3Router: '',
+    univ3Quoter: '',
+    wnative: '0x4200000000000000000000000000000000000006',
+    univ4Router: '0x4cded7Edf52c8AA5259A54Ec6a3CE7C6D2a455Df',
+    univ4PoolManager: '0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32',
+    univ4Quoters: ['0x3972C00f7ed4885e145823eb7C655375d275A1C5'],
+    permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    sushiV2Router: '',
+  },
+  // PREDICTED CREATE2 addresses under the default salt (src/tests/deploy.html, Hup core group) —
+  // confirm each has code before enabling Hedera in appChains. No LSP26 and no Universal Profiles
+  // on Hedera, so follower gates stay off; no Uniswap either.
+  chain295: {
+    name: 'hedera',
+    forwarder: '0x218D9A09134365B843777198ed211a7290bC8596',
+    forwarderName: 'HupChatForwarder',
+    hup: '0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2',
+    status: '0xC09FbaA0aDF928d0Ff41D28c74b3b57Eb9cF27b5',
+    followerSystem: '',
+    community: '',
+    sell: '',
+    tipper: '0xfECd93B665518AA84D41fDbD9ECe92E8CbA1906b',
+    trade: '',
+    offers: '',
+    events: '',
+    predict: '',
+    apps: '',
+    polls: '0x5FFb711AD7d061a501a711b3A9E1795daf0c2b5F',
+    fund: '',
+    tasks: '',
+    premium: '',
+    drops: '',
+    splits: '',
+    nativeGate: '',
+    univ3Router: '',
+    univ3Quoter: '',
+  },
   chain5042: {
     name: 'arc',
     forwarder: '0xc407722d150c8a65e890096869f8015D90a89EfD',

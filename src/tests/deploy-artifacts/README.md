@@ -26,6 +26,18 @@ cannot compile the LUKSO satellites itself — the LSP stack pins OpenZeppelin 4
 `node_modules` while the workspace top level is 5.4, so root-first resolution hands ERC725Y the
 wrong `Ownable` — which is why the bytecode is precompiled here.
 
+## Hup core (new chains)
+
+`node build-hup-core.cjs <path-to-solc-0.8.36> <openzeppelin-5.6.1-contracts-dir>` builds the set a
+new chain starts with: HupChatForwarder, Hup, HupStatus, HupPolls and HupTipper (**solc 0.8.36,
+optimizer 200, no viaIR, cancun**). They sit in the deploy page's "Hup core" group, numbered in
+deploy order: each one's per-chain defaults are the predicted addresses of the ones above it, so
+confirm each lands where predicted before moving on. HupStatus takes its owner explicitly; through
+the factory the constructor's caller is the factory itself.
+
+On Hedera (295) the deploying account must exist first. Send it HBAR before anything else, because
+an EVM address with no account cannot even simulate.
+
 ## Order matters
 
 The satellites take the engine address as an **immutable** constructor argument, so a new engine

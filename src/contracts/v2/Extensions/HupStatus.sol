@@ -37,13 +37,15 @@ contract HupStatus is IHupStatus, Ownable, Pausable, ERC2771Context {
 
     /**
      * @notice Initializes the contract and sets the maximum allowed length for user status messages.
-     * @dev The contract deploys with the caller as the initial owner and sets the initial content length limit.
+     * @dev The owner is passed explicitly: through a CREATE2 factory the caller is the factory itself,
+     *      which would leave the contract with an owner nobody controls.
      * @param _maxLength The initial maximum byte length for status content.
      * @param _trustedForwarderAddress The address of the EIP-2771 compatible meta transaction relayer.
+     * @param _owner The initial owner (the admin EOA or Universal Profile).
      */
-    constructor(uint256 _maxLength, address _trustedForwarderAddress) 
-        Ownable(_msgSender()) // Use _msgSender() to ensure correct owner is set even in gasless deployment
-        ERC2771Context(_trustedForwarderAddress) 
+    constructor(uint256 _maxLength, address _trustedForwarderAddress, address _owner)
+        Ownable(_owner)
+        ERC2771Context(_trustedForwarderAddress)
     {
         maxLength = _maxLength;
         _trustedForwarder = _trustedForwarderAddress;
