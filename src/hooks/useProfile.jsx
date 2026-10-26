@@ -8,7 +8,7 @@ import { AVATAR_MAX_SIZE, resolveAvatarImageUrl, resolveIPFSImageUrl } from '@/l
 
 export const DEFAULT_USERNAME = 'new-user'
 const PROFILE_DEDUPE_MS = 5 * 60_000
-const DEFAULT_PFP = resolveIPFSImageUrl(process.env.NEXT_PUBLIC_DEFAULT_PFP_CID, { width: 512 })
+export const DEFAULT_PFP = resolveIPFSImageUrl(process.env.NEXT_PUBLIC_DEFAULT_PFP_CID, { width: 512 })
 
 /**
  * The identity a post row already carries about its author, shaped like a fetched profile so it

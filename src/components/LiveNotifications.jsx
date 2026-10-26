@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation'
 import { mutate as mutateGlobal } from 'swr'
 import { BellIcon } from '@phosphor-icons/react'
 import { toast } from '@/components/NextToast'
+import { NotificationToastAvatar, NotificationToastText } from '@/components/NotificationToast'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
-import { DEFAULT_USERNAME, profileFetcher } from '@/hooks/useProfile'
-import { normalizeAddress, shortAddress } from '@/lib/address'
+import { normalizeAddress } from '@/lib/address'
 import { buildGroups, hrefOf } from '@/app/notifications/_components/notificationModel'
 
 // Rows landing within this window share one flush, so twenty likes in a second are one toast
@@ -17,8 +17,6 @@ const MAX_GROUP_TOASTS = 2
 const CATCH_UP_LIMIT = 50
 // Only used when the stream cannot be opened at all
 const FALLBACK_POLL_MS = 20_000
-// A toast is not worth waiting on a slow profile lookup; the address stands in after this
-const NAME_TIMEOUT_MS = 1500
 
 const FEED_KEY_PREFIX = '/api/v1/notifications?'
 
@@ -60,24 +58,7 @@ const writeLastSeen = (wallet, id) => {
 
 const refreshFeed = () => mutateGlobal((key) => typeof key === 'string' && key.startsWith(FEED_KEY_PREFIX))
 
-async function displayNameOf(address) {
-  const timeout = new Promise((resolve) => setTimeout(resolve, NAME_TIMEOUT_MS, null))
-  const profile = await Promise.race([profileFetcher(address).catch(() => null), timeout])
-  return profile?.name && profile.name !== DEFAULT_USERNAME ? profile.name : shortAddress(address)
-}
-
-/** "Alice liked your post" / "Alice and 3 others liked your post", or the indexer's own sentence. */
-async function sentenceOf(group) {
-  const { meta, actors, latest } = group
-  if (!meta.verb || actors.length === 0) return latest.message || latest.title || 'New notification'
-
-  const name = await displayNameOf(actors[0])
-  const extra = actors.length - 1
-  const who = extra > 0 ? listFormat.format([name, plural(extra, { one: 'other', other: 'others' })]) : name
-  return `${who} ${meta.verb}`
-}
-
-async function announce(rows) {
+function announce(rows) {
   const groups = buildGroups(rows)
 
   if (groups.length > MAX_GROUP_TOASTS) {
@@ -93,13 +74,22 @@ async function announce(rows) {
     return
   }
 
-  const items = await Promise.all(groups.map(async (group) => ({ group, sentence: await sentenceOf(group) })))
-  // Oldest first, so the newest ends up as the front card of the stack
-  items.reverse().forEach(({ group, sentence }) => {
-    const Icon = group.meta.icon
-    toast(sentence, 'notification', {
-      icon: <Icon size={20} weight={group.meta.weight ?? 'regular'} />,
-      tone: group.meta.tone,
+  // Oldest first, so the newest ends up as the front card of the stack. The avatar and the name
+  // are live components: the toast shows straight away and fills in as the profile resolves.
+  groups.reverse().forEach((group) => {
+    const { meta, actors, latest } = group
+    const [actor] = actors
+    const Icon = meta.icon
+
+    const message = meta.verb && actor
+      ? <NotificationToastText address={actor} others={actors.length - 1} verb={meta.verb} />
+      : latest.message || latest.title || 'New notification'
+
+    toast(message, 'notification', {
+      icon: actor
+        ? <NotificationToastAvatar address={actor} icon={Icon} weight={meta.weight} />
+        : <Icon size={20} weight={meta.weight ?? 'regular'} />,
+      tone: meta.tone,
       href: hrefOf(group) || '/notifications',
     })
   })

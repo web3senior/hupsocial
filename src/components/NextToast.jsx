@@ -1,6 +1,7 @@
 'use client'
 
 import clsx from 'clsx'
+import { isValidElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Spinner } from '@/components/Loading'
 import styles from './NextToast.module.scss'
@@ -93,8 +94,29 @@ export const toast = (message = `Default message`, type, options) => {
   // InternalLinkRouter routes it client-side and middle-click still opens a tab.
   const text = document.createElement(opts.href ? `a` : `span`)
   text.className = clsx(styles['toast__message'], opts.href && styles['toast__message--link'])
-  text.textContent = message
   if (opts.href) text.setAttribute(`href`, opts.href)
+
+  // A React element message (a sentence that fills in a name once its profile loads) gets its
+  // own root; a string stays plain text.
+  let messageRoot = null
+
+  const clearMessageRoot = () => {
+    if (!messageRoot) return
+    messageRoot.unmount()
+    messageRoot = null
+  }
+
+  const applyMessage = (nextMessage) => {
+    if (isValidElement(nextMessage)) {
+      messageRoot ??= createRoot(text)
+      messageRoot.render(nextMessage)
+    } else {
+      clearMessageRoot()
+      text.textContent = nextMessage
+    }
+  }
+
+  applyMessage(message)
 
   // Also the update() path: swaps the variant class and inserts/removes the icon in place,
   // which is what lets a `loading` toast morph into a success/danger one without remounting.
@@ -153,6 +175,8 @@ export const toast = (message = `Default message`, type, options) => {
 
   container.appendChild(div)
   restack(container)
+  // React roots commit after this frame, so measure the stack again once their content is in
+  if (messageRoot || loadingRoot) window.requestAnimationFrame(() => restack(container))
 
   let timer
   let dismissed = false
@@ -177,6 +201,7 @@ export const toast = (message = `Default message`, type, options) => {
       `animationend`,
       () => {
         clearLoading()
+        clearMessageRoot()
         div.remove()
         restack(container)
       },
@@ -192,7 +217,7 @@ export const toast = (message = `Default message`, type, options) => {
     if (dismissed) return false
     const nextOpts = typeof nextOptions === `number` ? { duration: nextOptions } : nextOptions ?? {}
     duration = resolveDuration(nextOpts, TYPE_ALIASES[nextType] ?? nextType)
-    if (nextMessage != null) text.textContent = nextMessage
+    if (nextMessage != null) applyMessage(nextMessage)
     applyType(nextType)
     if (nextOpts.footer !== undefined) applyFooter(nextOpts.footer)
     restack(container)

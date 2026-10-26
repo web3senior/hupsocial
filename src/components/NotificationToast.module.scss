@@ -1,0 +1,51 @@
+.notification-toast__avatar {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.notification-toast__picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  overflow: hidden;
+}
+
+.notification-toast__picture--pending {
+  background: var(--shimmer-bg);
+}
+
+// The action glyph on the avatar's corner, ringed in the card colour so it reads as a separate
+// chip. Colour comes from the toast's --toast-tone (NextToast.module.scss).
+.notification-toast__badge {
+  position: absolute;
+  right: -0.25rem;
+  bottom: -0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: var(--toast-tone, var(--foreground, #141414));
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--surface, #fff);
+
+  // Two classes deep so it outranks the toast's own `.toast__icon svg` sizing
+  .notification-toast__avatar & svg {
+    width: 0.65rem;
+    height: 0.65rem;
+  }
+}
+
+.notification-toast__text {
+  font-weight: 500;
+}
+
+.notification-toast__name {
+  font-weight: 700;
+}
