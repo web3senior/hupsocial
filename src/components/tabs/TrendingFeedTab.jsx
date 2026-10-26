@@ -2,12 +2,13 @@
 
 import { Spinner } from '@/components/Loading'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import { getTrendingPosts } from '@/lib/api'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { useFeedTabCache } from '@/hooks/useFeedTabCache'
 import { PostCard } from '@/components/Post'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
 import FeedError from '@/components/ui/FeedError'
@@ -31,17 +32,26 @@ export default function TrendingFeedTab() {
   const { address } = useConnection()
   const router = useRouter()
 
-  const [posts, setPosts] = useState({ list: [] })
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
+  // Switching tabs away and back restores the loaded posts and scroll place, like For you
+  const { initialCache, remember, containerRef, containerStyle, cardStyle } = useFeedTabCache('trending', address)
+
+  const [posts, setPosts] = useState(() => ({ list: initialCache?.list ?? [] }))
+  const [page, setPage] = useState(initialCache?.page ?? 1)
+  const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false)
   const [isFetching, setIsFetching] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [windowHours, setWindowHours] = useState(null)
+  const [isLoaded, setIsLoaded] = useState(Boolean(initialCache))
+  const [windowHours, setWindowHours] = useState(initialCache?.windowHours ?? null)
   const [loadError, setLoadError] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
+  // Viewer the shown rows were fetched for; the mount fetch is skipped while it still matches
+  const appliedAddressRef = useRef(initialCache ? (address ?? null) : undefined)
 
   useEffect(() => {
-    if (!mounted) return
+    remember({ list: posts.list, page, hasMore, windowHours })
+  })
+
+  useEffect(() => {
+    if (!mounted || appliedAddressRef.current === (address ?? null)) return
 
     let cancelled = false
 
@@ -53,6 +63,7 @@ export default function TrendingFeedTab() {
         setWindowHours(res?.meta?.trending_window_hours ?? null)
         setPage(1)
         setLoadError(false)
+        appliedAddressRef.current = address ?? null
       })
       .catch((error) => {
         console.error('Trending feed error:', error)
@@ -125,11 +136,13 @@ export default function TrendingFeedTab() {
         <p className={clsx('text-center', 'p-100')}>Quiet day — showing top posts from this week.</p>
       )}
 
-      <div className={clsx('__container', styles.page__container)} data-width="medium">
+      <div ref={containerRef} style={containerStyle} className={clsx('__container', styles.page__container)} data-width="medium">
         {posts.list.map((item, i) => (
           <section
             key={`${item.network_id}-${item.id}`}
-            className={clsx(styles.post, 'animate', 'fade')}
+            data-post-key={`${item.network_id}-${item.id}`}
+            style={cardStyle(`${item.network_id}-${item.id}`)}
+            className={clsx(styles.post, !initialCache && ['animate', 'fade'])}
             onPointerDown={rememberCardPointerDown}
             onClick={(e) => {
               if (isTextSelectionDrag(e)) return

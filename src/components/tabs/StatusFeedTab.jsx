@@ -1,9 +1,10 @@
 'use client'
 
 import { Spinner } from '@/components/Loading'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import clsx from 'clsx'
 import { getStatuses } from '@/lib/api'
+import { useFeedTabCache } from '@/hooks/useFeedTabCache'
 import Profile from '@/components/Profile'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
 import FeedError from '@/components/ui/FeedError'
@@ -19,15 +20,26 @@ const STATUSES_PAGE_SIZE = 20
  * many-users list.
  */
 export default function StatusFeedTab() {
-  const [statuses, setStatuses] = useState([])
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
+  // Switching tabs away and back restores the loaded statuses and scroll place, like For you
+  const { initialCache, remember, containerRef, containerStyle, cardStyle } = useFeedTabCache('status', null)
+
+  const [statuses, setStatuses] = useState(() => initialCache?.list ?? [])
+  const [page, setPage] = useState(initialCache?.page ?? 1)
+  const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false)
   const [isFetching, setIsFetching] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(Boolean(initialCache))
   const [loadError, setLoadError] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
+  // Set once rows are shown, so a cache hydration skips the mount fetch
+  const hasDataRef = useRef(Boolean(initialCache))
 
   useEffect(() => {
+    remember({ list: statuses, page, hasMore })
+  })
+
+  useEffect(() => {
+    if (hasDataRef.current) return
+
     let cancelled = false
 
     getStatuses(1, STATUSES_PAGE_SIZE)
@@ -37,6 +49,7 @@ export default function StatusFeedTab() {
         setHasMore(res?.meta?.hasMore || false)
         setPage(1)
         setLoadError(false)
+        hasDataRef.current = true
       })
       .catch((error) => {
         console.error('Status feed error:', error)
@@ -103,10 +116,15 @@ export default function StatusFeedTab() {
 
   return (
     <div className={clsx('__container')} data-width="small">
-      <div className={clsx('__container', pageStyles.page__container)} data-width="medium">
+      <div ref={containerRef} style={containerStyle} className={clsx('__container', pageStyles.page__container)} data-width="medium">
         <div className={styles['status-feed']}>
           {statuses.map((item) => (
-            <article key={`${item.network_id}-${item.id}`} className={styles['status-feed__item']}>
+            <article
+              key={`${item.network_id}-${item.id}`}
+              data-post-key={`${item.network_id}-${item.id}`}
+              style={cardStyle(`${item.network_id}-${item.id}`)}
+              className={styles['status-feed__item']}
+            >
               <Profile creator={item.wallet_address} createdAt={item.event_timestamp} networkId={Number(item.network_id)} />
               <p className={styles['status-feed__content']}>{item.content}</p>
             </article>

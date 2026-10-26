@@ -2,13 +2,14 @@
 
 import { Spinner } from '@/components/Loading'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import { getFollowingPosts } from '@/lib/api'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { getActiveChain } from '@/lib/communication'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { useFeedTabCache } from '@/hooks/useFeedTabCache'
 import { PostCard } from '@/components/Post'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
 import FeedError from '@/components/ui/FeedError'
@@ -29,17 +30,32 @@ export default function FollowingFeedTab() {
   const router = useRouter()
   const [activeChain] = getActiveChain()
 
-  const [posts, setPosts] = useState({ list: [] })
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
+  // Switching tabs away and back restores the loaded posts and scroll place, like For you.
+  // Keyed per chain: the follow graph is read from one network at a time.
+  const { initialCache, remember, containerRef, containerStyle, cardStyle } = useFeedTabCache(
+    `following-${activeChain?.id}`,
+    address,
+  )
+
+  const [posts, setPosts] = useState(() => ({ list: initialCache?.list ?? [] }))
+  const [page, setPage] = useState(initialCache?.page ?? 1)
+  const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false)
   const [isFetching, setIsFetching] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(Boolean(initialCache))
   const [followingSupported, setFollowingSupported] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
+  // "address|chainId" the shown rows were fetched for; the mount fetch is skipped while it matches
+  const appliedParamsRef = useRef(initialCache ? `${address}|${activeChain?.id}` : null)
+
+  useEffect(() => {
+    remember({ list: posts.list, page, hasMore })
+  })
 
   useEffect(() => {
     if (!mounted || !isConnected || !address || !activeChain) return
+    const params = `${address}|${activeChain.id}`
+    if (appliedParamsRef.current === params) return
 
     let cancelled = false
 
@@ -51,6 +67,7 @@ export default function FollowingFeedTab() {
         setFollowingSupported(res?.meta?.followingSupported !== false)
         setPage(1)
         setLoadError(false)
+        appliedParamsRef.current = params
       })
       .catch((error) => {
         console.error('Following feed error:', error)
@@ -140,11 +157,13 @@ export default function FollowingFeedTab() {
 
   return (
     <div className={clsx('__container')} data-width="small">
-      <div className={clsx('__container', styles.page__container)} data-width="medium">
+      <div ref={containerRef} style={containerStyle} className={clsx('__container', styles.page__container)} data-width="medium">
         {posts.list.map((item, i) => (
           <section
             key={item.id}
-            className={clsx(styles.post, 'animate', 'fade')}
+            data-post-key={item.id}
+            style={cardStyle(String(item.id))}
+            className={clsx(styles.post, !initialCache && ['animate', 'fade'])}
             onPointerDown={rememberCardPointerDown}
             onClick={(e) => {
               if (isTextSelectionDrag(e)) return
