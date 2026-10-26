@@ -99,9 +99,9 @@ export default function CommunityProposalDetail({ networkId, communityId, propos
         <h2 className={styles.proposal__title}>Proposed payment</h2>
         <dl className={styles.proposal__facts}>
           <div><dt>Amount</dt><dd>{amountLabel}</dd></div>
-          <div><dt>Asset</dt><dd>{native ? currency?.symbol || 'Native currency' : `${payment.isLsp7 ? 'LSP7' : 'ERC20'}: ${payment.asset}`}</dd></div>
-          <div><dt>Recipient</dt><dd>{payment.recipient}</dd></div>
+          {native ? <div><dt>Asset</dt><dd>{currency?.symbol || 'Native currency'}</dd></div> : <div className={styles['proposal__fact--wide']}><dt>Asset ({payment.isLsp7 ? 'LSP7' : 'ERC20'})</dt><dd className={styles.proposal__address}><span>{payment.asset}</span><CopyButton value={payment.asset} title="Copy asset address" /></dd></div>}
           <div><dt>Payment available after</dt><dd>{formatWhen(proposal.executableAt)}</dd></div>
+          <div className={styles['proposal__fact--wide']}><dt>Recipient</dt><dd className={styles.proposal__address}><span>{payment.recipient}</span><CopyButton value={payment.recipient} title="Copy recipient address" /></dd></div>
         </dl>
         <p className={styles.proposal__muted}>These instructions are fixed onchain. A passing proposal can be paid once after its execution delay, provided the treasury has enough funds.</p>
         {proposal.executed ? <strong>Payment executed</strong> : status.key === 'succeeded' && <button type="button" className={styles.proposal__choice} disabled={!writer.account || !canExecute || Boolean(writer.busy)} onClick={() => act('execute', { functionName: 'execute', args: [id] }, 'Treasury payment executed')}>{writer.busy === 'execute' ? <><Spinner size={16} color="currentColor" /> Executing…</> : canExecute ? 'Execute approved payment' : 'Waiting for execution delay'}</button>}

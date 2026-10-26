@@ -136,6 +136,7 @@
     margin: 0;
 
     div {
+      min-width: 0;
       border: 1px solid var(--border);
       border-radius: var(--global-border-radius);
       padding: 0.55rem 0.75rem;
@@ -150,6 +151,24 @@
       margin: 0.15rem 0 0;
       font-size: var(--font-size-14, 0.875rem);
       font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  &__fact--wide {
+    grid-column: 1 / -1;
+  }
+
+  &__address {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    span {
+      min-width: 0;
+      font-family: var(--font-mono, ui-monospace, monospace);
+      font-weight: 500;
+      overflow-wrap: anywhere;
     }
   }
 
