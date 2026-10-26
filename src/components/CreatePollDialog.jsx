@@ -6,7 +6,7 @@ import { parseEventLogs, zeroAddress } from 'viem'
 import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
-import { isSessionActive, writeWithBurnerSession } from '@/lib/burnerSession'
+import { canSessionPayGas, isSessionActive, isSessionUnusableError, writeWithBurnerSession } from '@/lib/burnerSession'
 import { uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { MAX_POLL_OPTIONS, MIN_POLL_OPTIONS, POLL_DURATIONS, REQUIREMENT_MODE, REQUIREMENT_TYPE } from '@/lib/polls'
 import { allowlistRootFor } from '@/lib/pollAllowlist'
@@ -392,32 +392,45 @@ const CreatePollDialog = forwardRef(function CreatePollDialog({ onCreated, fixed
 
     const session = await isSessionActive({ userAddress: address, publicClient }).catch(() => ({ active: false }))
 
+    // createPoll isn't sponsored, so the session key pays its own gas — and it is funded per
+    // chain. An empty one on this network falls through to the wallet instead of surfacing
+    // the node's insufficient-funds error.
     if (session.active) {
-      setIsSubmittingBurner(true)
-      try {
-        const tx = await writeWithBurnerSession({
-          chain: chainInfo,
-          contractAddress: pollsAddress,
-          abi: pollsAbi,
-          functionName: 'createPoll',
-          args,
-        })
+      if (await canSessionPayGas(publicClient)) {
+        setIsSubmittingBurner(true)
+        try {
+          const tx = await writeWithBurnerSession({
+            chain: chainInfo,
+            contractAddress: pollsAddress,
+            abi: pollsAbi,
+            functionName: 'createPoll',
+            args,
+          })
 
-        // writeWithBurnerSession already awaited confirmation, so this resolves immediately
-        const burnerReceipt = await tx.wait().catch(() => null)
-        const pollId = pollIdFromLogs(burnerReceipt?.logs)
+          // writeWithBurnerSession already awaited confirmation, so this resolves immediately
+          const burnerReceipt = await tx.wait().catch(() => null)
+          const pollId = pollIdFromLogs(burnerReceipt?.logs)
 
-        toast('Poll created — attach it to your post', 'success')
-        clearPollDraft()
-        resetForm()
-        dialogRef.current?.close()
-        onCreated?.(pollId ? { pollId, chainId } : undefined)
-      } catch (err) {
-        toast(err.message || 'Transaction rejected or encountered an error.', 'error')
-      } finally {
-        setIsSubmittingBurner(false)
+          toast('Poll created — attach it to your post', 'success')
+          clearPollDraft()
+          resetForm()
+          dialogRef.current?.close()
+          onCreated?.(pollId ? { pollId, chainId } : undefined)
+          return
+        } catch (err) {
+          // Only a failure that never reached the mempool is safe to re-send from the wallet;
+          // a revert is the real answer and must not be sent twice
+          if (!isSessionUnusableError(err)) {
+            toast(err.message || 'Transaction rejected or encountered an error.', 'error')
+            return
+          }
+          console.warn('Session key could not send this poll:', err.message)
+        } finally {
+          setIsSubmittingBurner(false)
+        }
+      } else {
+        toast('Session key has no gas on this network — sending with your wallet.', 'info')
       }
-      return
     }
 
     writeContract({
