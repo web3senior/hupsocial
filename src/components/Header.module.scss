@@ -39,7 +39,7 @@
 
   // Matches the footer nav: while browsing down the bar thins to its controls over the feed.
   // Faded per layer rather than with opacity on the header, which would make it a backdrop
-  // root and drop the blur mid-fade. Touching the bar restores it.
+  // root and drop the blur mid-fade. A pointer or keyboard focus restores it, a tap does not.
   @include md-down() {
     transition:
       background-color 0.2s ease,
@@ -49,13 +49,15 @@
       transition: opacity 0.2s ease;
     }
 
-    &--dimmed:not(:hover):not(:focus-within) {
-      background-color: transparent;
-      -webkit-backdrop-filter: blur(0) saturate(100%);
-      backdrop-filter: blur(0) saturate(100%);
+    &--dimmed {
+      @include unless-engaged {
+        background-color: transparent;
+        -webkit-backdrop-filter: blur(0) saturate(100%);
+        backdrop-filter: blur(0) saturate(100%);
 
-      > * {
-        opacity: 0.45;
+        > * {
+          opacity: 0.45;
+        }
       }
     }
   }

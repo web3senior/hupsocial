@@ -160,3 +160,20 @@ $large-width: map.get($responsive-breakpoints, 'lg');
     }
   }
 }
+/*
+   Applies its styles unless the element is under a real pointer or holds keyboard focus.
+   Touch browsers leave :hover and focus on whatever was last tapped, so a bare
+   :not(:hover):not(:focus-within) pins the element after any tap until the next tap elsewhere.
+*/
+@mixin unless-engaged {
+  &:not(:has(:focus-visible)) {
+    @media (hover: hover) {
+      &:not(:hover) {
+        @content;
+      }
+    }
+    @media (hover: none) {
+      @content;
+    }
+  }
+}
