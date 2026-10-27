@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useDisconnect } from 'wagmi'
 import clsx from 'clsx'
-import { ArrowLeftIcon, ArticleIcon, BookIcon, CalendarDotsIcon, CaretRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, FadersHorizontalIcon, GasPumpIcon, HardDrivesIcon, HeadCircuitIcon, HeartIcon, MoonIcon, QuestionIcon, RobotIcon, SealCheckIcon, StackIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
+import { ArrowLeftIcon, ArticleIcon, BookIcon, CalendarDotsIcon, CaretRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, FadersHorizontalIcon, GasPumpIcon, HardDrivesIcon, HeadCircuitIcon, HeartIcon, MoonIcon, QuestionIcon, RobotIcon, ScrollIcon, SealCheckIcon, ShieldCheckIcon, StackIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { MORE_NAV_ITEMS_SCHEMA } from '@/stores/useSidebarStore'
 import { useSolanaWalletStore } from '@/stores/useSolanaWalletStore'
@@ -52,6 +52,8 @@ const SUBMENUS = {
       { id: 'github', name: 'GitHub', href: 'https://github.com/web3senior/hupsocial', icon: GitHub },
       { id: 'status', name: 'System status', path: '/status', icon: HardDrivesIcon },
       { id: 'install', name: `Install ${process.env.NEXT_PUBLIC_NAME}`, path: '/install', icon: DownloadSimpleIcon },
+      { id: 'terms', name: 'Terms of use', path: '/terms', icon: ScrollIcon },
+      { id: 'privacy', name: 'Privacy Policy', path: '/privacy-policy', icon: ShieldCheckIcon },
     ],
   },
 }
