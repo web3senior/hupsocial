@@ -1329,7 +1329,7 @@ function Room({
       </div>
 
       {typists.length > 0 && !searching && (
-        <div className={styles.typing}>
+        <div className={clsx(styles.typing, showJump && messages?.length > 0 && styles['typing--raised'])}>
           <span className={styles.typing__faces}>
             {typists.map((wallet) => (
               <Profile key={wallet} creator={wallet} variant="imageOnly" size={18} hoverCard={false} fingerprint={false} />
