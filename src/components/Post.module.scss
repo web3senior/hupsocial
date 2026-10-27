@@ -78,15 +78,15 @@
     display: none;
   }
 
-  &[data-content='false'] {
-    .post {
-      &__main {
-        padding-left: 3rem;
-      }
+  // Body and actions line up under the name, the open post included, so a reply reads in line
+  // with the parent above it
+  .post {
+    &__main {
+      padding-left: 3rem;
+    }
 
-      &__footer {
-        padding-left: 2.5rem;
-      }
+    &__footer {
+      padding-left: 2.5rem;
     }
   }
 
@@ -222,18 +222,6 @@
           background-color: var(--border);
           z-index: 0;
         }
-      }
-    }
-
-    // The open post runs full width under its avatar, but heading a thread it lines up with the
-    // parts beneath it, so the line runs clear of its text as it does down the rest
-    &[data-content='true'] .post {
-      &__main {
-        padding-left: 3rem;
-      }
-
-      &__footer {
-        padding-left: 2.5rem;
       }
     }
   }
