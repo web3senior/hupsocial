@@ -119,6 +119,16 @@ export default function MoreMenu({ trigger, placement }) {
           {view === 'root' && (
             <>
               <div className={styles['more-menu__group']}>
+                {/* The ambassador program, one tap from the top rather than inside Explore: it is
+                    how strangers are recruited, so it should not take a drill-down to find */}
+                <Link
+                  href="/hupsters"
+                  onClick={close}
+                  className={clsx(styles['more-menu__row'], isActivePath(pathname, '/hupsters') && styles['more-menu__row--active'])}
+                  aria-current={isActivePath(pathname, '/hupsters') ? 'page' : undefined}
+                >
+                  Hupsters
+                </Link>
                 <SubmenuRow id="explore" label="Explore" onOpen={openSubmenu} />
                 <SubmenuRow id="activity" label="Your activity" onOpen={openSubmenu} />
                 <SubmenuRow id="appearance" label="Appearance" onOpen={openSubmenu} />
