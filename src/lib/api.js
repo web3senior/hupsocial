@@ -1,6 +1,7 @@
 import { getViewerId } from './viewer'
 import { normalizeAddress } from './address'
 import { profileUpdateMessage } from './profileSignature'
+import { readReferral } from './referral'
 
 /**
  * @param {string} address
@@ -96,9 +97,12 @@ export async function getUniversalProfile(addr) {
 }
 
 export async function ensureProfile(address) {
+  // The referral rides along on every connect; the route only reads it when it creates the row
+  const ref = readReferral()
   const res = await fetch(`/api/v1/users/profile/${normalizeAddress(address)}`, {
     method: 'POST',
     cache: 'no-store',
+    ...(ref ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref }) } : {}),
   })
 
   if (!res.ok) {

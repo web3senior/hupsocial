@@ -243,6 +243,24 @@
     &:first-child {
       border-top: 0;
     }
+
+    // A row with more to read than one line holds — a Hupster application
+    &--stacked {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+  }
+
+  &__links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.8rem;
+    word-break: break-all;
   }
 
   &__header {

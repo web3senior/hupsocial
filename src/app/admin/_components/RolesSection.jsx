@@ -75,7 +75,8 @@ export default function RolesSection() {
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.error || 'Could not update the role')
 
-      setResult({ ok: true, text: action === 'grant' ? `${label} given to ${json.data.wallet}.` : `${label} taken from ${json.data.wallet}.` })
+      const done = { grant: `${label} given to`, revoke: `${label} taken from`, decline: 'Application declined for' }[action]
+      setResult({ ok: true, text: `${done} ${json.data.wallet}.` })
       if (action === 'grant') {
         setWallet('')
         setNote('')
@@ -158,6 +159,60 @@ export default function RolesSection() {
               >
                 {result.text}
               </div>
+            )}
+          </div>
+
+          <div className={styles['admin-contracts__card']}>
+            <div className={styles['admin-contracts__card-header']}>
+              <h3 className={styles['admin-contracts__card-title']}>Applications</h3>
+              <span className={styles['admin-contracts__badge']}>{state.applications?.length ?? 0}</span>
+            </div>
+
+            {!state.applications?.length ? (
+              <p className={styles['admin-contracts__empty']}>No applications waiting. People apply from /hupsters.</p>
+            ) : (
+              <ul className={styles['admin-contracts__list']}>
+                {state.applications.map((application) => (
+                  <li key={application.wallet_address} className={clsx(styles['admin-contracts__list-row'], styles['admin-contracts__list-row--stacked'])}>
+                    <Profile
+                      creator={application.wallet_address}
+                      variant="fullWithoutTime"
+                      size={32}
+                      hoverCard={false}
+                      fallback={profileFallbackFromRow(application)}
+                    />
+                    {application.message && <p className={styles['admin-contracts__detail-label']}>{application.message}</p>}
+                    <ul className={styles['admin-contracts__links']}>
+                      {application.links.map((link) => (
+                        <li key={link}>
+                          <a href={link} target="_blank" rel="noopener noreferrer nofollow">
+                            {link} ↗
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className={styles['admin-contracts__actions']}>
+                      <span className={styles['admin-contracts__detail-label']}>{formatRelativeTime(application.createdAt) ?? '—'}</span>
+                      <button
+                        type="button"
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+                        onClick={() => submit('grant', application.wallet_address)}
+                        disabled={!address || busy !== null}
+                      >
+                        {busy === `grant:${application.wallet_address}` ? 'Signing…' : 'Approve'}
+                      </button>
+                      <button
+                        type="button"
+                        className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--secondary'])}
+                        onClick={() => submit('decline', application.wallet_address)}
+                        disabled={!address || busy !== null}
+                      >
+                        {busy === `decline:${application.wallet_address}` ? 'Signing…' : 'Decline'}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 

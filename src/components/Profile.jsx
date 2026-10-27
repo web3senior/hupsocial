@@ -193,7 +193,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             <PremiumBadge premium={profile.premium} />
             {/* Hup's own mark for its ambassadors, given by an admin — beside the paid one, since
                 both are claims Hup makes about the account. */}
-            <AmbassadorBadge roles={profile.roles} />
+            <AmbassadorBadge roles={profile.roles} linked={!linkBox} />
             <CommunityBadge badge={profile.badge} iconOnly linked={!linkBox} />
             {/* The automated mark sits ahead of the chain and Universal Profile glyphs: those two
                 say where a post came from, this one says what published it. */}

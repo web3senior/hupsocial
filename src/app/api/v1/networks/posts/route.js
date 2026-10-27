@@ -10,6 +10,8 @@ import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 import { attachTipUsdTotals } from '@/lib/tipTotals'
 import { attachSalesUsdTotals } from '@/lib/salesTotals'
 import { getFollowingAddresses } from '@/lib/followSystem'
+import { hasTable } from '@/lib/schema'
+import { HUPSTER_TAG } from '@/lib/roles'
 
 export const runtime = 'nodejs'
 
@@ -186,6 +188,18 @@ export async function GET(request) {
       )`
     }
 
+    // "Hupsters" = the /hupsters proof feed: posts by current Hupsters that carry #hupsters, each
+    // linking to what they published elsewhere, so anyone can check the link and tip from here.
+    // Read off user_roles live, so a revoked Hupster's posts leave the feed with the mark.
+    if (feedType === 'hupsters') {
+      if (!(await hasTable('user_roles'))) {
+        return NextResponse.json({ success: true, data: [], nextPage: null, meta: { page, count: 0, hasMore: false } })
+      }
+      whereClause += ` AND p.wallet_address IN (SELECT r.wallet_address FROM user_roles r WHERE r.role = 'ambassador')
+        AND p.content LIKE ?`
+      whereParams.push(`%#${HUPSTER_TAG}%`)
+    }
+
     // "Shorts" = posts carrying at least one video attachment. Normally has_video, a generated
     // column (cidex/scripts/add-posts-has-video.sql) that runs the JSON walk at write time, so this
     // stays a plain indexed per-row check inside the paginated derived table rather than a scan
@@ -298,7 +312,8 @@ export async function GET(request) {
     // Discovery feeds (home, premium, nft) rate-limit each author so a single wallet can't own
     // the timeline. Profile timelines, community rooms and following are deliberate subscriptions
     // to one author or one room, so they stay complete; trending does its own per-author dedup.
-    const applyAuthorCooldown = !walletAddress && !communityId && feedType !== 'following'
+    // The Hupsters proof feed is a review queue — every proof has to reach its tippers.
+    const applyAuthorCooldown = !walletAddress && !communityId && feedType !== 'following' && feedType !== 'hupsters'
 
     // Paginate FIRST inside a derived table (filter + sort on the bare posts table), then join
     // back to hydrate the page. Applying whereClause directly to buildPostSelect let the

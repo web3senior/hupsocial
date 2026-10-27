@@ -8,7 +8,7 @@ import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/
 import { resolveAgentProfile } from '@/lib/agentProfile'
 import { readAgentIdentities } from '@/lib/agentIdentities'
 import { readPremium } from '@/lib/premiumServer'
-import { readRoles } from '@/lib/rolesServer'
+import { readRoles, resolveReferrer } from '@/lib/rolesServer'
 import { isAccentColor, parseAccentSelection } from '@/lib/premium'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
 import { readHandleSegment } from '@/lib/username'
@@ -807,6 +807,23 @@ export async function POST(request, { params }) {
        client tells a wallet's first ever connect from its thousandth — the one moment it can ask
        for a username as part of arriving rather than as an interruption. */
     const isNewAccount = insert.affectedRows === 1
+
+    /* Who sent this wallet here (lib/referral.js). Only the request that creates the row may set
+       it, so an existing account can never be re-attributed; and it is decoration on the signup,
+       so a failure here costs the credit, never the account. */
+    if (isNewAccount) {
+      const { ref } = await request.json().catch(() => ({}))
+      if (ref && (await hasColumn('users', 'referred_by'))) {
+        try {
+          const referrer = await resolveReferrer(ref, walletAddress, resolveHandle)
+          if (referrer) {
+            await pool.execute('UPDATE users SET referred_by = ? WHERE wallet_address = ? AND referred_by IS NULL', [referrer, walletAddress])
+          }
+        } catch (referralError) {
+          console.error('[REFERRAL_RECORD_ERROR]:', referralError.message)
+        }
+      }
+    }
 
     const [rows] = await pool.execute(
       `

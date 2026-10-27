@@ -2,6 +2,7 @@ import { Geist_Mono } from 'next/font/google'
 import ClientLayout from '../components/ClientLayout'
 import ServiceWorkerRegistry from '../components/ServiceWorkerRegistry'
 import InternalLinkRouter from '../components/InternalLinkRouter'
+import ReferralCapture from '../components/ReferralCapture'
 import './Globals.scss'
 import './../styles/Global.scss'
 
@@ -116,6 +117,7 @@ export default function RootLayout({ children }) {
       <body>
         <ServiceWorkerRegistry />
         <InternalLinkRouter />
+        <ReferralCapture />
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>

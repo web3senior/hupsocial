@@ -81,6 +81,9 @@ export default function HomeFeedTab({
   containerWidth = 'small',
   // Rendered at the top of the feed card, above the posts (home passes its compose prompt)
   lead = null,
+  // Shown in place of the skeleton once a feed has loaded and turned out empty. Feeds that are
+  // never empty in practice leave it null and keep the skeleton as before.
+  emptyState = null,
 }) {
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
   const authoredPostNonce = usePostStore((state) => state.authoredPostNonce)
@@ -94,13 +97,13 @@ export default function HomeFeedTab({
   const scopedNetworkId = feedMode === 'network' ? networkId : null
   // The viewer of a Solana feed is the Solana wallet — has_liked and the basket key off it
   const address = isSolanaNetworkId(scopedNetworkId) ? solanaWallet.address : evmAddress
-  const feedType = feedMode === 'premium' ? 'premium' : feedMode === 'nft' ? 'nft' : null
+  const feedType = feedMode === 'premium' ? 'premium' : feedMode === 'nft' ? 'nft' : feedMode === 'hupsters' ? 'hupsters' : null
   // Home-style feeds hide NFT-sale posts — those live in the dedicated NFTs tab.
   const excludeNft = feedMode === 'foryou' || feedMode === 'network'
   // Follows are LSP26 on an EVM chain, so a Solana feed has no one to suggest.
   const showSuggestions = feedMode === 'foryou' || (feedMode === 'network' && !isSolanaNetworkId(networkId))
   const feedCacheKey =
-    feedMode === 'network' ? `network-${networkId}` : feedMode === 'premium' ? 'premium' : feedMode === 'nft' ? 'nft' : 'foryou'
+    feedMode === 'network' ? `network-${networkId}` : ['premium', 'nft', 'hupsters'].includes(feedMode) ? feedMode : 'foryou'
   const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
 
   // Feed snapshot from an earlier visit this session, if any. Safe to read in
@@ -544,7 +547,8 @@ export default function HomeFeedTab({
               </section>
             ))}
 
-            {postsLoaded === 0 && (loadError ? <FeedError onRetry={handleRetry} /> : <PostSkeletonGrid count={14} />)}
+            {postsLoaded === 0 &&
+              (loadError ? <FeedError onRetry={handleRetry} /> : hasInitialized && emptyState ? emptyState : <PostSkeletonGrid count={14} />)}
 
             {visiblePosts?.map((item, i) => (
               <Fragment key={postKey(item)}>

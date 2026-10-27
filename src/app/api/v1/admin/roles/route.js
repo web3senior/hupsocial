@@ -5,7 +5,9 @@
  * GET lists who holds a role. Unsigned: every holder already wears the mark on their profile, so
  * the list is nothing a stranger could not assemble; the admin page gates who looks.
  *
- * POST grants or revokes, and only for a signature from the admin wallet over roleMessage plus a
+ * GET also carries the applications waiting on a decision.
+ *
+ * POST grants, revokes or declines an application, and only for a signature from the admin wallet over roleMessage plus a
  * fresh nonce, burned before anything is written. The wallet may be given as an address or as a
  * handle (`@alice`), since that is how the team knows the people they are picking.
  */
@@ -16,8 +18,8 @@ import { isWalletAddress, normalizeAddress } from '@/lib/address'
 import { hasColumn } from '@/lib/schema'
 import { readHandleSegment } from '@/lib/username'
 import { verifyWalletSignature } from '@/lib/walletSignature'
-import { isRole, roleMessage } from '@/lib/roles'
-import { grantRole, listRoleHolders, revokeRole, rolesAreMigrated } from '@/lib/rolesServer'
+import { isRole, isRoleAction, roleMessage } from '@/lib/roles'
+import { declineApplication, grantRole, listPendingApplications, listRoleHolders, revokeRole, rolesAreMigrated } from '@/lib/rolesServer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -45,7 +47,8 @@ export async function GET(request) {
   }
 
   try {
-    return NextResponse.json({ success: true, data: await listRoleHolders(role) })
+    const [roster, applications] = await Promise.all([listRoleHolders(role), listPendingApplications(role)])
+    return NextResponse.json({ success: true, data: { ...roster, applications } })
   } catch (error) {
     console.error('ADMIN_ROLES_READ_ERROR:', error.message)
     return NextResponse.json({ success: false, error: 'Could not read role holders.' }, { status: 500 })
@@ -60,7 +63,7 @@ export async function POST(request) {
   try {
     const { action, wallet: input, role, note, signature, nonce, chainId } = await request.json()
 
-    if ((action !== 'grant' && action !== 'revoke') || !isRole(role) || !signature || !nonce) {
+    if (!isRoleAction(action) || !isRole(role) || !signature || !nonce) {
       return NextResponse.json({ success: false, error: 'action, wallet, role, signature and nonce are required.' }, { status: 400 })
     }
 
@@ -89,6 +92,11 @@ export async function POST(request) {
       const trimmed = typeof note === 'string' ? note.trim().slice(0, NOTE_MAX) : ''
       await grantRole({ wallet, role, grantedBy: ADMIN_WALLET, note: trimmed || null })
       return NextResponse.json({ success: true, data: { wallet, role, granted: true } })
+    }
+
+    if (action === 'decline') {
+      const declined = await declineApplication({ wallet, role, decidedBy: ADMIN_WALLET })
+      return NextResponse.json({ success: true, data: { wallet, role, declined } })
     }
 
     const held = await revokeRole({ wallet, role })

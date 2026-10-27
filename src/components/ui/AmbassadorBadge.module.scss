@@ -5,4 +5,20 @@
   // stylesheet tries to stretch it.
   object-fit: contain;
   vertical-align: middle;
+
+  &--link {
+    display: inline-flex;
+    flex-shrink: 0;
+    border-radius: 4px;
+    transition: transform 0.15s ease;
+
+    &:hover {
+      transform: scale(1.15);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--brand-500);
+      outline-offset: 2px;
+    }
+  }
 }
