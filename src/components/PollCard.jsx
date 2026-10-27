@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
@@ -17,6 +17,7 @@ import { shortTxError } from '@/lib/utils'
 import pollsAbi from '@/abis/HupPolls.json'
 import { toast } from '@/components/NextToast'
 import PollTimer from '@/components/PollTimer'
+import ConfirmVoteDialog from '@/components/ConfirmVoteDialog'
 import ProgressBar from '@/components/ui/ProgressBar'
 import { openConnect } from '@/lib/connectDialog'
 import styles from './PollCard.module.scss'
@@ -49,6 +50,7 @@ export default function PollCard({ pollRef }) {
   // The indexer needs a few seconds to catch up, so a confirmed ballot renders from here
   // until the API row carries it
   const [localBallot, setLocalBallot] = useState(null)
+  const confirmVoteRef = useRef(null)
 
   // The card's status is derived from the clock at render time, so a window that opens or
   // ends on screen needs a re-render as well as fresh data — SWR alone would not re-render
@@ -114,26 +116,41 @@ export default function PollCard({ pollRef }) {
   const nativeSymbol = config.chains.find((item) => item.id === chainId)?.nativeCurrency?.symbol ?? ''
 
   /**
+   * Runs the cheap refusals first, then asks for confirmation — a ballot can't be changed once
+   * it lands, so a stray tap shouldn't cast one. The ballot itself is sent by `castVote`.
+   */
+  const requestVote = (option) => {
+    if (!canVote()) return
+    confirmVoteRef.current?.open(option)
+  }
+
+  const canVote = () => {
+    if (!isConnected || !address) {
+      if (!openConnect()) toast('Connect your wallet to vote', 'error')
+      return false
+    }
+    if (!pollsAddress) {
+      toast("Polls aren't available on this network", 'error')
+      return false
+    }
+    if (!isOpen || hasVoted || isBusy) return false
+    // Refuse here what the contract would refuse anyway, so a gated poll never spends a
+    // signature prompt — or a sponsored transaction — on a ballot that cannot land
+    if (gated && onchainEligible === false) {
+      toast('You don’t meet this poll’s requirements', 'error')
+      return false
+    }
+    return true
+  }
+
+  /**
    * Sends the ballot sponsored when the trial covers this chain, and falls back to the
    * viewer's own wallet otherwise. Same three-path shape as a like: relayer, session key,
    * plain transaction.
    */
   const castVote = async (optionIndex) => {
-    if (!isConnected || !address) {
-      if (!openConnect()) toast('Connect your wallet to vote', 'error')
-      return
-    }
-    if (!pollsAddress) {
-      toast("Polls aren't available on this network", 'error')
-      return
-    }
-    if (!isOpen || hasVoted || isBusy) return
-    // Refuse here what the contract would refuse anyway, so a gated poll never spends a
-    // signature prompt — or a sponsored transaction — on a ballot that cannot land
-    if (gated && onchainEligible === false) {
-      toast('You don’t meet this poll’s requirements', 'error')
-      return
-    }
+    // Re-checked on confirm: the window can close or another tab can vote while the dialog is up
+    if (!canVote()) return
 
     const chainDefinition = config.chains.find((item) => item.id === chainId)
     if (!chainDefinition) return
@@ -238,7 +255,7 @@ export default function PollCard({ pollRef }) {
                   [styles['pollCard__option--result']]: showResults,
                   [styles['pollCard__option--highlight']]: isHighlighted,
                 })}
-                onClick={() => castVote(option.index)}
+                onClick={() => requestVote(option)}
                 disabled={!isOpen || hasVoted || isBusy || isBlocked}
                 aria-label={showResults ? `${option.label}, ${formatShare(option.share)}` : `Vote for ${option.label}`}
               >
@@ -318,6 +335,8 @@ export default function PollCard({ pollRef }) {
             no longer actionable and the footer belongs to the result */}
         {isBlocked && isOpen && <span className={styles.pollCard__blocked}>You don’t meet the requirements</span>}
       </footer>
+
+      <ConfirmVoteDialog ref={confirmVoteRef} onConfirm={castVote} />
     </section>
   )
 }

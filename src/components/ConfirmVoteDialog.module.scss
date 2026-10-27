@@ -1,0 +1,82 @@
+/* Chrome for the NativeDialog root — the primitive only supplies centering, backdrop and animation */
+.confirmVote {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  overflow: hidden;
+  flex-direction: column;
+  width: min(340px, calc(100vw - 2rem));
+
+  &[open] {
+    display: flex;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.5rem 1.5rem 1.25rem;
+    text-align: center;
+    cursor: default;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-16, 1rem);
+    font-weight: 700;
+  }
+
+  &__choice {
+    margin: 0;
+    padding: 0.5rem 0.9rem;
+    max-width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--surface-muted);
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  &__message {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.45;
+    color: var(--text-muted);
+  }
+
+  &__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--border);
+  }
+
+  &__button {
+    all: unset;
+    box-sizing: border-box;
+    padding: 0.9rem 1rem;
+    text-align: center;
+    font-size: var(--font-size-16, 1rem);
+    color: var(--text);
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+
+    + .confirmVote__button {
+      border-left: 1px solid var(--border);
+    }
+
+    &:hover,
+    &:focus-visible {
+      background-color: var(--surface-muted);
+    }
+
+    &--primary {
+      font-weight: 700;
+      color: var(--primary, currentColor);
+    }
+  }
+}
