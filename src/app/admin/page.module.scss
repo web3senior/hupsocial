@@ -1,4 +1,4 @@
-/* @file app/admin/contracts/page.module.scss */
+/* @file app/admin/page.module.scss */
 
 @use '@/styles/components/responsive' as *;
 
@@ -7,18 +7,12 @@
   min-height: 80vh;
   box-sizing: border-box;
 
-  // Aside is fixed at 250px and nothing in the layout reserves that gutter, so a canvas this
-  // wide has to keep clear of it itself — otherwise the left column of cards sits under the nav
-  @include md-up() {
-    padding-left: 250px;
-  }
-
+  // Width and the sidebar gutter come from the global __container[data-width="xxlarge"], which
+  // clears the aside at whatever width it currently is
   &__container {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    max-width: 1200px;
-    margin: 0 auto;
     padding: 0 1rem;
     box-sizing: border-box;
   }

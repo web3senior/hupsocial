@@ -138,6 +138,12 @@ const nextConfig = {
         destination: '/bazaar',
         permanent: true,
       },
+      // The admin console moved up from /admin/contracts; browsers carry a #section across the hop
+      {
+        source: '/admin/contracts',
+        destination: '/admin',
+        permanent: true,
+      },
       // The launchpad and its token pages left this app entirely, so /trade no longer exists and
       // these pointed at nothing — which the profile route then answered with a 200 "Profile Not
       // Found". Sending them to the feed keeps an old shared link resolving without inventing a

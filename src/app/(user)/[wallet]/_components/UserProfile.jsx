@@ -47,6 +47,7 @@ import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdenti
 import { useProfile } from '@/hooks/useProfile'
 import { handleBrokenAvatar } from '@/lib/utils'
 import AgentBadge from '@/components/ui/AgentBadge'
+import AmbassadorBadge from '@/components/ui/AmbassadorBadge'
 import AgentIdentityChip from '@/components/ui/AgentIdentityChip'
 import PremiumBadge from '@/components/ui/PremiumBadge'
 import Avatar from '@/components/ui/Avatar'
@@ -734,6 +735,7 @@ const Profile = ({ addr }) => {
 
               {/* Straight after the name, the same mark every post header shows. */}
               <PremiumBadge premium={profile.premium} size="lg" />
+              <AmbassadorBadge roles={profile.roles} size="lg" />
 
               {/* The worn tag, from the same component every post header uses, so one badge can
                   never look like two things — only its scale changes, so it holds its own beside a

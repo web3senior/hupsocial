@@ -1,4 +1,4 @@
-/* @file app/admin/contracts/page.jsx */
+/* @file app/admin/page.jsx */
 'use client'
 
 import { Spinner } from '@/components/Loading'
@@ -39,6 +39,7 @@ import styles from './page.module.scss'
 import ScheduleForwarderSection from './_components/ScheduleForwarderSection'
 import RelayerSweepSection from './_components/RelayerSweepSection'
 import UsernamesSection from './_components/UsernamesSection'
+import RolesSection from './_components/RolesSection'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
 
@@ -119,6 +120,7 @@ const SECTIONS = [
   { id: 'balances', label: 'Balances', icon: '💰', contractKey: null },
   { id: 'relayer', label: 'Relayer', icon: '⛽', contractKey: null },
   { id: 'usernames', label: 'Usernames', icon: '🏷️', contractKey: null, offchain: true },
+  { id: 'hupsters', label: 'Hupsters', icon: '📣', contractKey: null, offchain: true },
   { id: 'forwarders', label: 'Forwarders', icon: '✍️', contractKey: 'forwarder' },
   { id: 'scheduling', label: 'Scheduling', icon: '⏰', contractKey: 'scheduleForwarder' },
   { id: 'sell-fees', label: 'Sell Fees', icon: '💸', contractKey: 'sell' },
@@ -2611,9 +2613,9 @@ export default function Page() {
   if (!isConnected) {
     return (
       <>
-        <PageTitle name="Admin Contracts" />
+        <PageTitle name="Admin" />
         <div className={clsx(styles['admin-contracts'], 'ms-motion-slideDownIn')}>
-          <div className={styles['admin-contracts__container']}>
+          <div className={clsx('__container', styles['admin-contracts__container'])} data-width="xxlarge">
             <p className={styles['admin-contracts__gate']}>Connect your wallet to continue.</p>
           </div>
         </div>
@@ -2624,9 +2626,9 @@ export default function Page() {
   if (!isAdmin) {
     return (
       <>
-        <PageTitle name="Admin Contracts" />
+        <PageTitle name="Admin" />
         <div className={clsx(styles['admin-contracts'], 'ms-motion-slideDownIn')}>
-          <div className={styles['admin-contracts__container']}>
+          <div className={clsx('__container', styles['admin-contracts__container'])} data-width="xxlarge">
             <p className={styles['admin-contracts__gate']}>You do not have permission to access this page.</p>
           </div>
         </div>
@@ -2636,12 +2638,12 @@ export default function Page() {
 
   return (
     <>
-      <PageTitle name="Admin Contracts" />
+      <PageTitle name="Admin" />
       <div className={clsx(styles['admin-contracts'], 'ms-motion-slideDownIn')}>
-        <div className={styles['admin-contracts__container']}>
+        <div className={clsx('__container', styles['admin-contracts__container'])} data-width="xxlarge">
           <header className={styles['admin-contracts__toolbar']}>
             <div className={styles['admin-contracts__toolbar-main']}>
-              <h1 className={styles['admin-contracts__page-title']}>Contract Admin</h1>
+              <h1 className={styles['admin-contracts__page-title']}>Admin</h1>
               <p className={styles['admin-contracts__page-subtitle']}>
                 Every write on this page is signed by <code>{address}</code>.
               </p>
@@ -2807,6 +2809,8 @@ export default function Page() {
           {activeSection === 'relayer' && <RelayerSweepSection chains={visibleChains(null)} />}
 
           {activeSection === 'usernames' && <UsernamesSection />}
+
+          {activeSection === 'hupsters' && <RolesSection />}
 
           {activeSection === 'scheduling' && <ScheduleForwarderSection chains={visibleChains('scheduleForwarder')} />}
 

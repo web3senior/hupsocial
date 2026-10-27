@@ -170,7 +170,7 @@ export const CONTRACTS = {
     fund: '0xbFa95c400099b499Cca00E2A6cc52998733bB02A',
     tasks: '0x232AD3137Ef5c3F1E3CE04248ab9C9729d3e987a',
     premium: '0x8c02E00F47Edfe733069C4d4699f0e81A5c9479b',
-    // Salt ethers.id("hup-drops"); satellites and levers are registered on /admin/contracts
+    // Salt ethers.id("hup-drops"); satellites and levers are registered on /admin
     drops: '0xB1E03B5d2fb35f5414fd209e34E7500DFD6782DC',
     splits: '0x0e12F47E8EE3488343A68bb792C89c934c428349',
     nativeGate: '0xB30ca74c9Aa86bb56AecEB694Cf7127AD0F60890',

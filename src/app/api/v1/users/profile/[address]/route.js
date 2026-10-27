@@ -8,6 +8,7 @@ import { resolveWornBadge, parseBadgeSelection, findWearableBadge } from '@/lib/
 import { resolveAgentProfile } from '@/lib/agentProfile'
 import { readAgentIdentities } from '@/lib/agentIdentities'
 import { readPremium } from '@/lib/premiumServer'
+import { readRoles } from '@/lib/rolesServer'
 import { isAccentColor, parseAccentSelection } from '@/lib/premium'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
 import { readHandleSegment } from '@/lib/username'
@@ -196,7 +197,7 @@ function scheduleChainRecheck(address, row) {
  * A Universal Profile as the read serves it, from the onchain document — live, or the row's copy
  * of it. The row can be AHEAD of that document: see cidex/scripts/add-profile-sync-stamp.sql.
  */
-function shapeUniversalProfile(profile, row, address, { badge, origin, premium, erc8004 }) {
+function shapeUniversalProfile(profile, row, address, { badge, origin, premium, roles, erc8004 }) {
   const liveStamp = String(profile.lastMetadataUpdate ?? '')
   const storedStamp = row?.profile_sync_stamp ?? null
   const hupIsAhead = storedStamp !== null && storedStamp === liveStamp
@@ -247,6 +248,8 @@ function shapeUniversalProfile(profile, row, address, { badge, origin, premium, 
   profile.badge = badge
   // And the same again for premium: a paid subscription is a Hup fact, never an LSP3 one.
   profile.premium = premium
+  // And for roles an admin gave this wallet (lib/roles.js) — Hup's call, never the profile's.
+  profile.roles = roles
   /* Only a colour this build would render is served — a row holding anything else (an old
      value, a hand-edited one) reads as no accent rather than as CSS. */
   profile.accent = isAccentColor(row?.accent_color) ? row.accent_color : null
@@ -263,7 +266,7 @@ function shapeUniversalProfile(profile, row, address, { badge, origin, premium, 
 }
 
 /** A profile the chain has nothing for, from the row alone. */
-function shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) {
+function shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004 }) {
   const dbProfile = row
 
   // The notification email is private contact data on a public endpoint —
@@ -296,6 +299,7 @@ function shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) {
   delete dbProfile.badge_community_id
   dbProfile.badge = badge
   dbProfile.premium = premium
+  dbProfile.roles = roles
   /* Same rule as the badge pointer: the raw column never leaves the server unvalidated. */
   const accentColor = dbProfile.accent_color
   delete dbProfile.accent_color
@@ -365,7 +369,7 @@ export async function GET(request, { params }) {
        and adds no latency running in the same batch. It is re-verified against
        community_members on every call — see lib/badge.js for why it is never stored already
        resolved. */
-    const [[rows], badge, premium, erc8004] = await Promise.all([
+    const [[rows], badge, premium, roles, erc8004] = await Promise.all([
       pool.execute(
         `SELECT
           u.*,
@@ -389,7 +393,12 @@ export async function GET(request, { params }) {
         console.error('[PREMIUM_RESOLVE_ERROR]:', premiumError.message)
         return null
       }),
-      /* Guarded like the two above: agent_identities only exists once add-huptasks-contracts.sql has run. */
+      /* Same guard again: a database without add-user-roles.sql reads as no roles. */
+      readRoles(address).catch((rolesError) => {
+        console.error('[ROLES_RESOLVE_ERROR]:', rolesError.message)
+        return []
+      }),
+      /* Guarded like the ones above: agent_identities only exists once add-huptasks-contracts.sql has run. */
       (isEvmAddress(address) ? readAgentIdentities(address) : Promise.resolve([])).catch((identityError) => {
         console.error('[AGENT_IDENTITY_RESOLVE_ERROR]:', identityError.message)
         return []
@@ -414,11 +423,11 @@ export async function GET(request, { params }) {
       if (row.is_universal_profile) {
         return publicProfile({
           source: 'universal_profile',
-          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin, premium, erc8004 }),
+          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin, premium, roles, erc8004 }),
         })
       }
 
-      return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) })
+      return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004 }) })
     }
 
     const { answered, profile: live } = await readUniversalProfile(address)
@@ -437,7 +446,7 @@ export async function GET(request, { params }) {
     if (isUP) {
       return publicProfile({
         source: 'universal_profile',
-        data: shapeUniversalProfile(live, row, address, { badge, origin, premium, erc8004 }),
+        data: shapeUniversalProfile(live, row, address, { badge, origin, premium, roles, erc8004 }),
       })
     }
 
@@ -447,7 +456,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, erc8004 }) })
+    return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004 }) })
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

@@ -48,7 +48,7 @@ always means new satellites.
    canonical LSP26 follower registry.
 2. **Satellites** — `node satellite-initcode.js 0x<newEngineAddress>` writes
    `HupDropsDeployerLSP7.paste-ready.txt` and `…LSP8.paste-ready.txt` next to itself; deploy both.
-3. **Register** — on `/admin/contracts`, in the HupDrops card, set standard `3` to the LSP7
+3. **Register** — on `/admin`, in the HupDrops card, set standard `3` to the LSP7
    satellite and standard `4` to the LSP8 satellite, signing **directly from the admin EOA**
    (`setDeployer` checks `msg.sender`, so a relayed call reverts). Re-set the mint and creation
    fees there too: a fresh engine starts at zero.
@@ -63,7 +63,7 @@ ABI the app uses and is generated from the same compile.
 The payment-split factory the engine turns payee tables into. It takes **no constructor
 arguments**, so with the default salt the same bytes land on the same address on every chain
 (`0xcf0F7922FCB5bbFa03B6BAa39D584E5749D5923b`). Deploy it once per chain, before or after the
-engine, then register it on `/admin/contracts` with `setSplits` and fill `chain<id>.splits` in
+engine, then register it on `/admin` with `setSplits` and fill `chain<id>.splits` in
 `src/config/contracts.js`. Until it is registered, any drop that asks for a split reverts with
 `SplitsUnavailable`; drops that do not ask for one are unaffected.
 
@@ -178,7 +178,7 @@ forwarder, on purpose — the contract holds backers' money and answers to nobod
 
 After deploying: fill `chain<id>.fund` in `src/config/contracts.js`, register the deployment with
 cidex via the template at the bottom of `cidex/scripts/add-hupfund.sql` (name must be `HupFund`),
-restart cidex, and set the fee and sweep the ledger from the Fundraise tab on `/admin/contracts`.
+restart cidex, and set the fee and sweep the ledger from the Fundraise tab on `/admin`.
 
 Deployed: Base Sepolia `0xEB6c36fE71aC893Dca06fCAbc78C0C6690eA6D4b` (2026-09-08).
 
@@ -222,7 +222,7 @@ on every chain**. That address is already in `src/config/contracts.js` as `sched
 each gasless chain; nothing to fill in. Rebuilding changes the bytecode and the address, so keep
 this artifact as is.
 
-After deploying on a chain: open `/admin/contracts#scheduling` and press **Trust on Hup** (the
+After deploying on a chain: open `/admin#scheduling` and press **Trust on Hup** (the
 Hup admin wallet calls `setTrustedForwarder`). Scheduling goes live on that chain at that moment.
 No cidex rows: scheduled posts are ordinary `create` calls, indexed like any other post.
 

@@ -16,6 +16,7 @@ import { tunnelChatUrl } from '@/lib/tunnel'
 import { getAddress } from 'viem'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import AgentBadge from './ui/AgentBadge'
+import AmbassadorBadge from './ui/AmbassadorBadge'
 import Avatar from './ui/Avatar'
 import PremiumBadge from './ui/PremiumBadge'
 import Shimmer from './ui/Shimmer'
@@ -190,6 +191,9 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             {/* Straight after the name, the way a paid mark is read everywhere else. It is a
                 claim about the account, not about the post's chain, so it takes no chain colour. */}
             <PremiumBadge premium={profile.premium} />
+            {/* Hup's own mark for its ambassadors, given by an admin — beside the paid one, since
+                both are claims Hup makes about the account. */}
+            <AmbassadorBadge roles={profile.roles} />
             <CommunityBadge badge={profile.badge} iconOnly linked={!linkBox} />
             {/* The automated mark sits ahead of the chain and Universal Profile glyphs: those two
                 say where a post came from, this one says what published it. */}
