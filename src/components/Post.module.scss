@@ -653,6 +653,18 @@
   --post-button-bg: #12301c;
 }
 
+// A light subtree inside a dark page (the copy-as-image sheet): the page's own [data-theme]
+// still matches the dark rule above, which wins on source order, so the nearer theme has to
+// win on specificity instead.
+:global([data-theme='dark'] [data-theme='light']) .post,
+:global([data-theme='terminal'] [data-theme='light']) .post {
+  --post-button-bg: var(--surface-muted);
+  --post-text: #000000;
+  --post-muted: #999999;
+  --post-link: #0095f6;
+  --post-action: #424242;
+}
+
 // --- Post icon buttons ---
 .post__navTrigger {
   @extend %circle-chip;
