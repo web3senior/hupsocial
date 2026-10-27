@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import clsx from 'clsx'
-import { BookmarkSimpleIcon, ChartBarIcon, ChatCircleIcon, HeartIcon, PiggyBankIcon, RepeatIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { BookmarkSimpleIcon, ChartBarIcon, ChatCircleIcon, HeartIcon, CoinIcon, RepeatIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import Profile from '@/components/Profile'
 import MediaGallery from '@/components/Gallery'
 import { renderMarkdown } from '@/lib/markdown'
@@ -76,7 +76,7 @@ export default function PendingPost({ entry }) {
               <RepeatIcon width={20} height={20} />
             </button>
             <button type="button" tabIndex={-1} data-action="tip">
-              <PiggyBankIcon width={18} height={18} />
+              <CoinIcon width={18} height={18} />
             </button>
             <button type="button" tabIndex={-1} data-action="view">
               <ChartBarIcon width={17} height={17} />
