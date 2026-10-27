@@ -6,7 +6,7 @@ import { useConnection } from 'wagmi'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { usePostStats } from '@/hooks/usePostStats'
 import { toast } from '@/components/NextToast'
-import { CoinIcon } from '@phosphor-icons/react'
+import { PiggyBankIcon } from '@phosphor-icons/react'
 import { openConnect } from '@/lib/connectDialog'
 import Counter from './Counter'
 import styles from './Tip.module.scss'
@@ -72,7 +72,7 @@ export const Tip = ({ post, onTip }) => {
   return (
     <Tooltip content={title} placement="bottom" size="compact" hoverOnly>
       <button data-action="tip" data-earned={hasEarned || undefined} aria-label="Tip the author" onClick={handleTip}>
-        <CoinIcon width={18} height={18} />
+        <PiggyBankIcon width={18} height={18} />
         {hasEarned ? (
           // Keyed on the dollar figure so the counter replays its slide-up when a tip lands,
           // not on every price tick that leaves the rounded label unchanged.
