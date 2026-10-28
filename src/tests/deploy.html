@@ -358,6 +358,8 @@
       { id: "HupFund", group: "Extensions", label: "HupFund (fundraising campaigns, escrowed — admin only)", file: "HupFund.json" },
       { id: "HupTasks", group: "Extensions", label: "HupTasks (micro bounties on posts, escrowed — salt hup-tasks)", file: "HupTasks.json" },
       { id: "HupScheduleForwarder", group: "Extensions", label: "HupScheduleForwarder (scheduled posts, no constructor args — salt hup-schedule-forwarder, same address everywhere)", file: "HupScheduleForwarder.json" },
+      { id: "HupBridgeVault", group: "Hup bridge", label: "Hup bridge · vault (one per source chain; fees in wei, dailyReleaseBps_ 2000 = 20% a day, permit2_ 0x000000000022D473030F116dDEE9F6B43aC78BA3)", file: "HupBridgeVault.json", signerArgs: ["admin"] },
+      { id: "HupLuksoBridge", group: "Hup bridge", label: "Hup bridge · LUKSO mirrors (LUKSO only; burn fees in wei)", file: "HupLuksoBridge.json", signerArgs: ["admin"] },
       { id: "HupCommunity", group: "Communities", label: "HupCommunity", file: "HupCommunity.json" },
       { id: "HupCommunityGovernance", group: "Communities", label: "Community proposals, delegation & treasury (uses existing HupCommunity)", file: "HupCommunityGovernance.json" },
       { id: "LSP26", group: "Registries", label: "LSP26 Follower System (canonical address)", raw: true },
@@ -916,7 +918,7 @@
       if (!currentChainId) throw new Error("Connect the wallet first — the chain decides where to verify.");
       return {
         address: ethers.getAddress(els.verifyAddress.value.trim()),
-        identifier: `v2/Extensions/${loadedArtifact.id}.sol:${loadedArtifact.id}`,
+        identifier: loadedArtifact.identifier || `v2/Extensions/${loadedArtifact.id}.sol:${loadedArtifact.id}`,
         args: (() => {
           const fields = [...els.ctorFields.querySelectorAll("input")];
           const types = fields.map((field) => field.dataset.type);
@@ -927,6 +929,11 @@
     }
 
     async function verificationInput() {
+      if (loadedArtifact.verificationInput) {
+        const response = await fetch(loadedArtifact.verificationInput);
+        if (!response.ok) throw new Error("Could not load the contract verification input.");
+        return response.json();
+      }
       const folder = verifyFolder(currentChainId);
       const communityContracts = ["HupCommunityGovernance", "HupCommunityTreasury"];
       const inputPath = communityContracts.includes(loadedArtifact.id)
@@ -950,7 +957,7 @@
         const response = await fetch(`https://sourcify.dev/server/v2/verify/${currentChainId}/${address}`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ stdJsonInput: input, compilerVersion: COMPILER_LONG, contractIdentifier: identifier }),
+          body: JSON.stringify({ stdJsonInput: input, compilerVersion: loadedArtifact.compilerVersion || COMPILER_LONG, contractIdentifier: identifier }),
         });
         const body = await response.json().catch(() => ({}));
         if (response.status === 409) {
@@ -986,7 +993,7 @@
         const { address, args } = verifyTarget();
         const input = await verificationInput();
         const form = new FormData();
-        form.append("compiler_version", `v${COMPILER_LONG}`);
+        form.append("compiler_version", `v${loadedArtifact.compilerVersion || COMPILER_LONG}`);
         form.append("license_type", "mit");
         form.append("autodetect_constructor_args", args ? "false" : "true");
         if (args) form.append("constructor_args", args);
@@ -1027,7 +1034,7 @@
           sourceCode: JSON.stringify(input),
           contractaddress: address,
           contractname: identifier,
-          compilerversion: `v${COMPILER_LONG}`,
+          compilerversion: `v${loadedArtifact.compilerVersion || COMPILER_LONG}`,
           // Their spelling, not a typo here
           constructorArguements: args,
         });

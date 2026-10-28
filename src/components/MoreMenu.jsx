@@ -129,6 +129,14 @@ export default function MoreMenu({ trigger, placement }) {
                 >
                   Hupsters
                 </Link>
+                <Link
+                  href="/bridge"
+                  onClick={close}
+                  className={clsx(styles['more-menu__row'], isActivePath(pathname, '/bridge') && styles['more-menu__row--active'])}
+                  aria-current={isActivePath(pathname, '/bridge') ? 'page' : undefined}
+                >
+                  Bridge
+                </Link>
                 <SubmenuRow id="explore" label="Explore" onOpen={openSubmenu} />
                 <SubmenuRow id="activity" label="Your activity" onOpen={openSubmenu} />
                 <SubmenuRow id="appearance" label="Appearance" onOpen={openSubmenu} />
