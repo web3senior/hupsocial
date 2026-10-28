@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { ClockIcon } from '@phosphor-icons/react'
 import styles from './PollTimer.module.scss'
 
 /**
@@ -12,8 +13,9 @@ import styles from './PollTimer.module.scss'
  */
 
 /**
- * Ticking "6d:4h:10m:3s" — unit-labelled and unpadded, so the number reads at a glance
- * without being mistaken for a wall clock. Seconds always ride along, even with days left:
+ * Ticking "6d 4h 10m 03s" — unit-labelled and space-separated, so the number reads at a
+ * glance without being mistaken for a wall clock. Minutes and seconds are padded so the
+ * phrase keeps its width while it turns over. Seconds always ride along, even with days left:
  * a countdown that only moves once a minute reads as stuck, and the whole point of ticking
  * is that the viewer can see it tick.
  * @param {number} seconds Seconds from now until the edge.
@@ -25,9 +27,14 @@ const countdown = (seconds) => {
   const minutes = Math.floor((seconds % 3600) / 60)
   const secs = Math.floor(seconds % 60)
 
-  if (days > 0) return `${days}d:${hours}h:${minutes}m:${secs}s`
-  return `${hours}h:${minutes}m:${secs}s`
+  const pad = (value) => String(value).padStart(2, '0')
+
+  if (days > 0) return `${days}d ${hours}h ${pad(minutes)}m ${pad(secs)}s`
+  if (hours > 0) return `${hours}h ${pad(minutes)}m ${pad(secs)}s`
+  return `${minutes}m ${pad(secs)}s`
 }
+
+const exactTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 const phaseOf = (now, opens, closes) => (now >= closes ? 'closed' : now >= opens ? 'open' : 'upcoming')
 
@@ -67,11 +74,18 @@ export default function PollTimer({ opensAt, closesAt, onPhaseChange }) {
   if (phase === 'closed') return <>Final results</>
 
   const upcoming = phase === 'upcoming'
-  const remaining = (upcoming ? opens : closes) - now
+  const edge = upcoming ? opens : closes
+  const remaining = edge - now
 
+  // The countdown says how long; the tooltip says exactly when, for anyone planning around it
   return (
-    <span className={styles.pollTimer}>
-      {upcoming ? 'Opens in' : 'Ends in'} {countdown(remaining)}
-    </span>
+    <time
+      className={styles.pollTimer}
+      dateTime={new Date(edge * 1000).toISOString()}
+      title={`${upcoming ? 'Opens' : 'Ends'} ${exactTime.format(edge * 1000)}`}
+    >
+      <ClockIcon size={13} weight="bold" aria-hidden="true" />
+      {upcoming ? 'Opens in' : 'Ends in'} <span className={styles.pollTimer__value}>{countdown(remaining)}</span>
+    </time>
   )
 }

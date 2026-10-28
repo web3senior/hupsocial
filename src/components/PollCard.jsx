@@ -292,43 +292,42 @@ export default function PollCard({ pollRef }) {
         })}
       </ul>
 
-      {/* The window as a bar as well as a number: the countdown says how long is left, the
-          fill says how much of the poll is already spent — which is the part that tells a
-          reader whether it is worth coming back to. An upcoming poll fills toward the moment
-          it opens instead. */}
-      {status.key !== 'closed' && (
-        <ProgressBar
-          className={styles.pollCard__window}
-          startsAt={status.key === 'upcoming' ? poll.opened_at : poll.opens_at}
-          endsAt={status.key === 'upcoming' ? poll.opens_at : poll.closes_at}
-          height={4}
-          color={status.key === 'upcoming' ? 'var(--poll-upcoming)' : 'var(--poll-open)'}
-          animated={status.key === 'open'}
-          label={isCounting ? <span className={styles.pollCard__meta}>Counting your vote…</span> : undefined}
-          hint={
-            <span className={styles.pollCard__meta}>
-              <PollTimer opensAt={poll.opens_at} closesAt={poll.closes_at} onPhaseChange={refreshPhase} />
-            </span>
-          }
-          // The bar's own clock is the last thing still running when a poll ends with nobody
-          // touching the page — it hands the card back its re-render
-          onComplete={refreshPhase}
-          ariaLabel="Voting window"
-        />
-      )}
-
       <footer className={styles.pollCard__footer}>
-        {/* The running total never reveals the split, so it shows before a ballot as well as
-            after — a poll with 300 votes on it is worth voting in, and that was invisible */}
-        <Link href={`/polls/${chainId}/${pollId}`} className={styles.pollCard__total}>
-          {formatVotes(poll.total_votes)} {showResults ? 'total ' : ''}
-          {Number(poll.total_votes) === 1 ? 'vote' : 'votes'}
-        </Link>
+        <div className={styles.pollCard__footerRow}>
+          {/* The running total never reveals the split, so it shows before a ballot as well as
+              after — a poll with 300 votes on it is worth voting in, and that was invisible */}
+          <Link href={`/polls/${chainId}/${pollId}`} className={styles.pollCard__total}>
+            {formatVotes(poll.total_votes)} {showResults ? 'total ' : ''}
+            {Number(poll.total_votes) === 1 ? 'vote' : 'votes'}
+          </Link>
 
-        {status.key === 'closed' && (
-          <span className={styles.pollCard__meta}>
-            <PollTimer opensAt={poll.opens_at} closesAt={Number(poll.closed_at) > 0 ? poll.closed_at : poll.closes_at} onPhaseChange={refreshPhase} />
+          {isCounting && <span className={styles.pollCard__meta}>Counting your vote…</span>}
+
+          <span className={clsx(styles.pollCard__meta, styles.pollCard__timer)}>
+            <PollTimer
+              opensAt={poll.opens_at}
+              closesAt={status.key === 'closed' && Number(poll.closed_at) > 0 ? poll.closed_at : poll.closes_at}
+              onPhaseChange={refreshPhase}
+            />
           </span>
+        </div>
+
+        {/* The window as a bar as well as a number: the countdown says how long is left, the
+            fill says how much of the poll is already spent — which is the part that tells a
+            reader whether it is worth coming back to. An upcoming poll fills toward the moment
+            it opens instead. */}
+        {status.key !== 'closed' && (
+          <ProgressBar
+            startsAt={status.key === 'upcoming' ? poll.opened_at : poll.opens_at}
+            endsAt={status.key === 'upcoming' ? poll.opens_at : poll.closes_at}
+            height={6}
+            color={status.key === 'upcoming' ? 'var(--poll-upcoming)' : 'var(--poll-open)'}
+            animated={status.key === 'open'}
+            // The bar's own clock is the last thing still running when a poll ends with nobody
+            // touching the page — it hands the card back its re-render
+            onComplete={refreshPhase}
+            ariaLabel="Voting window"
+          />
         )}
 
         {/* Only while it still matters: after a poll closes, why someone couldn't vote is

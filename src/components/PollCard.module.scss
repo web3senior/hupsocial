@@ -61,6 +61,7 @@
     }
   }
 
+  /* Long polls scroll inside the card rather than pushing the feed a screen down */
   &__options {
     display: flex;
     flex-direction: column;
@@ -68,6 +69,11 @@
     list-style: none;
     margin: 0;
     padding: 0;
+    max-height: 26rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
   }
 
   &__option {
@@ -157,18 +163,26 @@
     opacity: 0.85;
   }
 
-  /* Slimmer than a result bar and pinned above the footer: it measures the clock, not the
-     vote, and must never be mistaken for a tally */
-  &__window {
-    gap: 0.25rem;
-  }
-
+  /* Total, countdown and the window bar read as one block under the options — the bar
+     measures the clock, not the vote, so it sits with the timer rather than among the tallies */
   &__footer {
     display: flex;
-    align-items: center;
-    gap: 0.6rem;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-top: 0.25rem;
     font-size: var(--font-size-12);
     color: var(--text-muted, #888);
+  }
+
+  &__footerRow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.6rem;
+  }
+
+  &__timer {
+    margin-left: auto;
   }
 
   &__total {
@@ -187,7 +201,6 @@
   }
 
   &__blocked {
-    margin-left: auto;
     color: #b45309;
   }
 

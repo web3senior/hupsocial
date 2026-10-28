@@ -1,4 +1,17 @@
-/* Equal-width digits, so the phrase holds still while the seconds turn over */
 .pollTimer {
-  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  /* Equal-width digits, so the phrase holds still while the seconds turn over */
+  &__value {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--foreground);
+  }
 }
