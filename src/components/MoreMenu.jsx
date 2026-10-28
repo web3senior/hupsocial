@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useDisconnect } from 'wagmi'
 import clsx from 'clsx'
-import { ArrowLeftIcon, ArticleIcon, BookIcon, CalendarDotsIcon, CaretRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, FadersHorizontalIcon, GasPumpIcon, HardDrivesIcon, HeadCircuitIcon, HeartIcon, MoonIcon, QuestionIcon, RobotIcon, ScrollIcon, SealCheckIcon, ShieldCheckIcon, StackIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
+import { ArrowLeftIcon, ArticleIcon, BookIcon, BridgeIcon, CalendarDotsIcon, CaretRightIcon, ChatCenteredDotsIcon, DownloadSimpleIcon, FadersHorizontalIcon, GasPumpIcon, HardDrivesIcon, HeadCircuitIcon, HeartIcon, MoonIcon, QuestionIcon, RobotIcon, ScrollIcon, SealCheckIcon, ShieldCheckIcon, StackIcon, SunIcon, TerminalWindowIcon } from '@phosphor-icons/react'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { MORE_NAV_ITEMS_SCHEMA } from '@/stores/useSidebarStore'
 import { useSolanaWalletStore } from '@/stores/useSolanaWalletStore'
@@ -28,6 +28,7 @@ const SUBMENUS = {
     items: [
       ...MORE_NAV_ITEMS_SCHEMA,
       { id: 'networks', name: 'Networks', path: '/networks', icon: StackIcon },
+      { id: 'bridge', name: 'LUKSO Bridge', path: '/bridge', icon: BridgeIcon },
     ],
   },
   activity: {
@@ -135,7 +136,7 @@ export default function MoreMenu({ trigger, placement }) {
                   className={clsx(styles['more-menu__row'], isActivePath(pathname, '/bridge') && styles['more-menu__row--active'])}
                   aria-current={isActivePath(pathname, '/bridge') ? 'page' : undefined}
                 >
-                  Bridge
+                  LUKSO Bridge
                 </Link>
                 <SubmenuRow id="explore" label="Explore" onOpen={openSubmenu} />
                 <SubmenuRow id="activity" label="Your activity" onOpen={openSubmenu} />
