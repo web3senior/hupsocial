@@ -10,6 +10,16 @@ const CLOSE_DELAY = 60
 // Touch has no hover, so a press reveals the bubble instead — on its own timer, so it
 // never lingers over whatever that same press opened (a native select picker, a panel)
 const TOUCH_DURATION = 2600
+// Once one tooltip has shown, sliding to a neighbour (Like → Repost) shows its bubble at
+// once rather than making the user wait the full delay again. The warmth lasts this long
+// after the last bubble closes, then the next hover waits from scratch.
+const WARM_WINDOW = 300
+
+// Shared across every Tooltip: the one bubble on screen, and when the last one closed
+let activeClose = null
+let lastClosedAt = 0
+
+const isWarm = () => activeClose !== null || Date.now() - lastClosedAt < WARM_WINDOW
 
 /**
  * Tooltip
@@ -47,6 +57,7 @@ const Tooltip = forwardRef(function Tooltip(
   const closeTimerRef = useRef(null)
   const detachRef = useRef(null)
   const pointerFocusRef = useRef(false)
+  const closeRef = useRef(null)
 
   const clearTimers = useCallback(() => {
     clearTimeout(openTimerRef.current)
@@ -60,13 +71,22 @@ const Tooltip = forwardRef(function Tooltip(
     detachRef.current?.()
     detachRef.current = null
     const el = panelRef.current
-    if (el?.matches(':popover-open')) el.hidePopover()
+    if (el?.matches(':popover-open')) {
+      el.hidePopover()
+      lastClosedAt = Date.now()
+    }
+    if (activeClose === closeRef.current) activeClose = null
   }, [clearTimers])
 
   const open = useCallback(() => {
     clearTimers()
     const el = panelRef.current
     if (!el || el.matches(':popover-open')) return
+
+    // A warm neighbour opens before the previous bubble's close timer fires — hand over
+    // now so two bubbles never overlap
+    if (activeClose && activeClose !== closeRef.current) activeClose()
+    activeClose = closeRef.current
 
     // Nothing to measure until showPopover() lands — a closed popover is display:none
     // and reports a zero box — so it opens invisible and is placed on the next frame
@@ -96,8 +116,13 @@ const Tooltip = forwardRef(function Tooltip(
 
   const scheduleOpen = useCallback(() => {
     clearTimers()
-    openTimerRef.current = setTimeout(open, delay)
+    openTimerRef.current = setTimeout(open, isWarm() ? 0 : delay)
   }, [clearTimers, delay, open])
+
+  // A stable identity for the shared `activeClose` slot, kept pointing at the latest close
+  useEffect(() => {
+    closeRef.current = close
+  }, [close])
 
   const scheduleClose = useCallback(() => {
     clearTimers()
@@ -125,6 +150,11 @@ const Tooltip = forwardRef(function Tooltip(
       clearTimers()
       detachRef.current?.()
       detachRef.current = null
+      // Unmounting while open would otherwise leave every tooltip warm for good
+      if (activeClose && activeClose === closeRef.current) {
+        activeClose = null
+        lastClosedAt = Date.now()
+      }
     },
     [clearTimers]
   )
