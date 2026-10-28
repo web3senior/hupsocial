@@ -94,6 +94,23 @@
     width: 100%;
   }
 
+  // X's post-page stamp: muted time · date · views, the count alone in the text colour
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.25rem;
+    color: var(--post-action);
+    font-size: 15px;
+
+    &__count {
+      color: var(--foreground);
+      font-weight: 700;
+    }
+  }
+
   &__translateTrigger {
     border: 0;
     background: transparent;

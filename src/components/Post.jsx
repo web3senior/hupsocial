@@ -47,7 +47,7 @@ import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { postToMarkdown, getPostMarkdownUrl } from '@/lib/postMarkdown'
 import { AI_TARGETS, buildPostAiUrl } from '@/lib/aiTargets'
 import useSWR, { useSWRConfig } from 'swr'
-import { getPostStatsKey } from '@/hooks/usePostStats'
+import { getPostStatsKey, usePostStats } from '@/hooks/usePostStats'
 import NativePopover from './ui/NativePopover'
 import Tooltip from './ui/Tooltip'
 import SellItemPopover from './SellItemPopover'
@@ -485,6 +485,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         </main>
 
         <footer className={`${styles.post__footer}`}>
+          {showContent && <PostMeta item={item} createdAt={displayItem?.created_at} />}
           <div
             onClick={(e) => {
               // Only real controls (and open popover panels) keep their clicks — blank
@@ -513,6 +514,43 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         </footer>
       </section>
     </>
+  )
+}
+
+const metaTimeFormatter = new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' })
+const metaDateFormatter = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' })
+const metaViewsFormatter = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
+/**
+ * "6:22 PM · Oct 28, 2026 · 13.4K Views" under the open post, as X stamps its post page. The
+ * views come from the same live stats as the View action, so the two never disagree.
+ * @param {Object} props
+ * @param {Object} props.item The row whose views are counted (a repost counts its own).
+ * @param {string} props.createdAt
+ */
+const PostMeta = ({ item, createdAt }) => {
+  const { stats } = usePostStats(item)
+  const date = createdAt ? new Date(createdAt) : null
+  const hasDate = date && !Number.isNaN(date.getTime())
+  const views = Number(stats?.total_views ?? item?.total_views) || 0
+
+  if (!hasDate && views === 0) return null
+
+  return (
+    <div className={styles.post__meta}>
+      {hasDate && (
+        // Local time differs between the server render and the reader's browser
+        <time dateTime={date.toISOString()} title={date.toLocaleString()} suppressHydrationWarning>
+          {metaTimeFormatter.format(date)} · {metaDateFormatter.format(date)}
+        </time>
+      )}
+      {hasDate && views > 0 && <span aria-hidden="true">·</span>}
+      {views > 0 && (
+        <span>
+          <strong className={styles.post__meta__count}>{metaViewsFormatter.format(views)}</strong> {views === 1 ? 'View' : 'Views'}
+        </span>
+      )}
+    </div>
   )
 }
 
