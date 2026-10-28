@@ -5,24 +5,34 @@ import { useConnection, useReadContract, useSwitchChain, useWriteContract } from
 import { waitForTransactionReceipt } from 'wagmi/actions'
 import { encodeAbiParameters, erc20Abi, hexToString, isAddress, parseUnits, zeroAddress } from 'viem'
 import clsx from 'clsx'
-import { WarningIcon } from '@phosphor-icons/react'
+import { ArrowsDownUpIcon, WarningIcon } from '@phosphor-icons/react'
 import { CONTRACTS, config } from '@/config/wagmi'
-import { appChains } from '@/config/contracts'
+import { appChains, fromEvmNativeUnits, toEvmNativeUnits } from '@/config/contracts'
 import { TIP_TOKENS } from '@/lib/tokens'
 import { searchTokens } from '@/lib/tokenSearch'
 import { trackTip } from '@/lib/tipTracking'
 import { shortTxError } from '@/lib/utils'
+import { useTokenPrice } from '@/hooks/useNativePrice'
 import tipperAbi from '@/abis/HupTipper.json'
 import { toast } from '@/components/NextToast'
 import NativeDialog from './ui/NativeDialog'
 import Profile from './Profile'
 import styles from './TipModal.module.scss'
 
+// Dollar presets when the token has a market price, plain token amounts when it doesn't
 const TIP_PRESETS = [1, 2, 5, 10]
 
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
-// The amount the way the button and the toast both say it — "5 LYX", "0.25 G$"
+// The amount the way the button and the toast both say it — "5 LYX", "0.25 G$". A dollar tip in
+// a pricey coin lands far below 1, where fixed fraction digits would round it to 0, so small
+// amounts keep significant digits instead — "0.0002631 ETH"
 const amountNumber = new Intl.NumberFormat('en', { maximumFractionDigits: 6 })
+const smallAmountNumber = new Intl.NumberFormat('en', { maximumSignificantDigits: 4 })
+const formatAmount = (value) => (Math.abs(value) >= 1 ? amountNumber : smallAmountNumber).format(value)
+const usdNumber = new Intl.NumberFormat('en', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 })
+// Dollars → a plain decimal string parseUnits accepts: standard notation never emits "1e-7",
+// and extra digits past the token's decimals are rounded by parseUnits itself
+const decimalString = new Intl.NumberFormat('en-US', { useGrouping: false, maximumSignificantDigits: 8 })
 
 // An approval only unlocks the send button, so the modal stays open while it mines — but not
 // past this, or a transaction nobody will ever see mined keeps the button locked forever
@@ -108,7 +118,9 @@ const encodeErc677TipData = (postId, memo = '0x') =>
  * @param {Function} props.setShowTipModal Clears the open-modal state on close.
  */
 const TipModal = ({ item, setShowTipModal }) => {
-  const [amount, setAmount] = useState('1')
+  // What the user typed, in dollars or in token units depending on `unit`
+  const [amountInput, setAmountInput] = useState('1')
+  const [unit, setUnit] = useState('usd')
   const [paymentChoice, setPaymentChoice] = useState('native')
   const [customToken, setCustomToken] = useState('')
   const [tokenSearchResults, setTokenSearchResults] = useState([])
@@ -223,8 +235,30 @@ const TipModal = ({ item, setShowTipModal }) => {
     : customSymbol || 'tokens'
   const decimals = isTokenTip ? tokenDecimals : nativeCurrency?.decimals ?? 18
 
+  // Native and curated tokens are priced straight away; a custom one once its address is valid
+  const { price, isLoading: isPriceLoading } = useTokenPrice(isTokenTip && !tokenAddress ? null : chainId, isTokenTip ? tokenAddress : null)
+  const hasPrice = Boolean(price && price > 0)
+  // Dollar mode holds while the price loads — the amount just stays unresolved (send locked) —
+  // rather than briefly reading a "$1" as 1 whole coin
+  const isUsd = unit === 'usd' && (hasPrice || isPriceLoading)
+
+  // A token with no market price can only be tipped in its own units. A dollar figure typed
+  // before that was known means nothing in those units, so it reads as empty rather than being
+  // reinterpreted — "$1" never becomes 1 whole token
+  const shownInput = unit === 'usd' && !isUsd ? '' : amountInput
+  const shownUnit = isUsd ? 'usd' : 'token'
+  const handleChangeAmount = (value) => {
+    setUnit(shownUnit)
+    setAmountInput(value)
+  }
+
+  const inputNumber = Number(shownInput)
+  const isValidInput = shownInput.trim() !== '' && Number.isFinite(inputNumber) && inputNumber > 0
+  // The token amount is the source of truth for the transaction; dollars only derive it
+  const amount = !isValidInput ? '' : isUsd ? (hasPrice ? decimalString.format(inputNumber / price) : '') : shownInput.trim()
   const parsedAmount = Number(amount)
-  const isValidAmount = Number.isFinite(parsedAmount) && parsedAmount > 0
+  const isValidAmount = amount !== '' && Number.isFinite(parsedAmount) && parsedAmount > 0
+  const usdValue = isValidAmount && hasPrice ? parsedAmount * price : null
   let amountUnits = null
   if (isValidAmount && decimals !== undefined) {
     try {
@@ -266,7 +300,27 @@ const TipModal = ({ item, setShowTipModal }) => {
     if (isWrongChain) await switchChain.mutateAsync({ chainId })
   }
 
-  const amountLabel = `${amountNumber.format(parsedAmount)} ${symbol}`
+  const amountLabel = `${formatAmount(parsedAmount)} ${symbol}`
+  const sendLabel = isUsd && usdValue !== null ? `${usdNumber.format(usdValue)} (${amountLabel})` : amountLabel
+
+  const handleChangeToken = (value) => {
+    setPaymentChoice(value)
+    // Every token starts over in dollars at $1 — never carry "1 ETH" over as "1 WBTC"
+    setUnit('usd')
+    setAmountInput('1')
+  }
+
+  // Flip the field between dollars and token units, carrying the current value across
+  const handleToggleUnit = () => {
+    if (!hasPrice) return
+    if (isUsd) {
+      setUnit('token')
+      setAmountInput(isValidAmount ? decimalString.format(parsedAmount) : '')
+    } else {
+      setUnit('usd')
+      setAmountInput(usdValue !== null ? String(Number(usdValue.toFixed(2))) : '')
+    }
+  }
 
   // Mount = open / unmount = close, matching the NewPost dialog contract
   useEffect(() => {
@@ -339,7 +393,11 @@ const TipModal = ({ item, setShowTipModal }) => {
 
       // The recipient is resolved onchain by HupTipper from the post's creator — the client
       // only commits the post id, amount, and token
-      const args = [address, BigInt(item.id), amountUnits, tokenAddress ?? zeroAddress, isLsp7, '0x']
+      // HupTipper checks the amount against msg.value, which some chains (Hedera) count in fewer
+      // decimals than the wallet sends — so a native amount goes in contract units, and the value
+      // is rounded to the same precision so the two still match
+      const contractAmount = isTokenTip ? amountUnits : toEvmNativeUnits(chainId, amountUnits)
+      const args = [address, BigInt(item.id), contractAmount, tokenAddress ?? zeroAddress, isLsp7, '0x']
 
       // Always the connected wallet, never the session key — it holds no funds
       const hash = await writeContractAsync({
@@ -348,7 +406,7 @@ const TipModal = ({ item, setShowTipModal }) => {
         functionName: 'tip',
         args,
         chainId,
-        ...(isTokenTip ? {} : { value: amountUnits }),
+        ...(isTokenTip ? {} : { value: fromEvmNativeUnits(chainId, contractAmount) }),
       })
       handOff(hash)
     } catch (err) {
@@ -393,7 +451,7 @@ const TipModal = ({ item, setShowTipModal }) => {
 
         <div className={styles.tipModal__field}>
           <label htmlFor="tipModalToken">Token</label>
-          <select id="tipModalToken" value={paymentChoice} onChange={(e) => setPaymentChoice(e.target.value)}>
+          <select id="tipModalToken" value={paymentChoice} onChange={(e) => handleChangeToken(e.target.value)} disabled={isBusy}>
             <option value="native">{`${nativeCurrency?.name || 'Native'} (${nativeCurrency?.symbol || ''})`}</option>
             {tipTokens.map((token) => (
               <option key={token.address} value={`token:${token.address}`}>
@@ -451,27 +509,51 @@ const TipModal = ({ item, setShowTipModal }) => {
         <div className={styles.tipModal__field}>
           <label htmlFor="tipModalAmount">Amount</label>
           <div className={styles.tipModal__amount}>
+            {isUsd && <span className={styles.tipModal__amountCurrency}>$</span>}
             <input
               type="number"
               id="tipModalAmount"
-              value={amount}
+              value={shownInput}
               min={0}
               step="any"
               inputMode="decimal"
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => handleChangeAmount(e.target.value)}
               placeholder="0"
+              disabled={isBusy}
             />
-            <span className={styles.tipModal__amountSymbol}>{symbol}</span>
+            {!isUsd && <span className={styles.tipModal__amountSymbol}>{symbol}</span>}
+          </div>
+          <div className={styles.tipModal__conversion}>
+            <span aria-live="polite">
+              {isUsd
+                ? isValidAmount
+                  ? `≈ ${amountLabel}`
+                  : isPriceLoading
+                  ? `Fetching ${symbol} price…`
+                  : `Enter an amount in dollars`
+                : usdValue !== null
+                ? `≈ ${usdNumber.format(usdValue)}`
+                : hasPrice
+                ? `Enter an amount in ${symbol}`
+                : `No market price for ${symbol} — amount is in ${symbol}`}
+            </span>
+            {hasPrice && (
+              <button type="button" className={styles.tipModal__unitToggle} onClick={handleToggleUnit} disabled={isBusy}>
+                <ArrowsDownUpIcon size={14} />
+                {isUsd ? `Enter in ${symbol}` : 'Enter in USD'}
+              </button>
+            )}
           </div>
           <div className={styles.tipModal__presets}>
             {TIP_PRESETS.map((preset) => (
               <button
                 key={preset}
                 type="button"
-                className={clsx(styles.tipModal__preset, parsedAmount === preset && styles['tipModal__preset--active'])}
-                onClick={() => setAmount(`${preset}`)}
+                className={clsx(styles.tipModal__preset, inputNumber === preset && styles['tipModal__preset--active'])}
+                onClick={() => handleChangeAmount(`${preset}`)}
+                disabled={isBusy}
               >
-                {preset} {symbol}
+                {isUsd ? usdNumber.format(preset) : `${preset} ${symbol}`}
               </button>
             ))}
           </div>
@@ -491,7 +573,7 @@ const TipModal = ({ item, setShowTipModal }) => {
             onClick={handleTip}
             disabled={isBusy || amountUnits === null || isSelf || !tipperAddress}
           >
-            {isBusy ? 'Sending…' : isValidAmount ? `Send ${amountLabel}` : `Send`}
+            {isBusy ? 'Sending…' : isValidAmount ? `Send ${sendLabel}` : `Send`}
           </button>
         )}
       </footer>
