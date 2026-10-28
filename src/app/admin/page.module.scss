@@ -580,6 +580,49 @@
     padding: 3rem 0;
   }
 
+  &__gate-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 3rem;
+
+    .admin-contracts__gate {
+      padding-bottom: 0;
+    }
+  }
+
+  // A feedback ticket or a post report: a meta line, then text that may run long
+  &__entry-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__entry-title {
+    font-size: 0.95rem;
+  }
+
+  &__entry-body {
+    margin: 0;
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  &__entry-quote {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    width: 100%;
+    margin: 0;
+    padding: 0.6rem 0.8rem;
+    border-left: 3px solid var(--border);
+    border-radius: 0.4rem;
+    background: var(--surface-muted);
+  }
+
   &__tools {
     display: flex;
     flex-wrap: wrap;

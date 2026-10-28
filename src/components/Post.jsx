@@ -88,6 +88,7 @@ import View from './ui/View'
 import Bookmark from './ui/Bookmark'
 import Share from './ui/Share'
 import { PostSkeleton } from './ui/PostSkeleton'
+import { isVeiledByReports } from '@/lib/reports'
 import clsx from 'clsx'
 import styles from './Post.module.scss'
 // Encrypted community content (posts, comments, quoted cards — everything inside encrypted
@@ -148,7 +149,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const isRepost = item.is_repost !== null && item.is_repost !== undefined
   // Flagged posts are never withheld — the content still renders, blurred behind a veil until
   // the viewer opts in. Revealing is per-post and resets on remount.
-  const isActioned = Number(item.actioned_reports || 0) >= 3 || Number(item.moderation_flagged || 0) === 1
+  const isActioned = isVeiledByReports(item.actioned_reports) || Number(item.moderation_flagged || 0) === 1
   const [isRevealed, setIsRevealed] = useState(false)
   const isVeiled = isActioned && !isRevealed
   const repostedPostId = isRepost ? Number(item.is_repost) : null

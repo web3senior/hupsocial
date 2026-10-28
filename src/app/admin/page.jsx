@@ -40,6 +40,9 @@ import ScheduleForwarderSection from './_components/ScheduleForwarderSection'
 import RelayerSweepSection from './_components/RelayerSweepSection'
 import UsernamesSection from './_components/UsernamesSection'
 import RolesSection from './_components/RolesSection'
+import FeedbackSection from './_components/FeedbackSection'
+import ReportsSection from './_components/ReportsSection'
+import useAdminPass from './_components/useAdminPass'
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESS?.toLowerCase()
 
@@ -121,6 +124,8 @@ const SECTIONS = [
   { id: 'relayer', label: 'Relayer', icon: '⛽', contractKey: null },
   { id: 'usernames', label: 'Usernames', icon: '🏷️', contractKey: null, offchain: true },
   { id: 'hupsters', label: 'Hupsters', icon: '📣', contractKey: null, offchain: true },
+  { id: 'feedback', label: 'Feedback', icon: '💬', contractKey: null, offchain: true },
+  { id: 'reports', label: 'Reports', icon: '🚩', contractKey: null, offchain: true },
   { id: 'forwarders', label: 'Forwarders', icon: '✍️', contractKey: 'forwarder' },
   { id: 'scheduling', label: 'Scheduling', icon: '⏰', contractKey: 'scheduleForwarder' },
   { id: 'sell-fees', label: 'Sell Fees', icon: '💸', contractKey: 'sell' },
@@ -271,6 +276,7 @@ export default function Page() {
   const [taskTxStates, setTaskTxStates] = useState({})
 
   const isAdmin = isConnected && address?.toLowerCase() === ADMIN_WALLET
+  const adminPass = useAdminPass(isAdmin ? address : undefined)
 
   // The chains a tab renders: those running that contract, narrowed by the chain chip. Tab
   // counts read from the same helper, so picking a chain also shows which groups it is in.
@@ -292,12 +298,12 @@ export default function Page() {
 
   // The strip scrolls sideways, so a deep-linked tab near the end opens off screen — pull it back
   // in. Instant, because the app sets scroll-behavior: smooth globally and this would animate.
-  // `isAdmin` is a dependency because the strip only mounts once the gate below opens: on a deep
-  // link the hash resolves while the page still shows "connect your wallet", and without it this
-  // would run against a ref that is still null.
+  // `isAdmin` and the pass are dependencies because the strip only mounts once the gates below
+  // open: on a deep link the hash resolves while the page still shows "connect your wallet" or
+  // "sign to continue", and without them this would run against a ref that is still null.
   useEffect(() => {
     tabsRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' })
-  }, [activeSection, isAdmin])
+  }, [activeSection, isAdmin, adminPass.unlocked])
 
   // Read the native-coin balance of every deployed contract on a chain. This is the money the
   // withdraw forms further down move out, so it doubles as a pre-flight check before signing.
@@ -2636,6 +2642,34 @@ export default function Page() {
     )
   }
 
+  // Being connected as the admin wallet is not proof on its own: one signature opens the page
+  // and the private reads behind it (feedback, reports) for this tab.
+  if (!adminPass.unlocked) {
+    return (
+      <>
+        <PageTitle name="Admin" />
+        <div className={clsx(styles['admin-contracts'], 'ms-motion-slideDownIn')}>
+          <div className={clsx('__container', styles['admin-contracts__container'])} data-width="xxlarge">
+            <div className={styles['admin-contracts__gate-panel']}>
+              <p className={styles['admin-contracts__gate']}>Sign once with the admin wallet to open this page. The pass lasts 8 hours in this tab.</p>
+              <button
+                type="button"
+                onClick={adminPass.unlock}
+                disabled={adminPass.signing}
+                className={clsx(styles['admin-contracts__button'], styles['admin-contracts__button--primary'])}
+              >
+                {adminPass.signing ? 'Signing…' : 'Sign to continue'}
+              </button>
+              {adminPass.error && (
+                <div className={clsx(styles['admin-contracts__validation'], styles['admin-contracts__validation--error'])}>{adminPass.error}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       <PageTitle name="Admin" />
@@ -2811,6 +2845,10 @@ export default function Page() {
           {activeSection === 'usernames' && <UsernamesSection />}
 
           {activeSection === 'hupsters' && <RolesSection />}
+
+          {activeSection === 'feedback' && <FeedbackSection adminFetch={adminPass.adminFetch} />}
+
+          {activeSection === 'reports' && <ReportsSection adminFetch={adminPass.adminFetch} />}
 
           {activeSection === 'scheduling' && <ScheduleForwarderSection chains={visibleChains('scheduleForwarder')} />}
 

@@ -13,6 +13,7 @@
 import { getPostById, getPostThread, getProfile } from '@/lib/api'
 import { previewableLink } from '@/lib/linkPreview'
 import { resolveLinkPreview } from '@/lib/linkPreviewServer'
+import { isVeiledByReports } from '@/lib/reports'
 import {
   getEmbedBodyText,
   getEmbedMediaItems,
@@ -30,7 +31,7 @@ const HTML_HEADERS = { 'Content-Type': 'text/html; charset=utf-8' }
 function isWithheld(row) {
   return (
     Number(row?.is_deleted || 0) === 1 ||
-    Number(row?.actioned_reports || 0) >= 3 ||
+    isVeiledByReports(row?.actioned_reports) ||
     Number(row?.moderation_flagged || 0) === 1
   )
 }

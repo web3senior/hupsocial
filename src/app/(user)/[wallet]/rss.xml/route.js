@@ -3,6 +3,7 @@ import { isWalletAddress, normalizeAddress, shortAddress } from '@/lib/address'
 import pool from '@/lib/db'
 import { communityJoin } from '@/lib/communityJoin'
 import { summarizePost } from '@/lib/postSummary'
+import { isVeiledByReports } from '@/lib/reports'
 
 /**
  * @file (user)/[wallet]/rss.xml/route.js
@@ -94,7 +95,7 @@ function renderItem(row, authorName) {
 
   /* The app veils these until the viewer taps through; a reader has no veil, so it gets the
      link instead of the words. */
-  const isVeiled = Number(row.moderation_flagged || 0) === 1 || Number(row.actioned_reports || 0) >= 3
+  const isVeiled = Number(row.moderation_flagged || 0) === 1 || isVeiledByReports(row.actioned_reports)
   const text = isVeiled
     ? 'This post is behind a content warning. Open it on Hup to view it.'
     : summarizePost({ ...row, content, display_name: authorName }, POST_TEXT_MAX)
