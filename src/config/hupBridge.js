@@ -28,7 +28,7 @@ export const BRIDGE_SOURCES = [
   { chain: soneium, vault: '', confirmations: 10 },
   { chain: monad, vault: '', confirmations: 10 },
   { chain: arc, vault: '', confirmations: 10 },
-  { chain: robinhood, vault: '', confirmations: 20 },
+  { chain: robinhood, vault: '0x744e42085b8331BfACb212D55042BE9328325BB8', confirmations: 20 },
 ].filter(({ vault }) => vault)
 
 // How deep a LUKSO burn must be before the signer attests its release.

@@ -10,7 +10,7 @@ import styles from './BridgeAnimation.module.scss'
 const chains = [
   { name: 'Ethereum', logo: '/networks/ethereum.svg' },
   { name: 'Base', logo: '/networks/base.svg' },
-  { name: 'Arbitrum', logo: '/networks/arbitrum.svg' },
+  { name: 'Robinhood', logo: '/networks/robinhood-chain.svg' },
   { name: 'Other EVM chains' },
 ]
 const lanes = [28, 76, 124, 172]
