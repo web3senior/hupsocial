@@ -192,7 +192,8 @@ export default function BridgePanel() {
   const [token, setToken] = useState(NATIVE_TOKEN)
   const [amount, setAmount] = useState('')
   const [recipientDraft, setRecipient] = useState('')
-  const [remember, setRemember] = useState(true)
+  // Off by default: the wallet is asked to approve exactly the amount being bridged.
+  const [remember, setRemember] = useState(false)
   const [lookup, setLookup] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -463,7 +464,7 @@ export default function BridgePanel() {
             </dl>}
 
             {showRemember && <label className={styles.remember} htmlFor="hup-bridge-remember">
-              <span>Skip approval for future {info.symbol} bridges<small>Your next bridge is one transaction</small></span>
+              <span>Approve unlimited {info.symbol}<small>{remember ? `Future ${info.symbol} bridges skip the approval step` : `Approves exactly ${amount.trim()} ${info.symbol}`}</small></span>
               <ToggleSwitch id="hup-bridge-remember" checked={remember} disabled={busyNow} onChange={(event) => setRemember(event.target.checked)} />
             </label>}
 
