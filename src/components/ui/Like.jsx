@@ -243,6 +243,7 @@ export const Like = ({ post, onUpdate }) => {
     const previousData = interactionState
     const nextCount = liked ? previousData.likeCount + 1 : Math.max(0, previousData.likeCount - 1)
     mutate({ isLiked: liked, likeCount: nextCount, isProcessing: true }, { revalidate: false })
+    const pending = toast(liked ? 'Liking…' : 'Removing like…', 'loading')
 
     try {
       const build = liked ? hupInstruction.like : hupInstruction.unlike
@@ -255,9 +256,11 @@ export const Like = ({ post, onUpdate }) => {
       markLikeOverride(actor, post.network_id, post.id, liked)
       mutate((prev) => ({ ...prev, isProcessing: false }), { revalidate: true })
       if (typeof onUpdate === 'function') onUpdate(post.id, { is_liked: liked ? 1 : 0, total_likes: nextCount })
-      toast(`${liked ? 'Liked' : 'Like removed'}${sponsored ? '' : ' onchain!'}`, 'success')
+      const done = `${liked ? 'Liked' : 'Like removed'}${sponsored ? '' : ' onchain!'}`
+      if (!pending.update(done, 'success')) toast(done, 'success')
     } catch (err) {
       console.error(`${liked ? 'Like' : 'Unlike'} failed:`, err)
+      pending.dismiss()
       toast(shortTxError(err, liked ? 'Could not like post' : 'Could not remove like'), 'error')
       mutate(previousData, { revalidate: false })
     }
@@ -290,6 +293,8 @@ export const Like = ({ post, onUpdate }) => {
     // The optimistic flip is the pending feedback — no loader swap, so the icon and
     // counter never jump while the action settles
     mutate({ isLiked: liked, likeCount: nextCount, isProcessing: true }, { revalidate: false })
+    // The relay round trip takes a few seconds, so the tap says it is in flight
+    const pending = toast(liked ? 'Liking…' : 'Removing like…', 'loading')
 
     const settle = () => {
       // Pin the optimistic state past the cidex indexing lag so the revalidation cannot
@@ -301,7 +306,8 @@ export const Like = ({ post, onUpdate }) => {
         onUpdate(post.id, { is_liked: liked ? 1 : 0, total_likes: nextCount })
       }
 
-      toast(liked ? 'Liked' : 'Like removed', 'success')
+      const done = liked ? 'Liked' : 'Like removed'
+      if (!pending.update(done, 'success')) toast(done, 'success')
     }
 
     try {
@@ -341,6 +347,8 @@ export const Like = ({ post, onUpdate }) => {
       }
 
       pendingActionRef.current = liked ? 'like' : 'unlike'
+      // The wallet path reports its own progress below and on the receipt
+      pending.dismiss()
 
       await ensureWalletChain()
       await writeContractAsync({
@@ -356,6 +364,7 @@ export const Like = ({ post, onUpdate }) => {
     } catch (err) {
       console.error(`${liked ? 'Like' : 'Unlike'} failed:`, err)
       pendingActionRef.current = null
+      pending.dismiss()
       mutate(previousData, { revalidate: false })
       if (liked && isGaslessEnabled(chainId)) {
         addToBatch(actor, post.network_id, post.id)

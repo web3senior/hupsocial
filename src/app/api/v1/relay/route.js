@@ -390,6 +390,31 @@ export async function POST(request) {
           try { reason = new ethers.Interface(forwarderAbi).parseError(simErr.data)?.name ?? reason } catch {}
         }
 
+        // The forwarder swallows the target's revert and reports a bare FailedCall. Replaying the
+        // inner call as the forwarder (ERC-2771: sender appended to calldata) recovers the
+        // target's own custom error, which is the one worth showing.
+        if (reason === 'FailedCall') {
+          try {
+            await provider.call({
+              from: forwarderAddress,
+              to: fullRequest.to,
+              data: ethers.concat([fullRequest.data, fullRequest.from]),
+              gasLimit: BigInt(fullRequest.gas),
+            })
+          } catch (innerErr) {
+            const innerData = innerErr.data ?? innerErr.info?.error?.data
+            for (const iface of [hupInterface, pollsInterface]) {
+              try {
+                const name = iface.parseError(innerData)?.name
+                if (name) {
+                  reason = name
+                  break
+                }
+              } catch {}
+            }
+          }
+        }
+
         // For InvalidSigner: read the forwarder's actual EIP-712 domain to surface mismatches.
         if (reason === 'ERC2771ForwarderInvalidSigner') {
           // Another device may have confirmed a request after the nonce check above.
