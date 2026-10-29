@@ -28,6 +28,12 @@ Build each update in a new release directory with the production environment lin
 
 Changing `NEXT_PUBLIC_*` values requires rebuilding. Shared runtime secret changes require a service restart. Use versioned secure backups for environment changes so a release rollback can restore compatible configuration.
 
+### User blocks migration
+
+Apply `deploy/migrations/20261029-user-blocks.sql` to the app database before activating a release with database-backed blocking. It creates the `user_blocks` table with a wallet-pair primary key and case-sensitive address storage. EVM addresses are normalized by the app; Solana addresses retain their case. The migration is additive and safe to leave in place if the app release is rolled back.
+
+Block/Unblock updates require a wallet signature and consume a single-use authentication nonce in the same database transaction as the write. Block lists are read from MySQL; the previous browser-only list is no longer used.
+
 ## Scheduled work
 
 The repository has an author-authenticated scheduled-post delivery endpoint, but no Vercel cron configuration or general cron-authenticated delivery endpoint was found during deployment preparation. Do not attach a privileged timer to that endpoint or trigger deliveries as a health check. Confirm any external scheduler/indexer configuration separately before retiring Vercel.

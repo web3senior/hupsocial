@@ -4,6 +4,7 @@ import { Spinner } from '@/components/Loading'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import clsx from 'clsx'
 import { useBlockedUsers } from '@/hooks/useBlockedUsers'
+import { usePostStore } from '@/stores/usePostStore'
 import { getStatuses } from '@/lib/api'
 import { useFeedTabCache } from '@/hooks/useFeedTabCache'
 import Profile from '@/components/Profile'
@@ -21,10 +22,12 @@ const STATUSES_PAGE_SIZE = 20
  * many-users list.
  */
 export default function StatusFeedTab() {
+  const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
+  const appliedRefreshRef = useRef(feedRefreshNonce)
+  const { address, isBlocked } = useBlockedUsers()
   // Switching tabs away and back restores the loaded statuses and scroll place, like For you
-  const { initialCache, remember, containerRef, containerStyle, cardStyle } = useFeedTabCache('status', null)
+  const { initialCache, remember, containerRef, containerStyle, cardStyle } = useFeedTabCache('status', address)
 
-  const { isBlocked } = useBlockedUsers()
   const [statuses, setStatuses] = useState(() => initialCache?.list ?? [])
   const [page, setPage] = useState(initialCache?.page ?? 1)
   const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false)
@@ -33,25 +36,26 @@ export default function StatusFeedTab() {
   const [loadError, setLoadError] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
   // Set once rows are shown, so a cache hydration skips the mount fetch
-  const hasDataRef = useRef(Boolean(initialCache))
+  const hasDataRef = useRef(initialCache ? (address ?? null) : undefined)
 
   useEffect(() => {
     remember({ list: statuses, page, hasMore })
   })
 
   useEffect(() => {
-    if (hasDataRef.current) return
+    if (hasDataRef.current === (address ?? null) && appliedRefreshRef.current === feedRefreshNonce) return
 
     let cancelled = false
 
-    getStatuses(1, STATUSES_PAGE_SIZE)
+    getStatuses(1, STATUSES_PAGE_SIZE, null, address)
       .then((res) => {
         if (cancelled) return
         setStatuses(res?.data || [])
         setHasMore(res?.meta?.hasMore || false)
         setPage(1)
         setLoadError(false)
-        hasDataRef.current = true
+        hasDataRef.current = address ?? null
+        appliedRefreshRef.current = feedRefreshNonce
       })
       .catch((error) => {
         console.error('Status feed error:', error)
@@ -65,7 +69,7 @@ export default function StatusFeedTab() {
     return () => {
       cancelled = true
     }
-  }, [retryNonce])
+  }, [retryNonce, address, feedRefreshNonce])
 
   const handleRetry = useCallback(() => {
     setLoadError(false)
@@ -79,7 +83,7 @@ export default function StatusFeedTab() {
     const nextPage = page + 1
 
     try {
-      const res = await getStatuses(nextPage, STATUSES_PAGE_SIZE)
+      const res = await getStatuses(nextPage, STATUSES_PAGE_SIZE, null, address)
       if (res?.success && res.data.length > 0) {
         setStatuses((prev) => [...prev, ...res.data])
         setPage(nextPage)
@@ -90,7 +94,7 @@ export default function StatusFeedTab() {
     } finally {
       setIsFetching(false)
     }
-  }, [isFetching, hasMore, page])
+  }, [isFetching, hasMore, page, address])
 
   const visibleStatuses = statuses.filter((item) => !isBlocked(item.wallet_address))
 

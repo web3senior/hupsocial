@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import { useBlockedUsers } from '@/hooks/useBlockedUsers'
+import { usePostStore } from '@/stores/usePostStore'
 import { getTrendingPosts } from '@/lib/api'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -29,6 +30,8 @@ const WEEK_WINDOW_HOURS = 168
  * connection is optional and only adds like/bookmark state.
  */
 export default function TrendingFeedTab() {
+  const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
+  const appliedRefreshRef = useRef(feedRefreshNonce)
   const { isBlocked } = useBlockedUsers()
   const mounted = useClientMounted()
   const { address } = useConnection()
@@ -53,7 +56,7 @@ export default function TrendingFeedTab() {
   })
 
   useEffect(() => {
-    if (!mounted || appliedAddressRef.current === (address ?? null)) return
+    if (!mounted || (appliedAddressRef.current === (address ?? null) && appliedRefreshRef.current === feedRefreshNonce)) return
 
     let cancelled = false
 
@@ -66,6 +69,7 @@ export default function TrendingFeedTab() {
         setPage(1)
         setLoadError(false)
         appliedAddressRef.current = address ?? null
+        appliedRefreshRef.current = feedRefreshNonce
       })
       .catch((error) => {
         console.error('Trending feed error:', error)
@@ -79,7 +83,7 @@ export default function TrendingFeedTab() {
     return () => {
       cancelled = true
     }
-  }, [mounted, address, retryNonce])
+  }, [mounted, address, retryNonce, feedRefreshNonce])
 
   const handleRetry = useCallback(() => {
     setLoadError(false)

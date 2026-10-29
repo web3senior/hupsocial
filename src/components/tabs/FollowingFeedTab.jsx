@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
 import { useBlockedUsers } from '@/hooks/useBlockedUsers'
+import { usePostStore } from '@/stores/usePostStore'
 import { getFollowingPosts } from '@/lib/api'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { getActiveChain } from '@/lib/communication'
@@ -26,6 +27,8 @@ const POSTS_PAGE_SIZE = 20
  * a time - see src/lib/followSystem.js).
  */
 export default function FollowingFeedTab() {
+  const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
+  const appliedRefreshRef = useRef(feedRefreshNonce)
   const { isBlocked } = useBlockedUsers()
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
@@ -57,7 +60,7 @@ export default function FollowingFeedTab() {
   useEffect(() => {
     if (!mounted || !isConnected || !address || !activeChain) return
     const params = `${address}|${activeChain.id}`
-    if (appliedParamsRef.current === params) return
+    if (appliedParamsRef.current === params && appliedRefreshRef.current === feedRefreshNonce) return
 
     let cancelled = false
 
@@ -70,6 +73,7 @@ export default function FollowingFeedTab() {
         setPage(1)
         setLoadError(false)
         appliedParamsRef.current = params
+        appliedRefreshRef.current = feedRefreshNonce
       })
       .catch((error) => {
         console.error('Following feed error:', error)
@@ -84,7 +88,7 @@ export default function FollowingFeedTab() {
     return () => {
       cancelled = true
     }
-  }, [mounted, isConnected, address, activeChain?.id, retryNonce])
+  }, [mounted, isConnected, address, activeChain?.id, retryNonce, feedRefreshNonce])
 
   const handleRetry = useCallback(() => {
     setLoadError(false)

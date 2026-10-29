@@ -12,6 +12,8 @@ import { attachSalesUsdTotals } from '@/lib/salesTotals'
 import { getFollowingAddresses } from '@/lib/followSystem'
 import { hasTable } from '@/lib/schema'
 import { HUPSTER_TAG } from '@/lib/roles'
+import { blockedFeedFilter, readUserBlocks } from '@/lib/blockUsers'
+import { normalizeAddress } from '@/lib/address'
 
 export const runtime = 'nodejs'
 
@@ -164,6 +166,10 @@ export async function GET(request) {
     // drive both the page query and the profile total-count query below.
     let whereClause = ` WHERE p.is_comment IS NULL AND p.is_deleted = 0`
     const whereParams = []
+    const blockedAddresses = await readUserBlocks(pool, viewerAddress)
+    const blockFilter = blockedFeedFilter(blockedAddresses)
+    whereClause += blockFilter.sql
+    whereParams.push(...blockFilter.params)
 
     // "Premium" (bazaar) = posts with an active HupBazaar listing. Listings live onchain keyed
     // by postId with no enumeration, so this reads the store_listings discovery index, which
@@ -523,16 +529,18 @@ async function attachLastComments(rows, viewerAddress) {
   // so it rides the same indexes. (A ROW_NUMBER() OVER a tuple-IN-on-expression
   // derived table looked cleaner but is exactly the kind of exotic plan this
   // XAMPP MariaDB 10.4 build crashes on.)
+  const commentBlocks = blockedFeedFilter(await readUserBlocks(pool, viewerAddress), 'c')
   const pickParams = []
   const pickQuery = pairs
     .map(([postId, networkId]) => {
-      pickParams.push(postId, networkId, postId, postId)
+      pickParams.push(postId, networkId, postId, postId, ...commentBlocks.params)
       return `(SELECT c.id, c.network_id, ? AS last_comment_of
         FROM posts c
         WHERE c.network_id = ?
           AND c.is_deleted = 0
           AND (c.content_type = 1 OR c.is_comment IS NOT NULL)
           AND (NULLIF(c.parent_id, 0) = ? OR c.is_comment = ?)
+          ${commentBlocks.sql}
         ORDER BY c.created_at DESC, c.id DESC
         LIMIT 1)`
     })
@@ -692,7 +700,9 @@ async function handleTrendingFeed({ networkId, viewerAddress, page, limit, offse
   // The cached ranking is viewer-independent; which community rows the viewer may see is not.
   // Filter first, then hand out one slot per author, so an author whose top post sits in a
   // room the viewer hasn't joined still trends with their next-best public post.
-  const visible = dedupeAuthors(await keepMemberCommunities(candidates, viewerAddress))
+  const blocked = new Set(await readUserBlocks(pool, viewerAddress))
+  const unblocked = candidates.filter((candidate) => !blocked.has(normalizeAddress(candidate.wallet_address)) && !blocked.has(normalizeAddress(candidate.original_wallet)))
+  const visible = dedupeAuthors(await keepMemberCommunities(unblocked, viewerAddress))
 
   const slice = visible.slice(offset, offset + limit)
   const hasMore = offset + limit < visible.length
@@ -783,7 +793,8 @@ async function getTrendingCandidates(networkId) {
 async function queryTrendingWindow(networkId, windowHours) {
   const params = []
   let query = `
-    SELECT p.id, p.network_id, p.wallet_address, p.community_id, comm.contract_address AS community_contract, agg.score
+    SELECT p.id, p.network_id, p.wallet_address, p.community_id, comm.contract_address AS community_contract, agg.score,
+      (SELECT original.wallet_address FROM posts original WHERE original.network_id = p.network_id AND original.id = p.is_repost LIMIT 1) AS original_wallet
     FROM (
       SELECT post_id, network_id, SUM(pts) AS score
       FROM (

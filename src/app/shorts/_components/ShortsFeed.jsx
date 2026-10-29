@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useConnection } from 'wagmi'
+import { useBlockedUsers } from '@/hooks/useBlockedUsers'
 import { getPosts } from '@/lib/api'
 import { ArrowDownIcon, ArrowUpIcon } from '@phosphor-icons/react'
 import { useMutedPreference, setMutedPreference } from '@/lib/soundPrefs'
@@ -94,7 +94,7 @@ const slideKey = (slide) => `${postKey(slide.post)}:${slide.videoIndex}`
  * changes how they are presented.
  */
 export default function ShortsFeed() {
-  const { address } = useConnection()
+  const { address, isBlocked } = useBlockedUsers()
   const isMuted = useMutedPreference()
 
   const [posts, setPosts] = useState([])
@@ -106,7 +106,7 @@ export default function ShortsFeed() {
 
   /* What the rail actually renders: the loaded posts fanned out one slide per video. Paging,
      merging and dedup stay post-level above — this is presentation only. */
-  const slides = useMemo(() => toSlides(posts), [posts])
+  const slides = useMemo(() => toSlides(posts.filter((post) => !isBlocked(post.wallet_address) && !isBlocked(post.repost_original?.wallet_address))), [posts, isBlocked])
 
   /* Held from mount until the restore below has settled on a slide. Without it a restore that
      has to page forward renders the rail as soon as page 1 lands, so slide 0 appears and starts

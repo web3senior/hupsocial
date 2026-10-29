@@ -691,7 +691,7 @@ const PostDocumentActions = ({ item, close }) => {
 }
 
 const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRemovedChange }) => {
-  const { address: blockViewer, isBlocked, toggleBlock } = useBlockedUsers()
+  const { address: blockViewer, isBlocked, toggleBlock, isSaving: isSavingBlock, isLoading: isLoadingBlocks, error: blockError } = useBlockedUsers()
   const postIsArticle = (() => {
     try {
       const content = typeof item?.content === 'string' ? JSON.parse(item.content) : item?.content
@@ -999,8 +999,9 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
               {blockViewer && !sameAddress(blockViewer, item.wallet_address) && (
                 <MenuItem
                   icon={<FlagIcon size={20} />}
-                  label={isBlocked(item.wallet_address) ? 'Unblock user' : 'Block user'}
-                  description="Hide this user's posts in feeds on this browser"
+                  label={isSavingBlock ? 'Saving…' : isBlocked(item.wallet_address) ? 'Unblock user' : 'Block user'}
+                  disabled={isSavingBlock || isLoadingBlocks || Boolean(blockError)}
+                  description="Hide this user's posts in your feeds"
                   onClick={(event) => {
                     event.stopPropagation()
                     toggleBlock(item.wallet_address)

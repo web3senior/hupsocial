@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { blockedFeedFilter, readUserBlocks } from '@/lib/blockUsers'
 
 export const runtime = 'nodejs'
 
@@ -18,6 +19,7 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 20
     const offset = (page - 1) * limit
     const networkId = searchParams.get('network_id')
+    const viewerAddress = searchParams.get('viewer_address')
 
     let queryParams = []
 
@@ -38,6 +40,10 @@ export async function GET(request) {
       queryParams.push(networkId)
     }
 
+    const blockFilter = blockedFeedFilter(await readUserBlocks(pool, viewerAddress), 's', false)
+    query += blockFilter.sql
+    queryParams.push(...blockFilter.params)
+
     query += ` ORDER BY s.event_timestamp DESC LIMIT ? OFFSET ?`
     queryParams.push(limit + 1, offset)
 
@@ -57,7 +63,7 @@ export async function GET(request) {
         hasMore,
         filter_chain_id: networkId || 'all',
       },
-    })
+    }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     console.error('[STATUSES_FETCH_ERROR]:', error.message)
     return NextResponse.json({ success: false, error: 'Failed to fetch statuses' }, { status: 500 })
