@@ -410,6 +410,70 @@
   }
 }
 
+/* Hover preview — a manual popover in the top layer. JS writes `left` (the feed column's right
+   edge plus a gap), `top` (level with the hovered media, clamped to the viewport) and
+   `--preview-room` (the space from the feed to the viewport edge). Inert, so the card beneath
+   keeps the pointer. */
+.hoverPreview {
+  --preview-max-width: min(70vw, 760px, var(--preview-room, 100vw));
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: fit-content;
+  height: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0;
+  translate: -8px 0;
+  transition:
+    opacity 0.15s ease,
+    translate 0.15s ease,
+    overlay 0.15s ease allow-discrete,
+    display 0.15s ease allow-discrete;
+
+  &:global(:popover-open) {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  /* No room beside the feed: centered over the page, auto margins on both axes */
+  &[data-side='center'] {
+    inset: 0;
+    margin: auto;
+  }
+}
+
+@supports (transition-behavior: allow-discrete) {
+  @starting-style {
+    .hoverPreview:global(:popover-open) {
+      opacity: 0;
+      translate: -8px 0;
+    }
+  }
+}
+
+.hoverPreview__media {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: var(--preview-max-width);
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+
+  /* With the ratio known, fill the largest box the viewport allows rather than the asset's
+     natural size — a small upload should still read as enlarged */
+  &[data-ratio] {
+    width: min(var(--preview-max-width), calc(70vh * var(--media-ratio)));
+    aspect-ratio: var(--media-ratio);
+  }
+}
+
 /* Lightbox Styles */
 /* A NativeDialog in the top layer, so no containing block or stacking context of the post can
    clip it. Percentages, not vw: the viewport unit counts the page scrollbar, the top layer not. */

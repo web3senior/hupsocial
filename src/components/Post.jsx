@@ -282,6 +282,8 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         data-commentable={item.allow_comment ? true : false}
         data-has-comments={hasCommentBelow ? true : false}
         data-removed={isRemoved}
+        /* The gallery's hover preview hangs beside the whole post, not just the media */
+        data-media-anchor=""
       >
         {isRepost && <RepostLabel walletAddress={item.wallet_address} />}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>

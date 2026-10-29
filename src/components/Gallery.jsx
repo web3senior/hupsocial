@@ -29,6 +29,13 @@ const isGif = (item) => item?.mimeType === 'image/gif'
 // frame — a GIF hotlinked from an external URL has no paused rendition to show.
 const supportsStill = (item) => Boolean(item?.cid) && !item.cid.startsWith('http')
 
+// Long enough that a pointer passing over the feed on its way elsewhere opens nothing
+const HOVER_PREVIEW_DELAY = 450
+// Gap between the feed column and the preview, and the margin kept from the viewport edge
+const HOVER_PREVIEW_GAP = 16
+// Below this much room beside the feed the preview gives up on the side and centers instead
+const HOVER_PREVIEW_MIN_ROOM = 240
+
 export default function MediaGallery({ data = [] }) {
   // State for gallery behavior
   const autoplay = useAutoplayPreference()
@@ -57,6 +64,17 @@ export default function MediaGallery({ data = [] }) {
   // players so handing playback from one to the other is explicit rather than accidental.
   const lightboxVideoRefs = useRef([])
   const GATEWAY_URL = primaryGateway()
+
+  /* Hover preview: the media enlarged beside the feed column while a mouse rests on it.
+     `hoverIndex` drives the open state; `previewIndex` holds the content and is only replaced
+     on the next open, so the panel keeps its media through the exit fade. */
+  const [hoverIndex, setHoverIndex] = useState(null)
+  const [previewIndex, setPreviewIndex] = useState(null)
+  const hoverPreviewRef = useRef(null)
+  const hoverPreviewVideoRef = useRef(null)
+  const hoverTimerRef = useRef(null)
+  const hoverAnchorRef = useRef(null)
+  const hoverMediaRef = useRef(null)
 
   const visualData = data.filter((item) => item.type !== 'audio')
   const audioData = data.filter((item) => item.type === 'audio')
@@ -297,6 +315,7 @@ export default function MediaGallery({ data = [] }) {
   const openLightbox = (index, e) => {
     /* Fired from inside the card, whose own click would otherwise open the post */
     e.stopPropagation()
+    hideHoverPreview()
     setSelectedIndex(index)
   }
 
@@ -317,6 +336,84 @@ export default function MediaGallery({ data = [] }) {
     }
     setSelectedIndex(null)
   }
+
+  const hideHoverPreview = useCallback(() => {
+    clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = null
+    setHoverIndex(null)
+  }, [])
+
+  const scheduleHoverPreview = (index, e) => {
+    // Touch and pen have no resting hover — a tap would flash the preview over its own action
+    if (e.pointerType !== 'mouse' || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
+    const item = visualData[index]
+    if (isLightboxOpen || (item?.spoiler && !revealedItems[index])) return
+    /* Posts span the feed column and mark themselves, so their right edge is the feed's; a
+       gallery outside one hangs the preview off the media itself */
+    hoverAnchorRef.current = e.currentTarget.closest('[data-media-anchor]') || e.currentTarget
+    hoverMediaRef.current = e.currentTarget
+    clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = setTimeout(() => {
+      hoverTimerRef.current = null
+      setPreviewIndex(index)
+      setHoverIndex(index)
+    }, HOVER_PREVIEW_DELAY)
+  }
+
+  /* Stuck to the feed column's right edge, sized to the room between it and the viewport edge,
+     with its top level with the hovered media — clamped so it never runs off the top or bottom.
+     Without enough room (a narrow window) it centers over the page instead. Runs once before
+     opening (width) and again once open (height is only measurable then, and again when the
+     media loads, since an asset of unknown ratio only takes its size at that point). */
+  const positionHoverPreview = useCallback(() => {
+    const panel = hoverPreviewRef.current
+    const anchor = hoverAnchorRef.current
+    if (!panel || !anchor) return
+    // clientWidth, not innerWidth: the latter counts the page scrollbar
+    const viewportWidth = document.documentElement.clientWidth
+    const edge = anchor.getBoundingClientRect().right
+    const room = viewportWidth - edge - HOVER_PREVIEW_GAP * 2
+    const beside = room >= HOVER_PREVIEW_MIN_ROOM
+    panel.dataset.side = beside ? 'feed' : 'center'
+    if (!beside) {
+      panel.style.removeProperty('--preview-room')
+      panel.style.left = ''
+      panel.style.top = ''
+      return
+    }
+    panel.style.setProperty('--preview-room', `${room}px`)
+    panel.style.left = `${edge + HOVER_PREVIEW_GAP}px`
+    const mediaTop = hoverMediaRef.current?.getBoundingClientRect().top ?? HOVER_PREVIEW_GAP
+    const lowest = window.innerHeight - panel.offsetHeight - HOVER_PREVIEW_GAP
+    panel.style.top = `${Math.max(HOVER_PREVIEW_GAP, Math.min(mediaTop, lowest))}px`
+  }, [])
+
+  /* The panel is inert, so the card under it keeps its hover and its clicks; a press or a
+     scroll means the reader has moved on from looking, and the preview gets out of the way */
+  useEffect(() => {
+    const panel = hoverPreviewRef.current
+    if (!panel) return
+    if (hoverIndex === null) {
+      if (panel.matches(':popover-open')) panel.hidePopover()
+      hoverPreviewVideoRef.current?.pause()
+      return
+    }
+    if (!panel.matches(':popover-open')) {
+      positionHoverPreview()
+      panel.showPopover()
+      positionHoverPreview()
+    }
+    const video = hoverPreviewVideoRef.current
+    if (video) {
+      const inline = videoRefs.current[hoverIndex]
+      if (inline && Number.isFinite(inline.currentTime)) video.currentTime = inline.currentTime
+      video.play().catch(() => {})
+    }
+    window.addEventListener('scroll', hideHoverPreview, { capture: true, passive: true })
+    return () => window.removeEventListener('scroll', hideHoverPreview, { capture: true })
+  }, [hoverIndex, hideHoverPreview, positionHoverPreview])
+
+  useEffect(() => () => clearTimeout(hoverTimerRef.current), [])
 
   const toggleInlinePlayback = (index, e) => {
     /* The post behind the gallery opens on click — starting a video should not */
@@ -534,6 +631,9 @@ export default function MediaGallery({ data = [] }) {
                   /* An image maximises on tap. A video plays or pauses instead — the control bar's
                      maximise button is the way into the lightbox for it. */
                   onClick={(e) => (item.type === 'video' ? toggleInlinePlayback(i, e) : openLightbox(i, e))}
+                  onPointerEnter={(e) => scheduleHoverPreview(i, e)}
+                  onPointerLeave={hideHoverPreview}
+                  onPointerDown={hideHoverPreview}
                 >
                   {renderMedia(item, i)}
 
@@ -608,6 +708,47 @@ export default function MediaGallery({ data = [] }) {
           ))}
         </div>
       )}
+
+      {/* Hover preview — inert, so it never takes the pointer from the card beneath it */}
+      <div ref={hoverPreviewRef} popover="manual" className={styles.hoverPreview} aria-hidden="true">
+        {previewIndex !== null && visualData[previewIndex] && (() => {
+          const item = visualData[previewIndex]
+          const ratio = getAspectRatio(item)
+          const style = ratio ? { '--media-ratio': ratio } : undefined
+          return item.type === 'video' ? (
+            <video
+              key={`preview-${previewIndex}`}
+              ref={hoverPreviewVideoRef}
+              className={styles.hoverPreview__media}
+              data-ratio={ratio ? '' : undefined}
+              style={style}
+              poster={resolvePosterUrl(item)}
+              /* Muted whatever the card is set to: the inline player may still be running under it */
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              onLoadedMetadata={positionHoverPreview}
+            >
+              {resolveVideoSources(item).map((source) => (
+                <source key={source} src={source} />
+              ))}
+            </video>
+          ) : (
+            <img
+              key={`preview-${previewIndex}`}
+              className={styles.hoverPreview__media}
+              data-ratio={ratio ? '' : undefined}
+              style={style}
+              /* Always the animated rendition, so a paused GIF plays in the preview */
+              src={resolveUrl(item)}
+              alt=""
+              draggable={false}
+              onLoad={positionHoverPreview}
+            />
+          )
+        })()}
+      </div>
 
       {/* Lightbox Overlay */}
       <NativeDialog
