@@ -343,11 +343,17 @@ export default function MediaGallery({ data = [] }) {
     setHoverIndex(null)
   }, [])
 
+  // A video the reader is already watching in the card needs no enlarged copy over it
+  const isInlineVideoPlaying = (index) => {
+    const video = videoRefs.current[index]
+    return Boolean(video) && !video.paused
+  }
+
   const scheduleHoverPreview = (index, e) => {
     // Touch and pen have no resting hover — a tap would flash the preview over its own action
     if (e.pointerType !== 'mouse' || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
     const item = visualData[index]
-    if (isLightboxOpen || (item?.spoiler && !revealedItems[index])) return
+    if (isLightboxOpen || (item?.spoiler && !revealedItems[index]) || isInlineVideoPlaying(index)) return
     /* Posts span the feed column and mark themselves, so their right edge is the feed's; a
        gallery outside one hangs the preview off the media itself */
     hoverAnchorRef.current = e.currentTarget.closest('[data-media-anchor]') || e.currentTarget
@@ -355,6 +361,8 @@ export default function MediaGallery({ data = [] }) {
     clearTimeout(hoverTimerRef.current)
     hoverTimerRef.current = setTimeout(() => {
       hoverTimerRef.current = null
+      // Autoplay may have started it during the delay
+      if (isInlineVideoPlaying(index)) return
       setPreviewIndex(index)
       setHoverIndex(index)
     }, HOVER_PREVIEW_DELAY)
@@ -537,7 +545,15 @@ export default function MediaGallery({ data = [] }) {
             onVolumeChange={isFullscreen ? handleVideoVolumeChange : undefined}
             /* Only the inline element reports into the card's play button; the lightbox twin
                shares the index but not the state, so it must not overwrite it. */
-            onPlay={isFullscreen ? undefined : () => setPlayingVideos((previous) => ({ ...previous, [i]: true }))}
+            onPlay={
+              isFullscreen
+                ? undefined
+                : () => {
+                    setPlayingVideos((previous) => ({ ...previous, [i]: true }))
+                    // Started under an open preview (autoplay, keyboard) — the card takes over
+                    if (hoverIndex === i) hideHoverPreview()
+                  }
+            }
             onPause={isFullscreen ? undefined : () => setPlayingVideos((previous) => ({ ...previous, [i]: false }))}
             /* `playing`, not `play`: the first fires once frames are actually being rendered,
                which is the moment the still can go without a blank in between */
