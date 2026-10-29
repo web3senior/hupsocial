@@ -11,3 +11,6 @@ allowBuilds:
   utf-8-validate: false
 minimumReleaseAgeExclude:
   - readable-sdk@1.0.0
+  - '@tanstack/db-ivm@1.0.0-rc.1'
+  - '@tanstack/db@1.0.0-rc.1'
+  - '@tanstack/react-db@1.0.0-rc.1'
