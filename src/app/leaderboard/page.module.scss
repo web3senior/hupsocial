@@ -176,7 +176,6 @@
 
   &__value {
     overflow: hidden;
-    font-family: var(--ff-mono);
     font-size: 1.85rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
@@ -204,7 +203,6 @@
   }
 
   &__change {
-    font-family: var(--ff-mono);
     font-variant-numeric: tabular-nums;
 
     &--up {
