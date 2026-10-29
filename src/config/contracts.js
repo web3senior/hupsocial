@@ -4,7 +4,7 @@
  * instead of config/wagmi, which constructs wallet connectors on evaluation.
  */
 
-import { arbitrum, base, baseSepolia, bsc, celo, hedera, lukso, mainnet, monad, soneium } from 'wagmi/chains'
+import { arbitrum, base, baseSepolia, bsc, celo, hedera, lukso, mainnet, monad, polygon, soneium } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
 // Arbitrum Orbit L2, ETH as gas
@@ -77,6 +77,7 @@ arbitrum.rpcUrls = {
 }
 celo.rpcUrls = { ...celo.rpcUrls, default: { http: ['https://celo-rpc.publicnode.com', ...celo.rpcUrls.default.http] } }
 soneium.rpcUrls = { ...soneium.rpcUrls, default: { http: ['https://soneium-rpc.publicnode.com', ...soneium.rpcUrls.default.http] } }
+polygon.rpcUrls = { ...polygon.rpcUrls, default: { http: ['https://polygon-bor-rpc.publicnode.com', 'https://polygon.drpc.org', ...polygon.rpcUrls.default.http] } }
 
 // Hedera, through the hashio JSON-RPC relay. viem's chain carries no multicall3; it is deployed at
 // the canonical address (probed onchain 2026-10-26).
@@ -101,7 +102,7 @@ export const fromEvmNativeUnits = (chainId, amount) => amount * evmNativeScale(c
 
 // Drives the wagmi `chains` tuple and server-side RPC lookups. L1s first, then L2s.
 // Hedera joins once its core set is deployed and confirmed at the chain295 addresses below.
-export const appChains = [mainnet, lukso, bsc, monad, arc, /* hedera, */ soneium, arbitrum, base, celo, robinhood, baseSepolia]
+export const appChains = [mainnet, lukso, bsc, polygon, monad, arc, /* hedera, */ soneium, arbitrum, base, celo, robinhood, baseSepolia]
 
 // ''            — not deployed on that chain.
 // hupForwarder  — only where Hup core trusts a different forwarder than `forwarder`.
@@ -454,6 +455,33 @@ export const CONTRACTS = {
   // on Hedera, so follower gates stay off; no Uniswap either.
   chain295: {
     name: 'hedera',
+    forwarder: '0x218D9A09134365B843777198ed211a7290bC8596',
+    forwarderName: 'HupChatForwarder',
+    hup: '0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2',
+    status: '0xC09FbaA0aDF928d0Ff41D28c74b3b57Eb9cF27b5',
+    followerSystem: '',
+    community: '',
+    sell: '',
+    tipper: '0xfECd93B665518AA84D41fDbD9ECe92E8CbA1906b',
+    trade: '',
+    offers: '',
+    events: '',
+    predict: '',
+    apps: '',
+    polls: '0x5FFb711AD7d061a501a711b3A9E1795daf0c2b5F',
+    fund: '',
+    tasks: '',
+    premium: '',
+    drops: '',
+    splits: '',
+    nativeGate: '',
+    univ3Router: '',
+    univ3Quoter: '',
+  },
+  // Core set only, CREATE2 under the default salt (same addresses as Soneium); code confirmed
+  // onchain 2026-10-29.
+  chain137: {
+    name: 'polygon',
     forwarder: '0x218D9A09134365B843777198ed211a7290bC8596',
     forwarderName: 'HupChatForwarder',
     hup: '0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2',

@@ -20,6 +20,7 @@ export const GECKOTERMINAL_NETWORKS = {
   1: 'eth',
   42: 'lukso',
   56: 'bsc',
+  137: 'polygon_pos',
   143: 'monad',
   295: 'hedera-hashgraph',
   1868: 'soneium',

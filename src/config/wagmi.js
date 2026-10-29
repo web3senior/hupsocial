@@ -11,6 +11,7 @@ import {
   mainnet,
   monad,
   optimismSepolia,
+  polygon,
   sepolia,
   somniaTestnet,
   unichainSepolia,
@@ -111,7 +112,8 @@ hedera.textColor = `#fff`
 hedera.isNew = true
 
 // Polygon
-//<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_10991_3429)"><path d="M0 0H18V18H0V0Z" fill="#6C00F6"/><path d="M4 11.56V8.68L6.8 7.19L7.75 7.73V9.03L6.8 8.5L5.25 9.29V10.89L6.8 11.71L8.38 10.89V6.44L11.15 5L14 6.44V9.33L11.16 10.78L10.25 10.25V8.96L11.16 9.47L12.75 8.67V7.1L11.16 6.3L9.62 7.1V11.57L6.8 13L4 11.56Z" fill="white"/></g><defs><clipPath id="clip0_10991_3429"><rect width="18" height="18" fill="white"/></clipPath></defs></svg>
+polygon.primaryColor = `#8247E5`
+polygon.textColor = `#fff`
 
 // The logos themselves live in config/chainIcons.js, keyed by chain id, so server code can
 // reach one without pulling this module's connectors in with it. Stamped onto the shared chain
@@ -139,6 +141,7 @@ const iconChains = [
   soneium,
   arc,
   hedera,
+  polygon,
 ]
 iconChains.forEach((chain) => {
   chain.icon = CHAIN_ICONS[chain.id]
