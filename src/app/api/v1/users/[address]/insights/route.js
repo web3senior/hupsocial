@@ -166,18 +166,30 @@ async function getReach(wallet, since, today, days) {
 
 async function getTopPosts(wallet, since) {
   const [rows] = await pool.execute(
-    `SELECT * FROM (
-       SELECT
-         p.id AS post_id,
-         p.network_id,
-         p.content,
-         (SELECT COUNT(*) FROM post_views pv WHERE pv.post_id = p.id AND pv.network_id = p.network_id AND pv.viewed_at >= ?) AS views,
-         (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.network_id = p.network_id AND pl.is_active = 1 AND pl.liked_at >= ?) AS likes,
-         (SELECT COUNT(*) FROM posts c WHERE c.is_comment = p.id AND c.network_id = p.network_id AND c.created_at >= ?) AS comments
-       FROM posts p
-       WHERE p.wallet_address = ? AND p.is_comment IS NULL AND p.is_deleted = 0
-     ) ranked
-     ORDER BY (ranked.views + ranked.likes * 2 + ranked.comments * 3) DESC
+    // Aggregate each activity table once. Correlated counts used to rescan a network's likes
+    // for every authored post because the likes index has contract_address before post_id.
+    `SELECT p.id AS post_id, p.network_id, p.content,
+            COALESCE(v.views, 0) AS views,
+            COALESCE(l.likes, 0) AS likes,
+            COALESCE(c.comments, 0) AS comments
+     FROM posts p
+     LEFT JOIN (
+       SELECT post_id, network_id, COUNT(*) AS views
+       FROM post_views WHERE viewed_at >= ?
+       GROUP BY post_id, network_id
+     ) v ON v.post_id = p.id AND v.network_id = p.network_id
+     LEFT JOIN (
+       SELECT post_id, network_id, COUNT(*) AS likes
+       FROM post_likes WHERE is_active = 1 AND liked_at >= ?
+       GROUP BY post_id, network_id
+     ) l ON l.post_id = p.id AND l.network_id = p.network_id
+     LEFT JOIN (
+       SELECT is_comment AS post_id, network_id, COUNT(*) AS comments
+       FROM posts WHERE is_comment IS NOT NULL AND created_at >= ?
+       GROUP BY is_comment, network_id
+     ) c ON c.post_id = p.id AND c.network_id = p.network_id
+     WHERE p.wallet_address = ? AND p.is_comment IS NULL AND p.is_deleted = 0
+     ORDER BY (COALESCE(v.views, 0) + COALESCE(l.likes, 0) * 2 + COALESCE(c.comments, 0) * 3) DESC
      LIMIT 5`,
     [since, since, since, wallet],
   )
@@ -206,13 +218,18 @@ async function getNetworkBreakdown(wallet, since) {
       [wallet, since],
     ),
     pool.execute(
-      `SELECT p.network_id, n.name, COUNT(*) AS total
-       FROM post_likes pl
-       JOIN posts p ON pl.post_id = p.id AND pl.network_id = p.network_id
-       JOIN networks n ON p.network_id = n.id
-       WHERE p.wallet_address = ? AND p.is_comment IS NULL AND p.is_deleted = 0
-         AND pl.is_active = 1 AND pl.liked_at >= ?
-       GROUP BY p.network_id, n.name`,
+      // Join network labels after grouping so the optimizer cannot start at networks and
+      // repeatedly scan that network's likes for each of the author's posts.
+      `SELECT engagement.network_id, n.name, engagement.total
+       FROM (
+         SELECT p.network_id, COUNT(*) AS total
+         FROM post_likes pl
+         JOIN posts p ON pl.post_id = p.id AND pl.network_id = p.network_id
+         WHERE p.wallet_address = ? AND p.is_comment IS NULL AND p.is_deleted = 0
+           AND pl.is_active = 1 AND pl.liked_at >= ?
+         GROUP BY p.network_id
+       ) engagement
+       JOIN networks n ON engagement.network_id = n.id`,
       [wallet, since],
     ),
     pool.execute(
