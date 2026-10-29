@@ -21,6 +21,7 @@ export default function PostOverlayHost({ children }) {
   const entry = usePostOverlayStore((state) => state.entry)
   const isOpen = Boolean(entry && pathname === entry.path)
   const wasOpenRef = useRef(false)
+  const pageRef = useRef(null)
 
   useEffect(() => {
     setPostOverlayHostMounted(true)
@@ -43,6 +44,16 @@ export default function PostOverlayHost({ children }) {
       return
     }
 
+    // `display: none` cancelled the page's CSS animations and showing it again restarts them, so
+    // every `animate fade` entrance (feed cards, page wrappers) replayed from opacity 0 on back.
+    // The page is being restored, not entered: finish those before paint. Endless ones (spinners,
+    // idle loops) have no end to jump to and carry on.
+    document.getAnimations().forEach((animation) => {
+      if (!pageRef.current?.contains(animation.effect?.target)) return
+      if (!Number.isFinite(animation.effect.getComputedTiming().endTime)) return
+      animation.finish()
+    })
+
     // Only a return to the page it opened from gets that page's offset back; a navigation the
     // overlay made to somewhere else (a profile) starts wherever that route puts it
     if (entry && pathname === entry.fromPath) window.scrollTo({ top: entry.scrollY, behavior: 'instant' })
@@ -50,7 +61,9 @@ export default function PostOverlayHost({ children }) {
 
   return (
     <>
-      <div style={{ display: isOpen ? 'none' : 'contents' }}>{children}</div>
+      <div ref={pageRef} style={{ display: isOpen ? 'none' : 'contents' }}>
+        {children}
+      </div>
       {isOpen && <PostOverlay entry={entry} />}
     </>
   )
