@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { usePostStore } from './usePostStore'
+import { seedPost } from '@/db/posts'
 
 /**
  * Opening a post in place, X-style: the feed stays mounted (hidden) and the post renders over
@@ -22,7 +22,7 @@ export const usePostOverlayStore = create((set) => ({
     const path = `/networks/${networkId}/${postId}`
 
     // PostDetails paints from the same cached row the route version reads
-    usePostStore.getState().setCurrentPost(item)
+    seedPost(item)
     set({
       entry: { path, fromPath: window.location.pathname, networkId, postId, post: item, scrollY: window.scrollY },
     })
@@ -46,6 +46,6 @@ export function openPost(item, router) {
     usePostOverlayStore.getState().open(item)
     return
   }
-  usePostStore.getState().setCurrentPost(item)
+  seedPost(item)
   router.push(`/networks/${item.network_id}/${item.id}`)
 }

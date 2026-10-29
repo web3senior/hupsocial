@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useId, useRef, useCallback, useMe
 import { useRouter } from 'next/navigation'
 import { isArticle } from '@/lib/article'
 import Link from 'next/link'
-import { usePostStore } from '@/stores/usePostStore'
+import { seedPost } from '@/db/posts'
 import { useWaitForTransactionReceipt, useConnection, useSignTypedData, useWriteContract, usePublicClient } from 'wagmi'
 import { getPublicClient } from 'wagmi/actions'
 import { initHupContract } from '@/lib/communication'
@@ -166,7 +166,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   // runs for rows from surfaces that don't embed (search, saved, older cached
   // feeds). It shares the SWR key the footer counters use (getPostStatsKey) so
   // stats mutations and the card content live in one cache entry, and that
-  // cache survives unmounts — a feed restored from useFeedCacheStore repaints
+  // cache survives unmounts — a feed restored from the session post store repaints
   // repost cards synchronously instead of re-showing the skeleton and shifting
   // the restored scroll position. revalidateIfStale is off for parity with the
   // rest of the restored feed (usePostStats already revalidates this key on
@@ -709,7 +709,6 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
   const [showEmbedModal, setShowEmbedModal] = useState(false)
   const isMounted = useClientMounted()
   const router = useRouter()
-  const { setCurrentPost } = usePostStore()
   const { address, isConnected } = useConnection()
   const { data: hash, isPending, mutate: writeContract } = useWriteContract()
   const {
@@ -903,7 +902,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
                 description="Open the full post"
                 onClick={(e) => {
                   e.stopPropagation()
-                  setCurrentPost(item)
+                  seedPost(item)
                   router.push(`/networks/${item.network_id}/${item.id}`)
                 }}
               />
@@ -1041,7 +1040,6 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
  */
 function ThreadMarker({ item, showThreadLink }) {
   const router = useRouter()
-  const { setCurrentPost } = usePostStore()
   const part = Number(item?.content?.thread?.part)
   const of = Number(item?.content?.thread?.of)
   if (!part || !(of > 1)) return null
@@ -1059,7 +1057,7 @@ function ThreadMarker({ item, showThreadLink }) {
           data-capture-ignore
           onClick={(e) => {
             e.stopPropagation()
-            setCurrentPost(item)
+            seedPost(item)
             router.push(`/networks/${item.network_id}/${item.id}`)
           }}
         >
@@ -1073,7 +1071,6 @@ function ThreadMarker({ item, showThreadLink }) {
 export function PostCard({ item, actions, chainId, networkName, threadAuthor = null }) {
   const { isBlocked } = useBlockedUsers()
   const router = useRouter()
-  const { setCurrentPost } = usePostStore()
   const { address } = useActiveWallet()
 
   const shouldFetch = Number(item?.total_comments || 0) > 0
@@ -1108,7 +1105,7 @@ export function PostCard({ item, actions, chainId, networkName, threadAuthor = n
   const openLastComment = (e) => {
     e.stopPropagation()
     if (isTextSelectionDrag(e)) return
-    setCurrentPost(lastComment)
+    seedPost(lastComment)
     router.push(`/networks/${lastComment.network_id}/${lastComment.id}`)
   }
 
@@ -1243,7 +1240,7 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
   const { address } = useActiveWallet()
 
   // Same SWR recipe as the repost original in Post: the cache survives unmounts, so a feed
-  // restored from useFeedCacheStore repaints the quote card in its first frame instead of
+  // restored from the session post store repaints the quote card in its first frame instead of
   // collapsing it while it refetches — which left a blank gap inside the card's reserved height.
   const quotedKey = getPostStatsKey({ id: quoteId, network_id: networkId }, address)
   const { data: fetchedQuotedPost, isLoading } = useSWR(

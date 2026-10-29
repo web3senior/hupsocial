@@ -10,7 +10,7 @@ import { requestAuthNonce } from '@/lib/api'
 import { blockUserMessage } from '@/lib/blockUsers'
 import { normalizeAddress, sameAddress } from '@/lib/address'
 import { toast } from '@/components/NextToast'
-import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
+import { clearFeedCaches } from '@/db/feedCache'
 import { usePostStore } from '@/stores/usePostStore'
 
 const pendingWallets = new Set()
@@ -63,7 +63,7 @@ export function useBlockedUsers() {
       const result = await response.json()
       if (!response.ok || !result.success) throw new Error(result.error || 'Could not save blocked users')
       await mutate((current = []) => claim.blocked ? [...new Set([...current, claim.target])] : current.filter((value) => value !== claim.target), { revalidate: false })
-      useFeedCacheStore.setState({ caches: {} })
+      clearFeedCaches()
       usePostStore.getState().requestFeedRefresh()
       toast(claim.blocked ? 'User blocked' : 'User unblocked', 'success')
     } catch (failure) {

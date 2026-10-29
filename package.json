@@ -38,6 +38,7 @@
     "@wallet-standard/app": "^1.1.1",
     "@walletconnect/ethereum-provider": "^2.23.9",
     "@yogesharc/thinking-orbs": "^0.1.1",
+    "@tanstack/react-db": "1.0.0-rc.1",
     "bs58": "^6.0.0",
     "clsx": "^2.1.1",
     "cube-motion": "^0.1.0",

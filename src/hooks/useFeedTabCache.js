@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
+import { readFeedCache, saveFeedCache } from '@/db/feedCache'
 import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
 
 /**
@@ -17,9 +17,8 @@ import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
  * @param {string|null} address Viewer the cached rows were fetched for (like state differs per wallet)
  */
 export function useFeedTabCache(key, address) {
-  const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
   // Read once per mount; the store is in-memory, so this is empty during SSR hydration
-  const [initialCache] = useState(() => useFeedCacheStore.getState().readFeedCache(key, address ?? null))
+  const [initialCache] = useState(() => readFeedCache(key, address ?? null))
   const containerRef = useRef(null)
   const stateRef = useRef(null)
 
@@ -37,7 +36,7 @@ export function useFeedTabCache(key, address) {
       if (!state || !state.list?.length) return
       saveFeedCache(key, { ...state, address: address ?? null, ...snapshot() })
     }
-  }, [key, address, saveFeedCache, snapshot])
+  }, [key, address, snapshot])
 
   const remember = (state) => {
     stateRef.current = state

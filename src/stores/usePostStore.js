@@ -8,7 +8,6 @@ export const usePostStore = create((set, get) => ({
   apps: { list: [] },
   TABS_DATA: [],
   hasInitialized: false,
-  currentPost: null,
 
   // Bumped by the Aside home link when the page is already scrolled to top;
   // the active feed tab watches this and re-fetches page 1.
@@ -20,8 +19,6 @@ export const usePostStore = create((set, get) => ({
   // this one arrives seconds after the fact and must not yank a reader out of the feed.
   authoredPostNonce: 0,
   notifyAuthoredPost: () => set((state) => ({ authoredPostNonce: state.authoredPostNonce + 1 })),
-
-  setCurrentPost: (post) => set({ currentPost: post }),
 
   setInitialData: (apps, postsResponse) => {
     const rawPosts = postsResponse?.data || []

@@ -24,7 +24,7 @@ import { toast } from '@/components/NextToast'
 import statusAbi from '@/abi/status.json'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
-import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
+import { readFeedCache, saveFeedCache } from '@/db/feedCache'
 import Post from '@/components/Post'
 import { getActiveChain } from '@/lib/communication'
 import { CommunityBadge } from '@/components/Profile'
@@ -99,9 +99,8 @@ const POSTS_PAGE_SIZE = 20
  */
 const useProfileFeed = ({ wallet, viewer, postType }) => {
   const cacheKey = `profile-${wallet}-${postType}`
-  const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
   // In-memory store: always empty during hydration, so cache hits only happen on client remounts.
-  const [initialCache] = useState(() => useFeedCacheStore.getState().readFeedCache(cacheKey, viewer ?? null))
+  const [initialCache] = useState(() => readFeedCache(cacheKey, viewer ?? null))
 
   const [posts, setPosts] = useState(() => ({ list: initialCache?.list ?? [] }))
   const [total, setTotal] = useState(initialCache?.total ?? 0)
@@ -137,7 +136,7 @@ const useProfileFeed = ({ wallet, viewer, postType }) => {
       if (!state?.loaded) return
       saveFeedCache(cacheKey, state)
     }
-  }, [cacheKey, saveFeedCache])
+  }, [cacheKey])
 
   const loadMore = useCallback(async () => {
     if (isFetchingRef.current || !hasMoreRef.current) return
@@ -220,8 +219,7 @@ export default function UserProfile({ address: routeAddress }) {
 
   // The tab and viewport the reader left this profile on, alongside the feeds' own snapshots.
   const pageCacheKey = `profile-${profileAddress}`
-  const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
-  const [initialPageCache] = useState(() => useFeedCacheStore.getState().readFeedCache(pageCacheKey, address ?? null))
+  const [initialPageCache] = useState(() => readFeedCache(pageCacheKey, address ?? null))
   const [activeTab, setActiveTab] = useState(initialPageCache?.activeTab ?? 'posts')
   const containerRef = useRef(null)
 
@@ -245,7 +243,7 @@ export default function UserProfile({ address: routeAddress }) {
     return () => {
       saveFeedCache(pageCacheKey, { ...pageSnapshotRef.current, ...snapshot() })
     }
-  }, [pageCacheKey, saveFeedCache, snapshot])
+  }, [pageCacheKey, snapshot])
 
   const TABS_DATA = [
     { id: 'posts', label: 'Posts', count: postsFeed.total },

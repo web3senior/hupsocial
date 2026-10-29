@@ -6,24 +6,23 @@ import { useConnection } from 'wagmi'
 import Post from '@/components/Post'
 import Comments from '@/components/Comments'
 import CommentSkeletonList from '@/components/ui/CommentSkeleton'
-import { usePostStore } from '@/stores/usePostStore'
+import { usePost } from '@/db/posts'
 import pageStyles from './page.module.scss'
 import detailStyles from './_components/PostDetails.module.scss'
 import PostTitleRow from './_components/PostTitleRow'
 
 // Every navigation into this dynamic route pays a server roundtrip, and this
-// boundary is what the user sees during it. The click handlers put the tapped
-// post in the store before router.push, so paint the real post here — the
-// markup mirrors PostDetails exactly, making the Suspense swap invisible.
+// boundary is what the user sees during it. Any post this session has already
+// shown — in a feed, a thread, a quote — is in the post store, so paint the real
+// post here — the markup mirrors PostDetails exactly, making the Suspense swap
+// invisible.
 export default function Loading() {
   const params = useParams()
   const { address } = useConnection()
-  const currentPost = usePostStore((state) => state.currentPost)
-
-  // Only trust the cache when it is the post being navigated to (back/forward
-  // can land here with a stale currentPost from another thread)
   const targetId = params?.postId
-  const cachedMatchesTarget = currentPost && (targetId == null || String(currentPost.id) === String(targetId))
+  // Looked up by the route's own network and id, so it is always the post being navigated to
+  const currentPost = usePost(params?.networkId, targetId)
+  const cachedMatchesTarget = Boolean(currentPost)
 
   return (
     <>

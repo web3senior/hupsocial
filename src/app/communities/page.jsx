@@ -49,8 +49,8 @@ import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { buildLinks, displayLinks, emptySocials, parseLinks } from '@/lib/socialLinks'
 import { asClause, describeWalletError } from '@/lib/walletErrors'
 import { toast } from '@/components/NextToast'
-import { usePostStore } from '@/stores/usePostStore'
-import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
+import { seedPost } from '@/db/posts'
+import { readFeedCache, saveFeedCache } from '@/db/feedCache'
 import BrandingLinksFields from './_components/BrandingLinksFields'
 import CommunityBrandingEditor from './_components/CommunityBrandingEditor'
 import { DEFAULT_COVER_POSITION, coverObjectPosition, coverPositionFrom } from '@/lib/coverPosition'
@@ -385,7 +385,6 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   const vault = useCommunityVault()
   const router = useRouter()
   // Hands the clicked row to the post detail page so it paints instantly, exactly as HomeFeedTab does
-  const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   const CONTRACT_ADDRESS = CONTRACTS[`chain${chainId}`]?.community
 
   // Live mode: ask the contract as well as the indexed row. On the detail page that is one card's
@@ -429,12 +428,11 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
   // community. Opening a post unmounts this page; coming back re-reads the snapshot instead of
   // refetching page 1 behind a shimmer and dropping the reader at the top of the feed.
   const feedCacheKey = `community-${chainId}-${id}`
-  const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
   // Safe to read in an initializer: the store is in-memory, so it's always empty during SSR
   // hydration and hits only ever happen on client-side remounts. Only the detail view keeps a
   // feed at all, so the directory's cards never read or write one.
   const [initialFeedCache] = useState(() =>
-    hideHeader ? useFeedCacheStore.getState().readFeedCache(feedCacheKey, address ?? null) : null
+    hideHeader ? readFeedCache(feedCacheKey, address ?? null) : null
   )
 
   const [communityPosts, setCommunityPosts] = useState(initialFeedCache?.list ?? [])
@@ -1722,7 +1720,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
       if (!snapshot || snapshot.list.length === 0) return
       saveFeedCache(feedCacheKey, { ...snapshot, scrollY: lastFeedScrollYRef.current, feedHeight: lastFeedHeightRef.current || null })
     }
-  }, [hideHeader, feedCacheKey, saveFeedCache])
+  }, [hideHeader, feedCacheKey])
 
   // Restore the cached position once the hydrated posts have rendered. Reaching the target once
   // isn't enough to stop: Next's layout router scrolls the new segment to top AFTER this effect,
@@ -2849,7 +2847,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                         // Hand the row to the post store first, exactly as the home feed does: the
                         // detail page paints that copy immediately instead of shimmering while its
                         // own fetch runs
-                        setCurrentPost(post)
+                        seedPost(post)
                         router.push(`/networks/${post.network_id ?? chainId}/${post.id}`)
                       }}
                     >

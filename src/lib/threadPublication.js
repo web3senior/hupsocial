@@ -23,7 +23,7 @@ import { isSessionActive } from '@/lib/burnerSession'
 import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGasless'
 import { describeWalletError } from '@/lib/walletErrors'
 import { releaseGhost, THREAD_PROGRESS_EVENT, trackPostPublication } from '@/lib/postPublication'
-import { usePendingPostStore } from '@/stores/usePendingPostStore'
+import { updatePendingPost } from '@/db/pendingPosts'
 import { useComposerStore } from '@/stores/useComposerStore'
 
 // A beat past the relay's own cooldown, so the request never lands a hair early and bounces
@@ -154,7 +154,7 @@ export function continueThread(thread) {
     releaseGhost(ghostId, rootKey)
     announce()
   }
-  if (ghostId) usePendingPostStore.getState().updatePendingPost(ghostId, { progress: { part: index, of: total } })
+  if (ghostId) updatePendingPost(ghostId, { progress: { part: index, of: total } })
 
   // If this part never lands, the composer comes back as a reply to the part that did, holding
   // this one and everything still behind it — the thread resumes from exactly where it broke

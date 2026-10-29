@@ -14,8 +14,8 @@ import { PostSkeleton } from '@/components/ui/PostSkeleton'
 import SearchBox, { MIN_SEARCH_LENGTH, profileHref } from '@/components/SearchBox'
 import useRecipientSuggestions from '@/hooks/useRecipientSuggestions'
 import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
-import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
-import { usePostStore } from '@/stores/usePostStore'
+import { readFeedCache, saveFeedCache } from '@/db/feedCache'
+import { seedPost } from '@/db/posts'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import styles from '../page.module.scss'
 
@@ -97,17 +97,15 @@ const formatCount = (count, isCapped) => (count === 0 ? '' : ` ${count}${isCappe
 export default function SearchPanel() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const setCurrentPost = usePostStore((state) => state.setCurrentPost)
   // The route only computes has_liked for a viewer, so results refetch when the wallet arrives
   const { address } = useConnection()
-  const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
 
   const urlQuery = (searchParams.get('q') || '').trim()
 
   // A snapshot from an earlier visit this session. Reused when the URL asks for the same query,
   // or for none at all (the sidebar's Search link lands on the bare route).
   const [initialCache] = useState(() => {
-    const cached = useFeedCacheStore.getState().readFeedCache(SEARCH_CACHE_KEY, address ?? null)
+    const cached = readFeedCache(SEARCH_CACHE_KEY, address ?? null)
     if (!cached) return null
     return !urlQuery || urlQuery === cached.query ? cached : null
   })
@@ -179,7 +177,7 @@ export default function SearchPanel() {
       if (!state || state.query.length < MIN_SEARCH_LENGTH) return
       saveFeedCache(SEARCH_CACHE_KEY, { ...state, ...snapshot() })
     }
-  }, [saveFeedCache, snapshot])
+  }, [snapshot])
 
   const commitQuery = useCallback(
     (query) => {
@@ -250,7 +248,7 @@ export default function SearchPanel() {
   }, [committedQuery, isCommitted, address, retryNonce])
 
   const handlePostClick = (item) => {
-    setCurrentPost(item)
+    seedPost(item)
     router.push(`/networks/${item.network_id}/${item.id}`)
   }
 

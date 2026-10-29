@@ -14,8 +14,9 @@ import { config } from '@/config/wagmi'
 import { toast } from '@/components/NextToast'
 import { usePostStore } from '@/stores/usePostStore'
 import { useComposerStore } from '@/stores/useComposerStore'
-import { useCommentsCacheStore } from '@/stores/useCommentsCacheStore'
-import { usePendingPostStore } from '@/stores/usePendingPostStore'
+import { invalidateThread } from '@/db/comments'
+import { addPendingPost, getPendingPost, removePendingPost, updatePendingPost } from '@/db/pendingPosts'
+import { upsertPosts } from '@/db/posts'
 
 // cidex only sees the post once the transaction is mined AND its next scan runs, so the wait is
 // a block time plus a poll interval — a couple of seconds on a fast chain, longer on a slow one.
@@ -65,9 +66,8 @@ export const THREAD_PROGRESS_EVENT = 'hup:thread-progress'
  */
 export const releaseGhost = (ghostId, resolvedKey) => {
   if (!ghostId) return
-  const ghostStore = usePendingPostStore.getState()
-  ghostStore.updatePendingPost(ghostId, { status: 'indexed', resolvedKey, progress: null })
-  window.setTimeout(() => ghostStore.removePendingPost(ghostId), GHOST_HANDOVER_MS)
+  updatePendingPost(ghostId, { status: 'indexed', resolvedKey, progress: null })
+  window.setTimeout(() => removePendingPost(ghostId), GHOST_HANDOVER_MS)
   usePostStore.getState().notifyAuthoredPost()
 }
 
@@ -97,7 +97,7 @@ const lookupPost = async ({ networkId, author, metadata, txHash }) => {
 const revealReply = ({ networkId, parentId }) => {
   if (!parentId) return
 
-  useCommentsCacheStore.getState().invalidateThread(networkId, parentId)
+  invalidateThread(networkId, parentId)
   // Every viewer variant of the parent's stats entry — the key carries the connected address, and
   // the author's card can be mounted under either it or the anonymous key.
   globalMutate((key) => typeof key === 'string' && key.startsWith(`posts/${networkId}/${parentId}/`))
@@ -189,12 +189,11 @@ export function trackPostPublication({
   const copy = { ...(COPY[kind] ?? COPY.post), ...copyOverride }
   // A handle the author already closed takes no update, so a fresh card stands in for it
   const handle = openHandle?.update(copy.pending, 'loading') ? openHandle : toast(copy.pending, 'loading')
-  const ghostStore = usePendingPostStore.getState()
 
   // Nothing to poll for — better a card that expires than one that spins forever
   if (!networkId || !author || !metadata) {
     handle.update(copy.slow, 'info')
-    if (earlyGhostId) ghostStore.removePendingPost(earlyGhostId)
+    if (earlyGhostId) removePendingPost(earlyGhostId)
     return
   }
 
@@ -208,7 +207,7 @@ export function trackPostPublication({
   // A composer that closed at the tap already put its ghost up (`ghostId`), before anything was
   // pinned: that card is taken over in place — same id, same timestamp — so it never blinks out
   // and back between the tap and the transaction.
-  const adopted = earlyGhostId ? ghostStore.pending.find((entry) => entry.id === earlyGhostId) : null
+  const adopted = earlyGhostId ? getPendingPost(earlyGhostId) : null
   const ghost =
     kind === 'post' && recovery?.state?.content
       ? {
@@ -225,10 +224,10 @@ export function trackPostPublication({
         }
       : null
 
-  if (ghost) ghostStore.addPendingPost(ghost)
-  else if (earlyGhostId) ghostStore.removePendingPost(earlyGhostId)
+  if (ghost) addPendingPost(ghost)
+  else if (earlyGhostId) removePendingPost(earlyGhostId)
   const dropGhost = () => {
-    if (ghost) ghostStore.removePendingPost(ghost.id)
+    if (ghost) removePendingPost(ghost.id)
   }
 
   const pollForIndexing = () => {
@@ -250,11 +249,14 @@ export function trackPostPublication({
         // names is actually in the list, so the refresh below swaps one for the other with
         // nothing blank in between. A held ghost only learns its row — the feed keeps that row
         // out of sight while the ghost is still publishing — and waits for releaseGhost.
-        if (ghost && !settles) ghostStore.updatePendingPost(ghost.id, { resolvedKey })
+        if (ghost && !settles) updatePendingPost(ghost.id, { resolvedKey })
         else if (ghost) {
-          ghostStore.updatePendingPost(ghost.id, { status: 'indexed', resolvedKey })
+          updatePendingPost(ghost.id, { status: 'indexed', resolvedKey })
           window.setTimeout(dropGhost, GHOST_HANDOVER_MS)
         }
+        // The indexed row goes straight into the shared post store: an edit is rewritten on every
+        // card already showing the post, wherever it is, with no refetch of any feed.
+        if (kind === 'edit') upsertPosts([{ network_id: networkId, ...found }])
         // A reply belongs to a post page's comment list, not the home feed — so it refreshes the
         // thread it landed in instead of pulling page 1 of a feed the author isn't looking at.
         // is_comment is the parent the indexer actually recorded, which beats the composer's own

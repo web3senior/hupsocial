@@ -20,7 +20,7 @@ const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximum
 // Session-lifetime cache of loaded rows per wallet+filter: a revisit (or tab
 // return) paints the previous data instantly and revalidates silently in the
 // background — the skeleton only ever shows on the first visit. Same pattern
-// as the home feed's useFeedCacheStore; module scope survives route unmounts,
+// as the home feed's session feed cache (db/feedCache); module scope survives route unmounts,
 // a full reload starts fresh.
 const CACHE_TTL_MS = 10 * 60 * 1000
 const sessionCache = new Map()

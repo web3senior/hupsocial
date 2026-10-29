@@ -14,7 +14,7 @@ import { DEFAULT_COMMENTS_SORT } from '@/lib/commentsRequest'
 import { THREAD_PROGRESS_EVENT } from '@/lib/postPublication'
 import ReplyBar from './ReplyBar'
 import PostTitleRow from './PostTitleRow'
-import { usePostStore } from '@/stores/usePostStore'
+import { getPost, seedPost, upsertPosts, usePost } from '@/db/posts'
 import styles from './PostDetails.module.scss'
 
 const sameId = (a, b) => a != null && b != null && String(a) === String(b)
@@ -23,22 +23,20 @@ const sameId = (a, b) => a != null && b != null && String(a) === String(b)
 const isPost = (row, networkId, postId) =>
   sameId(row?.id, postId) && (row.network_id == null || sameId(row.network_id, networkId))
 
-// What to paint for a post before its own request answers: the feed's cached copy first — it
-// already carries the viewer's flags — else the row the server rendered the page with. Only a
-// post that arrives by fetch into an empty mount gets the entry animation: a cached one was
-// already painted by loading.jsx and a served one is in the HTML, and `animate fade` starts from
-// opacity 0, so replaying it over either blanks a visible post.
-const seedPostState = (networkId, postId, cachedPost, servedPost) => {
-  const post = isPost(cachedPost, networkId, postId) ? cachedPost : isPost(servedPost, networkId, postId) ? servedPost : null
-  return { post, forId: postId, animateEntry: post === null }
-}
+// Only a post that arrives by fetch into an empty mount gets the entry animation: a stored one
+// was already painted by loading.jsx and a served one is in the HTML, and `animate fade` starts
+// from opacity 0, so replaying it over either blanks a visible post.
+const seedEntryState = (networkId, postId, servedPost) => ({
+  forId: postId,
+  animateEntry: !getPost(networkId, postId) && !isPost(servedPost, networkId, postId),
+})
 
 /**
  * @param {Object} props
  * @param {string} props.networkId
  * @param {string} props.postId
  * @param {Object|null} [props.initialPost] The row the page read on the server. It is what a
- *   cold open paints before any request is made; the feed's cached copy still wins over it on a
+ *   cold open paints before any request is made; the post store's copy still wins over it on a
  *   navigation because that one already carries the viewer's own flags.
  */
 export default function PostDetails({ networkId, postId, initialPost = null }) {
@@ -47,19 +45,21 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
   const resolvedNetworkId = networkId || params.networkId
   const resolvedPostId = postId || params.postId
 
-  const { currentPost, setCurrentPost } = usePostStore()
   const { address } = useConnection()
   const mounted = useClientMounted()
 
-  const [{ post, forId, animateEntry }, setPostState] = useState(() =>
-    seedPostState(resolvedNetworkId, resolvedPostId, currentPost, initialPost),
-  )
+  // What to paint before the post's own request answers: the session post store's copy first —
+  // any feed, thread or quote that showed it put it there, with the viewer's flags — else the row
+  // the server rendered the page with. Live, so an edit landing anywhere repaints it here too.
+  const storedPost = usePost(resolvedNetworkId, resolvedPostId)
+  const post = storedPost ?? (isPost(initialPost, resolvedNetworkId, resolvedPostId) ? initialPost : null)
 
-  // In-page navigation (comment → parent) keeps this component mounted with a new postId, so
-  // the post has to swap during render: an effect would paint the previous one under the new
-  // URL for a frame.
+  const [{ forId, animateEntry }, setEntryState] = useState(() => seedEntryState(resolvedNetworkId, resolvedPostId, initialPost))
+
+  // In-page navigation (comment → parent) keeps this component mounted with a new postId; the
+  // entry decision is made during render for the same reason the post is read during render.
   if (!sameId(forId, resolvedPostId)) {
-    setPostState(seedPostState(resolvedNetworkId, resolvedPostId, currentPost, initialPost))
+    setEntryState(seedEntryState(resolvedNetworkId, resolvedPostId, initialPost))
   }
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
       .then((r) => r.json())
       .then((body) => {
         if (cancelled || !body?.data) return
-        setPostState((prev) => ({ ...prev, post: body.data }))
+        upsertPosts([{ network_id: resolvedNetworkId, ...body.data }])
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -132,7 +132,7 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
   const threadReplyIds = threadParts.length ? [threadParts[0].id] : null
 
   const openPost = (row) => {
-    setCurrentPost(row)
+    seedPost(row)
     router.push(`/networks/${resolvedNetworkId}/${row.id}`)
   }
 

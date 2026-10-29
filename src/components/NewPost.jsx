@@ -14,7 +14,7 @@ import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
 import { continueThread, threadPartCopy } from '@/lib/threadPublication'
 import { useComposerStore } from '@/stores/useComposerStore'
-import { usePendingPostStore } from '@/stores/usePendingPostStore'
+import { addPendingPost, removePendingPost } from '@/db/pendingPosts'
 import { useProfile } from '@/hooks/useProfile'
 import useMyCommunities from '@/hooks/useMyCommunities'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -2006,7 +2006,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       }
       if (!message) publishHandleRef.current?.dismiss()
       else if (!publishHandleRef.current?.update(message, 'error')) toast(message, 'error')
-      if (earlyGhostIdRef.current) usePendingPostStore.getState().removePendingPost(earlyGhostIdRef.current)
+      if (earlyGhostIdRef.current) removePendingPost(earlyGhostIdRef.current)
       useComposerStore.getState().restoreComposer({ props: recoveryProps, state: { ...recoveryState, ...extraState } })
     }
 
@@ -2021,7 +2021,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       )
       if (!isComment) {
         earlyGhostIdRef.current = `draft:${newUploadId()}`
-        usePendingPostStore.getState().addPendingPost({
+        addPendingPost({
           id: earlyGhostIdRef.current,
           networkId: Number(targetChainId),
           author: signerAddress,

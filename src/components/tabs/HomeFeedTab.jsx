@@ -16,8 +16,10 @@ import { PostCard } from '@/components/Post'
 import PendingPost from '@/components/PendingPost'
 import WhoToFollow from '@/components/home/WhoToFollow'
 import { usePostStore } from '@/stores/usePostStore'
-import { usePendingPostStore } from '@/stores/usePendingPostStore'
-import { useFeedCacheStore } from '@/stores/useFeedCacheStore'
+import { usePendingPosts } from '@/db/pendingPosts'
+import { postKey } from '@/db/posts'
+import { getListPosts, useListPosts, writeList } from '@/db/lists'
+import { feedScope, readFeedCache, saveFeedState } from '@/db/feedCache'
 import PageTitle from '@/components/PageTitle'
 import { openPost } from '@/stores/usePostOverlayStore'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
@@ -47,10 +49,6 @@ const SUGGESTIONS_AFTER_INDEX = 4
 // post — the browser and the chain never quite agree on the time
 const GHOST_MATCH_SKEW_S = 60
 
-// Post ids are per network — every chain's HupCommunity numbers its own posts from 1 — so a
-// cross-network feed routinely holds two different posts with the same id. Identity is the pair.
-const postKey = (post) => `${post.network_id}:${post.id}`
-
 // First occurrence wins, so callers put the copy they want to keep first.
 const dedupePosts = (list) => {
   const seen = new Set()
@@ -68,10 +66,10 @@ const dedupePosts = (list) => {
  * an active HupBazaar listing — the bazaar page). Extracted from app/page.jsx so
  * it can be mounted per-tab from HomeTabStrip's tab dispatch.
  *
- * Feed state (posts/pagination) is kept LOCAL to this instance rather than in
- * the shared usePostStore - multiple tabs (Home, several network tabs) can
- * exist at once, and a single global "hasInitialized" flag would make every
- * tab after the first skip fetching and show the wrong feed's posts.
+ * The posts are a list in the session post store (db/lists), one per feed scope, so every card
+ * renders the newest copy of its post — an edit, or a refetch on the post page, shows up here
+ * without this feed refetching. Pagination state stays local to the instance: multiple tabs
+ * (Home, several network tabs) can exist at once, each with its own scope.
  */
 export default function HomeFeedTab({
   feedMode = 'foryou',
@@ -89,7 +87,7 @@ export default function HomeFeedTab({
   const { isBlocked } = useBlockedUsers()
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
   const authoredPostNonce = usePostStore((state) => state.authoredPostNonce)
-  const pendingPosts = usePendingPostStore((state) => state.pending)
+  const pendingPosts = usePendingPosts()
 
   const mounted = useClientMounted()
   const { address: evmAddress } = useConnection()
@@ -106,17 +104,21 @@ export default function HomeFeedTab({
   const showSuggestions = feedMode === 'foryou' || (feedMode === 'network' && !isSolanaNetworkId(networkId))
   const feedCacheKey =
     feedMode === 'network' ? `network-${networkId}` : ['premium', 'nft', 'hupsters'].includes(feedMode) ? feedMode : 'foryou'
-  const saveFeedCache = useFeedCacheStore((state) => state.saveFeedCache)
+  const listScope = feedScope(feedCacheKey)
 
   // Feed snapshot from an earlier visit this session, if any. Safe to read in
   // an initializer: the store is in-memory, so it's always empty during SSR
   // hydration, and cache hits only ever happen on client-side remounts.
-  const [initialCache] = useState(() => useFeedCacheStore.getState().readFeedCache(feedCacheKey, address ?? null))
+  const [initialCache] = useState(() => readFeedCache(feedCacheKey, address ?? null))
 
-  const [posts, setPosts] = useState(() => ({ list: initialCache?.list ?? [] }))
-  const [postsLoaded, setPostsLoaded] = useState(initialCache ? initialCache.list.length : 0)
+  // The scope whose list has been written for this viewer — by the snapshot above or a fetch.
+  // Until then the stored list may be an expired visit's or another wallet's, so none of it shows.
+  const [readyScope, setReadyScope] = useState(() => (initialCache ? listScope : null))
+  const hasInitialized = readyScope === listScope
+  const storedPosts = useListPosts(listScope)
+  const posts = useMemo(() => ({ list: hasInitialized ? storedPosts : [] }), [hasInitialized, storedPosts])
+  const postsLoaded = posts.list.length
   const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false)
-  const [hasInitialized, setHasInitialized] = useState(Boolean(initialCache))
   const [isFetching, setIsFetching] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [page, setPage] = useState(initialCache?.page ?? 1)
@@ -133,10 +135,9 @@ export default function HomeFeedTab({
   // its closure — `address` still undefined pre-wagmi-reconnect (appended pages
   // then fetch without viewer_address and lose is_liked) and `page` stuck at 1.
   const loadMorePostsRef = useRef(() => {})
-  // The list as committed, readable from async callbacks. A poll response is diffed against
-  // this at the moment it lands, so a merge or refresh that happened while the request was in
-  // flight is already accounted for — otherwise those posts come straight back behind the pill.
-  const postsListRef = useRef(initialCache?.list ?? [])
+  // The list as committed is read from the store at the moment a poll response lands
+  // (getListPosts), so a merge or refresh that happened while the request was in flight is
+  // already accounted for — otherwise those posts come straight back behind the pill.
   // Page 1 as the latest poll saw it; the merge restarts from it when it no longer overlaps the
   // list at all (more arrived than a page holds), instead of prepending across a hole.
   const pendingPageRef = useRef(null)
@@ -160,9 +161,10 @@ export default function HomeFeedTab({
     ready: posts.list.length > 0,
   })
 
-  // Snapshot the cacheable state every render for the save-on-exit cleanup below.
+  // Snapshot the cacheable state every render for the save-on-exit cleanup below. The posts
+  // themselves are already in the store; only whether there are any matters here.
   useEffect(() => {
-    cacheSnapshotRef.current = { list: posts.list, page, hasMore, address: address ?? null }
+    cacheSnapshotRef.current = { count: posts.list.length, page, hasMore, address: address ?? null }
   })
 
   useEffect(() => {
@@ -195,50 +197,31 @@ export default function HomeFeedTab({
     }
   }, [mounted])
 
-  // Every list write goes through here so the ref never lags the state.
-  const commitPosts = useCallback((list) => {
-    postsListRef.current = list
-    setPosts({ list })
-  }, [])
-
+  // Page 1 makes the list exactly these rows (duplicates dropped by the store, first wins).
   const setInitialData = useCallback(
     (postsResponse) => {
-      const initialPosts = dedupePosts(postsResponse?.data || [])
-
-      commitPosts(initialPosts)
-      setPostsLoaded(initialPosts.length)
+      writeList(listScope, postsResponse?.data || [], { mode: 'replace' })
       setHasMore(postsResponse?.meta?.hasMore || false)
-      setHasInitialized(true)
+      setReadyScope(listScope)
     },
-    [commitPosts],
+    [listScope],
   )
 
   const appendPosts = useCallback(
     (postsResponse) => {
-      const current = postsListRef.current
-      const existing = new Set(current.map(postKey))
-      const uniqueNewPosts = (postsResponse?.data || []).filter((post) => !existing.has(postKey(post)))
-
-      commitPosts([...current, ...uniqueNewPosts])
-      setPostsLoaded((loaded) => loaded + uniqueNewPosts.length)
+      writeList(listScope, postsResponse?.data || [], { mode: 'append' })
       setHasMore(postsResponse?.meta?.hasMore || false)
     },
-    [commitPosts],
+    [listScope],
   )
 
   // Pill merge: newer posts go on top and the pagination below stays exactly as it was —
   // routing this through setInitialData reset hasMore and killed infinite scroll.
   const prependPosts = useCallback(
     (newPosts) => {
-      const current = postsListRef.current
-      const existing = new Set(current.map(postKey))
-      const uniqueNewPosts = newPosts.filter((post) => !existing.has(postKey(post)))
-      if (uniqueNewPosts.length === 0) return
-
-      commitPosts([...uniqueNewPosts, ...current])
-      setPostsLoaded((loaded) => loaded + uniqueNewPosts.length)
+      writeList(listScope, newPosts, { mode: 'prepend' })
     },
-    [commitPosts],
+    [listScope],
   )
 
   // Snapshot this feed's state when it goes away — unmount (navigation to
@@ -246,11 +229,11 @@ export default function HomeFeedTab({
   // jumping between two network tabs, so cleanup, not unmount, is the exit).
   useEffect(() => {
     return () => {
-      const state = cacheSnapshotRef.current
-      if (!state || state.list.length === 0) return
-      saveFeedCache(feedCacheKey, { ...state, ...snapshot() })
+      const { count, ...state } = cacheSnapshotRef.current ?? {}
+      if (!count) return
+      saveFeedState(feedCacheKey, { ...state, ...snapshot() })
     }
-  }, [feedCacheKey, saveFeedCache, snapshot])
+  }, [feedCacheKey, snapshot])
 
   useEffect(() => {
     let cancelled = false
@@ -311,7 +294,7 @@ export default function HomeFeedTab({
       const response = await getPosts(1, POSTS_PAGE_SIZE, scopedNetworkId, null, address, null, feedType, excludeNft)
       if (seq !== pollSeqRef.current || !response.success) return
 
-      const known = new Set(postsListRef.current.map(postKey))
+      const known = new Set(getListPosts(listScope).map(postKey))
       const fresh = dedupePosts(response.data).filter((post) => !known.has(postKey(post)))
 
       pendingPageRef.current = { data: response.data, hasMore: Boolean(response.meta?.hasMore) }
@@ -320,7 +303,7 @@ export default function HomeFeedTab({
     } catch (error) {
       console.error('Polling error:', error)
     }
-  }, [address, scopedNetworkId, feedType, excludeNft])
+  }, [address, scopedNetworkId, feedType, excludeNft, listScope])
 
   // Background polling for new posts. Skipping the tick while hidden loses nothing: every poll
   // rebuilds the queue from a fresh page 1, so the catch-up poll on visibilitychange sees
@@ -384,7 +367,7 @@ export default function HomeFeedTab({
 
     const pending = pendingPageRef.current
     const pageKeys = new Set((pending?.data ?? []).map(postKey))
-    const overlaps = postsListRef.current.some((post) => pageKeys.has(postKey(post)))
+    const overlaps = getListPosts(listScope).some((post) => pageKeys.has(postKey(post)))
 
     if (pending && !overlaps) {
       // More arrived than one page holds: prepending would leave a hole between the two, so
@@ -399,7 +382,7 @@ export default function HomeFeedTab({
     clearReservations()
 
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [newPostsQueue, prependPosts, setInitialData, clearReservations])
+  }, [newPostsQueue, prependPosts, setInitialData, clearReservations, listScope])
 
   // Always a real page-1 fetch. Draining the pill instead used to hand the author a queue that
   // was polled before their post existed, so the post itself surfaced one poll later — behind
