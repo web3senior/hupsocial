@@ -251,6 +251,7 @@
       295: ["https://mainnet.hashio.io/api"],
       1868: ["https://rpc.soneium.org", "https://soneium-rpc.publicnode.com"],
       137: ["https://polygon-bor-rpc.publicnode.com", "https://polygon.drpc.org"],
+      43114: ["https://avalanche-c-chain-rpc.publicnode.com", "https://api.avax.network/ext/bc/C/rpc"],
       // sepolia.base.org sits behind Cloudflare and 403s some callers — publicnode leads
       84532: ["https://base-sepolia-rpc.publicnode.com", "https://base-sepolia.drpc.org"],
     };
@@ -322,7 +323,7 @@
 
     const CHAIN_NAMES = {
       1: "Ethereum", 42: "LUKSO", 56: "BNB", 137: "Polygon", 143: "Monad", 295: "Hedera", 1868: "Soneium", 4663: "Robinhood",
-      8453: "Base", 42161: "Arbitrum", 42220: "Celo", 10143: "Monad Testnet",
+      8453: "Base", 42161: "Arbitrum", 42220: "Celo", 43114: "Avalanche", 10143: "Monad Testnet",
     };
 
     // Contracts with precompiled artifacts in ./deploy-artifacts/artifacts. The HupDrops suite,
@@ -396,11 +397,13 @@
         295: ["HupChatForwarder"], // Hedera — the EIP-712 name the relay signs against by default
         1868: ["HupChatForwarder"], // Soneium
         137: ["HupChatForwarder"], // Polygon
+        43114: ["HupChatForwarder"], // Avalanche
       },
       Hup: {
         295: ["0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
         1868: ["0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
         137: ["0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        43114: ["0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
       },
       // maxLength 100, as on Base and LUKSO; the owner is explicit because through the factory
       // the constructor's caller is the factory itself
@@ -408,16 +411,19 @@
         295: ["100", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
         1868: ["100", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
         137: ["100", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        43114: ["100", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
       },
       HupPolls: {
         295: ["0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
         1868: ["0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
         137: ["0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        43114: ["0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
       },
       HupTipper: {
         295: ["0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
         1868: ["0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
         137: ["0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
+        43114: ["0xD7Cc29e9DbE744dbA5978A47ffa886258410d1A2", "0x218D9A09134365B843777198ed211a7290bC8596", "0x20e229667Cec8A0e9D3C6Fb89693B2a44ec2C50e"],
       },
       // Engine args per chain: Hup core, the chain's HupChatForwarder (`forwarder` in
       // contracts.js — not hupForwarder, which only Hup core accepts), the admin, and the

@@ -2,6 +2,7 @@ import { createConfig, fallback, http, webSocket } from 'wagmi'
 import {
   arbitrum,
   arbitrumSepolia,
+  avalanche,
   base,
   baseSepolia,
   bsc,
@@ -115,6 +116,11 @@ hedera.isNew = true
 polygon.primaryColor = `#8247E5`
 polygon.textColor = `#fff`
 
+// Avalanche
+avalanche.primaryColor = `#E84142`
+avalanche.textColor = `#fff`
+avalanche.isNew = true
+
 // The logos themselves live in config/chainIcons.js, keyed by chain id, so server code can
 // reach one without pulling this module's connectors in with it. Stamped onto the shared chain
 // objects here because that is where every client caller already reads them from.
@@ -142,6 +148,7 @@ const iconChains = [
   arc,
   hedera,
   polygon,
+  avalanche,
 ]
 iconChains.forEach((chain) => {
   chain.icon = CHAIN_ICONS[chain.id]
@@ -163,6 +170,7 @@ export const BROWSER_RPC_URLS = {
   [baseSepolia.id]: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'],
   // Both keyless endpoints reflect the request Origin; arc-scan covers the official one's 503s
   [arc.id]: ['https://rpc.mainnet.arc.io', 'https://rpc.arc-scan.org'],
+  [avalanche.id]: ['https://avalanche-c-chain-rpc.publicnode.com', 'https://api.avax.network/ext/bc/C/rpc'],
   // Hashio, the Hedera-run JSON-RPC relay; keyless and CORS-open
   [hedera.id]: ['https://mainnet.hashio.io/api'],
 }

@@ -87,6 +87,7 @@ export const SLUG_CHAIN_IDS = {
   arbitrum: 42161,
   optimism: 10,
   polygon: 137,
+  avax: 43114,
   base: 8453,
   celo: 42220,
   lukso: 42,

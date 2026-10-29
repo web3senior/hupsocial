@@ -16,6 +16,7 @@ const GECKOTERMINAL_NETWORKS = {
   1: 'eth',
   56: 'bsc',
   137: 'polygon_pos',
+  43114: 'avax',
   1868: 'soneium',
   8453: 'base',
   42161: 'arbitrum',
