@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
+import { useBlockedUsers } from '@/hooks/useBlockedUsers'
 import { getFollowingPosts } from '@/lib/api'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { getActiveChain } from '@/lib/communication'
@@ -25,6 +26,7 @@ const POSTS_PAGE_SIZE = 20
  * a time - see src/lib/followSystem.js).
  */
 export default function FollowingFeedTab() {
+  const { isBlocked } = useBlockedUsers()
   const mounted = useClientMounted()
   const { address, isConnected } = useConnection()
   const router = useRouter()
@@ -113,6 +115,8 @@ export default function FollowingFeedTab() {
     openPost(item, router)
   }
 
+  const visiblePosts = posts.list.filter((item) => !isBlocked(item.wallet_address) && !isBlocked(item.repost_original?.wallet_address))
+
   if (!mounted) return null
 
   if (!isConnected) {
@@ -151,14 +155,14 @@ export default function FollowingFeedTab() {
     return <EmptyState>{`Following isn't available on ${activeChain?.name ?? 'this network'} yet. Try switching networks.`}</EmptyState>
   }
 
-  if (isLoaded && posts.list.length === 0) {
+  if (isLoaded && visiblePosts.length === 0 && !hasMore) {
     return <EmptyState>No posts yet from wallets you follow.</EmptyState>
   }
 
   return (
     <div className={clsx('__container')} data-width="small">
       <div ref={containerRef} style={containerStyle} className={clsx('__container', styles.page__container)} data-width="medium">
-        {posts.list.map((item, i) => (
+        {visiblePosts.map((item, i) => (
           <section
             key={item.id}
             data-post-key={item.id}
@@ -171,7 +175,7 @@ export default function FollowingFeedTab() {
             }}
           >
             <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} />
-            {i < posts.list.length - 1 && <hr />}
+            {i < visiblePosts.length - 1 && <hr />}
           </section>
         ))}
       </div>

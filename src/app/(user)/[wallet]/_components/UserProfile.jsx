@@ -56,6 +56,7 @@ import clsx from 'clsx'
 import NativePopover from '@/components/ui/NativePopover'
 import { ProfileQRCode } from './ProfileQRCode'
 import FollowListDialog from './FollowListDialog'
+import BlockUserButton from '@/components/BlockUserButton'
 import ProfileLinks from './ProfileLinks'
 import PremiumNudge from './PremiumNudge'
 import BirthdayConfetti from '@/components/ui/BirthdayConfetti'
@@ -941,6 +942,7 @@ const Profile = ({ addr }) => {
                 >
                   {isSigning ? 'Confirm Wallet...' : isConfirming ? 'Confirming...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
                 </button>
+                <BlockUserButton target={addr} />
               </li>
             )}
           </ul>

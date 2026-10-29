@@ -90,6 +90,7 @@ import Share from './ui/Share'
 import { PostSkeleton } from './ui/PostSkeleton'
 import { isVeiledByReports } from '@/lib/reports'
 import clsx from 'clsx'
+import { useBlockedUsers } from '@/hooks/useBlockedUsers'
 import styles from './Post.module.scss'
 // Encrypted community content (posts, comments, quoted cards — everything inside encrypted
 // communities is sealed with the community key): attempts in-place decryption using the
@@ -184,6 +185,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   )
 
   const baseDisplayItem = isRepost ? repostedPost : item
+  const { isBlocked } = useBlockedUsers()
   const displayItem = useDecryptedCommunityItem(baseDisplayItem)
   const commentTarget = displayItem || item
 
@@ -228,6 +230,8 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   // Guard clause: Render global loading state until repost data is completely ready.
   // Only on a truly cold load — keepPreviousData keeps the previous entry rendered
   // while the key swaps from the anonymous to the connected viewer.
+  if (isBlocked(baseDisplayItem?.wallet_address) || isBlocked(item.wallet_address)) return null
+
   if (isRepost && isLoadingRepost && !repostedPost) {
     return <PostSkeleton />
   }
@@ -687,6 +691,7 @@ const PostDocumentActions = ({ item, close }) => {
 }
 
 const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRemovedChange }) => {
+  const { address: blockViewer, isBlocked, toggleBlock } = useBlockedUsers()
   const postIsArticle = (() => {
     try {
       const content = typeof item?.content === 'string' ? JSON.parse(item.content) : item?.content
@@ -991,6 +996,18 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
                   }}
                 />
               )}
+              {blockViewer && !sameAddress(blockViewer, item.wallet_address) && (
+                <MenuItem
+                  icon={<FlagIcon size={20} />}
+                  label={isBlocked(item.wallet_address) ? 'Unblock user' : 'Block user'}
+                  description="Hide this user's posts in feeds on this browser"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    toggleBlock(item.wallet_address)
+                    close()
+                  }}
+                />
+              )}
               {!isOwner && (
                 <MenuItem
                   icon={<FlagIcon size={20} />}
@@ -1051,6 +1068,7 @@ function ThreadMarker({ item, showThreadLink }) {
 }
 
 export function PostCard({ item, actions, chainId, networkName, threadAuthor = null }) {
+  const { isBlocked } = useBlockedUsers()
   const router = useRouter()
   const { setCurrentPost } = usePostStore()
   const { address } = useActiveWallet()
@@ -1081,7 +1099,8 @@ export function PostCard({ item, actions, chainId, networkName, threadAuthor = n
   )
   const isLastCommentLoading = isLoading && !lastComment
 
-  const hasCommentBelow = shouldFetch && (isLastCommentLoading || !!lastComment)
+  const visibleLastComment = isBlocked(lastComment?.wallet_address) ? null : lastComment
+  const hasCommentBelow = shouldFetch && (isLastCommentLoading || !!visibleLastComment)
 
   const openLastComment = (e) => {
     e.stopPropagation()
@@ -1096,7 +1115,7 @@ export function PostCard({ item, actions, chainId, networkName, threadAuthor = n
       {shouldFetch &&
         (isLastCommentLoading ? (
           <LastCommentShimmer />
-        ) : lastComment ? (
+        ) : visibleLastComment ? (
           <div
             className={styles.post__commentLink}
             onPointerDown={rememberCardPointerDown}
@@ -1237,8 +1256,11 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
   // Same in-place decryption the main card gets — a quoted encrypted post renders readable for
   // members instead of the locked placeholder. Called before the early returns (hook rules).
   const quotedPost = useDecryptedCommunityItem(fetchedQuotedPost ?? null)
+  const { isBlocked } = useBlockedUsers()
 
   if (isLoading && !fetchedQuotedPost) return null
+
+  if (isBlocked(quotedPost?.wallet_address)) return null
 
   if (!quotedPost) {
     return <div className={clsx(styles.post__quoteCard, styles.post__quoteCard_unavailable)}>Original post unavailable</div>

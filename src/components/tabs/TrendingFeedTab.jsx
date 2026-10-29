@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
+import { useBlockedUsers } from '@/hooks/useBlockedUsers'
 import { getTrendingPosts } from '@/lib/api'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -28,6 +29,7 @@ const WEEK_WINDOW_HOURS = 168
  * connection is optional and only adds like/bookmark state.
  */
 export default function TrendingFeedTab() {
+  const { isBlocked } = useBlockedUsers()
   const mounted = useClientMounted()
   const { address } = useConnection()
   const router = useRouter()
@@ -108,6 +110,8 @@ export default function TrendingFeedTab() {
     openPost(item, router)
   }
 
+  const visiblePosts = posts.list.filter((item) => !isBlocked(item.wallet_address) && !isBlocked(item.repost_original?.wallet_address))
+
   if (!mounted) return null
 
   if (loadError) {
@@ -126,7 +130,7 @@ export default function TrendingFeedTab() {
     )
   }
 
-  if (isLoaded && posts.list.length === 0) {
+  if (isLoaded && visiblePosts.length === 0 && !hasMore) {
     return <EmptyState>Nothing is trending right now. Check back soon.</EmptyState>
   }
 
@@ -137,7 +141,7 @@ export default function TrendingFeedTab() {
       )}
 
       <div ref={containerRef} style={containerStyle} className={clsx('__container', styles.page__container)} data-width="medium">
-        {posts.list.map((item, i) => (
+        {visiblePosts.map((item, i) => (
           <section
             key={`${item.network_id}-${item.id}`}
             data-post-key={`${item.network_id}-${item.id}`}
@@ -150,7 +154,7 @@ export default function TrendingFeedTab() {
             }}
           >
             <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} />
-            {i < posts.list.length - 1 && <hr />}
+            {i < visiblePosts.length - 1 && <hr />}
           </section>
         ))}
       </div>

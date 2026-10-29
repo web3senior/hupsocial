@@ -7,6 +7,7 @@ import { useConnection } from 'wagmi'
 import { isSolanaNetworkId } from '@/config/solana'
 import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import clsx from 'clsx'
+import { useBlockedUsers } from '@/hooks/useBlockedUsers'
 import { getPosts } from '@/lib/api'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { useClientMounted } from '@/hooks/useClientMount'
@@ -85,6 +86,7 @@ export default function HomeFeedTab({
   // never empty in practice leave it null and keep the skeleton as before.
   emptyState = null,
 }) {
+  const { isBlocked } = useBlockedUsers()
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
   const authoredPostNonce = usePostStore((state) => state.authoredPostNonce)
   const pendingPosts = usePendingPostStore((state) => state.pending)
@@ -485,14 +487,14 @@ export default function HomeFeedTab({
     return { ghostPosts: ghosts, heldKeys: held }
   }, [pendingPosts, posts.list, newPostsQueue, feedMode, networkId])
   const visiblePosts = useMemo(
-    () => (heldKeys.size ? (posts?.list ?? []).filter((item) => !heldKeys.has(postKey(item))) : posts?.list),
-    [posts.list, heldKeys]
+    () => (posts.list ?? []).filter((item) => !heldKeys.has(postKey(item)) && !isBlocked(item.wallet_address) && !isBlocked(item.repost_original?.wallet_address)),
+    [posts.list, heldKeys, isBlocked]
   )
   // A held row is the author's own thread mid-publish, already drawn as its ghost — not news.
   // Once the thread is released, the authored-post pull surfaces it the ordinary way.
   const pillCount = useMemo(
-    () => (heldKeys.size ? newPostsQueue.filter((item) => !heldKeys.has(postKey(item))).length : newPostsQueue.length),
-    [newPostsQueue, heldKeys]
+    () => newPostsQueue.filter((item) => !heldKeys.has(postKey(item)) && !isBlocked(item.wallet_address) && !isBlocked(item.repost_original?.wallet_address)).length,
+    [newPostsQueue, heldKeys, isBlocked]
   )
 
   const lastAuthoredNonceRef = useRef(authoredPostNonce)
@@ -549,6 +551,8 @@ export default function HomeFeedTab({
 
             {postsLoaded === 0 &&
               (loadError ? <FeedError onRetry={handleRetry} /> : hasInitialized && emptyState ? emptyState : <PostSkeletonGrid count={14} />)}
+
+            {hasInitialized && postsLoaded > 0 && visiblePosts.length === 0 && <p>No posts to show. You can unblock users from their profiles.</p>}
 
             {visiblePosts?.map((item, i) => (
               <Fragment key={postKey(item)}>

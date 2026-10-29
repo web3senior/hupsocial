@@ -3,6 +3,7 @@
 import { Spinner } from '@/components/Loading'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import clsx from 'clsx'
+import { useBlockedUsers } from '@/hooks/useBlockedUsers'
 import { getStatuses } from '@/lib/api'
 import { useFeedTabCache } from '@/hooks/useFeedTabCache'
 import Profile from '@/components/Profile'
@@ -23,6 +24,7 @@ export default function StatusFeedTab() {
   // Switching tabs away and back restores the loaded statuses and scroll place, like For you
   const { initialCache, remember, containerRef, containerStyle, cardStyle } = useFeedTabCache('status', null)
 
+  const { isBlocked } = useBlockedUsers()
   const [statuses, setStatuses] = useState(() => initialCache?.list ?? [])
   const [page, setPage] = useState(initialCache?.page ?? 1)
   const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false)
@@ -90,6 +92,8 @@ export default function StatusFeedTab() {
     }
   }, [isFetching, hasMore, page])
 
+  const visibleStatuses = statuses.filter((item) => !isBlocked(item.wallet_address))
+
   if (loadError) {
     return (
       <FeedPanel>
@@ -106,7 +110,7 @@ export default function StatusFeedTab() {
     )
   }
 
-  if (statuses.length === 0) {
+  if (visibleStatuses.length === 0 && !hasMore) {
     return (
       <FeedPanel>
         <p className={clsx('text-center', 'p-100')}>No statuses right now. Statuses last as long as their creators choose.</p>
@@ -118,7 +122,7 @@ export default function StatusFeedTab() {
     <div className={clsx('__container')} data-width="small">
       <div ref={containerRef} style={containerStyle} className={clsx('__container', pageStyles.page__container)} data-width="medium">
         <div className={styles['status-feed']}>
-          {statuses.map((item) => (
+          {visibleStatuses.map((item) => (
             <article
               key={`${item.network_id}-${item.id}`}
               data-post-key={`${item.network_id}-${item.id}`}
