@@ -882,7 +882,14 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
         trigger={
           <Tooltip content="More" placement="bottom" size="compact" hoverOnly>
             <button
-              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                if (e.button === 0) e.currentTarget.popoverTargetElement?.togglePopover()
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (e.detail > 0) e.preventDefault()
+              }}
               onMouseEnter={() => router.prefetch(`/networks/${item.network_id}/${item.id}`)}
               className={clsx(styles.post__navTrigger, 'pointer rounded-full')}
               aria-label="Post options"
@@ -892,6 +899,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
           </Tooltip>
         }
         placement="bottom-end"
+        className={styles.post__menuPopover}
       >
         {({ close }) => (
           <div className={clsx(styles.post__menu, 'flex flex-column align-items-center justify-content-start')}>

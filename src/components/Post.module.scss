@@ -768,6 +768,12 @@
 // The post's three-dots menu. Deliberately a separate block from .post__dropdown — the saved
 // page reuses that one for its folder menu with the older label-left/icon-right rows, and
 // widening these rules would silently restyle it.
+.post__menuPopover {
+  &:not(:global(:popover-open)) {
+    transition: none;
+  }
+}
+
 .post__menu {
   width: 100%;
 
