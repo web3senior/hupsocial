@@ -19,7 +19,6 @@
   @include md-down() {
     left: -100%;
   }
-
 }
 
 .compact {
@@ -54,7 +53,6 @@
     padding-inline: 0;
     margin-inline: 4px 0;
   }
-
 }
 
 .aside.aside--grid {
@@ -69,11 +67,13 @@
     box-sizing: border-box;
     margin-block: 0;
     padding-block: 0;
-    padding: 1rem .5rem;
+    padding: 1rem 0.5rem;
     bottom: auto;
     height: 100dvh;
     max-height: 100dvh;
-    max-width: 100%;
+    // No max-width: the track's minimum is --aside-width, which Aside.jsx measures from this
+    // element. Capping the rail at the track let a narrow track (left over from the 64px tablet
+    // rail, or a wide page container) clip it, publish the clipped width, and stay stuck there.
     overflow: hidden;
     border: 0;
     border-radius: 0;
@@ -120,7 +120,7 @@
 .navList {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.8rem;
   list-style: none;
   padding: 0;
   margin-inline: 0;
@@ -205,18 +205,13 @@
   background-color: var(--hover);
 }
 
+[data-theme='light'] .link.linkActive {
+  background-color: #f9fbfc;
+}
+
 .navSection {
   display: flex;
   flex-direction: column;
-
-  &__label {
-    margin: 0 0 0.25rem;
-    padding-inline: 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    line-height: 1.5;
-    color: var(--text-muted);
-  }
 
   &__list {
     display: flex;
@@ -301,14 +296,14 @@
 
 .logoCap {
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 0;
 }
 
 .divider {
   border: none;
-  margin: 0.5rem 0;
+  margin: 0.125rem 0;
 }
 
 .more {
@@ -539,7 +534,6 @@
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--surface);
 }
-
 
 .aside--placeholder {
   width: 220px;
