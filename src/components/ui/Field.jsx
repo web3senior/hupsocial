@@ -57,7 +57,7 @@ export default function Field({
           {control}
         </span>
         {trailing && (
-          <span className={styles.field__trailing} aria-hidden="true">
+          <span className={styles.field__trailing}>
             {trailing}
           </span>
         )}

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef } from 'react'
 import { Rise } from 'cube-motion/react'
+import { KeyIcon, ShieldCheckIcon } from '@phosphor-icons/react'
 import { CHAIN_ICONS } from '@/config/chainIcons'
 import styles from './VaultIllustration.module.scss'
 
@@ -14,7 +15,7 @@ export function ChainLogo({ chainId, size = 24 }) {
     : <span className={styles.illustration__fallback} aria-hidden="true">◈</span>
 }
 
-export default function VaultIllustration({ chain, version, threshold }) {
+export default function VaultIllustration({ threshold }) {
   const svgRef = useRef(null)
   const id = useId().replace(/:/g, '')
 
@@ -55,9 +56,9 @@ export default function VaultIllustration({ chain, version, threshold }) {
         <rect x="83" y="94" width="13" height="27" rx="4" fill="#8495A3" />
         <rect x="83" y="190" width="13" height="27" rx="4" fill="#8495A3" />
         <path d="M88 99V116M88 195V212" stroke="#B9C7D0" strokeWidth="2" strokeLinecap="round" />
-        <text x="108" y="101" fill="#AABCC8" fontFamily="inherit" fontSize="9" fontWeight="700" letterSpacing="3">HUP</text>
+        <image href="/logos/safe.svg" x="104" y="86" width="18" height="18" preserveAspectRatio="xMidYMid meet" />
         <rect x="188" y="89" width="22" height="7" rx="3.5" fill="#13251F" />
-        <circle cx="193" cy="92.5" r="2" fill="#94E6BD"><animate attributeName="opacity" values="1;0.4;1" dur="4s" repeatCount="indefinite" begin="indefinite" /></circle>
+        <circle cx="193" cy="92.5" r="2" fill="#12FF80"><animate attributeName="opacity" values="1;0.4;1" dur="4s" repeatCount="indefinite" begin="indefinite" /></circle>
         <circle cx="161" cy="157" r="44" fill="#111B26" stroke="#6B7E8C" />
         <circle cx="161" cy="157" r="37" fill={`url(#${id}-rim)`} />
         <circle cx="161" cy="157" r="31" fill="#263644" stroke="#111E2A" strokeWidth="2" />
@@ -69,13 +70,9 @@ export default function VaultIllustration({ chain, version, threshold }) {
         </g>
         <rect x="141" y="212" width="40" height="4" rx="2" fill="#607687" />
         <path d="M94 253V262H113V253M204 253V262H223V253" fill="#17232F" />
-        <g transform="translate(32 106)"><rect width="34" height="34" rx="11" fill="#20343F" stroke="#718B97" /><circle cx="12" cy="12" r="5" stroke="#BAE4E4" strokeWidth="1.8" /><path d="M15.6 15.6L24 24L27 21M21 21L24 18" stroke="#BAE4E4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><animateTransform attributeName="transform" type="translate" values="32 106;32 100;32 106" dur="6s" repeatCount="indefinite" begin="indefinite" /></g>
-        <g transform="translate(278 181)"><rect width="34" height="34" rx="11" fill="#20343F" stroke="#718B97" /><circle cx="12" cy="12" r="5" stroke="#BAE4E4" strokeWidth="1.8" /><path d="M15.6 15.6L24 24L27 21M21 21L24 18" stroke="#BAE4E4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><animateTransform attributeName="transform" type="translate" values="278 181;278 187;278 181" dur="7s" repeatCount="indefinite" begin="indefinite" /></g>
+        <g transform="translate(32 106)"><rect width="34" height="34" rx="11" fill="#20343F" stroke="#718B97" /><KeyIcon x={7} y={7} size={20} color="#BAE4E4" /><animateTransform attributeName="transform" type="translate" values="32 106;32 100;32 106" dur="6s" repeatCount="indefinite" begin="indefinite" /></g>
+        <g transform="translate(278 181)"><rect width="34" height="34" rx="11" fill="#20343F" stroke="#718B97" /><ShieldCheckIcon x={7} y={7} size={20} color="#BAE4E4" /><animateTransform attributeName="transform" type="translate" values="278 181;278 187;278 181" dur="7s" repeatCount="indefinite" begin="indefinite" /></g>
       </svg>
-      <div className={styles.illustration__network} key={chain?.id}>
-        <ChainLogo chainId={chain?.id} size={28} />
-        <span><strong>{chain?.name || 'Choose a network'}</strong><small>{version ? `Safe ${version}` : 'Vault'}</small></span>
-      </div>
       {threshold && <span className={styles.illustration__caption}>{threshold} approvals required</span>}
     </Rise>
   )

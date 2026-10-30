@@ -122,6 +122,6 @@
 
   &__hint {
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: var(--field-hint-font-size, 0.8rem);
   }
 }

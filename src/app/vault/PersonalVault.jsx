@@ -8,16 +8,20 @@ import useSWR from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import clsx from 'clsx'
 import { Rise } from 'cube-motion/react'
-import { ArrowDownLeftIcon, ArrowUpRightIcon, KeyIcon, ShieldCheckIcon, WalletIcon } from '@phosphor-icons/react'
+import { ArrowUpRightIcon, KeyIcon, ListChecksIcon, PlusIcon, ShieldCheckIcon, WalletIcon } from '@phosphor-icons/react'
 import { formatUnits, isAddress, parseUnits, toHex } from 'viem'
 import PageTitle from '@/components/PageTitle'
 import { WalletConnectDialog } from '@/components/ConnectWallet'
 import { Spinner } from '@/components/Loading'
+import CopyButton from '@/components/ui/CopyButton'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useVaultTransaction } from '@/hooks/useVaultTransaction'
 import { approvalSignatures, factoryAbi, factoryAbiFor, historyEventsFor, normalizeProposal, proposalStatus, readToken, readVault, receiptEvent, safeAbi, safeAbiFor, simulateTransfer, transactionArgs, validAddress, vaultSetup, verifyDeployment } from '@/lib/personalVault'
 import styles from './page.module.scss'
 import VaultIllustration, { ChainLogo } from './VaultIllustration'
+import CreateVaultDialog from './CreateVaultDialog'
+import VaultAttribution from './VaultAttribution'
+import ImportVaultDialog from './ImportVaultDialog'
 
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 })
 const short = (value) => `${value.slice(0, 6)}…${value.slice(-4)}`
@@ -38,17 +42,24 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
   const mounted = useClientMounted()
   const router = useRouter()
   const connectRef = useRef(null)
+  const createRef = useRef(null)
+  const importRef = useRef(null)
   const busyRef = useRef(false)
   const { send, pending } = useVaultTransaction()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [chainId, setChainId] = useState(Number(initialChain) || config.chains.find((chain) => deployments[chain.id])?.id)
+  const [chainId] = useState(Number(initialChain) || config.chains.find((chain) => deployments[chain.id])?.id)
+  const [createChainId, setCreateChainId] = useState(null)
+  const [importChainId, setImportChainId] = useState(null)
   const [token, setToken] = useState('')
   const [kind, setKind] = useState('native')
   const [proposal, setProposal] = useState(null)
   const chain = config.chains.find((entry) => entry.id === chainId)
+  const createChain = config.chains.find((entry) => entry.id === (createChainId ?? chainId))
   const deployment = deployments[chainId]
+  const availableChains = config.chains.filter((entry) => deployments[entry.id])
+  const defaultModalChainId = deployment ? chainId : availableChains[0]?.id
   const vault = isAddress(initialVault) ? initialVault : null
   const client = chain ? getPublicClient(config, { chainId }) : null
   const blocked = busy || Boolean(pending)
@@ -73,10 +84,6 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
   }, { shouldRetryOnError: false, revalidateOnFocus: false })
   const approved = status.data?.approvals.filter((item) => item.approved) || []
   const mine = status.data?.approvals.find((item) => item.owner.toLowerCase() === address?.toLowerCase())
-  const chooseChain = (next) => {
-    if (initialVault) router.push(`/vault?chain=${next}`)
-    else setChainId(next)
-  }
 
   const act = async (task) => {
     if (busyRef.current) return
@@ -106,7 +113,11 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
     const fields = new FormData(event.currentTarget)
     act(async () => {
       if (!address) throw new Error('Connect a signing wallet first.')
-      const setup = vaultSetup(String(fields.get('owners')).split(/[\n,]+/).filter((entry) => entry.trim()), Number(fields.get('threshold')), address)
+      const chainId = Number(fields.get('chainId'))
+      const deployment = deployments[chainId]
+      if (!deployment) throw new Error('Choose a supported vault network.')
+      const client = getPublicClient(config, { chainId })
+      const setup = vaultSetup(fields.getAll('owners').map((entry) => String(entry).trim()), Number(fields.get('threshold')), address)
       await verifyDeployment(client, deployment)
       const salt = BigInt(toHex(crypto.getRandomValues(new Uint8Array(32))))
       const args = [deployment.singleton.address, setup.initializer, salt]
@@ -118,7 +129,25 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
       // A database outage must never turn a confirmed creation into a prompt to deploy again.
       // The opened vault page retries registration and exposes a retry action if needed.
       await registerVault(chainId, created.proxy).catch(() => null)
+      createRef.current?.close()
       router.push(urlFor(chainId, created.proxy))
+    })
+  }
+
+  const importVault = (event) => {
+    event.preventDefault()
+    const fields = new FormData(event.currentTarget)
+    act(async () => {
+      const targetChainId = Number(fields.get('chainId'))
+      const targetDeployment = deployments[targetChainId]
+      if (!targetDeployment) throw new Error('Choose a supported vault network.')
+      const target = validAddress(String(fields.get('address')).trim())
+      const targetClient = getPublicClient(config, { chainId: targetChainId })
+      await readVault(targetClient, target, targetDeployment)
+      await registerVault(targetChainId, target)
+      await myVaults.mutate().catch(() => null)
+      importRef.current?.close()
+      router.push(urlFor(targetChainId, target))
     })
   }
 
@@ -167,6 +196,17 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
     <>
       <PageTitle name="Vault" containerWidth="medium" />
       {mounted && <WalletConnectDialog ref={connectRef} />}
+      {mounted && <CreateVaultDialog ref={createRef} address={address} chain={createChain} chains={availableChains} deployments={deployments} deployment={deployments[createChain?.id]} busy={blocked} pending={pending} error={error} onSubmit={create} onNetworkChange={(next) => {
+        setError('')
+        setCreateChainId(next)
+      }} onConnect={() => {
+        createRef.current?.close()
+        connectRef.current?.open()
+      }} />}
+      {mounted && <ImportVaultDialog ref={importRef} chainId={importChainId ?? defaultModalChainId} chains={availableChains} deployments={deployments} busy={blocked} error={error} onSubmit={importVault} onNetworkChange={(next) => {
+        setError('')
+        setImportChainId(next)
+      }} />}
       <div className={styles.vault}>
         <div className={clsx('__container', styles.vault__container)} data-width="medium">
           <header className={styles.vault__hero}>
@@ -176,35 +216,35 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
               <p>A personal vault controlled by your signing wallets. A little more peace of mind for everything you hold.</p>
               <div className={styles.vault__heroActions}>{mounted && !address ? <button className={styles.vault__button} onClick={() => connectRef.current?.open()}><WalletIcon size={18} /> Connect wallet</button> : <span className={styles.vault__badge}><KeyIcon size={14} /> Multiple approvals</span>}</div>
             </Rise>
-            <VaultIllustration chain={chain} version={deployment?.version} threshold={snapshot.data?.threshold} />
+            <VaultIllustration threshold={snapshot.data?.threshold} />
           </header>
-          <div className={styles.vault__features}>
-            <div><ArrowDownLeftIcon size={19} /><span><strong>Receive</strong><small>One address for your assets</small></span></div>
-            <div><ShieldCheckIcon size={19} /><span><strong>Approve together</strong><small>Your chosen signing threshold</small></span></div>
-            <div><ArrowUpRightIcon size={19} /><span><strong>Send with control</strong><small>Review every transfer</small></span></div>
-          </div>
-          <section className={styles.vault__card} aria-label="Open a vault">
-            <div className={styles.vault__sectionHeading}><span className={styles.vault__step}>01</span><div><h2>Choose your network</h2><p>Your vault lives on the network you select.</p></div></div>
-            <div className={styles.vault__networks} role="group" aria-label="Quick network selection">
-              {config.chains.map((entry) => <button type="button" key={entry.id} className={clsx(styles.vault__network, chainId === entry.id && styles['vault__network--selected'])} aria-pressed={chainId === entry.id} disabled={blocked} onClick={() => chooseChain(entry.id)} title={!deployments[entry.id] ? `${entry.name} · creation unavailable` : entry.name}><ChainLogo chainId={entry.id} size={28} /><span>{entry.name}</span><small className={styles.vault__networkVersion}>{deployments[entry.id] ? `Safe ${deployments[entry.id].version}` : 'Unavailable'}</small></button>)}
+          <section className={styles.vault__features} aria-label="How your vault works">
+            <div className={styles.vault__feature}>
+              <span className={styles.vault__featureIcon}><WalletIcon size={23} weight="duotone" /></span>
+              <div><strong>One vault address</strong><p>Receive funds in one place, on the network you choose.</p></div>
             </div>
-            <form className={styles.vault__form} onSubmit={(event) => {
-              event.preventDefault()
-              const entry = String(new FormData(event.currentTarget).get('address')).trim()
-              act(async () => {
-                validAddress(entry)
-                await readVault(client, entry, deployment)
-                await registerVault(chainId, entry).catch(() => null)
-                router.push(urlFor(chainId, entry))
-              })
-            }}>
-              {!deployment && <p className={styles.vault__notice}>Supported Safe deployments are not listed for this network. Choose another network.</p>}
-              <details className={styles.vault__existing} open={Boolean(initialVault)}><summary>Already have a vault? Open it here <ArrowUpRightIcon size={15} /></summary><div className={styles.vault__form}><label>Vault address<input name="address" placeholder="0x…" defaultValue={initialVault} required pattern="0x[a-fA-F0-9]{40}" /></label><button className={styles.vault__secondary} disabled={!deployment || blocked}>Open vault</button></div></details>
-            </form>
+            <div className={styles.vault__feature}>
+              <span className={styles.vault__featureIcon}><ShieldCheckIcon size={23} weight="duotone" /></span>
+              <div><strong>Your approval rules</strong><p>Choose your signing wallets and how many must approve.</p></div>
+            </div>
+            <div className={styles.vault__feature}>
+              <span className={styles.vault__featureIcon}><ListChecksIcon size={23} weight="duotone" /></span>
+              <div><strong>Review before sending</strong><p>Check the asset, amount and recipient for every transfer.</p></div>
+            </div>
           </section>
-          <section className={styles.vault__card} aria-label="My vaults">
-            <div className={styles.vault__row}><h2>My vaults</h2>{mounted && address && <button type="button" className={styles.vault__secondary} disabled={myVaults.isValidating} onClick={() => myVaults.mutate()}>Refresh</button>}</div>
-            <p>Vaults linked to your signing wallet, available on every device.</p>
+          <section className={styles.vault__myVaults} aria-label="My vaults">
+            <div className={styles.vault__listHeader}>
+              <div className={styles.vault__listTitle}><h2>My vaults</h2><p>Vaults linked to your signing wallet, available on every device.</p></div>
+              <div className={styles.vault__row} role="group" aria-label="Vault actions"><button type="button" className={styles.vault__button} disabled={!mounted || !defaultModalChainId || blocked} onClick={() => {
+              setError('')
+              setCreateChainId(defaultModalChainId)
+              createRef.current?.open()
+            }}><PlusIcon size={18} /> New vault</button><button type="button" className={styles.vault__secondary} disabled={!mounted || !defaultModalChainId || blocked} onClick={() => {
+              setError('')
+              setImportChainId(defaultModalChainId)
+              importRef.current?.open()
+            }}><WalletIcon size={18} /> Import vault</button></div>
+            </div>
             {(!mounted || !address) ? <div className={styles.vault__empty}><WalletIcon size={26} /><p>Connect a signing wallet to find your vaults.</p><button type="button" className={styles.vault__secondary} disabled={!mounted} onClick={() => connectRef.current?.open()}>Connect wallet</button></div> : <>
               {myVaults.isLoading && <Spinner size={20} label="Loading your vaults" />}
               {myVaults.error && <p className={styles.vault__error} role="alert">{errorText(myVaults.error)} <button type="button" onClick={() => myVaults.mutate()}>Retry</button></p>}
@@ -212,8 +252,8 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
                 await registration.mutate()
                 setMessage('Vault saved to My vaults.')
               })}>{registration.isValidating ? 'Saving…' : 'Save vault'}</button></div>}
-              {myVaults.data && !myVaults.data.some((page) => page.vaults.length) && <p>No vaults recorded for this wallet yet. Create one below or open an existing vault to add it.</p>}
-              <div className={styles.vault__savedGrid}>{myVaults.data?.flatMap((page) => page.vaults).map((item) => <a key={`${item.chainId}-${item.address}`} className={clsx(styles.vault__savedVault, item.chainId === chainId && item.address.toLowerCase() === vault?.toLowerCase() && styles['vault__savedVault--active'])} href={urlFor(item.chainId, item.address)}><ChainLogo chainId={item.chainId} size={30} /><span><strong>{config.chains.find((entry) => entry.id === item.chainId)?.name || `Network ${item.chainId}`}</strong><code>{short(item.address)}</code><small>{item.threshold} of {item.signerCount} approvals · Safe {item.version}</small></span><ArrowUpRightIcon size={18} /></a>)}</div>
+              {myVaults.data && !myVaults.data.some((page) => page.vaults.length) && <p>No vaults recorded for this wallet yet. Choose New vault to create one, or open an existing vault to add it.</p>}
+              <div className={styles.vault__savedGrid}>{myVaults.data?.flatMap((page) => page.vaults).map((item) => <SavedVaultCard key={`${item.chainId}-${item.address}`} item={item} active={item.chainId === chainId && item.address.toLowerCase() === vault?.toLowerCase()} />)}</div>
               {myVaults.data?.at(-1)?.nextCursor != null && <button type="button" className={styles.vault__secondary} disabled={myVaults.isValidating} onClick={() => myVaults.setSize(myVaults.size + 1)}>Load more vaults</button>}
             </>}
           </section>
@@ -222,16 +262,6 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
           {blocked && <p className={styles.vault__row} role="status"><Spinner size={18} /> {pending || 'Checking vault…'}</p>}
           {!chain && <p role="alert" className={styles.vault__error}>This network is not configured in Hup. Choose a supported network.</p>}
 
-          {!initialVault && <section className={styles.vault__card}>
-            <div className={styles.vault__sectionHeading}><span className={styles.vault__step}>02</span><div><h2>Give your vault its keys</h2><p>Separate wallets. Shared approval.</p></div><KeyIcon size={24} className={styles.vault__sectionIcon} /></div>
-            <p>Choose wallets you control. Two of three signers is a useful starting point. Signers pay network gas for approvals and execution.</p>
-            <form className={styles.vault__form} onSubmit={create}>
-              <label>Signing wallets · one address per line<textarea key={mounted && address ? address : 'disconnected'} name="owners" rows={4} defaultValue={mounted && address ? `${address}\n` : ''} placeholder="Main wallet&#10;Hardware wallet&#10;Recovery wallet" required /></label>
-              <label>Approvals required<input name="threshold" type="number" min="2" max="10" step="1" defaultValue="2" required /></label>
-              <p>Keep enough signers available to meet the threshold. Hup cannot recover lost keys. Signer changes require the vault’s approval threshold through a compatible Safe interface.</p>
-              <button className={styles.vault__button} disabled={!mounted || !address || !deployment || blocked}>Create vault</button>
-            </form>
-          </section>}
           {initialVault && !vault && <p role="alert" className={styles.vault__error}>Invalid vault address.</p>}
           {snapshot.isLoading && <Spinner label="Loading vault" />}
           {snapshot.error && <p className={styles.vault__error} role="alert">{errorText(snapshot.error)} <button onClick={() => snapshot.mutate()}>Retry</button></p>}
@@ -285,10 +315,33 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
             </section>}
             <VaultHistory key={`${chainId}-${vault}`} client={client} vault={vault} chain={chain} deployment={deployment} nonce={snapshot.data.nonce.toString()} />
           </>}
+          <footer><VaultAttribution /></footer>
         </div>
       </div>
     </>
   )
+}
+
+function SavedVaultCard({ item, active }) {
+  const config = useConfig()
+  const chain = config.chains.find((entry) => entry.id === item.chainId)
+  const balance = useSWR(chain ? ['personal-vault-native-balance', item.chainId, item.address] : null, () => getPublicClient(config, { chainId: item.chainId }).getBalance({ address: item.address }), { refreshInterval: 30_000, shouldRetryOnError: false })
+  const currency = chain?.nativeCurrency
+  const amount = balance.data == null || !currency ? null : formatUnits(balance.data, currency.decimals)
+  const display = amount != null && balance.data > 0n && Number(amount) < 0.000001 ? '<0.000001' : amount != null ? amountLabel(balance.data, currency.decimals) : '—'
+
+  return <article className={clsx(styles.vault__savedVault, active && styles['vault__savedVault--active'])}>
+    <a className={styles.vault__savedLink} href={urlFor(item.chainId, item.address)} aria-label={`Open vault ${item.address}`} />
+    <span className={styles.vault__savedHeading}><ChainLogo chainId={item.chainId} size={24} /><strong>{chain?.name || `Network ${item.chainId}`}</strong><ArrowUpRightIcon size={15} /></span>
+    <span className={styles.vault__savedBalance} title={amount != null ? `${amount} ${currency.symbol}` : undefined}>
+      {balance.isLoading ? <Spinner size={16} label="Loading native balance" /> : <strong>{balance.error ? '—' : display}</strong>}
+      <span>{currency?.symbol || 'Native coin'}</span>
+    </span>
+    {balance.error && <small>Balance unavailable</small>}
+    <span className={styles.vault__savedAddress}><code>{short(item.address)}</code><CopyButton value={item.address} title="Copy vault address" className={styles.vault__savedCopy} /></span>
+    <small>{item.threshold} of {item.signerCount} approvals</small>
+    <small>Safe {item.version}</small>
+  </article>
 }
 
 function VaultHistory({ client, vault, chain, deployment, nonce }) {

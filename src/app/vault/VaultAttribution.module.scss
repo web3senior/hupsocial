@@ -1,0 +1,16 @@
+.attribution {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.8rem 0;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.5;
+
+  a { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--foreground); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 4px; border-radius: 3px; }
+  &__logo { width: 14px; height: 14px; flex-shrink: 0; background: currentColor; mask: url('/logos/safe.svg') center / contain no-repeat; }
+}

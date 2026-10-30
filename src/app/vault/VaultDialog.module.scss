@@ -1,0 +1,36 @@
+.vaultDialog {
+  &__content { --field-hint-font-size: 0.72rem; display: grid; gap: 1rem; }
+  &__networkGroup { display: grid; gap: 0.7rem; margin-top: 0.75rem; min-width: 0; }
+  &__form { display: grid; gap: 0.85rem; }
+  &__networkGroup > strong { font-size: 0.85rem; font-weight: 600; }
+  &__wallets { display: grid; gap: 0.7rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+  &__wallets legend { padding: 0 0 0.5rem; font-size: 0.85rem; font-weight: 600; }
+  &__remove { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; }
+  &__remove:hover:not(:disabled) { background: var(--surface-muted); color: var(--foreground); }
+  &__remove:disabled { opacity: 0.35; cursor: not-allowed; }
+  &__add { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 40px; border: 1px dashed var(--border); border-radius: 10px; background: transparent; color: var(--accent-primary); font: inherit; font-size: 0.8rem; cursor: pointer; }
+  &__add:disabled { opacity: 0.4; cursor: not-allowed; }
+  &__note { margin: 0; color: var(--text-muted); font-size: 0.72rem; line-height: 1.6; }
+  &__error { margin: 0; padding: 0.8rem; border: 1px solid #c85151; border-radius: 10px; color: var(--foreground); font-size: 0.8rem; line-height: 1.5; overflow-wrap: anywhere; }
+  &__status { display: flex; align-items: center; gap: 0.6rem; margin: 0; color: var(--text-muted); font-size: 0.8rem; }
+  &__actions { display: flex; gap: 0.7rem; margin-top: 1rem; }
+
+  &__cancel, &__submit {
+    flex: 1;
+    min-height: 44px;
+    padding: 0.65rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+    &:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+  }
+
+  &__submit { background: var(--accent-primary); color: var(--app-accent-text); border-color: transparent; }
+}

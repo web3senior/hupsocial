@@ -1,7 +1,18 @@
 # Personal vault v1
 
-The page is available directly at `/vault`; its sidebar entry is intentionally hidden while
-the feature is under development.
+The page is available at `/vault` and through the Vault sidebar entry.
+
+Choose New vault to open the shared DialogSheet creation modal, then select a network.
+The modal uses Hup's TextField inputs, shared VaultNetworkPicker cards and NativeDialog behavior;
+dismissal is disabled while creation is pending. Signers are individual address fields with
+add/remove controls, bounded by the shared signer limits. The approval count cannot exceed
+the number of fields. Changing the modal network preserves signer drafts and does not change
+an opened vault or switch the wallet until creation is submitted. The matching Safe version
+is shown from the selected deployment. Page and modal attribution link to Safe.
+
+Import vault opens a separate DialogSheet with the same network cards and a public address
+field. It verifies the deployed Safe, records its signers in the database, and opens the vault.
+The import modal does not accept keys and makes no onchain transaction.
 
 Open `/vault`, choose a network, connect a signing wallet, and create a Safe with 2–10
 distinct owners and a threshold of at least two. The connected account must be one owner.

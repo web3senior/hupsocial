@@ -10,6 +10,7 @@ import {
   CalendarBlankIcon,
   ChartBarIcon,
   ChartLineUpIcon,
+  VaultIcon,
   CurrencyCircleDollarIcon,
   CurrencyDollarIcon,
   HandshakeIcon,
@@ -68,7 +69,7 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'insights', name: 'Insights', path: '/insights', icon: ChartBarIcon },
   // Your own sales, so it sits with the rest of your account rather than in the market block
   { id: 'revenue', name: 'Money', path: '/revenue', icon: CurrencyDollarIcon },
-  // Vault is available at /vault while its sidebar entry is hidden during development.
+  { id: 'personal-vault', name: 'Vault', path: '/vault', icon: VaultIcon },
 ]
 
 export const MORE_NAV_ITEMS_SCHEMA = [

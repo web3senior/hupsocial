@@ -8,6 +8,7 @@ export const safeAbi = safeArtifact.abi
 export const factoryAbi = factoryArtifact.abi
 export const safeAbiFor = (deployment) => deployment?.version === '1.3.0' ? safe130.abi : safeAbi
 export const factoryAbiFor = (deployment) => deployment?.version === '1.3.0' ? factory130.abi : factoryAbi
+export const VAULT_SIGNER_LIMITS = Object.freeze({ min: 2, max: 10, defaultThreshold: 2 })
 export const lsp7Abi = parseAbi([
   'function transfer(address from, address to, uint256 amount, bool force, bytes data)',
 ])
@@ -19,10 +20,10 @@ export function validAddress(value) {
 
 export function vaultSetup(rawOwners, threshold, connected) {
   const owners = rawOwners.map((owner) => validAddress(owner.trim()))
-  if (owners.length < 2 || owners.length > 10) throw new Error('Choose between 2 and 10 signing wallets.')
+  if (owners.length < VAULT_SIGNER_LIMITS.min || owners.length > VAULT_SIGNER_LIMITS.max) throw new Error(`Choose between ${VAULT_SIGNER_LIMITS.min} and ${VAULT_SIGNER_LIMITS.max} signing wallets.`)
   if (new Set(owners.map((owner) => owner.toLowerCase())).size !== owners.length) throw new Error('Each signing wallet must be different.')
   if (owners.some((owner) => BigInt(owner) === 1n)) throw new Error('The sentinel address cannot be a signer.')
-  if (!Number.isInteger(threshold) || threshold < 2 || threshold > owners.length) throw new Error('Require at least 2 approvals, up to the number of signers.')
+  if (!Number.isInteger(threshold) || threshold < VAULT_SIGNER_LIMITS.min || threshold > owners.length) throw new Error(`Require at least ${VAULT_SIGNER_LIMITS.min} approvals, up to the number of signers.`)
   if (!connected || !owners.some((owner) => owner.toLowerCase() === connected.toLowerCase())) throw new Error('Include your connected wallet as a signer.')
   return { owners, threshold, initializer: encodeFunctionData({ abi: safeAbi, functionName: 'setup', args: [owners, BigInt(threshold), zeroAddress, '0x', zeroAddress, zeroAddress, 0n, zeroAddress] }) }
 }
