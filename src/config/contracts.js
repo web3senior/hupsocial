@@ -7,6 +7,9 @@
 import { arbitrum, avalanche, base, baseSepolia, bsc, celo, hedera, lukso, mainnet, monad, polygon, soneium } from 'wagmi/chains'
 import { defineChain } from 'viem'
 
+soneium.name = 'Soneium'
+bsc.name = 'BSC'
+
 // Arbitrum Orbit L2, ETH as gas
 export const robinhood = defineChain({
   id: 4663,
@@ -55,7 +58,8 @@ export const arc = defineChain({
 // (56 blocks datacenter IPs, 42 answers 403, sepolia.base.org does not answer), so pin ones
 // that work. Browsers need the reverse order on LUKSO — see BROWSER_RPC_URLS in config/wagmi.
 bsc.rpcUrls = { ...bsc.rpcUrls, default: { http: ['https://bsc-rpc.publicnode.com'] } }
-lukso.rpcUrls = { ...lukso.rpcUrls, default: { http: ['https://rpc.mainnet.lukso.network'] } }
+// The official RPC can reject server IPs with 403; keep the documented thirdweb fallback.
+lukso.rpcUrls = { ...lukso.rpcUrls, default: { http: ['https://rpc.mainnet.lukso.network', 'https://42.rpc.thirdweb.com'] } }
 baseSepolia.rpcUrls = {
   ...baseSepolia.rpcUrls,
   default: { http: ['https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'] },

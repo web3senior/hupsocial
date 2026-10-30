@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "vault:test": "node --import ./src/tests/personal-vault/loader.mjs --test src/tests/personal-vault/*.test.mjs",
     "dev:webpack": "next dev --webpack",
     "build:webpack": "next build --webpack",
     "ngrok": "ngrok http 3000",
@@ -32,6 +33,8 @@
     "@phosphor-icons/react": "^2.1.10",
     "@safe-global/safe-apps-provider": "^0.18.6",
     "@safe-global/safe-apps-sdk": "^9.1.0",
+    "@safe-global/safe-contracts": "1.4.1",
+    "@safe-global/safe-deployments": "^1.37.66",
     "@scure/bip39": "^2.3.0",
     "@solana/web3.js": "^1.98.4",
     "@tanstack/react-query": "^5.100.10",
@@ -69,6 +72,7 @@
     "react-dom": "19.2.8",
     "readable-sdk": "^1.0.0",
     "recharts": "^3.9.2",
+    "safe-contracts-v130": "npm:@gnosis.pm/safe-contracts@1.3.0",
     "sharp": "^0.35.3",
     "swr": "^2.4.1",
     "three": "0.183.2",
@@ -84,5 +88,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "sass": "^1.100.0"
+  },
+  "optionalDependencies": {
+    "@foundry-rs/anvil-win32-amd64": "1.7.1"
   }
 }

@@ -1,0 +1,42 @@
+.illustration {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  max-width: 360px;
+  margin: auto;
+  color: var(--accent-primary);
+
+  &__grid {
+    position: absolute;
+    inset: 12% 0 10%;
+    z-index: -1;
+    background-image: radial-gradient(var(--text-muted) 0.7px, transparent 0.7px);
+    background-size: 17px 17px;
+    opacity: 0.15;
+    mask-image: radial-gradient(ellipse, #000 25%, transparent 70%);
+  }
+
+  &__svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+  &__network {
+    position: absolute;
+    bottom: 17%;
+    right: 1%;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--background);
+    box-shadow: 0 8px 24px #00000018;
+    color: var(--foreground);
+
+    span { display: grid; gap: 0.15rem; }
+    strong { max-width: 130px; font-size: 0.75rem; }
+    small { color: var(--text-muted); font-size: 0.65rem; }
+  }
+
+  &__caption { display: block; margin-top: -0.4rem; text-align: center; color: var(--text-muted); font-size: 0.7rem; letter-spacing: 0.02em; }
+  &__fallback { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--border); border-radius: 50%; color: var(--text-muted); }
+}
