@@ -13,10 +13,11 @@ import { getPostById } from '@/lib/api'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import Avatar from '@/components/ui/Avatar'
+import Post from '@/components/Post'
 import { amountOf, hrefOf, previewPostIdOf, quotedSubjectOf } from './notificationModel'
 import styles from './NotificationRow.module.scss'
 
-const MAX_AVATARS = 3
+const MAX_AVATARS = 10
 const READ_DELAY_MS = 1500
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
@@ -95,15 +96,24 @@ export default function NotificationRow({ group, viewerAddress, onRead }) {
       observer.disconnect()
       clearTimeout(readTimer)
     }
-  }, [isUnread, onRead, unreadIds])
+  }, [isUnread, onRead, unreadIds, post])
 
   // The row is a link in behaviour but not in markup: actor avatars and names are real anchors, and
   // an <a> can never nest inside another <a>.
   const openTarget = () => href && router.push(href)
   const handleKeyDown = (event) => {
+    if (event.target !== event.currentTarget) return
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()
     openTarget()
+  }
+
+  if (meta.previewFrom === 'child' && post) {
+    return (
+      <div ref={rowRef} className={styles.row__post}>
+        <Post item={post} actions={['comment', 'repost', 'like', 'view', 'bookmark', 'share']} />
+      </div>
+    )
   }
 
   return (
@@ -117,7 +127,7 @@ export default function NotificationRow({ group, viewerAddress, onRead }) {
       onKeyDown={href ? handleKeyDown : undefined}
     >
       <span className={styles.row__icon}>
-        <Icon size={22} weight={meta.weight || 'regular'} />
+        <Icon size={30} weight={meta.weight || 'regular'} />
       </span>
 
       <div className={styles.row__body}>
@@ -137,17 +147,18 @@ export default function NotificationRow({ group, viewerAddress, onRead }) {
         {(preview?.text || preview?.media) && (
           <div className={styles.row__preview}>
             {preview.text && <p className={styles.row__previewText}>{preview.text}</p>}
-            {preview.media && (
-              <span className={styles.row__thumb}>
-                <Image src={preview.media} alt="" width={96} height={96} unoptimized />
-              </span>
-            )}
+
           </div>
         )}
 
         {amount && <span className={styles.row__amount}>{amount}</span>}
       </div>
 
+      {preview?.media && (
+        <span className={styles.row__thumb}>
+          <Image src={preview.media} alt="Post attachment" width={96} height={96} unoptimized />
+        </span>
+      )}
       {isUnread && <span className={styles.row__dot} aria-label="Unread" />}
     </article>
   )
@@ -187,7 +198,7 @@ function ActorAvatar({ address }) {
 
   return (
     <Link href={profilePath(address, profile.username)} className={styles.row__avatar} onClick={(event) => event.stopPropagation()} title={profile.fullName || profile.name}>
-      <Avatar src={profile.profileImage} alt={profile.name} size={32} />
+      <Avatar src={profile.profileImage} alt={profile.name} size={40} />
     </Link>
   )
 }

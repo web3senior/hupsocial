@@ -7,6 +7,8 @@ import { create } from 'zustand'
 // would flash the previous page's title on load.
 export const usePageTitleStore = create((set) => ({
   title: '',
+  action: null,
+  setAction: (action) => set({ action }),
   // Muted second line under the title
   subtitle: '',
   // Optional { href, label } the Header renders as a back arrow before the title

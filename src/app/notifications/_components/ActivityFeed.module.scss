@@ -5,49 +5,11 @@
   flex-direction: column;
   width: 100%;
 
-  // Sits at the top of the card rather than sticking to the viewport: the shell has to clip its
-  // children to stay inside its rounded border, and a clipping ancestor cancels sticky anyway.
   &__header {
     display: flex;
-    align-items: stretch;
-    gap: 0.5rem;
+    flex-direction: column;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-  }
-
-  &__actions {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding-right: 0.75rem;
-  }
-
-  &__action {
-    --size: 2.25rem;
-
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--size);
-    height: var(--size);
-    border: none;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition:
-      background-color 0.15s var(--transition-soft),
-      color 0.15s var(--transition-soft);
-
-    &:hover:not(:disabled) {
-      background: color-mix(in srgb, var(--foreground) 8%, transparent);
-      color: var(--foreground);
-    }
-
-    &:disabled {
-      cursor: wait;
-      opacity: 0.6;
-    }
   }
 
   &__tabs {
@@ -56,7 +18,7 @@
     flex: 1;
     min-width: 0;
     gap: 0.25rem;
-    padding: 0.5rem;
+    padding: 0;
     overflow-x: auto;
     scrollbar-width: none;
 
@@ -76,12 +38,14 @@
     justify-content: center;
     gap: 0.375rem;
     white-space: nowrap;
-    padding: 0.55rem 0.75rem;
+    position: relative;
+    min-height: 3.5rem;
+    padding: 0.75rem;
     border: none;
-    border-radius: 999px;
+    border-radius: 0;
     background: transparent;
     color: var(--text-muted);
-    font-size: 0.9375rem;
+    font-size: 1rem;
     // Weight never changes with state: a bolder active label is wider, and the whole strip would
     // re-measure on every press.
     font-weight: 700;
@@ -104,8 +68,19 @@
     }
 
     &--active {
-      background: color-mix(in srgb, var(--foreground) 8%, transparent);
       color: var(--foreground);
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        width: 4rem;
+        height: 4px;
+        border-radius: 999px;
+        background: #1d9bf0;
+        transform: translateX(-50%);
+      }
     }
   }
 

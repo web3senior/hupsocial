@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { mutate as mutateGlobal } from 'swr'
 import clsx from 'clsx'
-import { ArrowsCounterClockwiseIcon, BellIcon, ChecksIcon, UserIcon, WarningCircleIcon } from '@phosphor-icons/react'
+import { BellIcon, ChecksIcon, UserIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { useConnection, useSignMessage } from 'wagmi'
 import { Spinner } from '@/components/Loading'
+import { usePageTitleStore } from '@/stores/usePageTitleStore'
 import { openConnect } from '@/lib/connectDialog'
 import NotificationRow from './NotificationRow'
-import { FILTERS, buildGroups, buildSections } from './notificationModel'
+import { FILTERS, buildGroups } from './notificationModel'
 import styles from './ActivityFeed.module.scss'
 
 // Rows collapse into groups, so a page of raw notifications yields far fewer visible rows — 40 keeps
@@ -33,6 +34,7 @@ const readSessionCache = (key) => {
 }
 
 export default function ActivityFeed() {
+  const setHeaderAction = usePageTitleStore((state) => state.setAction)
   const { address, isConnected, chain } = useConnection()
   const { mutateAsync: signMessageAsync } = useSignMessage()
 
@@ -77,7 +79,8 @@ export default function ActivityFeed() {
       try {
         const params = new URLSearchParams({
           wallet_address: address,
-          filter,
+          filter: filter === 'priority' ? 'inbox' : filter,
+          ...(filter === 'priority' && { unread: '1' }),
           page: String(page),
           limit: String(PAGE_SIZE),
         })
@@ -274,6 +277,18 @@ export default function ActivityFeed() {
     }
   }, [address, chain, totalUnread, refreshCounts, signMessageAsync])
 
+  useEffect(() => {
+    setHeaderAction({
+      pathname: '/notifications',
+      label: 'Mark all as read',
+      icon: ChecksIcon,
+      onClick: markAllAsRead,
+      disabled: !isConnected || totalUnread === 0,
+    })
+
+    return () => setHeaderAction(null)
+  }, [isConnected, totalUnread, markAllAsRead, setHeaderAction])
+
   const groups = useMemo(() => {
     if (!isConnected || !address) return []
 
@@ -283,32 +298,14 @@ export default function ActivityFeed() {
     return buildGroups(owned)
   }, [address, isConnected, notifications])
 
-  const sections = useMemo(() => buildSections(groups), [groups])
-
   const activeFilter = FILTERS.find((entry) => entry.id === filter) || FILTERS[0]
   const hasGroups = groups.length > 0
   const retry = () => (nextPage && hasGroups ? loadNotifications({ page: nextPage, append: true }) : loadNotifications())
 
-  if (!isConnected) {
-    return (
-      <div className={styles.feed}>
-        <div className={styles.feed__empty}>
-          <UserIcon size={28} />
-          <p>Connect your wallet to see your notifications.</p>
-          <button type="button" className={styles.feed__more} onClick={() => openConnect()}>
-            Connect wallet
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className={styles.feed}>
-      {/* The page name lives in the app header via PageTitle, so this bar carries only the
-          tab switcher and the feed's own actions. */}
       <header className={styles.feed__header}>
-        <nav className={styles.feed__tabs}>
+        <nav className={styles.feed__tabs} aria-label="Notification filters">
           {FILTERS.map((entry) => (
             <button
               key={entry.id}
@@ -327,30 +324,6 @@ export default function ActivityFeed() {
           ))}
         </nav>
 
-        {/* Both buttons render unconditionally: a control appearing on state change would resize
-            the tab strip beside it. */}
-        <div className={styles.feed__actions}>
-          <button
-            type="button"
-            className={styles.feed__action}
-            onClick={markAllAsRead}
-            disabled={totalUnread === 0}
-            title="Mark all as read"
-            aria-label="Mark all as read"
-          >
-            <ChecksIcon size={18} />
-          </button>
-          <button
-            type="button"
-            className={styles.feed__action}
-            onClick={() => loadNotifications()}
-            disabled={isLoading}
-            title="Refresh"
-            aria-label="Refresh notifications"
-          >
-            {isLoading ? <Spinner size={18} color="currentColor" label="Refreshing" /> : <ArrowsCounterClockwiseIcon size={18} />}
-          </button>
-        </div>
       </header>
 
       <div
@@ -369,22 +342,22 @@ export default function ActivityFeed() {
           </div>
         )}
 
-        {!isLoading && !hasGroups && !error && (
+        {isConnected && !isLoading && !hasGroups && !error && (
           <div className={styles.feed__empty}>
             <BellIcon size={28} />
             <p>{activeFilter.empty}</p>
           </div>
         )}
 
-        {sections.map((section) => (
-          <section key={section.id} className={styles.feed__section} aria-labelledby={`notifications-${section.id}`}>
-            <h2 id={`notifications-${section.id}`} className={styles.feed__sectionTitle}>
-              {section.label}
-            </h2>
-            {section.groups.map((group) => (
-              <NotificationRow key={group.key} group={group} viewerAddress={address} onRead={markAsRead} />
-            ))}
-          </section>
+        {!isConnected && (
+          <div className={styles.feed__empty}>
+            <UserIcon size={28} />
+            <p>Connect your wallet to see your notifications.</p>
+            <button type="button" className={styles.feed__more} onClick={() => openConnect()}>Connect wallet</button>
+          </div>
+        )}
+        {groups.map((group) => (
+          <NotificationRow key={group.key} group={group} viewerAddress={address} onRead={markAsRead} />
         ))}
       </div>
 

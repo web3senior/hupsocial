@@ -78,6 +78,7 @@ const useTitleCell = (isActive, pathname) => {
 
 export default function Header() {
   const pathname = usePathname()
+  const action = usePageTitleStore((state) => state.action)
   const title = usePageTitleStore((state) => state.title)
   const subtitle = usePageTitleStore((state) => state.subtitle)
   const back = usePageTitleStore((state) => state.back)
@@ -133,6 +134,18 @@ export default function Header() {
                 </h1>
                 {subtitle && <p className={styles.header__subtitle}>{subtitle}</p>}
               </div>
+            )}
+            {action?.pathname === pathname && (
+              <button
+                type="button"
+                className={styles.header__action}
+                onClick={action.onClick}
+                disabled={action.disabled}
+                title={action.label}
+                aria-label={action.label}
+              >
+                <action.icon size={20} />
+              </button>
             )}
           </div>
         </div>

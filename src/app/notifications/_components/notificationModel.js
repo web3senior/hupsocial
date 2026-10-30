@@ -22,14 +22,11 @@ import {
 import { formatUnits } from 'viem'
 import { offerHref } from '@/lib/nftLinks'
 
-// Tabs mirror the `filter` values the notifications API understands. "All" deliberately
-// leaves out your own activity (post indexed, you liked a post) — that lives under "You",
-// exactly like X keeps the feed to things other people did to you.
+// Priority shows unread incoming activity using the existing inbox endpoint.
 export const FILTERS = [
   { id: 'inbox', label: 'All', empty: 'Nothing from anyone yet.' },
+  { id: 'priority', label: 'Priority', empty: 'You are all caught up. No unread notifications.' },
   { id: 'mentions', label: 'Mentions', empty: 'No replies, quotes or mentions yet.' },
-  { id: 'money', label: 'Money', empty: 'No tips, sales, offers or bets yet.' },
-  { id: 'you', label: 'You', empty: 'Your own activity will show up here.' },
 ]
 
 const DEFAULT_META = { icon: BellIcon, tone: 'neutral', group: 'none' }

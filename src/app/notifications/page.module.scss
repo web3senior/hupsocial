@@ -6,8 +6,8 @@
     position: relative;
     background-color: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--page-border-radius);
-    box-shadow: var(--card-elevation, 0px 0px 8px rgba(0, 0, 0, 0.04));
+    border-radius: 0;
+    box-shadow: none;
     overflow: clip;
     isolation: isolate;
     // Rows carry their own padding and run edge to edge, so the shell adds none.
