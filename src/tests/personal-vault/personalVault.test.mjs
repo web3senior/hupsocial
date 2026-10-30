@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 import { resolve } from 'node:path'
 import { after, before, test } from 'node:test'
-import { createPublicClient, createWalletClient, decodeFunctionData, encodeFunctionData, erc20Abi, http, keccak256, parseEther, zeroAddress } from 'viem'
+import { createPublicClient, createWalletClient, decodeFunctionData, encodeFunctionData, erc20Abi, http, keccak256, parseEther, toHex, zeroAddress } from 'viem'
 import { mnemonicToAccount } from 'viem/accounts'
 import { foundry } from 'viem/chains'
 import safeArtifact from '@safe-global/safe-contracts/build/artifacts/contracts/SafeL2.sol/SafeL2.json'
@@ -23,6 +23,22 @@ let wallets
 let deployment
 let vault
 const deployments = {}
+
+test('LSP7 token symbols come from LSP4 when ERC20 symbol() is absent', async () => {
+  const token = accounts[1].address
+  const metadataClient = {
+    getCode: async () => '0x01',
+    readContract: async ({ functionName }) => {
+      if (functionName === 'decimals') return 18
+      if (functionName === 'balanceOf') return 4n * 10n ** 18n
+      if (functionName === 'getData') return toHex('POTATO')
+      throw new Error('symbol() is not implemented')
+    },
+  }
+  const result = await readToken(metadataClient, token, accounts[0].address)
+  assert.equal(result.symbol, 'POTATO')
+  assert.equal(result.balance, 4n * 10n ** 18n)
+})
 
 before(async () => {
   const listener = createServer()

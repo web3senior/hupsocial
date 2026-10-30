@@ -1,8 +1,9 @@
-// Best-effort token profile via GeckoTerminal's public single-token endpoint (no key),
+// Best-effort token profile via the configured LUKSO index and GeckoTerminal (no key),
 // server-side only. Same contract as tokenLogos.js: this is reading material, so every
 // failure path resolves to null and the UI renders identity-only instead of erroring.
 
 import { GECKOTERMINAL_NETWORKS } from '@/lib/tokenLogos'
+import { supportsTokenScan } from '@/lib/luksoAssets'
 
 const GECKOTERMINAL_ENDPOINT = 'https://api.geckoterminal.com/api/v2/networks'
 // Prices and volume drift by the minute, but this feeds an info card, not the quote path —
@@ -39,6 +40,30 @@ export async function fetchTokenInfo(chainId, address) {
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.info
 
   let info = null
+  // The index retains LSP4 artwork when its original IPFS document is unavailable.
+  if (supportsTokenScan(chainId) && process.env.NEXT_PUBLIC_LUKSO_API_ENDPOINT) {
+    try {
+      const response = await fetch(process.env.NEXT_PUBLIC_LUKSO_API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          query: `query TokenBranding($address: String!) {
+            Asset(where: {id: {_eq: $address}, isLSP7: {_eq: true}}, limit: 1) {
+              lsp4TokenName
+              lsp4TokenSymbol
+              icons(limit: 1) { src }
+            }
+          }`,
+          variables: { address: String(address).toLowerCase() },
+        }),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      })
+      const asset = response.ok ? (await response.json())?.data?.Asset?.[0] : null
+      if (asset) info = { name: asset.lsp4TokenName ?? null, symbol: asset.lsp4TokenSymbol ?? null, logo: asset.icons?.[0]?.src || null }
+    } catch {
+      // Continue with the market source when indexing is unavailable.
+    }
+  }
   try {
     const response = await fetch(`${GECKOTERMINAL_ENDPOINT}/${network}/tokens/${String(address).toLowerCase()}`, {
       headers: { Accept: 'application/json' },
@@ -49,11 +74,11 @@ export async function fetchTokenInfo(chainId, address) {
       if (attributes) {
         const image = attributes.image_url
         info = {
-          name: attributes.name ?? null,
-          symbol: attributes.symbol ?? null,
+          name: info?.name ?? attributes.name ?? null,
+          symbol: info?.symbol ?? attributes.symbol ?? null,
           decimals: toNumber(attributes.decimals),
           // GeckoTerminal returns the literal string "missing.png" for unbranded tokens
-          logo: image && image !== 'missing.png' ? image : null,
+          logo: info?.logo || (image && image !== 'missing.png' ? image : null),
           priceUsd: toNumber(attributes.price_usd),
           volume24hUsd: toNumber(attributes.volume_usd?.h24),
           fdvUsd: toNumber(attributes.fdv_usd),

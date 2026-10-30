@@ -1,4 +1,5 @@
-import { concat, decodeEventLog, encodeFunctionData, erc20Abi, getAddress, isAddress, keccak256, pad, parseAbi, toHex, zeroAddress } from 'viem'
+import { concat, decodeEventLog, encodeFunctionData, erc20Abi, getAddress, hexToString, isAddress, keccak256, pad, parseAbi, toHex, zeroAddress } from 'viem'
+import { erc725yGetDataAbi, LSP4_TOKEN_SYMBOL_KEY } from '@/lib/lsp4'
 import safeArtifact from '@safe-global/safe-contracts/build/artifacts/contracts/SafeL2.sol/SafeL2.json'
 import factoryArtifact from '@safe-global/safe-contracts/build/artifacts/contracts/proxies/SafeProxyFactory.sol/SafeProxyFactory.json'
 import safe130 from 'safe-contracts-v130/build/artifacts/contracts/GnosisSafeL2.sol/GnosisSafeL2.json'
@@ -126,7 +127,11 @@ export async function readToken(client, token, vault) {
   const code = await client.getCode({ address: token })
   if (!code || code === '0x') throw new Error('Token contract not found.')
   const read = (functionName, args = []) => client.readContract({ address: token, abi: erc20Abi, functionName, args })
-  const [decimals, balance, symbol] = await Promise.all([read('decimals'), read('balanceOf', [vault]), read('symbol').catch(() => 'TOKEN')])
+  const readSymbol = () => read('symbol').catch(async () => {
+    const bytes = await client.readContract({ address: token, abi: erc725yGetDataAbi, functionName: 'getData', args: [LSP4_TOKEN_SYMBOL_KEY] })
+    return bytes && bytes !== '0x' ? hexToString(bytes) : 'TOKEN'
+  }).catch(() => 'TOKEN')
+  const [decimals, balance, symbol] = await Promise.all([read('decimals'), read('balanceOf', [vault]), readSymbol()])
   return { decimals, balance, symbol: String(symbol).slice(0, 40) }
 }
 

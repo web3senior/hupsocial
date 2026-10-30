@@ -14,6 +14,8 @@ import PageTitle from '@/components/PageTitle'
 import { WalletConnectDialog } from '@/components/ConnectWallet'
 import { Spinner } from '@/components/Loading'
 import CopyButton from '@/components/ui/CopyButton'
+import TokenIcon from '@/components/ui/TokenIcon'
+import useTokenIcon from '@/hooks/useTokenIcon'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useVaultTransaction } from '@/hooks/useVaultTransaction'
 import { approvalSignatures, factoryAbi, factoryAbiFor, historyEventsFor, normalizeProposal, proposalStatus, readToken, readVault, receiptEvent, safeAbi, safeAbiFor, simulateTransfer, transactionArgs, validAddress, vaultSetup, verifyDeployment } from '@/lib/personalVault'
@@ -76,6 +78,8 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
   const status = useSWR(snapshot.data && current ? ['personal-vault-proposal', chainId, vault, JSON.stringify(current), snapshot.data.nonce.toString()] : null, () => proposalStatus(client, current, snapshot.data), { refreshInterval: 10_000, shouldRetryOnError: false })
   const tokenAddress = current?.kind !== 'native' && current ? current.token : token
   const tokenInfo = useSWR(snapshot.data && isAddress(tokenAddress) ? ['personal-vault-token', chainId, vault, tokenAddress] : null, () => readToken(client, tokenAddress, vault), { refreshInterval: 15_000, shouldRetryOnError: false })
+  // LSP4 artwork resolves from the token itself; plain ERC20s use TokenIcon's fallback.
+  const tokenLogo = useTokenIcon({ chainId, token: tokenAddress, enabled: Boolean(tokenInfo.data && isAddress(tokenAddress)) })
   const isOwner = snapshot.data?.owners.some((owner) => owner.toLowerCase() === address?.toLowerCase())
   const registration = useSWR(snapshot.data && address ? ['personal-vault-registration', address, chainId, vault, snapshot.data.nonce.toString()] : null, async () => {
     const record = await registerVault(chainId, vault)
@@ -273,7 +277,7 @@ export default function PersonalVault({ deployments, initialChain, initialVault,
               <label>Look up a token balance<input value={token} onChange={(event) => setToken(event.target.value.trim())} placeholder="ERC20 or LSP7 contract address" /></label>
               {tokenInfo.isLoading && <Spinner size={18} label="Loading token" />}
               {tokenInfo.error && <p role="alert" className={styles.vault__error}>{errorText(tokenInfo.error)}</p>}
-              {tokenInfo.data && <p title={formatUnits(tokenInfo.data.balance, tokenInfo.data.decimals)}>{amountLabel(tokenInfo.data.balance, tokenInfo.data.decimals)} {tokenInfo.data.symbol} · {tokenInfo.data.decimals} decimals</p>}
+              {tokenInfo.data && <p className={styles.vault__tokenBalance} title={formatUnits(tokenInfo.data.balance, tokenInfo.data.decimals)}><TokenIcon token={{ address: tokenAddress, logo: tokenLogo, symbol: tokenInfo.data.symbol }} chainId={chainId} size="md" /><span>{amountLabel(tokenInfo.data.balance, tokenInfo.data.decimals)} {tokenInfo.data.symbol} · {tokenInfo.data.decimals} decimals</span></p>}
               <h3>Receive</h3><p>Send assets on {chain.name} to this address. You can also use it in payout settings that accept a custom recipient. For LSP7, the sender must allow transfers to a contract without LSP1 receiver support.</p>
               <code className={styles.vault__address}>{vault}</code>
               <div className={styles.vault__row}><button className={styles.vault__secondary} disabled={blocked} onClick={() => copy(vault)}>Copy address</button><button className={styles.vault__secondary} disabled={blocked} onClick={() => copy(`${window.location.origin}${urlFor(chainId, vault)}`)}>Copy vault link</button>{chain.blockExplorers?.default && <a href={`${chain.blockExplorers.default.url}/address/${vault}`} target="_blank" rel="noreferrer">View in explorer</a>}</div>
