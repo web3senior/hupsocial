@@ -1,0 +1,79 @@
+[
+  {
+    "id": "7799b182",
+    "label": "LUKSO",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "lukso-7799b182"
+  },
+  {
+    "id": "6ddc608a",
+    "label": "Ethereum",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "ethereum-6ddc608a"
+  },
+  {
+    "id": "fbec2c13",
+    "label": "Base",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "base-fbec2c13"
+  },
+  {
+    "id": "72b0b8f8",
+    "label": "Celo",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "celo-72b0b8f8"
+  },
+  {
+    "id": "9687956c",
+    "label": "Monad",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "monad-9687956c"
+  },
+  {
+    "id": "7f762f7b",
+    "label": "Robinhood",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "robinhood-7f762f7b"
+  },
+  {
+    "id": "d3f951a9",
+    "label": "BNB",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "bnb-d3f951a9"
+  },
+  {
+    "id": "55cdaacf",
+    "label": "Soneium",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "soneium-55cdaacf"
+  },
+  {
+    "id": "dda1046b",
+    "label": "Arc",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "arc-dda1046b"
+  },
+  {
+    "id": "ce98b248",
+    "label": "Polygon",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "polygon-ce98b248"
+  },
+  {
+    "id": "db82231d",
+    "label": "Arbitrum",
+    "preview": false,
+    "renderer": "canvas",
+    "file": "arbitrum-db82231d"
+  }
+]

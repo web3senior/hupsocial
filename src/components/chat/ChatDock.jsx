@@ -29,6 +29,9 @@ import Avatar from '@/components/ui/Avatar'
 import MentionPicker from '@/components/MentionPicker'
 import { useProfile } from '@/hooks/useProfile'
 import EmojiPicker from '@/components/EmojiPicker'
+import StickerPicker from './StickerPicker'
+import AnimatedSticker from './AnimatedSticker'
+import { stickerBody, stickerFromBody, stickerCaption } from '@/lib/chatStickers'
 import GifPicker from '@/components/GifPicker'
 import EmptyState from '@/components/ui/EmptyState'
 import { Spinner, ContentSpinner, MessageLoader } from '@/components/Loading'
@@ -1489,6 +1492,8 @@ function ChatLine({
 }) {
   const settled = !message.pending && typeof message.id === 'number'
   const picture = message.file?.image ? message.file : null
+  const sticker = stickerFromBody(message.body)
+  const caption = stickerCaption(message.body)
   const voice = message.file?.voice ? message.file : null
   const attached = message.file && !picture && !voice ? message.file : null
   const isMedia = Boolean(message.gif || picture)
@@ -1578,9 +1583,11 @@ function ChatLine({
             </div>
           )}
           {attached && <FileChip file={attached} title={when} />}
-          {message.body && (
+          {sticker && !caption && <AnimatedSticker sticker={sticker} />}
+          {caption && (
             <p className={clsx(styles.bubble, (isMedia || attached || voice) && styles['bubble--caption'])} title={when}>
-              {splitChatText(message.body).map((part, index) =>
+              {sticker && <AnimatedSticker sticker={sticker} inline />}
+              {splitChatText(caption).map((part, index) =>
                 part.type === 'link' ? (
                   <a key={index} href={part.value} target="_blank" rel="nofollow noopener noreferrer" className={styles.bubble__link}>
                     {part.value}
@@ -1982,6 +1989,8 @@ function ReactionChip({ reaction, onReact }) {
 
 /** The first words of a quoted line, mentions collapsed to their handle. */
 const quoteText = (reply) => {
+  const sticker = stickerFromBody(reply?.body)
+  if (sticker) return stickerCaption(reply.body) || `Sticker: ${sticker.label}`
   const { text } = toEditable(reply?.body || '')
   if (text) return text
   if (reply?.gif) return 'GIF'
@@ -2181,12 +2190,16 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
   const mentionsRef = useRef(new Map())
   // A picked GIF waits here for its caption; Send carries both
   const [gif, setGif] = useState(null)
+  const [sticker, setSticker] = useState(null)
   // Pictures and files picked or pasted, uploading while the caption is written
   const attachments = useChatAttachments({ address: viewer })
   const fileInputRef = useRef(null)
   // A line carries one attachment, so staging files puts a waiting GIF away
   const attach = (files) => {
-    if (attachments.add(files)) setGif(null)
+    if (attachments.add(files)) {
+      setGif(null)
+      setSticker(null)
+    }
     requestAnimationFrame(() => inputRef.current?.focus())
   }
   // Keystrokes are not requests: the server is told at most every few seconds, and once on stop
@@ -2259,16 +2272,22 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
   const submit = async () => {
     const text = draft.trim()
     const hasAttachments = attachments.items.length > 0
-    if ((!text && !gif && !hasAttachments) || isSending) return
+    if ((!text && !gif && !sticker && !hasAttachments) || isSending) return
+    const body = sticker ? stickerBody(sticker, toWire(text)) : toWire(text)
+    if (body.length > BODY_MAX_CHARS) {
+      toast('Message is too long. Shorten the caption to send it.', 'error')
+      return
+    }
     playCue('send')
     setIsSending(true)
     setDraft('')
     setMention(null)
     reportWriting(false)
-    const sent = hasAttachments ? await sendAttachments(text) : await onSend({ body: toWire(text), gif: gif?.full?.url ?? null })
+    const sent = hasAttachments ? await sendAttachments(text) : await onSend({ body, gif: gif?.full?.url ?? null })
     if (sent) {
       mentionsRef.current.clear()
       setGif(null)
+      setSticker(null)
     } else {
       setDraft(text)
     }
@@ -2306,7 +2325,15 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
     if (!sent) attachments.restore([attachment])
   }
 
-  const canSend = draft.trim().length > 0 || Boolean(gif) || attachments.items.length > 0
+  const canSend = draft.trim().length > 0 || Boolean(gif) || Boolean(sticker) || attachments.items.length > 0
+
+  const selectSticker = (picked) => {
+    if (isSending) return
+    attachments.clear()
+    setGif(null)
+    setSticker(picked)
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
 
   return (
     <form
@@ -2330,6 +2357,15 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
             <span className={styles.staged__text}>{quoteText(replyTo)}</span>
           </div>
           <button type="button" className={styles.staged__close} onClick={onCancelReply} aria-label="Cancel reply">
+            <XIcon size={16} weight="bold" />
+          </button>
+        </div>
+      )}
+      {sticker && (
+        <div className={styles.staged}>
+          <AnimatedSticker sticker={sticker} />
+          <span className={styles.staged__hint}>Add a message, then press Send</span>
+          <button type="button" className={styles.staged__close} disabled={isSending} onClick={() => setSticker(null)} aria-label="Remove sticker">
             <XIcon size={16} weight="bold" />
           </button>
         </div>
@@ -2453,6 +2489,9 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
                 <div className={styles.composer__tool}>
                   <EmojiPicker onSelect={insertEmoji} />
                 </div>
+                <div className={styles.composer__tool}>
+                  <StickerPicker onSelect={selectSticker} disabled={isSending} />
+                </div>
                 <button
                   type="button"
                   className={styles.composer__tool}
@@ -2501,6 +2540,7 @@ function Composer({ onSend, viewer, replyTo, onCancelReply, onTyping }) {
         onSelect={(picked) => {
           attachments.clear()
           setGif(picked)
+          setSticker(null)
           requestAnimationFrame(() => inputRef.current?.focus())
         }}
       />
