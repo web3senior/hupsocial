@@ -68,8 +68,17 @@
   padding: 20px 20px 0 20px;
   place-items: stretch;
 
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: -1;
+  }
+
   @media (hover: hover) {
-    &:hover {
+    &:hover::before {
       background-color: var(--post-hover-bg);
     }
   }
@@ -234,18 +243,24 @@
   }
 
   &[data-has-comments='true'] {
-    .post {
-      &__main {
-        &:before {
-          content: '';
-          position: absolute;
-          left: 1rem;
-          top: .2rem;
-          bottom: -4rem;
-          width: 2px;
-          background-color: var(--border);
-          z-index: 0;
-        }
+    // Span the entire post, including its footer, to the next avatar's top gap.
+    &::after {
+      content: '';
+      position: absolute;
+      left: 38px;
+      top: 62px;
+      bottom: -16px;
+      width: 2px;
+      background-color: var(--border);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    @media (max-width: 640px) {
+      &::after {
+        left: 28px;
+        top: 52px;
+        bottom: -6px;
       }
     }
   }

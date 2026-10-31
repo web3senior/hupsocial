@@ -62,6 +62,10 @@
   -webkit-tap-highlight-color: transparent;
   position: relative;
 
+  > section {
+    isolation: auto;
+  }
+
   // Parent shown above a comment for thread context — clickable back to its own page
   &__parent,
   &__threadPart {
@@ -418,6 +422,7 @@
 }
 
 .grid {
+  isolation: isolate;
 }
 
 .priceIcon {
