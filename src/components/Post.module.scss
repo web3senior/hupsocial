@@ -47,6 +47,7 @@
 // --- Post ---
 .post {
   --post-button-bg: var(--surface-muted);
+  --post-hover-bg: var(--gray-50);
   // Threads' type and palette, as tokens so the light and dark blocks at the end of this file can
   // set them and the terminal theme keeps its own greens. The byline (Profile.module.scss) reads
   // --post-muted / --post-meta-size with its old values as fallbacks, so only posts change.
@@ -69,7 +70,7 @@
 
   @media (hover: hover) {
     &:hover {
-      background-color: var(--gray-50);
+      background-color: var(--post-hover-bg);
     }
   }
 
@@ -652,6 +653,7 @@
 }
 
 :global([data-theme='dark']) .post {
+  --post-hover-bg: var(--black-50, #181818);
   --post-button-bg: #20232a;
   // Threads' dark palette: off-white text, #777 secondary
   --post-text: #f3f5f7;
@@ -661,6 +663,7 @@
 }
 
 :global([data-theme='terminal']) .post {
+  --post-hover-bg: var(--hover);
   --post-button-bg: #12301c;
 }
 
@@ -669,6 +672,7 @@
 // win on specificity instead.
 :global([data-theme='dark'] [data-theme='light']) .post,
 :global([data-theme='terminal'] [data-theme='light']) .post {
+  --post-hover-bg: var(--gray-50);
   --post-button-bg: var(--surface-muted);
   --post-text: #000000;
   --post-muted: #999999;
