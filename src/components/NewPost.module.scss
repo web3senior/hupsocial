@@ -240,11 +240,17 @@ dialog.newPost {
 .byline {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
-  min-height: 24px;
+  height: 28px;
+  flex-shrink: 0;
+  overflow: hidden;
 
   &__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 0.95rem;
     font-weight: 600;
     line-height: 1.2;
@@ -274,6 +280,9 @@ dialog.newPost {
   border-radius: 8px;
 
   &:is(button) {
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.2;
     cursor: pointer;
 
     &:hover:not(:disabled) {

@@ -129,7 +129,7 @@ const getContentPayload = (existingPost) => {
 const getContentElement = (content, type) =>
   content?.elements?.find((element) => element?.type === type)
 
-const getDraftStorageKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content`
+const getDraftStorageKey = (scope = '') => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-content${scope}`
 
 // Attachment references live beside the content draft rather than inside it:
 // getSerializablePostContent spreads whatever is on the content object into the published
@@ -138,16 +138,16 @@ const getDraftStorageKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}
 // Only the poll is kept so far, and for a specific reason — a poll is created onchain before
 // it is attached, so a refresh between the two strands a real transaction with nothing
 // pointing at it. The other attachments have the same shape and the same gap.
-const getAttachmentDraftKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-attachments`
+const getAttachmentDraftKey = (scope = '') => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-attachments${scope}`
 
 // A thread's parts after the first, as an array of the same { elements } content the first part
 // keeps in getDraftStorageKey — beside it, not inside it, for the same reason as the attachments
-const getThreadDraftKey = () => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-thread`
+const getThreadDraftKey = (scope = '') => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX}post-thread${scope}`
 
-const loadThreadDraft = () => {
+const loadThreadDraft = (scope = '') => {
   if (typeof window === 'undefined') return []
   try {
-    const parsed = JSON.parse(localStorage.getItem(getThreadDraftKey()) || '[]')
+    const parsed = JSON.parse(localStorage.getItem(getThreadDraftKey(scope)) || '[]')
     return Array.isArray(parsed) ? parsed.filter((content) => Array.isArray(content?.elements)) : []
   } catch {
     return []
@@ -155,16 +155,16 @@ const loadThreadDraft = () => {
 }
 
 // Every draft slot a plain post owns, emptied together once that post has gone out
-const clearPostDrafts = () => {
-  localStorage.removeItem(getDraftStorageKey())
-  localStorage.removeItem(getAttachmentDraftKey())
-  localStorage.removeItem(getThreadDraftKey())
+const clearPostDrafts = (scope = '') => {
+  localStorage.removeItem(getDraftStorageKey(scope))
+  localStorage.removeItem(getAttachmentDraftKey(scope))
+  localStorage.removeItem(getThreadDraftKey(scope))
 }
 
-const loadAttachmentDraft = () => {
+const loadAttachmentDraft = (scope = '') => {
   if (typeof window === 'undefined') return null
   try {
-    const parsed = JSON.parse(localStorage.getItem(getAttachmentDraftKey()) || 'null')
+    const parsed = JSON.parse(localStorage.getItem(getAttachmentDraftKey(scope)) || 'null')
     return parsed && typeof parsed === 'object' ? parsed : null
   } catch {
     return null
@@ -173,10 +173,10 @@ const loadAttachmentDraft = () => {
 
 // Only media items that finished uploading are saved (see getSerializablePostContent), so a
 // draft's cids stay resolvable even after a refresh drops the in-memory blob URLs.
-const loadDraftContent = () => {
+const loadDraftContent = (scope = '') => {
   if (typeof window === 'undefined') return null
   try {
-    const raw = localStorage.getItem(getDraftStorageKey())
+    const raw = localStorage.getItem(getDraftStorageKey(scope))
     if (!raw) return null
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed?.elements) ? parsed : null
@@ -196,7 +196,7 @@ const stripAttachments = (content) => {
   return bare
 }
 
-const getInitialPostContent = (text, url, actionType, existingPost, restoredContent) => {
+const getInitialPostContent = (text, url, actionType, existingPost, restoredContent, scope = '') => {
   // A submission the chain rejected comes back exactly as it was sent — ahead of the draft,
   // which the composer already cleared when it closed on the transaction
   if (restoredContent?.elements) return stripAttachments(restoredContent)
@@ -209,7 +209,7 @@ const getInitialPostContent = (text, url, actionType, existingPost, restoredCont
   }
 
   const hasPrefill = Boolean(normalizePrefillValue(text) || normalizePrefillValue(url))
-  const draft = !hasPrefill && actionType === 'post' ? loadDraftContent() : null
+  const draft = !hasPrefill && (actionType === 'post' || (actionType === 'comment' && scope)) ? loadDraftContent(scope) : null
   if (draft) return draft
 
   return createPostContent([normalizePrefillValue(text), normalizePrefillValue(url)].filter(Boolean).join('\n'))
@@ -494,7 +494,13 @@ const CommunityLogo = ({ src }) => {
 
 // ■■■ [Main Component] ■■■
 
-export default function NewPost({ text = '', url = '', seedFiles = null, startWithGif = false, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget: communityTargetProp = null, onConfirmed, restoreState = null, article: articleSeed = null, proposal: proposalSeed = null }) {
+export default function NewPost(props) {
+  const mounted = useClientMounted()
+  if (!mounted) return null
+  return <NewPostEditor {...props} />
+}
+
+function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = false, close, onClose, existingPost = null, actionType = 'post', replyTarget = null, quoteTarget = null, communityTarget: communityTargetProp = null, onConfirmed, restoreState = null, article: articleSeed = null, proposal: proposalSeed = null }) {
   const mounted = useClientMounted()
   // Raises this composer's video ceiling; the presign route enforces the same number.
   const { isPremium } = usePremium()
@@ -505,10 +511,12 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   // What a rejected submission left behind (components/ComposerRecovery): the payload that was
   // pinned, which already carries every attachment reference, plus the settings it was sent with
   const restoredContent = restoreState?.content ?? null
+  const draftScope = actionType === 'comment' ? ':comment' : ''
+  const canPersistDraft = actionType === 'post' || (actionType === 'comment' && Boolean(draftScope))
 
   const initialPostContent = useMemo(
-    () => getInitialPostContent(text, url, actionType, existingPost, restoredContent),
-    [text, url, actionType, existingPost, restoredContent]
+    () => getInitialPostContent(text, url, actionType, existingPost, restoredContent, draftScope),
+    [text, url, actionType, existingPost, restoredContent, draftScope]
   )
 
   const isComment = actionType === 'comment'
@@ -539,7 +547,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   // author is typing into; `content` mirrors that DOM from then on
   const [threadParts, setThreadParts] = useState(() => {
     const hasPrefill = Boolean(normalizePrefillValue(text) || normalizePrefillValue(url))
-    const draftThread = actionType === 'post' && !restoreState && !hasPrefill ? loadThreadDraft() : []
+    const draftThread = canPersistDraft && !restoreState && !hasPrefill ? loadThreadDraft(draftScope) : []
     return (restoreState?.thread ?? draftThread).map((content) => ({
       id: newUploadId(),
       content,
@@ -592,7 +600,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   // A fresh composer restores an attachment left over from a refresh — the poll it names is
   // already onchain and paid for.
   const [poll, setPoll] = useState(() =>
-    restoredContent?.poll ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.poll ?? null) : (loadAttachmentDraft()?.poll ?? null))
+    restoredContent?.poll ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.poll ?? null) : (loadAttachmentDraft(draftScope)?.poll ?? null))
   )
   const createPollRef = useRef(null)
   // The Poll button opens a chooser first — new poll, or one already asked — which then
@@ -603,7 +611,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   // post only carries a reference to it, so the card always shows what has actually been
   // raised rather than a figure frozen at publish time.
   const [hupFund, setHupFund] = useState(() =>
-    restoredContent?.hupFund ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.hupFund ?? null) : (loadAttachmentDraft()?.hupFund ?? null))
+    restoredContent?.hupFund ?? (actionType === 'edit' ? (getContentPayload(existingPost)?.hupFund ?? null) : (loadAttachmentDraft(draftScope)?.hupFund ?? null))
   )
   const createFundRef = useRef(null)
   const attachFundRef = useRef(null)
@@ -1773,8 +1781,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
     ({ txHash = null, signature = null } = {}) => {
       // Same slot, same rule as the persist effects below: a recovered composer neither writes
       // the draft nor clears it, because by now it may belong to a different post
-      if (actionType === 'post' && !restoreState) {
-        clearPostDrafts()
+      if (canPersistDraft && !restoreState) {
+        clearPostDrafts(draftScope)
       }
 
       // Handed to a module-scope tracker, not awaited here: the composer unmounts on the next
@@ -1822,7 +1830,7 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
 
       if (!backgroundRef.current) handleClose()
     },
-    [actionType, handleClose, hupTask, onConfirmed, restoreState]
+    [canPersistDraft, draftScope, handleClose, hupTask, onConfirmed, restoreState]
   )
 
   /**
@@ -1941,8 +1949,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
     })
 
     // The post is out of the draft slot the moment it is recorded — same rule as finishSubmission
-    if (actionType === 'post' && !restoreState) {
-      clearPostDrafts()
+    if (canPersistDraft && !restoreState) {
+      clearPostDrafts(draftScope)
     }
 
     toast(`Scheduled for ${formatWillSend(scheduledAt)}. It goes onchain then, even if you're offline.`, 'success')
@@ -2035,8 +2043,8 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
       }
       // Out of the draft slot now, not on the hash: a composer opened meanwhile must start empty
       // rather than offer the same words again. A failure brings them back through the recovery.
-      if (actionType === 'post' && !restoreState) {
-        clearPostDrafts()
+      if (canPersistDraft && !restoreState) {
+        clearPostDrafts(draftScope)
       }
       backgroundRef.current = true
       handleClose()
@@ -2402,40 +2410,40 @@ export default function NewPost({ text = '', url = '', seedFiles = null, startWi
   // A recovered composer never touches the draft keys. It is the second composer on screen
   // whenever the author started writing again while the transaction was in flight, and there is
   // only one draft slot — the post being written now owns it, not the one that already failed.
-  const persistsDraft = mounted && actionType === 'post' && !restoreState
+  const persistsDraft = mounted && canPersistDraft && !restoreState
 
   // Persist the draft so an accidental refresh doesn't lose it — restored via loadDraftContent()
   useEffect(() => {
     if (!persistsDraft) return
     try {
-      localStorage.setItem(getDraftStorageKey(), JSON.stringify(getSerializablePostContent(postContent)))
+      localStorage.setItem(getDraftStorageKey(draftScope), JSON.stringify(getSerializablePostContent(postContent)))
     } catch (error) {
       console.error('Failed to save post draft:', error)
     }
-  }, [persistsDraft, postContent])
+  }, [persistsDraft, postContent, draftScope])
 
   // And the thread's later parts. Empty parts are kept: "Add to thread" with nothing typed yet is
   // still where the author left off. No parts at all clears the slot.
   useEffect(() => {
     if (!persistsDraft) return
     try {
-      if (threadParts.length) localStorage.setItem(getThreadDraftKey(), JSON.stringify(threadParts.map((part) => getSerializablePostContent(part.content))))
-      else localStorage.removeItem(getThreadDraftKey())
+      if (threadParts.length) localStorage.setItem(getThreadDraftKey(draftScope), JSON.stringify(threadParts.map((part) => getSerializablePostContent(part.content))))
+      else localStorage.removeItem(getThreadDraftKey(draftScope))
     } catch (error) {
       console.error('Failed to save thread draft:', error)
     }
-  }, [persistsDraft, threadParts])
+  }, [persistsDraft, threadParts, draftScope])
 
   // Same idea for the attached poll, kept in its own key (see getAttachmentDraftKey)
   useEffect(() => {
     if (!persistsDraft) return
     try {
-      if (poll || hupFund) localStorage.setItem(getAttachmentDraftKey(), JSON.stringify({ poll, hupFund }))
-      else localStorage.removeItem(getAttachmentDraftKey())
+      if (poll || hupFund) localStorage.setItem(getAttachmentDraftKey(draftScope), JSON.stringify({ poll, hupFund }))
+      else localStorage.removeItem(getAttachmentDraftKey(draftScope))
     } catch (error) {
       console.error('Failed to save post attachments:', error)
     }
-  }, [persistsDraft, poll, hupFund])
+  }, [persistsDraft, poll, hupFund, draftScope])
 
   useEffect(() => {
     const uploads = uploadsRef.current
