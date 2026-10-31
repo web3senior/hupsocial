@@ -67,6 +67,12 @@
   padding: 20px 20px 0 20px;
   place-items: stretch;
 
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--gray-50);
+    }
+  }
+
   @media (max-width: 640px) {
     padding: 10px;
   }
