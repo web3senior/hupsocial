@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 import { ConnectWallet } from '@/components/ConnectWallet'
 import BackLink from '@/components/ui/BackLink'
 import { useScrollDim } from '@/hooks/useScrollDim'
+import { useScrollChrome } from '@/hooks/useScrollChrome'
 import logo from '@/../public/logo.svg'
 import { usePageTitleStore } from '@/stores/usePageTitleStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -94,6 +95,7 @@ export default function Header() {
   const cell = useTitleCell(hasTitle, pathname)
   // Fades with the footer nav while browsing down (phones only, see Header.module.scss)
   const isDimmed = useScrollDim()
+  const chromeRef = useScrollChrome(isDimmed)
 
   const cellStyle = cell && {
     '--title-cell-left': `${cell.left}px`,
@@ -101,7 +103,7 @@ export default function Header() {
   }
 
   return (
-    <header className={clsx(styles.header, isBare && styles['header--bare'], isDimmed && styles['header--dimmed'])}>
+    <header ref={chromeRef} className={clsx(styles.header, isBare && styles['header--bare'])}>
       <button
         type="button"
         className={styles.menuButton}

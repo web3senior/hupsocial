@@ -457,7 +457,7 @@ export default function Aside({ inLayoutGrid = false }) {
         <BatchLikeTrigger className={styles.floatingActions__button} badgeClassName={styles.floatingActions__badge} />
 
         <button
-          className={clsx(styles.floatingActions__button, styles['floatingActions__button--new'])}
+          className={styles.floatingActions__button}
           onClick={() => {
             if (!canCompose) {
               if (!openConnect()) toast('Please connect wallet', 'error')

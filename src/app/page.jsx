@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useHomeTabsStore, resolveTabs } from '@/stores/useHomeTabsStore'
 import { useScrollDim } from '@/hooks/useScrollDim'
+import { useScrollChrome } from '@/hooks/useScrollChrome'
 import HomeTabStrip from '@/components/HomeTabStrip'
 import HomeFeedTab from '@/components/tabs/HomeFeedTab'
 import ComposePrompt from '@/components/home/ComposePrompt'
@@ -39,10 +40,11 @@ export default function Page() {
 
   const activeTab = resolvedTabs.find((tab) => tab.id === activeTabId) ?? resolvedTabs[0]
   const isDimmed = useScrollDim()
+  const chromeRef = useScrollChrome(isDimmed)
 
   return (
     <div className={clsx(styles.page, styles.home)}>
-      <div className={clsx(styles['page__tab-bar'], isDimmed && styles['page__tab-bar--dimmed'])}>
+      <div ref={chromeRef} className={styles['page__tab-bar']}>
         <div className={`__container`} data-width={`small`}>
           <HomeTabStrip />
         </div>

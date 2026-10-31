@@ -4,12 +4,13 @@ import React, { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useConnection } from 'wagmi'
-import { ChatCircleIcon, HouseIcon, MagnifyingGlassIcon, PlusIcon, UserIcon } from '@phosphor-icons/react'
+import { BellIcon, ChatCircleIcon, HouseIcon, MagnifyingGlassIcon, PlusIcon } from '@phosphor-icons/react'
 import clsx from 'clsx'
 
 import { toast } from '@/components/NextToast'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useScrollDim } from '@/hooks/useScrollDim'
+import { useScrollChrome } from '@/hooks/useScrollChrome'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { usePostStore } from '@/stores/usePostStore'
 import { useChatDockStore } from '@/stores/useChatDockStore'
@@ -28,7 +29,7 @@ export default function Footer() {
   // The bar dims to a faint outline the moment you browse downward and returns on the way up
   const isDimmed = useScrollDim()
   const pathname = usePathname()
-  const { address, isConnected } = useConnection()
+  const { isConnected } = useConnection()
 
   // Pull global sidebar states to match functional action layers
   const setIsComponentOpen = useSidebarStore((state) => state.setIsComponentOpen)
@@ -40,6 +41,7 @@ export default function Footer() {
   const openChat = useChatDockStore((state) => state.open)
   const minimizeChat = useChatDockStore((state) => state.minimize)
   const isChatOpen = chatMode !== 'minimized'
+  const chromeRef = useScrollChrome(isDimmed && !isChatOpen, mounted, 'bottom')
 
   // Home link double-duty: scrolled down -> back to top, already at top -> pull fresh posts
   const handleHomeLinkClick = (event) => {
@@ -55,8 +57,6 @@ export default function Footer() {
   }
 
   const navLinks = useMemo(() => {
-    const profilePath = isConnected && address ? `/${address}` : '/connect'
-
     return [
       { name: 'Home', path: '/', icon: HouseIcon },
       { name: 'Search', path: '/search', icon: MagnifyingGlassIcon },
@@ -72,6 +72,7 @@ export default function Footer() {
         },
         icon: PlusIcon,
       },
+      { name: 'Notifications', path: '/notifications', icon: BellIcon },
       {
         name: 'Chat',
         action: () => (isChatOpen ? minimizeChat() : openChat()),
@@ -79,9 +80,8 @@ export default function Footer() {
         isActive: isChatOpen,
         hasDot: chatUnread > 0,
       },
-      { name: 'Profile', path: profilePath, icon: UserIcon },
     ]
-  }, [address, isConnected, setIsComponentOpen, isChatOpen, chatUnread, openChat, minimizeChat])
+  }, [isConnected, setIsComponentOpen, isChatOpen, chatUnread, openChat, minimizeChat])
 
   // The open room covers the page, so leaving for another tab has to put it away
   const closeChatOnNavigate = () => {
@@ -92,7 +92,7 @@ export default function Footer() {
 
   return (
     // The open room is seated above the bar and closes from it, so the bar stays while it is open
-    <footer className={clsx(styles.footer, isDimmed && !isChatOpen && styles['footer--dimmed'])}>
+    <footer ref={chromeRef} className={styles.footer}>
       <nav className={styles['footer__bar']} aria-label="Mobile Navigation">
         <ul className={styles['footer__list']}>
           {navLinks.map((item, index) => {

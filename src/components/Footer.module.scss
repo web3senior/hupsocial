@@ -15,33 +15,6 @@
     display: none;
   }
 
-  // Dimmed on the way down, restored on the way up (state lives in Footer.jsx). The bar never
-  // leaves: its glass and border fade out and the glyphs drop to a faint outline over
-  // the feed, still tappable. Faded per layer rather than with opacity on the footer, which
-  // would make it a backdrop root and drop the blur mid-fade. A pointer over the bar or
-  // keyboard focus in it restores it; a tap does not (see unless-engaged).
-  &--dimmed {
-    @include unless-engaged {
-      .footer__bar {
-        border-color: transparent;
-        background-color: transparent;
-        backdrop-filter: blur(0) saturate(100%);
-      }
-
-      .footer__link {
-        opacity: 0.45;
-
-        &::before {
-          opacity: 0;
-        }
-      }
-
-      .footer__dot {
-        border-color: transparent;
-      }
-    }
-  }
-
   &__bar {
     transition:
       background-color 0.32s ease,

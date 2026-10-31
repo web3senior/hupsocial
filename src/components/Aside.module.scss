@@ -437,13 +437,6 @@
     }
   }
 
-  // Modifier: Compose Button specific constraints
-  &__button--new {
-    @include md-down() {
-      display: none;
-    }
-  }
-
   // Element: Overlay Badge
   &__badge {
     position: absolute;
