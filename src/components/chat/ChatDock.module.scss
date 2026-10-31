@@ -16,6 +16,7 @@ $app-toolbar-clearance: 5.25rem;
   --dock-width: 360px;
   --dock-height: min(640px, calc(100vh - var(--header-height) - 2rem));
   --dock-radius: 1.25rem;
+  --dock-bar-height: calc(36px + 1.5rem + 1px);
 
   // Every colour the dock paints, all read from the app palette so it follows the theme
   --dock-surface: var(--surface);
@@ -141,16 +142,37 @@ $app-toolbar-clearance: 5.25rem;
 
   // The bar is the drag handle: the card goes wherever it is pulled (ChatDock.jsx)
   &__bar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
     flex-shrink: 0;
+    box-sizing: border-box;
+    height: var(--dock-bar-height);
     padding: 0.75rem 0.75rem 0.75rem 1rem;
-    border-bottom: 1px solid var(--dock-border);
+    isolation: isolate;
     cursor: grab;
     touch-action: none;
     user-select: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 -1.5rem;
+      z-index: -1;
+      pointer-events: none;
+      background: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--dock-surface) 85%, transparent),
+        color-mix(in srgb, var(--dock-surface) 35%, transparent) 65%,
+        transparent
+      );
+      backdrop-filter: blur(4px) saturate(1.3);
+      mask-image: linear-gradient(to bottom, #000 35%, transparent);
+    }
 
     @include md-down() {
       cursor: default;
@@ -238,6 +260,8 @@ $app-toolbar-clearance: 5.25rem;
   &__room {
     flex: 1;
     min-height: 0;
+    // Let scrolling messages pass beneath the glass without moving the header or composer.
+    margin-top: calc(-1 * var(--dock-bar-height));
     display: flex;
     flex-direction: column;
 
@@ -336,6 +360,8 @@ $app-toolbar-clearance: 5.25rem;
   flex: 1;
   min-height: 0;
   padding: 0.75rem 0.875rem;
+  padding-top: calc(var(--dock-bar-height) + 0.75rem);
+  scroll-padding-top: calc(var(--dock-bar-height) + 0.75rem);
   overflow-y: auto;
   overscroll-behavior: contain;
 
@@ -375,6 +401,7 @@ $app-toolbar-clearance: 5.25rem;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding-top: var(--dock-bar-height);
 
   &__field {
     position: relative;

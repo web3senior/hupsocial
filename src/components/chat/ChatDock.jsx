@@ -515,7 +515,7 @@ export default function ChatDock({ embedded = false }) {
                 {mode === 'expanded' ? <ArrowsInSimpleIcon size={18} weight="bold" /> : <ArrowsOutSimpleIcon size={18} weight="bold" />}
               </button>
               <button type="button" className={styles.dock__iconButton} onClick={minimize} aria-label="Minimize chat" title="Minimize">
-                <XIcon size={20} weight="bold" />
+                <CaretDownIcon size={20} weight="bold" />
               </button>
             </div>
           </header>
