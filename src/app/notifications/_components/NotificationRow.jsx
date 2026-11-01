@@ -10,6 +10,8 @@ import clsx from 'clsx'
 import { useProfile } from '@/hooks/useProfile'
 import { profilePath } from '@/lib/username'
 import { getPostById } from '@/lib/api'
+import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
+import { seedPost } from '@/db/posts'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import Avatar from '@/components/ui/Avatar'
@@ -110,7 +112,18 @@ export default function NotificationRow({ group, viewerAddress, onRead }) {
 
   if (meta.previewFrom === 'child' && post) {
     return (
-      <div ref={rowRef} className={styles.row__post}>
+      // <Post> never opens itself — feeds wrap it in the click target, and so must this row
+      <div
+        ref={rowRef}
+        className={styles.row__post}
+        onPointerDown={rememberCardPointerDown}
+        onClick={(event) => {
+          if (isTextSelectionDrag(event) || !href) return
+          seedPost(post)
+          router.push(href)
+        }}
+        onMouseEnter={() => href && router.prefetch(href)}
+      >
         <Post item={post} actions={['comment', 'repost', 'like', 'view', 'bookmark', 'share']} />
       </div>
     )
