@@ -23,8 +23,10 @@ const MAX_AVATARS = 10
 const READ_DELAY_MS = 1500
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 
-const postFetcher = ([, networkId, postId]) =>
-  getPostById(networkId, postId).then((response) => (Array.isArray(response?.data) ? response.data[0] : response?.data) || null)
+// The viewer's address rides along so the preview knows whether you already liked, reposted or
+// bookmarked the post — without it every heart renders empty.
+const postFetcher = ([, networkId, postId, viewerAddress]) =>
+  getPostById(networkId, postId, viewerAddress || null).then((response) => (Array.isArray(response?.data) ? response.data[0] : response?.data) || null)
 
 export default function NotificationRow({ group, viewerAddress, onRead }) {
   const router = useRouter()
@@ -45,7 +47,7 @@ export default function NotificationRow({ group, viewerAddress, onRead }) {
   // same post costs a single request instead of one per notification.
   const previewPostId = previewPostIdOf(group)
   const { data: post } = useSWR(
-    previewPostId && group.networkId ? ['notification-post', group.networkId, previewPostId] : null,
+    previewPostId && group.networkId ? ['notification-post', group.networkId, previewPostId, viewerAddress] : null,
     postFetcher,
     // Deleted posts answer 404 forever — retrying them would burn requests for no preview.
     { revalidateOnFocus: false, shouldRetryOnError: false, keepPreviousData: true },
