@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useConnection } from 'wagmi'
 import clsx from 'clsx'
@@ -98,6 +98,43 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
 
   const parentPost = parentId && sameId(parentState.forParentId, parentId) ? parentState.post : null
 
+  // The parent lands above a comment that is already on screen, which would push the comment
+  // you opened down out of view. Its viewport position is tracked until the parent arrives, then
+  // the page scrolls by however far it moved — zero where the browser's own anchoring held it.
+  // Replies are usually still loading then, so the page is grown just enough to scroll that far.
+  const pageRef = useRef(null)
+  const postRef = useRef(null)
+  const postTopRef = useRef(null)
+  const hasPost = Boolean(post)
+
+  useLayoutEffect(() => {
+    if (pageRef.current) pageRef.current.style.minHeight = ''
+  }, [resolvedPostId])
+
+  useLayoutEffect(() => {
+    if (parentPost || !hasPost) return
+    const remember = () => {
+      postTopRef.current = postRef.current?.getBoundingClientRect().top ?? null
+    }
+    remember()
+    window.addEventListener('scroll', remember, { passive: true })
+    return () => window.removeEventListener('scroll', remember)
+  }, [parentPost, hasPost])
+
+  useLayoutEffect(() => {
+    if (!parentPost || postTopRef.current == null || !postRef.current) return
+    const shift = postRef.current.getBoundingClientRect().top - postTopRef.current
+    postTopRef.current = null
+    if (!shift) return
+
+    const shortfall = window.scrollY + shift + window.innerHeight - document.documentElement.scrollHeight
+    if (shortfall > 0 && pageRef.current) {
+      pageRef.current.style.minHeight = `${pageRef.current.offsetHeight + shortfall}px`
+    }
+    // The page scrolls smoothly by default, which would slide the post back instead of holding it
+    window.scrollBy({ top: shift, behavior: 'instant' })
+  }, [parentPost])
+
   // A thread the author published in one go ({ part: 1, of: N } on the root): parts 2…N are
   // drawn under it as one piece, joined by the reply line, instead of competing with everyone
   // else's replies for a place in the list. A repost's row carries none of its original's content.
@@ -147,7 +184,7 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
   const threadId = isRepost ? post.is_repost : resolvedPostId
 
   return (
-    <div className={`${styles.post}`}>
+    <div ref={pageRef} className={`${styles.post}`}>
       {/* Above the card, not inside it: Threads titles the thread on the page itself */}
       <div className={`__container`} data-width={`small`}>
         <PostTitleRow post={post} networkId={resolvedNetworkId} />
@@ -172,7 +209,7 @@ export default function PostDetails({ networkId, postId, initialPost = null }) {
                 />
               </article>
             )}
-            <article className={clsx(styles.post, animateEntry && 'animate fade')}>
+            <article ref={postRef} className={clsx(styles.post, animateEntry && 'animate fade')}>
               <Post
                 item={post}
                 showContent={true}
