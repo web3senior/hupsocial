@@ -387,6 +387,8 @@ export function registerReadTools(server, { http }) {
           actor: row.actor_wallet_address,
           entity_type: row.entity_type,
           entity_id: row.entity_id,
+          // A reply or quote notification points at the post it was made on; this is the reply itself
+          ...(row.data?.comment_post_id ? { comment_id: Number(row.data.comment_post_id) } : {}),
           network_id: row.network_id,
           title: row.title,
           message: row.message,

@@ -35,11 +35,14 @@ const RESULT_MAX_CHARS = 12_000
 // The app reading its own public routes: loopback by default, where `next start` listens
 const baseUrl = () => (process.env.AGENT_MCP_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`).replace(/\/+$/, '')
 
+// The links tools hand the agent end up in its replies, so they point at the public site, not loopback
+const publicBaseUrl = () => (process.env.NEXT_PUBLIC_BASE_URL || 'https://hup.social').replace(/\/+$/, '')
+
 /** One connected client per process, kept on globalThis so a dev reload never opens another. */
 const connect = () => {
   globalThis.__hupAgentMcp ??= (async () => {
     const server = new McpServer({ name: 'hup', version: '1.0.0' })
-    registerReadTools(server, { http: createHttp(baseUrl()) })
+    registerReadTools(server, { http: createHttp(baseUrl(), { publicBase: publicBaseUrl() }) })
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair()
     const client = new Client({ name: 'hup-agent', version: '1.0.0' })
     await Promise.all([server.connect(serverSide), client.connect(clientSide)])

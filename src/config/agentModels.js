@@ -9,7 +9,6 @@
 export const AGENT_MODELS = Object.freeze([
   { id: 'openai/gpt-5-nano-2025-08-07', label: 'GPT-5 nano', tier: 'Lowest cost' },
   { id: 'deepseek/deepseek-chat', label: 'DeepSeek Chat', tier: 'Low cost' },
-  { id: 'google/gemini-3.8-flash', label: 'Gemini 3.8 Flash', tier: 'Low cost' },
   { id: 'openai/gpt-5-mini-2025-08-07', label: 'GPT-5 mini', tier: 'Medium cost' },
   { id: 'anthropic/claude-haiku-5.5', label: 'Claude Haiku 5.5', tier: 'Medium cost' },
   { id: 'anthropic/claude-sonnet-5.5', label: 'Claude Sonnet 5.5', tier: 'Higher cost' },

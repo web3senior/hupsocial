@@ -18,9 +18,11 @@ export class HupHttpError extends Error {
 const DEFAULT_TIMEOUT_MS = 30_000
 
 /**
- * @param {string} [baseUrl]
+ * @param {string} [baseUrl] Where requests go.
+ * @param {{ publicBase?: string }} [options] Where links shown to people point, when requests go
+ *   somewhere they cannot open (a server reading itself over loopback).
  */
-export function createHttp(baseUrl = DEFAULT_BASE_URL) {
+export function createHttp(baseUrl = DEFAULT_BASE_URL, { publicBase } = {}) {
   const base = String(baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '')
 
   const url = (path, query) => {
@@ -77,7 +79,8 @@ export function createHttp(baseUrl = DEFAULT_BASE_URL) {
   }
 
   return {
-    base,
+    // Links built from this are shown to people, so it is the public origin, never the request one
+    base: publicBase ? String(publicBase).replace(/\/+$/, '') : base,
     url,
     request,
     json,
