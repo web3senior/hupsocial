@@ -40,6 +40,8 @@ const createSchema = z.object({
   // Only for an imported wallet: its key, encrypted in the owner's browser (lib/agentWallet.js)
   keyCiphertext: z.string().regex(/^[A-Za-z0-9+/=._-]{40,2000}$/).optional(),
   kind: z.enum(['wallet', 'controller']).default('wallet'),
+  // The creation fee's payment, for an owner who already has an agent (lib/agentBilling.js)
+  fee: z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/), chainId: z.number().int().positive() }).optional(),
 })
 
 const keySchema = z.object({
@@ -131,7 +133,12 @@ export const getAgent = async (owner, address) => {
   return { ...present(row), memory: row.memory ?? '' }
 }
 
-export const createAgent = async (owner, input) => {
+/**
+ * Registers a new agent. `payment` is its creation fee, already checked onchain by the route
+ * (lib/agentBilling.js verifyCreationFee); it is stored with the agent in one transaction, keyed
+ * by its hash, so one payment can never create two agents.
+ */
+export const createAgent = async (owner, input, payment = null) => {
   const parsed = createSchema.safeParse(input)
   if (!parsed.success) throw new AgentError(400, 'Check the agent’s name and instructions')
   const { address, index, name, persona, proof, keyCiphertext = null, kind } = parsed.data
@@ -151,12 +158,27 @@ export const createAgent = async (owner, input) => {
     throw new AgentError(400, 'Only a Universal Profile can have controller agents')
   }
 
+  const connection = await pool.getConnection()
   try {
-    await pool.execute(
+    await connection.beginTransaction()
+    await connection.execute(
       'INSERT INTO hosted_agents (agent_address, owner_address, agent_index, kind, controller_address, key_ciphertext, name, persona) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [normalizeAddress(address), owner, index, kind, kind === 'controller' ? normalizeAddress(address) : null, keyCiphertext, name, persona],
     )
+    if (payment) {
+      try {
+        await connection.execute(
+          'INSERT INTO agent_creation_fees (tx_hash, network_id, owner_address, agent_address, amount_wei, usd_price) VALUES (?, ?, ?, ?, ?, ?)',
+          [payment.txHash, payment.networkId, owner, normalizeAddress(address), payment.amountWei, payment.usdPrice],
+        )
+      } catch (error) {
+        if (error?.code === 'ER_DUP_ENTRY') throw Object.assign(new AgentError(409, 'That payment already created an agent'), { code: 'FEE_USED' })
+        throw error
+      }
+    }
+    await connection.commit()
   } catch (error) {
+    await connection.rollback()
     if (error?.code !== 'ER_DUP_ENTRY') throw error
     // Say which clash it was: the wallet is already an agent (here or under another owner), or
     // this owner's slot is taken — never a name, which agents may share
@@ -165,6 +187,8 @@ export const createAgent = async (owner, input) => {
       throw new AgentError(409, taken.owner_address === owner ? `That wallet is already your agent ${taken.name}` : 'That wallet is already an agent on Hup')
     }
     throw new AgentError(409, 'That agent slot is taken. Reload the page and try again.')
+  } finally {
+    connection.release()
   }
   return getAgent(owner, address)
 }

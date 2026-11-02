@@ -10,7 +10,7 @@
  */
 
 import { ethers } from 'ethers'
-import { getAccount, getPublicClient } from 'wagmi/actions'
+import { getAccount, getPublicClient, sendTransaction, switchChain, waitForTransactionReceipt } from 'wagmi/actions'
 import { config, CONTRACTS } from '@/config/wagmi'
 import hupAbi from '@/abi/post.json'
 import { ContentType } from './content'
@@ -36,7 +36,7 @@ const authHeaders = (token) => ({ 'Content-Type': 'application/json', Authorizat
 
 const readJson = async (response, fallback) => {
   const data = await response.json().catch(() => ({}))
-  if (!response.ok || data.success === false) throw Object.assign(new Error(data.error || fallback), { status: response.status })
+  if (!response.ok || data.success === false) throw Object.assign(new Error(data.error || fallback), { status: response.status, code: data.code })
   return data
 }
 
@@ -122,7 +122,7 @@ export const walletForAgent = async (agent, reason = 'Using your agent') => {
  * without a passphrase. The grant still runs, pinning AllowedCalls to Hup's `create`.
  * @returns {Promise<{agent: object, granted: boolean, grantError: Error|null}>}
  */
-export const createControllerAgent = async ({ token, owner, index, name, persona, privateKey = null }) => {
+export const createControllerAgent = async ({ token, owner, index, name, persona, privateKey = null, fee = null }) => {
   let wallet
   if (privateKey) {
     const imported = parseAgentKey(privateKey)
@@ -140,7 +140,7 @@ export const createControllerAgent = async ({ token, owner, index, name, persona
     await fetch('/api/v1/agents/hosted', {
       method: 'POST',
       headers: authHeaders(token),
-      body: JSON.stringify({ address: wallet.address, index, name, persona, proof, kind: 'controller' }),
+      body: JSON.stringify({ address: wallet.address, index, name, persona, proof, kind: 'controller', fee }),
     }),
     'Your agent could not be created',
   )
@@ -258,25 +258,29 @@ export const recordWorkspaceSnapshot = async (token, address, snapshot) =>
 export const fetchCredits = async (token, address) =>
   readJson(await fetch(`/api/v1/agents/hosted/${address}/credits`, { headers: authHeaders(token) }), 'Credits could not be loaded')
 
+/** Networks whose own coin pays for credits and creation fees: the app's, minus testnets. */
+export const paymentChains = () => config.chains.filter((chain) => !chain.testnet)
+
 /**
- * Tops up the agent's credits from its own wallet: the agent's key, derived here, sends `amount`
- * LYX on LUKSO to Hup's billing address, and the server credits the confirmed transfer at the USD
- * price of the moment. Crediting is retried briefly, since a node can answer the receipt late.
+ * Tops up the agent's credits from its own wallet: the agent's key, opened here, sends `amount` of
+ * the network's own coin to Hup's billing address, and the server credits the confirmed transfer at
+ * the USD price of the moment. Crediting is retried briefly, since a node can answer the receipt late.
  * @returns {Promise<{credits: number, balance: number}>}
  */
-export const topUpAgent = async ({ token, agent, amount }) => {
+export const topUpAgent = async ({ token, agent, amount, chainId = TOP_UP_CHAIN_ID }) => {
   const billing = agentBillingAddress()
   if (!billing) throw new Error('Top-ups are not set up on this deployment')
-  const chain = chainById(TOP_UP_CHAIN_ID)
-  if (!chain) throw new Error('LUKSO is not available in this app')
+  const chain = chainById(chainId)
+  if (!chain) throw new Error('That network is not available in this app')
+  const symbol = chain.nativeCurrency.symbol
 
   let value
   try {
     value = ethers.parseEther(String(amount))
   } catch {
-    throw new Error('Enter an amount of LYX')
+    throw new Error(`Enter an amount of ${symbol}`)
   }
-  if (value <= 0n) throw new Error('Enter an amount of LYX')
+  if (value <= 0n) throw new Error(`Enter an amount of ${symbol}`)
 
   const wallet = await walletForAgent(agent, 'Topping up your agent’s credits')
   const provider = new ethers.JsonRpcProvider(chain.rpcUrls.default.http[0], chain.id, { staticNetwork: true })
@@ -285,7 +289,7 @@ export const topUpAgent = async ({ token, agent, amount }) => {
     tx = await wallet.connect(provider).sendTransaction({ to: billing, value })
   } catch (error) {
     if (/insufficient funds/i.test(error?.shortMessage || error?.message || '')) {
-      throw new Error(`Your agent's wallet does not hold enough LYX for that, plus gas. Send LYX to it first.`)
+      throw new Error(`Your agent's wallet does not hold enough ${symbol} on ${chain.name} for that, plus gas. Send ${symbol} to it first.`)
     }
     throw error
   }
@@ -294,7 +298,11 @@ export const topUpAgent = async ({ token, agent, amount }) => {
   for (let attempt = 0; ; attempt += 1) {
     try {
       return await readJson(
-        await fetch(`/api/v1/agents/hosted/${agent.address}/credits`, { method: 'POST', headers: authHeaders(token), body: JSON.stringify({ txHash: tx.hash }) }),
+        await fetch(`/api/v1/agents/hosted/${agent.address}/credits`, {
+          method: 'POST',
+          headers: authHeaders(token),
+          body: JSON.stringify({ txHash: tx.hash, chainId: chain.id }),
+        }),
         'The top-up could not be credited',
       )
     } catch (error) {
@@ -304,6 +312,63 @@ export const topUpAgent = async ({ token, agent, amount }) => {
       await new Promise((resolve) => setTimeout(resolve, 3000))
     }
   }
+}
+
+// --- Creation fee ---
+
+const pendingFeeKey = (owner) => `${process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''}agent_creation_fee_${String(owner).toLowerCase()}`
+
+/** A fee paid but not yet used for an agent, kept so a failed create never asks for a second payment. */
+export const readPendingFee = (owner) => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(pendingFeeKey(owner)) || 'null')
+    return stored?.txHash && stored?.chainId ? stored : null
+  } catch {
+    return null
+  }
+}
+
+export const forgetPendingFee = (owner) => {
+  try {
+    localStorage.removeItem(pendingFeeKey(owner))
+  } catch {
+    // Nothing kept to forget
+  }
+}
+
+/** What the owner's next agent costs on `chainId`: `{ required: false }`, or the fee in that coin. */
+export const fetchCreationFee = async (token, chainId) =>
+  readJson(await fetch(`/api/v1/agents/hosted/fee?chainId=${Number(chainId)}`, { headers: authHeaders(token) }), 'The fee could not be priced')
+
+/**
+ * Pays the creation fee from the connected wallet (a Universal Profile pays through its own
+ * extension) to Hup's billing address, unless a payment is already waiting to be used.
+ * @returns {Promise<{txHash: string, chainId: number}|null>} The payment to create with, or null when free.
+ */
+export const payCreationFee = async ({ token, owner, chainId }) => {
+  const waiting = readPendingFee(owner)
+  if (waiting) return waiting
+
+  const quote = await fetchCreationFee(token, chainId)
+  if (!quote.required) return null
+  const billing = agentBillingAddress()
+  if (!billing) throw new Error('Agent payments are not set up on this deployment')
+
+  if (getAccount(config).chainId !== quote.chainId) await switchChain(config, { chainId: quote.chainId })
+  const hash = await sendTransaction(config, { to: billing, value: BigInt(quote.amountWei), chainId: quote.chainId })
+  // Kept before waiting, so a closed tab or a slow receipt still leaves the payment usable
+  const payment = { txHash: hash, chainId: quote.chainId }
+  try {
+    localStorage.setItem(pendingFeeKey(owner), JSON.stringify(payment))
+  } catch {
+    // Without storage a retry asks again; the payment itself is still sent below
+  }
+  const receipt = await waitForTransactionReceipt(config, { chainId: quote.chainId, hash })
+  if (receipt.status !== 'success') {
+    forgetPendingFee(owner)
+    throw new Error('The payment failed onchain')
+  }
+  return payment
 }
 
 // --- Profile ---
@@ -360,7 +425,7 @@ const describe = (persona) => {
  * make, then writes its profile.
  * @returns {Promise<object>} The stored agent.
  */
-export const createHostedAgent = async ({ token, owner, index, name, persona, privateKey = null }) => {
+export const createHostedAgent = async ({ token, owner, index, name, persona, privateKey = null, fee = null }) => {
   let wallet
   let keyCiphertext
   if (privateKey) {
@@ -381,7 +446,7 @@ export const createHostedAgent = async ({ token, owner, index, name, persona, pr
     await fetch('/api/v1/agents/hosted', {
       method: 'POST',
       headers: authHeaders(token),
-      body: JSON.stringify({ address: wallet.address, index, name, persona, proof, keyCiphertext }),
+      body: JSON.stringify({ address: wallet.address, index, name, persona, proof, keyCiphertext, fee }),
     }),
     'Your agent could not be created',
   )

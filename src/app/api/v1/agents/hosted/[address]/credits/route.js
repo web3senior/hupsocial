@@ -1,7 +1,8 @@
 /**
  * @file app/api/v1/agents/hosted/[address]/credits/route.js
  * @description An agent's credits: balance, recent charges and top-ups (GET), and crediting a
- * top-up the agent's wallet just sent (POST {txHash}), checked onchain before anything is added.
+ * top-up the agent's wallet just sent on any Hup network (POST {txHash, chainId}), checked onchain
+ * before anything is added.
  */
 
 import { NextResponse } from 'next/server'
@@ -35,8 +36,8 @@ export async function POST(request, { params }) {
   try {
     const { address } = await params
     const agent = await getAgent(owner, address)
-    const { txHash } = await request.json().catch(() => ({}))
-    return NextResponse.json({ success: true, ...(await creditTopUp(agent, txHash)) })
+    const { txHash, chainId } = await request.json().catch(() => ({}))
+    return NextResponse.json({ success: true, ...(await creditTopUp(agent, txHash, chainId)) })
   } catch (error) {
     return failure(error)
   }
