@@ -7,6 +7,8 @@ import { BOT_COLORS, BOT_TRAIT_LABELS, BOT_TRAITS, botTraitsFor, randomBotTraits
 import styles from './BotAvatarEditor.module.scss'
 
 const TRAIT_NAMES = { dome: 'Dome', ears: 'Ears', eyes: 'Eyes', mouth: 'Mouth', chest: 'Chest', cheeks: 'Cheeks' }
+const PORTRAIT_TRAIT_NAMES = { hair: 'Hairstyle', hairColor: 'Hair color', skin: 'Skin tone', eyes: 'Eyes', mouth: 'Mouth', chest: 'Shirt emblem', cheeks: 'Cheeks' }
+const PORTRAIT_OPTIONS = { eyes: ['round', 'happy', 'sleepy', 'wink'], mouth: ['none', 'smile', 'o'] }
 
 /**
  * Picks a robot's look (lib/botAvatar.js): a live preview, the colours, one row per trait, and
@@ -14,14 +16,21 @@ const TRAIT_NAMES = { dome: 'Dome', ears: 'Ears', eyes: 'Eyes', mouth: 'Mouth', 
  * `seed` is what Reset returns to.
  */
 export default function BotAvatarEditor({ seed, value, onChange, disabled = false }) {
-  const set = (name, option) => onChange({ ...value, [name]: option })
+  const update = (traits) => {
+    if (traits.style === 'anime') {
+      if (!PORTRAIT_OPTIONS.eyes.includes(traits.eyes)) traits.eyes = 'round'
+      if (!PORTRAIT_OPTIONS.mouth.includes(traits.mouth)) traits.mouth = 'smile'
+    }
+    onChange(traits)
+  }
+  const set = (name, option) => update({ ...value, [name]: option })
 
   return (
     <div className={styles.editor}>
       <div className={styles.editor__preview}>
         <BotAvatar traits={value} size={144} className={styles.editor__robot} />
         <div className={styles.editor__actions}>
-          <button type="button" className={styles.editor__action} onClick={() => onChange(randomBotTraits())} disabled={disabled}>
+          <button type="button" className={styles.editor__action} onClick={() => update({ ...randomBotTraits(), style: value.style || 'robot' })} disabled={disabled}>
             <ShuffleIcon size={14} /> Shuffle
           </button>
           <button type="button" className={styles.editor__action} onClick={() => onChange(botTraitsFor(seed))} disabled={disabled}>
@@ -31,6 +40,16 @@ export default function BotAvatarEditor({ seed, value, onChange, disabled = fals
       </div>
 
       <div className={styles.editor__controls}>
+        <fieldset className={styles.editor__group} disabled={disabled}>
+          <legend className={styles.editor__legend}>Avatar style</legend>
+          <div className={styles.editor__options}>
+            {BOT_TRAITS.style.map((style) => (
+              <button key={style} type="button" className={clsx(styles.editor__option, (value.style || 'robot') === style && styles['editor__option--active'])} onClick={() => set('style', style)} aria-pressed={(value.style || 'robot') === style}>
+                {BOT_TRAIT_LABELS.style[style]}
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <fieldset className={styles.editor__group} disabled={disabled}>
           <legend className={styles.editor__legend}>Color</legend>
           <div className={styles.editor__swatches}>
@@ -49,11 +68,11 @@ export default function BotAvatarEditor({ seed, value, onChange, disabled = fals
           </div>
         </fieldset>
 
-        {Object.entries(TRAIT_NAMES).map(([name, label]) => (
+        {Object.entries(value.style === 'anime' ? PORTRAIT_TRAIT_NAMES : TRAIT_NAMES).map(([name, label]) => (
           <fieldset key={name} className={styles.editor__group} disabled={disabled}>
             <legend className={styles.editor__legend}>{label}</legend>
             <div className={styles.editor__options}>
-              {BOT_TRAITS[name].map((option) => (
+              {(value.style === 'anime' ? PORTRAIT_OPTIONS[name] || BOT_TRAITS[name] : BOT_TRAITS[name]).map((option) => (
                 <button
                   key={option}
                   type="button"

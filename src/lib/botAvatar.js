@@ -10,6 +10,7 @@
  */
 
 import { BOT_NETWORK_BADGES } from './botAvatarNetworks'
+import { animeAvatarSvg } from './animeAvatar'
 
 // --- Traits ---
 
@@ -35,6 +36,10 @@ export const BOT_TRAITS = Object.freeze({
   // The marks first, then a badge per network (lib/botAvatarNetworks.js)
   chest: ['circuit', 'heart', 'bolt', 'dots', ...Object.keys(BOT_NETWORK_BADGES)],
   cheeks: ['none', 'blush'],
+  style: ['robot', 'anime'],
+  hair: ['ponytail', 'long', 'bob'],
+  hairColor: ['blonde', 'brown', 'black', 'silver', 'pink'],
+  skin: ['light', 'tan', 'deep'],
 })
 
 /** Labels for an editor; the ids above are what is stored. */
@@ -45,11 +50,16 @@ export const BOT_TRAIT_LABELS = Object.freeze({
   mouth: { none: 'None', smile: 'Smile', grill: 'Grill', o: 'Oh' },
   chest: { circuit: 'Circuit', heart: 'Heart', bolt: 'Bolt', dots: 'Dots', ...Object.fromEntries(Object.entries(BOT_NETWORK_BADGES).map(([id, badge]) => [id, badge.label])) },
   cheeks: { none: 'None', blush: 'Blush' },
+  style: { robot: 'Robot', anime: 'Anime portrait' },
+  hair: { ponytail: 'Ponytail', long: 'Long', bob: 'Bob' },
+  hairColor: { blonde: 'Blonde', brown: 'Brown', black: 'Black', silver: 'Silver', pink: 'Pink' },
+  skin: { light: 'Light', tan: 'Tan', deep: 'Deep' },
 })
 
 /* What a seed may pick, where narrower than everything on offer: network badges are a choice an
    owner makes, and adding one must never change the robot an existing address already has. */
-const SEEDED_OPTIONS = { chest: ['circuit', 'heart', 'bolt', 'dots'] }
+const SEEDED_OPTIONS = { chest: ['circuit', 'heart', 'bolt', 'dots'], style: ['robot'] }
+const OPTIONAL_TRAITS = ['style', 'hair', 'hairColor', 'skin']
 
 /* FNV-1a, then a small xorshift per trait: stable across runtimes, and enough spread that agents
    whose addresses share a prefix still look different. */
@@ -100,7 +110,8 @@ export const resolveBotTraits = (seed, overrides) => {
 
 /** Whether `value` is a complete, valid set of traits — the check a server stores behind. */
 export const isBotTraits = (value) =>
-  Boolean(value) && typeof value === 'object' && Object.entries(BOT_TRAITS).every(([name, options]) => options.includes(value[name]))
+  Boolean(value) && typeof value === 'object' && Object.entries(BOT_TRAITS).every(([name, options]) =>
+    (OPTIONAL_TRAITS.includes(name) && value[name] === undefined) || options.includes(value[name]))
 
 /** A fresh random set from everything on offer, network badges included, for a Shuffle button. */
 export const randomBotTraits = () =>
@@ -122,6 +133,9 @@ const paletteFor = (colorId, fade = 1) => {
     glowBottom: `hsl(${hue} ${s(80)}% 60%)`,
     line: `hsl(${hue} ${s(70)}% 56%)`,
     light: `hsl(${hue} ${s(100)}% 95%)`,
+    // The anime portrait sits on a bold, flat field rather than the robot's pale wash
+    vividTop: `hsl(${hue} ${s(92)}% 66%)`,
+    vivid: `hsl(${hue} ${s(86)}% 58%)`,
   }
 }
 
@@ -226,6 +240,7 @@ const SNORE = (p) =>
 export const botAvatarSvg = (traits, { background = true, sleeping = false } = {}) => {
   const t = resolveBotTraits('', { ...DEFAULT_BOT, ...traits })
   const p = paletteFor(t.color, sleeping ? 0.45 : 1)
+  if (t.style === 'anime') return animeAvatarSvg(t, p, CHESTS[t.chest](p), { background, sleeping })
 
   return [
     // Keep the chest badge fully visible; sleeping robots also need room for the snore.
