@@ -6,38 +6,62 @@ import Link from 'next/link'
 import useSWRInfinite from 'swr/infinite'
 import {
   CalendarDotIcon,
+  ArrowUpRightIcon,
+  CaretUpIcon,
+  CaretDownIcon,
   CalendarDotsIcon,
   ChatCircleIcon,
   EyeIcon,
   FlameIcon,
   HandCoinsIcon,
-  HashIcon,
   HeartIcon,
   InfinityIcon,
   PackageIcon,
   RepeatIcon,
   SealCheckIcon,
-  SortAscendingIcon,
   StackIcon,
   TrendUpIcon,
   TrophyIcon,
   UsersIcon,
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
+import { Rise } from 'cube-motion/react'
 import { config } from '@/config/wagmi'
 import { SOLANA_CHAINS } from '@/config/solana'
 import PageTitle from '@/components/PageTitle'
 import OptionPicker from '@/components/ui/OptionPicker'
 import SegmentedControl from '@/components/ui/SegmentedControl'
+import Shimmer from '@/components/ui/Shimmer'
 import styles from './page.module.scss'
 import Profile from '@/components/Profile'
 import { useProfile } from '@/hooks/useProfile'
 import { profilePath } from '@/lib/username'
 const DEFAULT_AVATAR = '/default-pfp.svg'
 const PAGE_SIZE = 20
-// Half of this hangs over the card it sits on — .podium reserves the gutter for it
-const PODIUM_AVATAR_SIZE = 72
-const ROW_AVATAR_SIZE = 32
+const ROW_AVATAR_SIZE = 44
+const RANKING_METRICS = {
+  score: { field: 'score', label: 'Total score' },
+  engagement: { field: 'likes_received', label: 'Likes received' },
+  posts: { field: 'total_posts', label: 'Posts & comments' },
+  views: { field: 'views_received', label: 'Views received' },
+  tips: { field: 'tips_received', label: 'Tips received' },
+  transactions: { field: 'tx_count', label: 'Transactions' },
+  followers: { field: 'follower_count', label: 'Followers' },
+}
+// Shiny pixels that drift down past each podium picture: x across the field (%), size (px),
+// how long one fall takes and how far into it the pixel starts (s). Fixed so server and
+// client render the same field.
+const PODIUM_SPARKLES = [
+  { x: 6, size: 2, duration: 7.5, delay: 0 },
+  { x: 16, size: 1.5, duration: 9, delay: 3.2 },
+  { x: 27, size: 2, duration: 8, delay: 5.6 },
+  { x: 38, size: 1.5, duration: 10, delay: 1.4 },
+  { x: 50, size: 2.5, duration: 8.5, delay: 6.8 },
+  { x: 61, size: 1.5, duration: 9.5, delay: 2.3 },
+  { x: 72, size: 2, duration: 7, delay: 4.4 },
+  { x: 83, size: 1.5, duration: 10.5, delay: 0.8 },
+  { x: 94, size: 2, duration: 8, delay: 7.4 },
+]
 
 const PERIOD_OPTIONS = [
   { value: 'all', label: 'All time', icon: InfinityIcon },
@@ -94,6 +118,7 @@ export default function LeaderboardPage() {
   const [period, setPeriod] = useState('all')
   const [sort, setSort] = useState('score')
   const [networkId, setNetworkId] = useState('all')
+  const rankingMetric = RANKING_METRICS[sort]
 
   const getKey = (pageIndex, previousPageData) => {
     if (previousPageData && !previousPageData.meta?.hasMore) return null
@@ -122,7 +147,6 @@ export default function LeaderboardPage() {
   const stats = meta?.stats || EMPTY_STATS
   const dayStats = meta?.stats_24h || EMPTY_STATS
   const networks = meta?.networks || []
-  const topLeaders = useMemo(() => leaders.slice(0, 3), [leaders])
   // Ids travel as strings so the 'all' sentinel and a chain id compare the same way
   const networkOptions = useMemo(
     () => [
@@ -220,70 +244,70 @@ export default function LeaderboardPage() {
             <p className={styles.emptyState}>No ranked activity found.</p>
           ) : (
             <>
-              <section className={styles.podium} aria-label="Top ranked users">
-                {topLeaders.map((leader) => (
-                  <div key={leader.wallet_address} className={styles.podiumItem} data-rank={leader.rank}>
-                    <Link
-                      href={profilePath(leader.wallet_address, leader.username)}
-                      className={styles.cardLink}
-                      aria-label={`Open the profile ranked #${leader.rank}`}
-                    />
-                    <Profile
-                      creator={leader.wallet_address}
-                      variant="stacked"
-                      size={PODIUM_AVATAR_SIZE}
-                      className={styles.podiumProfile}
-                    />
-                    <div className={styles.scoreBlock}>
-                      <span>{numberFormatter.format(leader.score)}</span>
-                      <small>score</small>
-                    </div>
-                    <span className={styles.podiumRank}>Rank {leader.rank}</span>
-                  </div>
-                ))}
-              </section>
-
-              <section className={styles.leaderList} aria-label="Leaderboard rows, scroll horizontally for all statistics" tabIndex={0}>
-                <div className={styles.leaderRowHeader}>
-                  <span>#</span>
-                  <span>Profiles</span>
-                  <span>Posts</span>
-                  <span>Comments</span>
-                  <span>Likes</span>
-                  <span>Reposts</span>
-                  <span>Views</span>
-                  <span>Tips</span>
-                  <span>TXs</span>
-                  <span>Followers</span>
-                  <span>Score</span>
+              <header className={styles.rankingsHeader}>
+                <div>
+                  <h2>Community rankings</h2>
+                  <p>{PERIOD_OPTIONS.find((option) => option.value === period)?.label} · Ranked by {SORT_OPTIONS.find((option) => option.value === sort)?.label.toLowerCase()}</p>
                 </div>
+                <span>{numberFormatter.format(leaders.length)} profiles loaded</span>
+              </header>
+              <section className={styles.leaderGrid} aria-label="Ranked profiles">
                 {leaders.map((leader) => (
-                  <div key={`${leader.rank}-${leader.wallet_address}`} className={styles.leaderRow}>
+                  <Rise as="article" key={leader.wallet_address} className={clsx(styles.leaderCard, leader.rank <= 3 && styles['leaderCard--winner'])} data-rank={leader.rank}>
                     <Link
                       href={profilePath(leader.wallet_address, leader.username)}
-                      className={styles.cardLink}
+                      className={styles.leaderCard__link}
                       aria-label={`Open the profile ranked #${leader.rank}`}
                     />
-                    <span className={styles.rankNumber} data-rank={leader.rank}>
-                      {leader.rank}
-                    </span>
-                    <Profile
-                      creator={leader.wallet_address}
-                      variant="nameAndUsername"
-                      size={ROW_AVATAR_SIZE}
-                      className={styles.avatar}
-                    />
-
-                    <Metric icon={FlameIcon} label="Posts" value={leader.root_posts} />
-                    <Metric icon={ChatCircleIcon} label="Comments" value={leader.comments_made} />
-                    <Metric icon={HeartIcon} label="Likes" value={leader.likes_received} title={likesTitle(leader)} />
-                    <Metric icon={RepeatIcon} label="Reposts" value={leader.reposts_made} />
-                    <Metric icon={EyeIcon} label="Views" value={leader.views_received} />
-                    <Metric icon={HandCoinsIcon} label="Tips received" value={leader.tips_received} />
-                    <Metric icon={PackageIcon} label="Transactions" value={leader.tx_count} />
-                    <Metric icon={UsersIcon} label="Followers" value={leader.follower_count} />
-                    <span className={styles.rowScore}>{compactFormatter.format(leader.score)}</span>
-                  </div>
+                    <div className={styles.leaderCard__heading}>
+                      <span className={styles.leaderCard__rank} data-rank={leader.rank}>#{leader.rank}</span>
+                      <span className={styles.leaderCard__score}>
+                        <TrophyIcon size={16} aria-hidden="true" />
+                        {leader.rank <= 3 ? 'Top 3' : 'Ranked member'}
+                      </span>
+                    </div>
+                    <div className={styles.leaderCard__identity}>
+                      {leader.rank <= 3 && (
+                        <span className={styles.sparkles} style={{ '--podium-avatar': `${ROW_AVATAR_SIZE}px` }} aria-hidden="true">
+                          {PODIUM_SPARKLES.map((sparkle) => (
+                            <i
+                              key={sparkle.x}
+                              className={styles.sparkles__pixel}
+                              style={{
+                                '--sparkle-x': `${sparkle.x}%`,
+                                '--sparkle-size': `${sparkle.size}px`,
+                                '--sparkle-drift': `${(sparkle.x % 3 - 1) * 12}px`,
+                                animationDuration: `${sparkle.duration}s`,
+                                animationDelay: `-${sparkle.delay}s`,
+                              }}
+                            />
+                          ))}
+                        </span>
+                      )}
+                      <Profile
+                        creator={leader.wallet_address}
+                        variant="fullWithoutTime"
+                        size={ROW_AVATAR_SIZE}
+                        className={styles.leaderCard__profile}
+                      />
+                    </div>
+                    <div className={styles.leaderCard__highlight}>
+                      <span>{rankingMetric.label}</span>
+                      <strong title={numberFormatter.format(leader[rankingMetric.field])}>{compactFormatter.format(leader[rankingMetric.field])}</strong>
+                      {sort !== 'score' && <small>{compactFormatter.format(leader.score)} total score</small>}
+                    </div>
+                    <MetricRail rank={leader.rank}>
+                      <Metric icon={FlameIcon} label="Posts" value={leader.root_posts} active={sort === 'posts'} />
+                      <Metric icon={ChatCircleIcon} label="Comments" value={leader.comments_made} active={sort === 'posts'} />
+                      <Metric icon={HeartIcon} label="Likes" value={leader.likes_received} title={likesTitle(leader)} active={sort === 'engagement'} />
+                      <Metric icon={RepeatIcon} label="Reposts" value={leader.reposts_made} active={sort === 'engagement'} />
+                      <Metric icon={EyeIcon} label="Views" value={leader.views_received} active={sort === 'views'} />
+                      <Metric icon={HandCoinsIcon} label="Tips received" value={leader.tips_received} active={sort === 'tips'} />
+                      <Metric icon={PackageIcon} label="Transactions" value={leader.tx_count} active={sort === 'transactions'} />
+                      <Metric icon={UsersIcon} label="Followers" value={leader.follower_count} active={sort === 'followers'} />
+                    </MetricRail>
+                    <span className={styles.leaderCard__action} aria-hidden="true">View profile <ArrowUpRightIcon size={16} /></span>
+                  </Rise>
                 ))}
               </section>
 
@@ -348,29 +372,85 @@ function NetworksCard({ networks }) {
   )
 }
 
-function Metric({ icon: Icon, label, value, title }) {
+function MetricRail({ children, rank }) {
+  const railRef = useRef(null)
+  const [canScrollUp, setCanScrollUp] = useState(false)
+  const [canScrollDown, setCanScrollDown] = useState(false)
+
+  useEffect(() => {
+    const rail = railRef.current
+    if (!rail) return
+    const measure = () => {
+      setCanScrollUp(rail.scrollTop > 1)
+      setCanScrollDown(rail.scrollTop + rail.clientHeight < rail.scrollHeight - 1)
+    }
+    measure()
+    rail.addEventListener('scroll', measure, { passive: true })
+    const observer = new ResizeObserver(measure)
+    observer.observe(rail)
+    return () => {
+      rail.removeEventListener('scroll', measure)
+      observer.disconnect()
+    }
+  }, [])
+
+  const scrollRow = (direction) => {
+    const rail = railRef.current
+    if (!rail || rail.children.length < 2) return
+    const rowHeight = rail.children[1].getBoundingClientRect().top - rail.children[0].getBoundingClientRect().top
+    rail.scrollBy({
+      top: direction * rowHeight,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    })
+  }
+
   return (
-    <span className={styles.metric} title={title || label}>
-      <Icon size={15} />
-      <span>{compactFormatter.format(value)}</span>
-    </span>
+    <div className={styles.metricRail}>
+      <div className={styles.metricRail__header}>
+        <span>Activity</span>
+        {(canScrollUp || canScrollDown) && (
+          <div className={styles.metricRail__arrows}>
+            <button type="button" className={styles.metricRail__arrow} aria-label={`Show previous stats row for rank ${rank}`} disabled={!canScrollUp} onClick={() => scrollRow(-1)}>
+              <CaretUpIcon size={12} aria-hidden="true" />
+            </button>
+            <button type="button" className={styles.metricRail__arrow} aria-label={`Show next stats row for rank ${rank}`} disabled={!canScrollDown} onClick={() => scrollRow(1)}>
+              <CaretDownIcon size={12} aria-hidden="true" />
+            </button>
+          </div>
+        )}
+      </div>
+      <dl ref={railRef} className={styles.metricRail__list} data-scroll-up={canScrollUp} data-scroll-down={canScrollDown} tabIndex={0} aria-label={`Activity stats for rank ${rank}`}>
+        {children}
+      </dl>
+    </div>
   )
 }
 
-/* The column shows likes received, but every neighbouring column is an action the member took, so
-   the hover spells out which side of the like each number is. */
+function Metric({ icon: Icon, label, value, title, active }) {
+  return (
+    <div className={clsx(styles.leaderCard__metric, active && styles['leaderCard__metric--active'])} title={title || `${label}: ${numberFormatter.format(value)}`}>
+      <dt><Icon size={15} aria-hidden="true" />{label}</dt>
+      <dd>{compactFormatter.format(value)}</dd>
+    </div>
+  )
+}
+
+/* Keep received and given likes explicit in the metric's tooltip. */
 function likesTitle(leader) {
   return `Likes received: ${numberFormatter.format(leader.likes_received)} — Likes given: ${numberFormatter.format(leader.likes_given)}`
 }
 
 function LeaderboardSkeleton() {
   return (
-    <div className={styles.skeletonList} aria-label="Loading leaderboard">
+    <div className={styles.leaderGrid} aria-label="Loading leaderboard" aria-busy="true">
       {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className={styles.skeletonRow}>
-          <span />
-          <div />
-          <p />
+        <div key={index} className={clsx(styles.leaderCard, styles['leaderCard--loading'])} aria-hidden="true">
+          <Shimmer className={styles.leaderCard__placeholder} style={{ width: '35%', height: 20 }} />
+          <Shimmer className={styles.leaderCard__placeholder} style={{ width: '75%', height: ROW_AVATAR_SIZE }} />
+          <Shimmer className={styles.leaderCard__placeholder} style={{ height: 65 }} />
+          <div className={styles.metricRail__list}>
+            {Array.from({ length: 8 }).map((_, metricIndex) => <Shimmer key={metricIndex} className={styles.leaderCard__placeholder} style={{ height: 48 }} />)}
+          </div>
         </div>
       ))}
     </div>

@@ -246,270 +246,408 @@
   }
 }
 
-.podium {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-  // The top gutter is the half of each picture that hangs over its card
-  padding: 2.75rem 0 1rem;
-
-  @media (max-width: 720px) {
-    grid-template-columns: 1fr;
-    // Stacked, every card but the first hangs its picture over the one above — the row gap is
-    // that overhang, not the 0.75rem the columns use
-    row-gap: 3.25rem;
-  }
-}
-
-.podiumItem {
-  appearance: none;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.6rem;
-  min-width: 0;
-  padding: 0 1rem 1.15rem;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--background);
-  color: var(--text);
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 150ms ease, transform 150ms ease;
-
+.leaderCard--winner {
   &[data-rank='1'] {
     --podium-rank: var(--rank-1);
+    --podium-crown: url('/icons/1st.svg');
+    --podium-phase: -1s;
   }
 
   &[data-rank='2'] {
     --podium-rank: var(--rank-2);
+    --podium-crown: url('/icons/2nd.svg');
+    --podium-phase: -3s;
   }
 
   &[data-rank='3'] {
     --podium-rank: var(--rank-3);
+    --podium-crown: url('/icons/3rd.svg');
+    --podium-phase: -5s;
   }
 
-  &:hover {
-    border-color: var(--podium-rank, var(--leaderboard-accent));
-    transform: translateY(-2px);
-  }
-
-  // Nested so these outrank the layout utilities Profile's own root carries
-  .podiumProfile {
-    flex-direction: column;
-    gap: 0.5rem;
-    max-width: 100%;
-    margin-top: calc(var(--profile-avatar-size, 48px) / -2);
-
+  .leaderCard__profile {
     // The picture wears the card's colour as a collar, with the rank's ring outside it
+    // The picture wears a thin metal rim in the rank's colour, lit from within
     > :first-child {
+      --podium-avatar: var(--profile-avatar-size, 48px);
+
+      position: relative;
+      isolation: isolate;
       border-radius: 999px;
-      box-shadow: 0 0 0 4px var(--background), 0 0 0 6px var(--podium-rank, var(--border));
-    }
 
-    // The byline is a left-aligned column; under a centred picture it centres too
-    > :last-child {
-      align-items: center;
-    }
-  }
-}
-
-// The whole card is one link, laid under the identity: Profile's picture and name are
-// positioned, so they keep their own clicks and this only catches what is left.
-.cardLink {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-}
-
-.podiumRank {
-  color: var(--podium-rank, var(--text-muted));
-  font-size: var(--system-12-font-size);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-
-.podiumIdentity,
-.identity {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-
-  strong {
-    overflow: hidden;
-    color: var(--text);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--system-15-font-size);
-    line-height: var(--system-16-line-height);
-  }
-
-  code {
-    overflow: hidden;
-    color: var(--text-muted);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--system-12-font-size);
-  }
-}
-
-.scoreBlock {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.05rem;
-  color: var(--text);
-
-  span {
-    font-size: var(--system-22-font-size);
-    line-height: var(--system-22-line-height);
-    font-weight: 800;
-  }
-
-  small {
-    color: var(--text-muted);
-    font-size: var(--system-12-font-size);
-    font-weight: 700;
-  }
-}
-
-.leaderList {
-  --leader-columns: 36px 64px repeat(8, minmax(80px, 1fr)) 96px;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  max-width: 100%;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  border-top: 1px solid var(--border);
-}
-
-.leaderRowHeader {
-  appearance: none;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: grid;
-  grid-template-columns: var(--leader-columns);
-  align-items: center;
-  gap: 0.7rem;
-  width: 100%;
-  min-width: 960px;
-  background-color: var(--surface-muted);
-  padding: 0.75rem 0;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  text-align: left;
-      font-size: var(--system-12-font-size);
-
-      span:nth-child(1) {
-        text-align: center;
+      // Paint the face and metal rim over the crown's lower edge.
+      > :first-child {
+        position: relative;
+        z-index: 1;
+        border-radius: inherit;
+        box-shadow:
+          0 0 0 1px color-mix(in srgb, var(--podium-rank) 60%, #000),
+          0 0 0 3px var(--podium-rank, var(--border)),
+          0 0 0 4px color-mix(in srgb, var(--podium-rank) 45%, #fff),
+          0 0 16px 4px color-mix(in srgb, var(--podium-rank) 40%, transparent);
       }
 
-}
+      > :not(:first-child) {
+        z-index: 2;
+      }
 
-.leaderRow {
-  position: relative;
-  display: grid;
-  grid-template-columns: var(--leader-columns);
-  align-items: center;
-  gap: 0.7rem;
-  width: 100%;
-  min-width: 960px;
-  min-height: 72px;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  text-align: left;
+      // A slow rank-colored breath behind the rim, offset for each winner.
+      &::before {
+        content: '';
+        position: absolute;
+        inset: calc(var(--podium-avatar) * -0.28);
+        z-index: -1;
+        border-radius: inherit;
+        background: radial-gradient(
+          closest-side,
+          transparent 58%,
+          color-mix(in srgb, var(--podium-rank) 24%, transparent) 68%,
+          color-mix(in srgb, var(--podium-rank) 10%, transparent) 84%,
+          transparent
+        );
+        pointer-events: none;
+        animation: podiumHalo 6s ease-in-out var(--podium-phase, 0s) infinite;
 
-  &:hover {
-    background-color: var(--hover);
-  }
+        @media (prefers-reduced-motion: reduce) {
+          animation: none;
+        }
+      }
 
-}
+      // The crown sits behind the face and rim, above the halo.
+      &::after {
+        content: '';
+        position: absolute;
+        top: calc(var(--podium-avatar) * -0.24);
+        left: calc(var(--podium-avatar) * -0.14);
+        z-index: 0;
+        width: calc(var(--podium-avatar) * 0.5);
+        aspect-ratio: 1;
+        background: var(--podium-crown) center / contain no-repeat;
+        transform: rotate(-32deg);
+        pointer-events: none;
+      }
+    }
 
-.rankNumber {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  color: var(--text-muted);
-  font-size: var(--system-13-font-size);
-  font-weight: 700;
-
-  &[data-rank='1'] {
-    color: var(--rank-1);
-  }
-
-  &[data-rank='2'] {
-    color: var(--rank-2);
-  }
-
-  &[data-rank='3'] {
-    color: var(--rank-3);
   }
 }
 
-.avatar {
-  min-width: 0;
+// Shiny pixels drifting down past the picture, from above the card to just under the rim.
+// Decorative and click-through; the field is centred on the picture that hangs over the top.
+.sparkles {
+  position: absolute;
+  top: calc(var(--podium-avatar) * -0.4);
+  left: calc(var(--podium-avatar) / 2);
+  z-index: 2;
+  width: calc(var(--podium-avatar) * 1.9);
+  height: calc(var(--podium-avatar) * 1.5);
+  transform: translateX(-50%);
+  pointer-events: none;
 
-  > :nth-child(2) {
+  &__pixel {
+    position: absolute;
+    top: 0;
+    left: var(--sparkle-x);
+    width: var(--sparkle-size);
+    height: var(--sparkle-size);
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--podium-rank) 25%, #fff);
+    box-shadow: 0 0 4px 1px color-mix(in srgb, var(--podium-rank) 45%, transparent);
+    opacity: 0;
+    animation: podiumSparkle ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
     display: none;
-    min-width: 0;
-    overflow: hidden;
   }
 }
 
-@container leaderboard (min-width: 960px) {
-  .leaderList {
-    --leader-columns: 36px 240px repeat(8, minmax(80px, 1fr)) 96px;
-  }
-
-  .leaderRowHeader,
-  .leaderRow {
-    min-width: 1140px;
-  }
-
-  .avatar > :nth-child(2) {
-    display: flex;
-  }
-}
-
-.avatarLarge {
-  width: 52px;
-  height: 52px;
-}
-
-.metric {
-  display: inline-flex;
+.rankingsHeader {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
-  min-width: 0;
-  color: var(--text-muted);
-  font-size: var(--system-13-font-size);
-  font-weight: 600;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 1.25rem 0 1rem;
 
-  svg {
-    flex: 0 0 auto;
-    color: var(--leaderboard-accent);
+  h2 {
+    margin: 0;
+    color: var(--text);
+    font-size: var(--system-22-font-size);
+  }
+
+  p,
+  > span {
+    margin: 0.35rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--system-12-font-size);
   }
 }
 
-.rowScore {
-  justify-self: end;
-  min-width: 62px;
-  padding: 0.35rem 0.55rem;
-  border-radius: 999px;
-  color: var(--leaderboard-accent-text);
-  background-color: var(--leaderboard-accent);
-  text-align: center;
-  font-size: var(--system-13-font-size);
-  font-weight: 800;
+.leaderGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.leaderCard {
+  --card-accent: var(--text-muted);
+  position: relative;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--card-accent) 5%, transparent), transparent 45%), var(--background);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+
+  &[data-rank='1'] { --card-accent: var(--rank-1); }
+  &[data-rank='2'] { --card-accent: var(--rank-2); }
+  &[data-rank='3'] { --card-accent: var(--rank-3); }
+
+  &--loading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  &__placeholder {
+    border-radius: 9px;
+  }
+
+  &__highlight {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.65rem;
+    margin-bottom: 0.65rem;
+    padding: 0.6rem 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    pointer-events: none;
+
+    > span {
+      flex-basis: 100%;
+      color: var(--text-muted);
+      font-size: var(--system-12-font-size);
+    }
+
+    strong {
+      color: var(--text);
+      font-size: 1.5rem;
+      line-height: 1.2;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    small {
+      color: var(--text-muted);
+      font-size: var(--system-12-font-size);
+    }
+  }
+
+  &__action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.65rem;
+    color: var(--text-muted);
+    font-size: var(--system-12-font-size);
+    pointer-events: none;
+  }
+
+  &:hover,
+  &:focus-within {
+    border-color: color-mix(in srgb, var(--card-accent) 55%, var(--border));
+    box-shadow: 0 8px 28px color-mix(in srgb, var(--card-accent) 8%, transparent);
+  }
+
+  &__link {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+
+    &:focus-visible {
+      outline: 2px solid var(--card-accent);
+      outline-offset: 3px;
+    }
+  }
+
+  &__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    pointer-events: none;
+  }
+
+  &__rank {
+    color: var(--text-muted);
+    font-size: var(--system-15-font-size);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+
+    &[data-rank='1'] { color: var(--rank-1); }
+    &[data-rank='2'] { color: var(--rank-2); }
+    &[data-rank='3'] { color: var(--rank-3); }
+  }
+
+  &__score {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--card-accent) 12%, transparent);
+    color: var(--card-accent);
+    font-size: var(--system-13-font-size);
+    font-weight: 800;
+
+    small {
+      color: var(--text-muted);
+      font-size: var(--system-12-font-size);
+      font-weight: 500;
+    }
+  }
+
+  &__identity {
+    position: relative;
+    margin-bottom: 0.75rem;
+    padding-top: 0.5rem;
+    pointer-events: none;
+    --podium-avatar: 44px;
+  }
+
+  &__profile {
+    min-width: 0;
+
+    a,
+    button {
+      pointer-events: auto;
+    }
+  }
+
+  &__metric {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    scroll-snap-align: start;
+    gap: 0.15rem;
+    min-width: 0;
+    padding: 0.2rem 0.5rem;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--surface-muted) 55%, transparent);
+
+    dt {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: var(--text-muted);
+      font-size: var(--system-12-font-size);
+
+      svg { flex-shrink: 0; }
+    }
+
+    dd {
+      margin: 0;
+      color: var(--text);
+      font-size: var(--system-13-font-size);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    &--active {
+      background: color-mix(in srgb, var(--card-accent) 10%, var(--surface-muted));
+
+      dt,
+      dd { color: var(--card-accent); }
+    }
+  }
+}
+
+.metricRail {
+  position: relative;
+  min-width: 0;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 20px;
+    margin-bottom: 0.4rem;
+    color: var(--text-muted);
+    font-size: var(--system-12-font-size);
+  }
+
+  &__arrows {
+    display: flex;
+    gap: 0.15rem;
+  }
+
+  &__arrow {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--surface-muted);
+      color: var(--text);
+    }
+
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+  }
+
+  &__list {
+    --rail-top: #000;
+    --rail-bottom: #000;
+
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: 28px;
+    gap: 0.2rem;
+    min-width: 0;
+    max-height: 100px;
+    margin: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    mask-image: linear-gradient(to bottom, var(--rail-top), #000 12px, #000 calc(100% - 12px), var(--rail-bottom));
+
+    &[data-scroll-up='true'] {
+      --rail-top: transparent;
+    }
+
+    &[data-scroll-down='true'] {
+      --rail-bottom: transparent;
+    }
+
+    > * {
+      box-sizing: border-box;
+      min-width: 0;
+    }
+  }
+
+  &__arrow:focus-visible,
+  &__list:focus-visible {
+    outline: 2px solid var(--text-muted);
+    outline-offset: 2px;
+  }
 }
 
 /* Scroll sentinel: holds its height so the spinner appearing never shifts the list */
@@ -538,52 +676,41 @@
   background-color: color-mix(in srgb, var(--status-error) 12%, transparent);
 }
 
-.skeletonList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  padding-top: 0.5rem;
-}
-
-.skeletonRow {
-  display: grid;
-  grid-template-columns: 36px 44px 1fr;
-  align-items: center;
-  gap: 0.75rem;
-  min-height: 72px;
-  padding: 0.75rem 0;
-
-  span,
-  div,
-  p {
-    display: block;
-    border-radius: 999px;
-    background:
-      linear-gradient(90deg, transparent, var(--shimmer-glint), transparent),
-      var(--surface-muted);
-    background-size: 220% 100%;
-    animation: shimmer 1.35s linear infinite;
+@keyframes podiumHalo {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.94);
   }
 
-  span {
-    width: 32px;
-    height: 32px;
-  }
-
-  div {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-  }
-
-  p {
-    width: min(360px, 100%);
-    height: 18px;
+  50% {
+    opacity: 0.9;
+    transform: scale(1.08);
   }
 }
 
-@keyframes shimmer {
-  to {
-    background-position: -220% 0;
+// Each pixel follows its own drift, with a brief glint during the fall.
+@keyframes podiumSparkle {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: translate(var(--sparkle-drift), calc(var(--podium-avatar) * 0.75)) scale(1.15) rotate(45deg);
+    opacity: 0.9;
+  }
+
+  80% {
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: translate(calc(var(--sparkle-drift) * 0.5), calc(var(--podium-avatar) * 1.5)) scale(0.6) rotate(90deg);
+    opacity: 0;
   }
 }
