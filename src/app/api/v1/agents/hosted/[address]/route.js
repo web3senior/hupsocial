@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server'
 import { chatAddressFromRequest } from '@/lib/chatSession'
-import { AgentError, deleteAgent, getAgent, getSession, latestChatSession, listSessions, readMessages, readProposals, setAgentKey, updateAgent } from '@/lib/hostedAgents'
+import { abandonAgent, AgentError, deleteAgent, getAgent, getSession, latestChatSession, listSessions, readMessages, readProposals, setAgentKey, updateAgent } from '@/lib/hostedAgents'
 
 const failure = (error, tag) => {
   if (error instanceof AgentError) return NextResponse.json({ success: false, error: error.message }, { status: error.status })
@@ -61,7 +61,9 @@ export async function DELETE(request, { params }) {
 
   try {
     const { address } = await params
-    await deleteAgent(owner, address)
+    // ?abandon=1 undoes a Universal Profile agent its profile declined, freeing its fee
+    if (new URL(request.url).searchParams.get('abandon')) await abandonAgent(owner, address)
+    else await deleteAgent(owner, address)
     return NextResponse.json({ success: true })
   } catch (error) {
     return failure(error, 'HOSTED_AGENT_DELETE_ERROR')

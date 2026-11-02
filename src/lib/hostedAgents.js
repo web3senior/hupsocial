@@ -245,8 +245,36 @@ export const setAgentKey = async (owner, address, input) => {
  * workspace snapshots — and a derived agent can be made again at the same index to reach them.
  * Top-ups are kept as the record of money received.
  */
-export const deleteAgent = async (owner, address) => {
+export const deleteAgent = async (owner, address) => removeAgent(owner, await getAgent(owner, address))
+
+// How long after creation a declined profile grant may still undo the agent and free its fee
+const ABANDON_WINDOW_MS = 15 * 60 * 1000
+// AddressPermissions:Permissions:<address>
+const LSP6_PERMISSIONS_PREFIX = '0x4b80742de2bf82acb3630000'
+
+const holdsProfilePermissions = async (owner, key) => {
+  const provider = await getServerProvider(LUKSO_CHAIN_ID)
+  if (!provider) throw new AgentError(503, 'LUKSO is unreachable right now. Try again in a moment.')
+  const profile = new ethers.Contract(owner, ['function getData(bytes32) view returns (bytes)'], provider)
+  const value = await profile.getData(ethers.concat([LSP6_PERMISSIONS_PREFIX, key]))
+  return value !== '0x' && BigInt(value) !== 0n
+}
+
+/**
+ * Undoes a Universal Profile agent whose grant the profile declined, as if it was never made: the
+ * row goes, and so does its creation fee's record, so the same payment creates the next try. Only
+ * a fresh controller with no permissions on the profile — asked of the chain — qualifies; anything
+ * else would let one payment cover agent after agent.
+ */
+export const abandonAgent = async (owner, address) => {
   const agent = await getAgent(owner, address)
+  if (agent.kind !== 'controller') throw new AgentError(400, 'Only a Universal Profile agent can be abandoned')
+  if (Date.now() - Date.parse(agent.createdAt) > ABANDON_WINDOW_MS) throw new AgentError(409, 'This agent is past its setup. Remove it instead.')
+  if (await holdsProfilePermissions(owner, agent.controllerAddress)) throw new AgentError(409, 'Your profile already approved this agent')
+  await removeAgent(owner, agent, { releaseFee: true })
+}
+
+const removeAgent = async (owner, agent, { releaseFee = false } = {}) => {
   const connection = await pool.getConnection()
   try {
     await connection.beginTransaction()
@@ -254,6 +282,7 @@ export const deleteAgent = async (owner, address) => {
       await connection.execute(`DELETE FROM ${table} WHERE agent_address = ?`, [agent.address])
     }
     await connection.execute('DELETE FROM hosted_agents WHERE owner_address = ? AND agent_address = ?', [owner, agent.address])
+    if (releaseFee) await connection.execute('DELETE FROM agent_creation_fees WHERE owner_address = ? AND agent_address = ?', [owner, agent.address])
     await connection.commit()
   } catch (error) {
     await connection.rollback()

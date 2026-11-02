@@ -115,8 +115,8 @@ export const walletForAgent = async (agent, reason = 'Using your agent') => {
 /**
  * Creates a Universal Profile agent: a fresh key in this browser, registered with Hup by its own
  * signature, then made a controller of the owner's profile (lib/lsp6.js). No vault, no profile of
- * its own. The grant is a separate transaction from the profile — if it is declined the agent
- * exists without permissions, and its card offers the grant again.
+ * its own. The grant is a separate transaction from the profile — if it is declined the agent is
+ * undone and its fee freed (GRANT_DECLINED), so nothing stays that the profile never approved.
  *
  * With `privateKey`, an existing controller is brought in instead of a fresh key — but only one
  * the profile already limits to AGENT_PERMISSIONS (or has not granted at all). A wider key (the
@@ -151,7 +151,18 @@ export const createControllerAgent = async ({ token, owner, index, name, persona
     await grantAgentController({ profile: owner, agent: wallet.address })
     return { agent, granted: true, grantError: null }
   } catch (grantError) {
-    return { agent, granted: false, grantError }
+    // Declined: undone, fee freed, so no agent stays behind that the profile never approved. If
+    // the undo itself fails, the agent stays and its card offers the grant again
+    try {
+      await readJson(
+        await fetch(`/api/v1/agents/hosted/${agent.address}?abandon=1`, { method: 'DELETE', headers: authHeaders(token) }),
+        'The unapproved agent could not be removed',
+      )
+    } catch {
+      return { agent, granted: false, grantError }
+    }
+    forgetAgentKey(owner, wallet.address)
+    throw Object.assign(new Error('Not created: your Universal Profile did not approve this agent.'), { code: 'GRANT_DECLINED', cause: grantError })
   }
 }
 
