@@ -809,7 +809,8 @@ export const carryOutProposal = async ({ agent, proposal, chain, owner = null })
   if (asProfile && !grant.isController) throw new Error(`${agent.name} is not a controller of your Universal Profile. Add it from its card.`)
 
   const target = asProfile ? chainById(lukso.id) : proposal.kind === 'post' ? chain : chainById(proposal.networkId)
-  if (!target) throw new Error('This lives on a network this app does not support')
+  // A profile change is saved on Hup, not onchain: it has no network to find
+  if (!target && proposal.kind !== 'profile') throw new Error('This lives on a network this app does not support')
 
   const reason = {
     post: 'Posting as your agent',
