@@ -11,7 +11,8 @@ import { toast } from '@/components/NextToast'
 import styles from './EditMarketDialog.module.scss'
 
 const MIN_OUTCOMES = 2
-const MAX_OUTCOMES = 16
+// Fallback until the chain's MAX_OUTCOME_COUNT loads — older deployments cap at 16
+const DEFAULT_MAX_OUTCOMES = 16
 
 /**
  * Edit Market Dialog
@@ -26,8 +27,9 @@ const MAX_OUTCOMES = 16
  * @param {string} props.viewer The connected wallet (the creator, per the visibility gate).
  * @param {Function} props.onAction MarketDetail's submitTx — (functionName, args, label).
  * @param {boolean} props.isBusy True while any market transaction is in flight.
+ * @param {number} [props.maxOutcomes] The deployment's MAX_OUTCOME_COUNT.
  */
-const EditMarketDialog = forwardRef(function EditMarketDialog({ market, marketId, viewer, onAction, isBusy }, ref) {
+const EditMarketDialog = forwardRef(function EditMarketDialog({ market, marketId, viewer, onAction, isBusy, maxOutcomes = DEFAULT_MAX_OUTCOMES }, ref) {
   const dialogRef = useRef(null)
   const imageInputRef = useRef(null)
 
@@ -63,7 +65,7 @@ const EditMarketDialog = forwardRef(function EditMarketDialog({ market, marketId
   }
 
   const addOutcome = () => {
-    setOutcomeLabels((labels) => (labels.length < MAX_OUTCOMES ? [...labels, ''] : labels))
+    setOutcomeLabels((labels) => (labels.length < maxOutcomes ? [...labels, ''] : labels))
   }
 
   const removeOutcome = (index) => {
@@ -209,7 +211,7 @@ const EditMarketDialog = forwardRef(function EditMarketDialog({ market, marketId
               </button>
             </div>
           ))}
-          {outcomeLabels.length < MAX_OUTCOMES && (
+          {outcomeLabels.length < maxOutcomes && (
             <button type="button" onClick={addOutcome} disabled={busy} className={styles.editMarket__addOutcome}>
               <PlusIcon size={14} />
               Add outcome

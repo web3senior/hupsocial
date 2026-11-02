@@ -21,7 +21,8 @@ import NetworkSelect from '@/components/ui/NetworkSelect'
 import styles from './CreateMarketDialog.module.scss'
 
 const LUKSO_CHAIN_IDS = [42]
-const MAX_OUTCOMES = 16
+// Fallback until the chain's MAX_OUTCOME_COUNT loads — older deployments cap at 16
+const DEFAULT_MAX_OUTCOMES = 16
 const MAX_JUDGES = 8
 
 // Formats a unix-ms instant for a datetime-local input in the viewer's zone
@@ -122,6 +123,15 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
     chainId,
     query: { enabled: Boolean(predictAddress) },
   })
+  // The outcome cap is a per-deployment constant, so read it instead of hardcoding it
+  const { data: maxOutcomeValue } = useReadContract({
+    abi: predictAbi,
+    address: predictAddress || undefined,
+    functionName: 'MAX_OUTCOME_COUNT',
+    chainId,
+    query: { enabled: Boolean(predictAddress) },
+  })
+  const maxOutcomes = maxOutcomeValue != null ? Number(maxOutcomeValue) : DEFAULT_MAX_OUTCOMES
   const formatBps = (bps) => `${new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(Number(bps) / 100)}%`
   const feeLabel =
     feeBpsValue !== undefined && creatorFeeBpsValue !== undefined ? formatBps(feeBpsValue + creatorFeeBpsValue) : null
@@ -458,7 +468,7 @@ const CreateMarketDialog = forwardRef(function CreateMarketDialog({ onCreated, f
                 )}
               </div>
             ))}
-            {outcomeLabels.length < MAX_OUTCOMES && (
+            {outcomeLabels.length < maxOutcomes && (
               <button type="button" className={styles.marketDialog__listAdd} onClick={() => setOutcomeLabels((labels) => [...labels, ''])} disabled={isBusy}>
                 <PlusIcon size={12} />
                 Add outcome

@@ -106,6 +106,15 @@ export default function MarketDetail({ networkId, marketId }) {
     query: { enabled: Boolean(predictAddress && market && isCreator) },
   })
 
+  // Outcome cap for the edit dialog — a per-deployment constant
+  const { data: maxOutcomeValue } = useReadContract({
+    abi: predictAbi,
+    address: predictAddress,
+    functionName: 'MAX_OUTCOME_COUNT',
+    chainId,
+    query: { enabled: Boolean(predictAddress && market && isCreator) },
+  })
+
   // Featured surcharge for the upgrade button (native, admin-configured)
   const { data: featuredFeeValue } = useReadContract({
     abi: predictAbi,
@@ -752,7 +761,7 @@ export default function MarketDetail({ networkId, marketId }) {
       </section>
 
       {canEditMarket && (
-        <EditMarketDialog ref={editMarketRef} market={market} marketId={marketId} viewer={address} onAction={submitTx} isBusy={isBusy} />
+        <EditMarketDialog ref={editMarketRef} market={market} marketId={marketId} viewer={address} onAction={submitTx} isBusy={isBusy} maxOutcomes={maxOutcomeValue != null ? Number(maxOutcomeValue) : undefined} />
       )}
 
       {canEditJudges && (

@@ -45,7 +45,7 @@ contract HupPredict is IHupPredict, Pausable, ReentrancyGuard, AccessControl, ER
     uint256 public constant ABSOLUTE_MAX_FEE_BPS = 1_000;
     uint256 public constant MIN_RESOLVE_WINDOW = 1 days;
     uint256 public constant MAX_RESOLVE_WINDOW = 90 days;
-    uint256 public constant MAX_OUTCOME_COUNT = 16;
+    uint256 public constant MAX_OUTCOME_COUNT = 32;
     uint256 public constant MAX_JUDGES = 8;
     uint256 public constant ABSOLUTE_MAX_METADATA_BYTES = 2_048;
 
