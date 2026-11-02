@@ -1,26 +1,51 @@
 'use client'
 
-// PIN-free by design: the session key is a child of the app-wide Security Vault (Settings →
-// Security), which is the ONLY place the PIN is ever asked. When the vault is locked, this
-// component shows a pointer there instead of running its own password prompts.
+// PIN-free by design: the session key is a child of the app-wide vault (Settings → Security). New
+// keys come from Key Vault v2; keys made under the original vault keep working and can be moved
+// to v2 from here. When a vault is needed and locked, the shared unlock dialog opens for the
+// action underway — this component never runs a password prompt of its own.
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { getActiveChain } from '@/lib/communication'
 import hupABI from '@/abi/hup.json'
-import { ArrowsClockwiseIcon, CheckIcon, CopyIcon, KeyIcon, ShieldWarningIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { ArrowsClockwiseIcon, CheckIcon, CopyIcon, KeyIcon, ShieldCheckIcon, ShieldWarningIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import { ethers } from 'ethers'
 import Balance from '@/app/(user)/[wallet]/_components/balance'
 import { toRelativeTime } from '@/lib/dateHelper'
-import { isSessionActive, localStorageBurnerAddress,localStorageBurnerKey, localStorageBatchLikeKey, sessionStorageUnlockedKey} from '@/lib/burnerSession'
+import {
+  ensureVaultUnlocked,
+  getBurnerVersion,
+  isSessionActive,
+  localStorageBatchLikeKey,
+  resolveLegacyBurner,
+  unlockBurnerWithMaster,
+} from '@/lib/burnerSession'
+import { BURNER_FIELDS, readBurner, readUnlockedBurner, writeBurner, writeUnlockedBurner } from '@/lib/burnerStorage'
 import { localStorageGaslessKey, readGaslessPreference } from '@/lib/relayGasless'
 import { encryptData, decryptData } from '@/lib/cryptoHelper'
-import { getCachedMasterHex, deriveChildKeyBytes, CHILD_KEY_LABELS } from '@/lib/securityVault'
+import { getCachedMasterHex } from '@/lib/securityVault'
+import { deriveKeyFromMasterV2, ensureMasterV2, wrapLegacyMaster } from '@/lib/keyVaultV2'
+import { KEY_LABELS } from '@/lib/keyDerivationV2.mjs'
+import { upgradeBurnerToV2 } from '@/lib/burnerUpgrade'
+import { appChains } from '@/config/contracts'
 import { isHexString, Wallet } from 'ethers'
 import ToggleSwitch from '@/components/ui/ToggleSwitch'
 import styles from './InAppWallet.module.scss'
 import clsx from 'clsx'
+
+const chainName = (chainId) => appChains.find((chain) => chain.id === chainId)?.name ?? `Chain ${chainId}`
+
+const SWEEP_COPY = {
+  moved: 'moved',
+  empty: 'nothing to move',
+  dust: 'too little to cover gas, left on the old key',
+  failed: 'not moved',
+}
+
+// A cancelled unlock or signature is the member changing their mind, not an error to show
+const isCancel = (err) => err?.code === 4001 || err?.name === 'UserRejectedRequestError'
 
 export default function InAppWallet({ onOpenSecurity }) {
   // Establish state to track whether the switch is turned on or off
@@ -52,6 +77,20 @@ export default function InAppWallet({ onOpenSecurity }) {
 
   // UI helpers
   const [errorMsg, setErrorMsg] = useState('')
+
+  // v1 → v2 upgrade: which vault the stored key belongs to, and the per-chain sweep as it runs
+  // Read at first render: this panel already reads local storage while rendering (the backup
+  // button below), so it only ever renders in the browser
+  const readLegacyFlag = () => typeof window !== 'undefined' && Boolean(readBurner(BURNER_FIELDS.legacy))
+  const [burnerVersion, setBurnerVersion] = useState(getBurnerVersion)
+  const [hasLegacyKey, setHasLegacyKey] = useState(readLegacyFlag)
+  const [upgradeResults, setUpgradeResults] = useState(null)
+  const [isUpgrading, setIsUpgrading] = useState(false)
+
+  const readStoredVersion = useCallback(() => {
+    setBurnerVersion(getBurnerVersion())
+    setHasLegacyKey(Boolean(readBurner(BURNER_FIELDS.legacy)))
+  }, [])
 
   const { data: hash, mutate: writeContract } = useWriteContract()
 
@@ -85,6 +124,8 @@ export default function InAppWallet({ onOpenSecurity }) {
         publicClient,
       })
 
+      // The stored key is per wallet, so a switch re-reads which vault it belongs to
+      readStoredVersion()
       setSessionActive(session.active)
       setBurnerAddress(session.burnerAddress)
       setExpiresAt(session.expiresAt)
@@ -92,7 +133,7 @@ export default function InAppWallet({ onOpenSecurity }) {
       console.error('Status check failed:', err)
       setSessionActive(false)
     }
-  }, [address, publicClient])
+  }, [address, publicClient, readStoredVersion])
 
   useEffect(() => {
     checkStatus()
@@ -100,26 +141,23 @@ export default function InAppWallet({ onOpenSecurity }) {
     return () => clearInterval(interval)
   }, [checkStatus])
 
-  // Recovers the burner's plaintext private key using the unlocked vault master. Handles the
-  // legacy case (key at rest encrypted with the old per-feature PIN, which we no longer ask
-  // for): if the stored blob won't open with the master but the wallet is vault-derived, the
-  // exact same key is simply re-derived from the master and re-encrypted. Only a foreign
-  // (imported) key encrypted under the old scheme is unrecoverable without a re-import.
-  const unlockBurnerPrivateKey = async (masterHex) => {
-    const encryptedKey = localStorage.getItem(localStorageBurnerKey)
-    const storedAddress = localStorage.getItem(localStorageBurnerAddress)
-    if (!encryptedKey) return null
-
+  // Recovers the burner's plaintext private key with the master of the vault it belongs to.
+  // unlockBurnerWithMaster also handles the oldest case (a blob at rest under the retired
+  // per-feature password): a vault-derived key is re-derived and re-encrypted, and only a foreign
+  // imported key from that era needs a re-import.
+  const unlockBurnerPrivateKey = async () => {
+    if (!readBurner(BURNER_FIELDS.key)) return null
+    const version = getBurnerVersion()
+    const masterHex = version === 'v2' ? await ensureMasterV2({ reason: 'Backing up your session key' }) : getCachedMasterHex()
+    if (!masterHex) {
+      setNeedsVault(true)
+      return null
+    }
     try {
-      return await decryptData(encryptedKey, masterHex)
-    } catch {
-      const seedBytes = await deriveChildKeyBytes(masterHex, CHILD_KEY_LABELS.inAppWallet)
-      const derived = new ethers.Wallet(ethers.hexlify(seedBytes))
-      if (storedAddress && derived.address.toLowerCase() === storedAddress.toLowerCase()) {
-        localStorage.setItem(localStorageBurnerKey, await encryptData(derived.privateKey, masterHex))
-        return derived.privateKey
-      }
-      throw new Error('This session key was imported under an old password. Re-import it to use it again.')
+      return await unlockBurnerWithMaster(masterHex, version)
+    } catch (err) {
+      if (err.code === 'WRONG_PIN') throw new Error('This session key was imported under an old password. Re-import it to use it again.')
+      throw err
     }
   }
 
@@ -133,25 +171,21 @@ export default function InAppWallet({ onOpenSecurity }) {
         throw new Error('Connect your wallet first.')
       }
 
-      let targetBurnerAddress = localStorage.getItem(localStorageBurnerAddress)
+      // A key left from before keys had owners may be another wallet's — never authorize that one
+      await resolveLegacyBurner({ reason: 'Checking the session key on this device' })
 
-      if (!localStorage.getItem(localStorageBurnerKey) || !targetBurnerAddress) {
-        // Child key of the app-wide security vault. Same wallet + same PIN always reproduces
-        // the same burner key on any device — the vault (Settings → Security) is where that
-        // PIN lives; this component never asks for it.
-        const masterHex = getCachedMasterHex()
-        if (!masterHex) {
-          setNeedsVault(true)
-          return
-        }
+      let targetBurnerAddress = readBurner(BURNER_FIELDS.address)
 
-        const seedBytes = await deriveChildKeyBytes(masterHex, CHILD_KEY_LABELS.inAppWallet)
-        const burner = new ethers.Wallet(ethers.hexlify(seedBytes))
+      if (!readBurner(BURNER_FIELDS.key) || !targetBurnerAddress) {
+        // Child key of Key Vault v2. Same wallet + same PIN always reproduces the same burner
+        // key on any device; the shared unlock dialog asks for that PIN, this component never does.
+        const masterHex = await ensureMasterV2({ reason: 'Creating your in-app wallet' })
+        const burner = new ethers.Wallet(deriveKeyFromMasterV2(masterHex, KEY_LABELS.inAppWallet))
         const encryptedKey = await encryptData(burner.privateKey, masterHex)
 
-        localStorage.setItem(localStorageBurnerKey, encryptedKey)
-        localStorage.setItem(localStorageBurnerAddress, burner.address)
-        sessionStorage.setItem(sessionStorageUnlockedKey, burner.privateKey)
+        writeBurner({ key: encryptedKey, address: burner.address, version: 'v2' })
+        writeUnlockedBurner(burner.privateKey)
+        readStoredVersion()
 
         targetBurnerAddress = burner.address
       }
@@ -165,6 +199,7 @@ export default function InAppWallet({ onOpenSecurity }) {
         args: [targetBurnerAddress, duration],
       })
     } catch (err) {
+      if (isCancel(err)) return
       console.error('Session authorization failed:', err)
       setErrorMsg(err.message || 'Authorization failed. Please try again.')
     } finally {
@@ -177,24 +212,81 @@ export default function InAppWallet({ onOpenSecurity }) {
       setIsLoading(true)
       setErrorMsg('')
 
-      const masterHex = getCachedMasterHex()
-      if (!masterHex) {
-        setNeedsVault(true)
-        return
-      }
-
-      const decrypted = await unlockBurnerPrivateKey(masterHex)
+      const decrypted = await unlockBurnerPrivateKey()
       if (!decrypted) {
+        if (readBurner(BURNER_FIELDS.key)) return // vault pointer is showing
         throw new Error('No session key found on this device.')
       }
 
-      sessionStorage.setItem(sessionStorageUnlockedKey, decrypted)
+      writeUnlockedBurner(decrypted)
       setRevealedPrivateKey(decrypted)
       setRevealKeyMode(true)
     } catch (err) {
+      if (isCancel(err)) return
       setErrorMsg(err.message || 'Failed to unlock the session key.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // The pre-upgrade key, kept under v2 so whatever a sweep left behind is never out of reach
+  const handleRevealLegacy = async () => {
+    try {
+      setIsLoading(true)
+      setErrorMsg('')
+      const masterHex = await ensureMasterV2({ reason: 'Showing your previous session key' })
+      setRevealedPrivateKey(await decryptData(readBurner(BURNER_FIELDS.legacy), masterHex))
+      setRevealKeyMode(true)
+    } catch (err) {
+      if (isCancel(err)) return
+      setErrorMsg(err.message || 'Failed to open the previous session key.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  /**
+   * Moves a v1 session key to Key Vault v2: opens the old key (v1 vault) and the v2 vault, sweeps
+   * every chain's balance to the new address, then re-authorizes this chain's session for it.
+   * Other chains show "Not Set" until authorized there, as a new key always has.
+   */
+  const handleUpgrade = async () => {
+    try {
+      setIsUpgrading(true)
+      setErrorMsg('')
+      setUpgradeResults([])
+
+      await ensureVaultUnlocked({ reason: 'Upgrading your in-app wallet' })
+      const oldPrivateKey = readUnlockedBurner()
+      if (!oldPrivateKey) throw new Error('Your current session key is still locked.')
+
+      const masterV2Hex = await ensureMasterV2({ reason: 'Upgrading your in-app wallet' })
+      // Both vaults are open right now, which is the one moment the v1 master can be wrapped
+      // under v2 — after this, one v2 unlock opens communities too
+      if (getCachedMasterHex()) await wrapLegacyMaster(address).catch(() => false)
+
+      const { newAddress } = await upgradeBurnerToV2({
+        masterV2Hex,
+        oldPrivateKey,
+        onProgress: (result) => setUpgradeResults((previous) => [...(previous ?? []), result]),
+      })
+      readStoredVersion()
+
+      if (sessionActive) {
+        writeContract({
+          address: activeChain[1].hup,
+          abi: hupABI,
+          functionName: 'authorizeSession',
+          args: [newAddress, 3600 * 24 * 365],
+        })
+      }
+      await checkStatus()
+    } catch (err) {
+      if (isCancel(err)) return
+      console.error('In-app wallet upgrade failed:', err)
+      setErrorMsg(err.message || 'The upgrade did not finish. Nothing was lost; try again.')
+    } finally {
+      setIsUpgrading(false)
     }
   }
 
@@ -208,25 +300,22 @@ export default function InAppWallet({ onOpenSecurity }) {
         throw new Error('Invalid private key format. Must be a 66-character hex string (starting with 0x).')
       }
 
-      // At-rest encryption uses the vault master — no separate password to remember
-      const masterHex = getCachedMasterHex()
-      if (!masterHex) {
-        setNeedsVault(true)
-        return
-      }
+      // At-rest encryption uses the Key Vault v2 master — no separate password to remember
+      const masterHex = await ensureMasterV2({ reason: 'Importing a session key' })
 
       // Instantiation using the updated v6 class syntax
       const importedWallet = new Wallet(importPrivateKeyInput)
       const encryptedKey = await encryptData(importPrivateKeyInput, masterHex)
 
-      localStorage.setItem(localStorageBurnerKey, encryptedKey)
-      localStorage.setItem(localStorageBurnerAddress, importedWallet.address)
-      sessionStorage.setItem(sessionStorageUnlockedKey, importPrivateKeyInput)
+      writeBurner({ key: encryptedKey, address: importedWallet.address, version: 'v2' })
+      writeUnlockedBurner(importPrivateKeyInput)
+      readStoredVersion()
 
       await checkStatus()
       setShowImportPrompt(false)
       setImportPrivateKeyInput('')
     } catch (err) {
+      if (isCancel(err)) return
       setErrorMsg(err.message || 'Import failed. Check private key format.')
     } finally {
       setIsLoading(false)
@@ -305,6 +394,39 @@ export default function InAppWallet({ onOpenSecurity }) {
               </div>
             )}
 
+            {/* UPGRADE TO KEY VAULT V2 — only for a key made under the original vault */}
+            {burnerAddress && burnerVersion === 'v1' && (
+              <div className={styles.secureSetup}>
+                <h5>
+                  <ShieldCheckIcon size={16} /> Upgrade to Key Vault v2
+                </h5>
+                <p>
+                  Key Vault v2 replaces the short PIN with a strong passphrase that is far harder to guess, even by someone holding
+                  your signature. Upgrading gives this wallet a new address: Hup moves the balance on every network to it,
+                  keeps your current key as a backup, and asks you to authorize the new key on this network.
+                </p>
+                <div className="flex justify-end">
+                  <button onClick={handleUpgrade} className={styles.btnPrimary} disabled={isUpgrading || isLoading}>
+                    {isUpgrading ? 'Upgrading…' : 'Upgrade'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {upgradeResults && upgradeResults.length > 0 && (
+              <div className={styles.bgLight}>
+                <p className="m-0 mb-5">
+                  <strong>{isUpgrading ? 'Moving your balances…' : 'Upgrade finished'}</strong>
+                </p>
+                {upgradeResults.map((result) => (
+                  <p key={result.chainId} className="m-0">
+                    {chainName(result.chainId)}: {SWEEP_COPY[result.status]}
+                    {result.status === 'failed' && result.error ? ` (${result.error})` : ''}
+                  </p>
+                ))}
+              </div>
+            )}
+
             {/* VAULT LOCKED NOTICE — the Security tab is the app's only PIN entry point */}
             {needsVault && (
               <div className={styles.secureSetup}>
@@ -312,8 +434,8 @@ export default function InAppWallet({ onOpenSecurity }) {
                   <KeyIcon size={16} /> Security Vault locked
                 </h5>
                 <p>
-                  Your session key is derived from the app-wide Security Vault (one signature + one PIN, shared with
-                  private communities). Unlock it once and come back — no separate wallet password to remember.
+                  This session key was made under your original Security Vault (one signature + one PIN, shared with private
+                  communities). Unlock it once and come back, or upgrade the key to Key Vault v2.
                 </p>
                 <div className="flex justify-end">
                   <button onClick={onOpenSecurity} className={styles.btnPrimary} disabled={!onOpenSecurity}>
@@ -391,7 +513,7 @@ export default function InAppWallet({ onOpenSecurity }) {
                 Revoke Session
               </button>
 
-              {localStorage.getItem(localStorageBurnerKey) && !revealKeyMode && (
+              {readBurner(BURNER_FIELDS.key) && !revealKeyMode && (
                 <button
                   onClick={() => {
                     setErrorMsg('')
@@ -402,6 +524,12 @@ export default function InAppWallet({ onOpenSecurity }) {
                   disabled={isLoading}
                 >
                   Backup Key
+                </button>
+              )}
+
+              {hasLegacyKey && !revealKeyMode && (
+                <button onClick={handleRevealLegacy} className={styles.btnSecondary} disabled={isLoading}>
+                  Previous Key
                 </button>
               )}
 

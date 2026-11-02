@@ -159,6 +159,105 @@ const FORWARD_REQUEST_TYPES = {
   ],
 }
 
+// --- LSP25 (agents posting as their owner's Universal Profile) ---
+// An agent that is an LSP6 controller of a profile (lib/lsp6.js) signs an executeRelayCall for the
+// profile's Key Manager, and we send it. The same policy as the forwarder path applies to what
+// the profile ends up calling: LUKSO only, `UP.execute(CALL, Hup, 0, data)` only, and `data` one of
+// the sponsored selectors. The Key Manager is read from the profile and must point back at it.
+const upExecuteInterface = new ethers.Interface(['function execute(uint256 operationType, address target, uint256 value, bytes data) payable returns (bytes)'])
+const keyManagerInterface = new ethers.Interface([
+  'function target() view returns (address)',
+  'function executeRelayCall(bytes signature, uint256 nonce, uint256 validityTimestamps, bytes payload) payable returns (bytes)',
+])
+// A sponsored Hup call plus the Key Manager's permission checks and the profile's execute hop
+const LSP25_GAS = 900_000n
+
+async function relayLsp25(body) {
+  const chainId = Number(body.chainId)
+  const contracts = CONTRACTS[`chain${chainId}`]
+  if (chainId !== 42 || !contracts?.hup || !isGaslessChainId(chainId)) {
+    return NextResponse.json({ error: 'The relayer does not sponsor this network.' }, { status: 403 })
+  }
+
+  const { profile, signature, payload } = body
+  if (!ethers.isAddress(profile) || !ethers.isHexString(signature) || !ethers.isHexString(payload)) {
+    return NextResponse.json({ error: 'Malformed relay call.' }, { status: 400 })
+  }
+
+  let nonce
+  let validityTimestamps
+  let call
+  try {
+    nonce = BigInt(body.nonce)
+    validityTimestamps = BigInt(body.validityTimestamps ?? 0)
+    call = upExecuteInterface.decodeFunctionData('execute', payload)
+  } catch {
+    return NextResponse.json({ error: 'Malformed relay call.' }, { status: 400 })
+  }
+
+  const [operationType, target, value, data] = call
+  const bucket = operationType === 0n && value === 0n ? sponsoredBucket(chainId, target, data) : null
+  if (!bucket || target.toLowerCase() !== contracts.hup.toLowerCase()) {
+    console.error('RELAY_LSP25_REJECTED:', { profile, target, selector: (data || '').slice(0, 10) })
+    return NextResponse.json({ error: 'This call is not sponsored by the relayer.' }, { status: 403 })
+  }
+
+  const throttle = peekThrottle(bucket, chainId, profile)
+  if (!throttle.allowed) {
+    return NextResponse.json(
+      { error: `Slow down — you can do that again in ${formatWait(throttle.retryAfter)}.`, retryAfter: throttle.retryAfter },
+      { status: 429, headers: { 'Retry-After': String(throttle.retryAfter) } },
+    )
+  }
+
+  const provider = await getServerProvider(chainId)
+  if (!provider) return NextResponse.json({ error: 'Could not reach this network right now. Please try again shortly.' }, { status: 503 })
+
+  try {
+    const owner = new ethers.Contract(profile, ['function owner() view returns (address)'], provider)
+    const keyManagerAddress = await owner.owner()
+    const relayer = relayerWallet(provider)
+    const keyManager = new ethers.Contract(keyManagerAddress, keyManagerInterface, relayer)
+
+    // A profile names its own Key Manager; one that controls some other account is not this profile's
+    if ((await keyManager.target()).toLowerCase() !== profile.toLowerCase()) {
+      return NextResponse.json({ error: 'That profile is not controlled by an LSP6 Key Manager.' }, { status: 400 })
+    }
+
+    // The Key Manager checks the signature, the nonce and the agent's permissions; a no here costs nothing
+    try {
+      await keyManager.executeRelayCall.staticCall(signature, nonce, validityTimestamps, payload, { gasLimit: LSP25_GAS })
+    } catch (simErr) {
+      let reason = simErr.shortMessage || simErr.message || 'unknown revert'
+      try {
+        reason = hupInterface.parseError(simErr.data)?.name ?? reason
+      } catch {}
+      console.error('RELAY_LSP25_SIM_FAIL:', reason)
+      return NextResponse.json({ error: `Simulation failed: ${reason}` }, { status: 400 })
+    }
+
+    const { maxPriorityFeePerGas, maxFeePerGas } = await relayerFees(provider)
+    const tx = await enqueueRelayerSend(chainId, async () => {
+      const balance = await provider.getBalance(relayer.address, 'pending')
+      if (balance < LSP25_GAS * maxFeePerGas) {
+        throw Object.assign(new Error('The relayer has insufficient funds for this transaction.'), { code: 'INSUFFICIENT_FUNDS' })
+      }
+      recordThrottleHit(bucket, chainId, profile)
+      return keyManager.executeRelayCall(signature, nonce, validityTimestamps, payload, { gasLimit: LSP25_GAS, maxPriorityFeePerGas, maxFeePerGas })
+    })
+
+    return NextResponse.json({ success: true, txHash: tx.hash })
+  } catch (error) {
+    if (isTransportError(error)) forgetServerRpc(chainId)
+    console.error('RELAY_LSP25_ERROR:', error.shortMessage || error.message, error.code)
+    const insufficientFunds = error.code === 'INSUFFICIENT_FUNDS'
+    return NextResponse.json(
+      { error: error.shortMessage || error.message, code: insufficientFunds ? 'RELAY_INSUFFICIENT_FUNDS' : 'RELAY_UNAVAILABLE' },
+      { status: insufficientFunds ? 503 : 500 },
+    )
+  }
+}
+
 export async function POST(request) {
   let fullRequest = null
   let provider = null
@@ -201,6 +300,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json()
+    if (body?.kind === 'lsp25') return relayLsp25(body)
     const { request: forwardRequest, signature, forwarderAddress: fwdAddr, chainId: bodyChainId, forwarderName } = body
     forwarderAddress = fwdAddr
 

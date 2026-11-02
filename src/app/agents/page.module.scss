@@ -74,6 +74,24 @@
     line-height: 1.6;
     color: var(--text-muted);
   }
+
+  &__cta {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1rem;
+    border-radius: var(--global-border-radius);
+    background-color: #00c805;
+    color: #fff;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
 }
 
 .stats {

@@ -1,0 +1,91 @@
+.credits {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  &__balance {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  &__amount {
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__muted {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__topUp {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  &__input {
+    flex: 1;
+    min-width: 8rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    color: inherit;
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  &__button {
+    padding: 0.55rem 1rem;
+    border: none;
+    border-radius: var(--global-border-radius);
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 500;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__heading {
+    margin: 0 0 0.4rem;
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  // About five rows tall, then it scrolls, so a long history never pushes withdraw out of reach
+  &__list {
+    display: flex;
+    flex-direction: column;
+    max-height: 13rem;
+    margin: 0;
+    padding: 0 0.25rem 0 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    list-style: none;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.75rem;
+    align-items: baseline;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: var(--font-size-14, 0.875rem);
+    font-variant-numeric: tabular-nums;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}

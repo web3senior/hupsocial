@@ -2,15 +2,15 @@ import { ethers } from 'ethers'
 import { getUserSessions } from './communication'
 import { decryptData, encryptData, isPrivateKeyEncrypted } from './cryptoHelper'
 import { clearMasterSecret, deriveChildKeyBytes, getCachedMasterHex, CHILD_KEY_LABELS } from './securityVault'
+import { deriveKeyFromMasterV2, getCachedMasterV2, rejectMasterV2 } from './keyVaultV2'
+import { KEY_LABELS } from './keyDerivationV2.mjs'
 import { requestVaultUnlock } from './vaultUnlockBus'
+import { BURNER_FIELDS, claimLegacyBurner, disownLegacyBurner, isBurnerUnclaimed, readBurner, readUnlockedBurner, writeBurner, writeUnlockedBurner } from './burnerStorage'
 
 const prefix = process.env.NEXT_PUBLIC_LOCALSTORAGE_PREFIX || ''
 
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-export const localStorageBurnerAddress = `${prefix}burner_address`
-export const localStorageBurnerKey = `${prefix}burner_key`
 export const localStorageBatchLikeKey = `${prefix}batch_like_enabled`
-export const sessionStorageUnlockedKey = `${prefix}unlocked_burner_key`
 
 const getRpcUrl = (chain) => chain?.rpcUrls?.default?.http?.[0] || chain?.rpcUrl || chain?.rpc || process.env.NEXT_PUBLIC_LUKSO_RPC_URL
 
@@ -20,9 +20,9 @@ const getRpcUrl = (chain) => chain?.rpcUrls?.default?.http?.[0] || chain?.rpcUrl
  */
 export const isBurnerUnlocked = () => {
   if (typeof window === 'undefined') return false
-  if (sessionStorage.getItem(sessionStorageUnlockedKey)) return true
+  if (readUnlockedBurner()) return true
 
-  const storedKey = localStorage.getItem(localStorageBurnerKey)
+  const storedKey = readBurner(BURNER_FIELDS.key)
   return Boolean(storedKey) && !isPrivateKeyEncrypted(storedKey)
 }
 
@@ -41,10 +41,25 @@ export const isBurnerUnlocked = () => {
 export const ensureVaultUnlocked = async (context = {}) => {
   if (isBurnerUnlocked()) return
 
-  if (!localStorage.getItem(localStorageBurnerKey) || !localStorage.getItem(localStorageBurnerAddress)) {
+  if (!readBurner(BURNER_FIELDS.key) || !readBurner(BURNER_FIELDS.address)) {
     const err = new Error('No session key found on this device')
     err.code = 'NO_SESSION_KEY'
     throw err
+  }
+
+  if (getBurnerVersion() === 'v2') {
+    const cachedV2 = getCachedMasterV2()
+    if (cachedV2) {
+      try {
+        await unlockBurnerWithMaster(cachedV2, 'v2')
+        return
+      } catch (err) {
+        if (err.code !== 'WRONG_PIN') throw err
+        rejectMasterV2()
+      }
+    }
+    await requestVaultUnlock({ ...context, version: 'v2' })
+    return
   }
 
   const cachedMaster = getCachedMasterHex()
@@ -72,13 +87,13 @@ export const ensureVaultUnlocked = async (context = {}) => {
  *   directly, for keys still at rest under the old per-feature password scheme.
  */
 export const getBurnerSigner = async (chain, password = null) => {
-  const storedAddress = localStorage.getItem(localStorageBurnerAddress)
-  const storedKey = localStorage.getItem(localStorageBurnerKey)
+  const storedAddress = readBurner(BURNER_FIELDS.address)
+  const storedKey = readBurner(BURNER_FIELDS.key)
 
   if (!storedKey || !storedAddress) return null
 
   // 1. Check in-memory cache first
-  let privateKey = sessionStorage.getItem(sessionStorageUnlockedKey)
+  let privateKey = readUnlockedBurner()
 
   if (!privateKey) {
     // 2. Fallback to legacy unencrypted key
@@ -89,11 +104,11 @@ export const getBurnerSigner = async (chain, password = null) => {
       privateKey = await decryptData(storedKey, password)
 
       // Cache decrypted key in sessionStorage for this tab session
-      sessionStorage.setItem(sessionStorageUnlockedKey, privateKey)
+      writeUnlockedBurner(privateKey)
     } else {
       // 4. Otherwise the vault owns this key — unlock it (silently when already open)
       await ensureVaultUnlocked()
-      privateKey = sessionStorage.getItem(sessionStorageUnlockedKey)
+      privateKey = readUnlockedBurner()
       if (!privateKey) throw new Error('Session key is still locked')
     }
   }
@@ -120,8 +135,8 @@ export const getBurnerSigner = async (chain, password = null) => {
  * @throws {Error} code 'VAULT_LOCKED' when the key is encrypted and not unlocked this tab.
  */
 export const getBurnerSignerSilent = (chain) => {
-  const storedAddress = localStorage.getItem(localStorageBurnerAddress)
-  const storedKey = localStorage.getItem(localStorageBurnerKey)
+  const storedAddress = readBurner(BURNER_FIELDS.address)
+  const storedKey = readBurner(BURNER_FIELDS.key)
 
   if (!storedKey || !storedAddress) {
     const err = new Error('No session key found on this device')
@@ -129,7 +144,7 @@ export const getBurnerSignerSilent = (chain) => {
     throw err
   }
 
-  let privateKey = sessionStorage.getItem(sessionStorageUnlockedKey)
+  let privateKey = readUnlockedBurner()
 
   if (!privateKey) {
     if (isPrivateKeyEncrypted(storedKey)) {
@@ -162,12 +177,15 @@ export const getBurnerSignerSilent = (chain) => {
  * re-encrypted. A decrypt AND re-derive failure means the master is wrong, i.e. a wrong PIN
  * (or a foreign imported key from the old scheme, which needs a re-import in Settings).
  *
- * @throws {Error} code 'NO_SESSION_KEY' when this device holds no burner key.
+ * @param {string} masterHex The unlocked master of the vault the key belongs to.
+ * @param {'v1'|'v2'} [version] Which vault that is; v2 re-derives with the v2 label.
+ * @throws {Error} code 'NO_SESSION_KEY' when this device holds no burner key for this wallet,
+ *   including an ownerless one this wallet's master turns out not to open.
  * @throws {Error} code 'WRONG_PIN' when the master cannot open or reproduce the stored key.
  */
-export const unlockBurnerWithMaster = async (masterHex) => {
-  const storedKey = localStorage.getItem(localStorageBurnerKey)
-  const storedAddress = localStorage.getItem(localStorageBurnerAddress)
+export const unlockBurnerWithMaster = async (masterHex, version = 'v1') => {
+  const storedKey = readBurner(BURNER_FIELDS.key)
+  const storedAddress = readBurner(BURNER_FIELDS.address)
 
   if (!storedKey || !storedAddress) {
     const err = new Error('No session key found on this device')
@@ -175,27 +193,86 @@ export const unlockBurnerWithMaster = async (masterHex) => {
     throw err
   }
 
+  // A key from before keys had owners is this wallet's once its vault opens it, and not otherwise
+  const unclaimed = isBurnerUnclaimed()
+
   if (!isPrivateKeyEncrypted(storedKey)) {
-    sessionStorage.setItem(sessionStorageUnlockedKey, storedKey)
+    claimLegacyBurner()
+    writeUnlockedBurner(storedKey)
     return storedKey
   }
 
   try {
     const privateKey = await decryptData(storedKey, masterHex)
-    sessionStorage.setItem(sessionStorageUnlockedKey, privateKey)
+    claimLegacyBurner()
+    writeUnlockedBurner(privateKey)
     return privateKey
   } catch {
-    const seedBytes = await deriveChildKeyBytes(masterHex, CHILD_KEY_LABELS.inAppWallet)
-    const derived = new ethers.Wallet(ethers.hexlify(seedBytes))
+    const derived =
+      version === 'v2'
+        ? new ethers.Wallet(deriveKeyFromMasterV2(masterHex, KEY_LABELS.inAppWallet))
+        : new ethers.Wallet(ethers.hexlify(await deriveChildKeyBytes(masterHex, CHILD_KEY_LABELS.inAppWallet)))
     if (derived.address.toLowerCase() === storedAddress.toLowerCase()) {
-      localStorage.setItem(localStorageBurnerKey, await encryptData(derived.privateKey, masterHex))
-      sessionStorage.setItem(sessionStorageUnlockedKey, derived.privateKey)
+      claimLegacyBurner()
+      writeBurner({ key: await encryptData(derived.privateKey, masterHex) })
+      writeUnlockedBurner(derived.privateKey)
       return derived.privateKey
+    }
+    /* Another wallet's key, left over from before keys had owners — not a wrong passphrase. This
+       wallet stops reading it, and the vault it just opened stays open. */
+    if (unclaimed) {
+      disownLegacyBurner()
+      const err = new Error('No session key found on this device')
+      err.code = 'NO_SESSION_KEY'
+      throw err
     }
     const err = new Error('That PIN does not open this session key')
     err.code = 'WRONG_PIN'
     throw err
   }
+}
+
+/**
+ * Settles whose an ownerless session key is before anything acts on it — authorizing its address
+ * onchain for a wallet that cannot sign with it would be a session nobody can use. Opening it
+ * claims it; failing to marks it as another wallet's, and this wallet then reads no key at all.
+ * @param {{ reason?: string }} [context]
+ */
+export const resolveLegacyBurner = async (context = {}) => {
+  if (!isBurnerUnclaimed()) return
+  try {
+    await ensureVaultUnlocked(context)
+  } catch (err) {
+    if (err.code !== 'NO_SESSION_KEY') throw err
+  }
+}
+
+/** Which vault the stored session key belongs to. Keys from before v2 carry no marker. */
+export const getBurnerVersion = () => {
+  if (typeof window === 'undefined') return 'v1'
+  return readBurner(BURNER_FIELDS.version) === 'v2' ? 'v2' : 'v1'
+}
+
+/**
+ * Unlocks the session key with whichever cached master matches its vault, without prompting.
+ * What the unlock dialog runs after either kind of unlock: a v2 unlock may also have restored the
+ * v1 master, which is what a not-yet-upgraded key needs.
+ * @throws {Error} code 'NO_SESSION_KEY', 'WRONG_PIN', or 'VAULT_LOCKED' when that master is not open.
+ */
+export const unlockBurnerFromCachedMasters = async () => {
+  const version = getBurnerVersion()
+  const master = version === 'v2' ? getCachedMasterV2() : getCachedMasterHex()
+  if (!master) {
+    if (!readBurner(BURNER_FIELDS.key)) {
+      const err = new Error('No session key found on this device')
+      err.code = 'NO_SESSION_KEY'
+      throw err
+    }
+    const err = new Error('Security Vault is locked')
+    err.code = 'VAULT_LOCKED'
+    throw err
+  }
+  return unlockBurnerWithMaster(master, version)
 }
 
 /**
@@ -299,8 +376,8 @@ export const canSessionPayGas = async (publicClient) => {
 export const getStoredBurner = () => {
   if (typeof window === 'undefined') return null
 
-  const address = localStorage.getItem(localStorageBurnerAddress)
-  const privateKey = localStorage.getItem(localStorageBurnerKey)
+  const address = readBurner(BURNER_FIELDS.address)
+  const privateKey = readBurner(BURNER_FIELDS.key)
 
   if (!privateKey || !address) return null
 

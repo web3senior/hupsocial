@@ -1,0 +1,156 @@
+.identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+
+  &__add {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.5rem;
+    border: 1px dashed var(--border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted, #888);
+    font-family: inherit;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      border-style: solid;
+      color: var(--text);
+    }
+  }
+}
+
+/* Chrome for the NativeDialog root — the primitive only supplies centering, motion and the backdrop */
+.dialog {
+  flex-direction: column;
+  gap: 0.7rem;
+  width: min(420px, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &[open] {
+    display: flex;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+  }
+
+  &__close {
+    all: unset;
+    display: flex;
+    padding: 0.25rem;
+    border-radius: 50%;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__text,
+  &__hint {
+    margin: 0;
+    font-size: var(--font-size-12);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+
+    select {
+      padding: 0.5rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+      color: inherit;
+      font-family: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+    }
+  }
+
+  &__primary,
+  &__secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.55rem 0.9rem;
+    border-radius: var(--global-border-radius);
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  &__primary {
+    border: none;
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+  }
+
+  &__secondary {
+    min-width: 4.5rem;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+  }
+
+  &__divider {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+  }
+
+  &__link {
+    display: flex;
+    gap: 0.5rem;
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 0.5rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+      color: inherit;
+      font-family: inherit;
+      font-size: var(--font-size-14, 0.875rem);
+    }
+  }
+}

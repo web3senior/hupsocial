@@ -7,17 +7,18 @@
 
 export const CHAT_SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000
 
-// The same session serves chat, live and Hupi; the heading names what the wallet was asked for
+// The same session serves chat, live, Hupi and agents; the heading names what the wallet was asked for
 const SESSION_HEADINGS = {
   chat: 'Sign in to Hup chat',
   live: 'Sign in to go live on Hup',
   hupi: 'Sign in to Hupi',
+  agents: 'Sign in to your Hup agents',
 }
 
 export const sessionPurpose = (value) => (Object.hasOwn(SESSION_HEADINGS, value) ? value : 'chat')
 
 /**
- * @param {{address: string, nonce: string, issuedAt: number, purpose?: 'chat'|'live'|'hupi'}} claim
+ * @param {{address: string, nonce: string, issuedAt: number, purpose?: 'chat'|'live'|'hupi'|'agents'}} claim
  * @returns {string}
  */
 export const chatSessionMessage = ({ address, nonce, issuedAt, purpose }) =>

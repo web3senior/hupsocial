@@ -1,0 +1,299 @@
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+
+  &__sessions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  &__sessionPicker {
+    flex: 1;
+    min-width: 0;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface, var(--background));
+    color: var(--text);
+    font-family: inherit;
+    font-size: var(--font-size-12);
+    text-overflow: ellipsis;
+  }
+
+  &__newChat {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    font-size: var(--font-size-12);
+    font-weight: 500;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &--danger {
+      color: var(--danger-600, #dc2626);
+    }
+  }
+
+  &__log {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 420px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  &__empty {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    color: var(--text-muted);
+  }
+
+  &__message {
+    max-width: 85%;
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--global-border-radius);
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+
+    &--user {
+      align-self: flex-end;
+      background-color: var(--primary, #0d6efd);
+      color: #fff;
+    }
+
+    &--assistant {
+      align-self: flex-start;
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__markdown {
+    :global(p),
+    :global(ul),
+    :global(ol) {
+      margin: 0 0 0.5rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    :global(ul),
+    :global(ol) {
+      padding-left: 1.2rem;
+      list-style: revert;
+    }
+  }
+
+  &__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted);
+  }
+
+  &__composer {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  &__input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface);
+    color: inherit;
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+
+    &:focus {
+      outline: 2px solid var(--primary, #0d6efd);
+      outline-offset: -1px;
+    }
+  }
+
+  &__send {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    border: none;
+    border-radius: var(--global-border-radius);
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--global-border-radius);
+  background-color: var(--surface);
+
+  &--published,
+  &--discarded {
+    opacity: 0.7;
+  }
+
+  &__label {
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  &__text {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+
+    &--before,
+    &--removed {
+      color: var(--text-muted, #888);
+      text-decoration: line-through;
+    }
+  }
+
+  &__arrow {
+    color: var(--text-muted, #888);
+  }
+
+  &__done {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: var(--font-size-12);
+    color: var(--text-muted);
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  &__discard,
+  &__approve {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.8rem;
+    border-radius: var(--global-border-radius);
+    font-family: inherit;
+    font-size: var(--font-size-12);
+    font-weight: 500;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__discard {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+  }
+
+  &__approve {
+    border: none;
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+  }
+
+  // A removal cannot be undone, so its button reads as one
+  &--delete &__approve {
+    background-color: var(--danger-600, #dc2626);
+  }
+}
+
+.dialog {
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(400px, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &[open] {
+    display: flex;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-16, 1rem);
+  }
+
+  &__text {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.5;
+    color: var(--text-muted, #888);
+    overflow-wrap: anywhere;
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  &__cancel,
+  &__delete {
+    padding: 0.5rem 0.9rem;
+    border-radius: var(--global-border-radius);
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 500;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  &__cancel {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+  }
+
+  &__delete {
+    border: 1px solid transparent;
+    background: var(--danger-600, #dc2626);
+    color: #fff;
+  }
+}

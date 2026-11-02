@@ -58,17 +58,10 @@ const NAV_BADGES = {
   'new-orange': { label: 'NEW', background: 'var(--new-orange-badge-background)', color: 'var(--new-orange-badge-color)' },
 }
 
-// Captions for the groups that follow each store divider — the expanded rail labels its
-// sections instead of drawing a rule between them.
-const SECTION_LABELS = {
-  'divider-primary': 'Explore',
-  'divider-secondary': 'Your space',
-}
-
 // Split the flat nav list on its dividers so each group renders as its own section
 const groupNavItems = (items) => items.reduce((groups, item) => {
   if (item.type === 'divider') {
-    groups.push({ id: item.id, label: SECTION_LABELS[item.id], items: [] })
+    groups.push({ id: item.id, items: [] })
   } else {
     groups[groups.length - 1].items.push(item)
   }
@@ -406,10 +399,8 @@ export default function Aside({ inLayoutGrid = false }) {
 
           <div className={styles.navList} ref={navListRef} onScroll={handleNavListScroll}>
             {navGroups.map((group, groupIndex) => (
-              <section key={group.id} className={styles.navSection} aria-label={group.label}>
-                {group.label && (isExpanded
-                  ? <h2 className={styles.navSection__label}>{group.label}</h2>
-                  : <hr className={styles.divider} aria-hidden="true" />)}
+              <section key={group.id} className={styles.navSection}>
+                {groupIndex > 0 && <hr className={styles.divider} aria-hidden="true" />}
 
                 <ul className={styles.navSection__list}>
                   {group.items.map((item) => (

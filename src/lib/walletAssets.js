@@ -95,7 +95,7 @@ const decodeLsp4Symbol = (bytes) => {
 }
 
 /**
- * Every non-zero fungible balance `owner` holds across appChains.
+ * Every fungible balance `owner` holds across appChains, plus each network's own coin even at zero.
  *
  * `customTokens` are user-pinned `{ chainId, address }` pairs, folded in alongside the curated
  * candidates. Returns plain-serialisable rows — balances are decimal strings, not BigInt, so the
@@ -170,11 +170,14 @@ export async function fetchWalletAssets(config, owner, customTokens = []) {
     }
   })
 
+  /* Every network's own coin is listed, even at zero: it is the one asset every wallet can hold
+     on every chain, and a list of empty coins says "nothing here yet" more usefully than none.
+     Only a read that failed outright is left out. */
   appChains.forEach((chain, index) => {
     const settled = nativeSettled[index]
     if (settled.status !== 'fulfilled') return
     const value = unwrapBalance(settled.value)
-    if (!value) return
+    if (typeof value !== 'bigint') return
     const native = nativeCurrencyFor(chain.id)
     assets.push({
       id: `${chain.id}:native`,

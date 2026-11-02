@@ -17,31 +17,22 @@
  * its status code instead, so the client can tell "not allowed" from "failed midway".
  */
 
-import OpenAI from 'openai'
 import { NextResponse } from 'next/server'
 import { chatAddressFromRequest } from '@/lib/chatSession'
 import { hupiFollowUps, hupiTools, hupiToolStatus, readHupiMember, runHupiTool } from '@/lib/hupiTools'
 import { parseHupiPage } from '@/lib/hupiPage'
 import { HUPI_PERSONA } from '@/config/hupi'
+import { createModelClient, streamRound } from '@/lib/hupiModel'
 
 export const runtime = 'nodejs'
 // A turn can make several tool rounds; each is a model call plus a database read
 export const maxDuration = 60
-
-const AIML_BASE_URL = 'https://api.aimlapi.com/v1'
-const DEFAULT_MODEL = 'openai/gpt-5-nano-2025-08-07'
-/* GPT-5 models think before every round, and a turn has at least two rounds. Picking tools and
-   phrasing counts needs no deliberation, so minimal is the default; the env can raise it. */
-const DEFAULT_REASONING_EFFORT = 'minimal'
 
 // The client sends the conversation; only its tail reaches the model, bounding the prompt
 const MAX_HISTORY = 12
 const MAX_MESSAGE_CHARS = 2000
 // Rounds that may call tools; the round after the last is forced to answer in words
 const MAX_TOOL_ROUNDS = 4
-/* Reasoning counts toward this ceiling on GPT-5 models, so it carries headroom over the short
-   reply itself */
-const MAX_COMPLETION_TOKENS = 2000
 // Per wallet per UTC day: this bounds a stuck client or a script
 const DAILY_TURNS = 80
 // Cards under one reply; more than this is a list, and the reply already is one
@@ -127,47 +118,6 @@ const readHistory = (value) =>
     .filter((message) => message.content)
     .slice(-MAX_HISTORY)
 
-/**
- * One streamed model round. Text is handed to `onText` as it arrives; tool calls arrive in
- * pieces keyed by index and are only usable once the stream ends, so they are assembled here.
- * @returns {Promise<{text: string, calls: object[]}>}
- */
-const streamRound = async ({ client, model, messages, tools, signal, onText }) => {
-  const reasoningEffort = process.env.AIMLAPI_REASONING_EFFORT || DEFAULT_REASONING_EFFORT
-  const stream = await client.chat.completions.create(
-    {
-      model,
-      messages,
-      ...(tools ? { tools } : {}),
-      max_completion_tokens: MAX_COMPLETION_TOKENS,
-      ...(/gpt-5/.test(model) ? { reasoning_effort: reasoningEffort } : {}),
-      stream: true,
-    },
-    { signal },
-  )
-
-  let text = ''
-  const calls = []
-  for await (const chunk of stream) {
-    const delta = chunk.choices?.[0]?.delta
-    if (!delta) continue
-
-    if (delta.content) {
-      text += delta.content
-      onText(delta.content)
-    }
-
-    for (const part of delta.tool_calls ?? []) {
-      const call = (calls[part.index ?? 0] ??= { id: '', type: 'function', function: { name: '', arguments: '' } })
-      if (part.id) call.id = part.id
-      if (part.function?.name) call.function.name += part.function.name
-      if (part.function?.arguments) call.function.arguments += part.function.arguments
-    }
-  }
-
-  return { text, calls: calls.filter((call) => call?.function.name) }
-}
-
 export async function POST(request) {
   const startedAt = Date.now()
 
@@ -176,8 +126,8 @@ export async function POST(request) {
     return NextResponse.json({ success: false, error: 'Sign in to talk to Hupi' }, { status: 401 })
   }
 
-  const apiKey = process.env.AIMLAPI_API_KEY
-  if (!apiKey) {
+  const modelClient = createModelClient()
+  if (!modelClient) {
     console.error('[HUPI_ERROR]: AIMLAPI_API_KEY is not set')
     return NextResponse.json({ success: false, error: 'Hupi is not available right now' }, { status: 503 })
   }
@@ -201,8 +151,7 @@ export async function POST(request) {
   // One line per turn in the server log: where the time went, step by step
   const timings = [`profile ${Date.now() - profileAt}ms`]
 
-  const model = process.env.AIMLAPI_MODEL || DEFAULT_MODEL
-  const client = new OpenAI({ apiKey, baseURL: AIML_BASE_URL })
+  const { client, model } = modelClient
   const messages = [{ role: 'system', content: systemPrompt(member, page) }, ...history]
   const tools = hupiTools({ page })
   // Every card any tool offered this turn, by link; only the ones the reply links to are shown

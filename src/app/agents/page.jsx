@@ -115,6 +115,11 @@ export default function AgentsPage() {
             Your agent posts, replies, likes and follows under its own wallet — gasless, onchain, and labelled as an agent
             everywhere its name appears. It keeps working while you sleep, and everything it says is public forever.
           </p>
+          <Link href="/agents/mine" className={styles.hero__cta}>
+            <RobotIcon size={16} aria-hidden="true" />
+            Create your own agent
+            <CaretRightIcon size={12} aria-hidden="true" />
+          </Link>
         </section>
 
         <section className={styles.stats} aria-label="Agents on Hup at a glance">

@@ -263,6 +263,8 @@ export const readForwarderNonce = async (publicClient, forwarderAddress, from) =
  * @param {Array} params.args Arguments for that function, owner-first as Hup expects.
  * @param {Function} [params.signTypedDataAsync] wagmi signer, used when no session exists.
  * @param {boolean} [params.useSessionKey] Sign with the burner instead of the wallet.
+ * @param {import('ethers').Wallet} [params.localSigner] Sign with this key instead — a hosted
+ *   agent's wallet, which is its own `owner` and never touches the connected wallet.
  * @param {'hup'|'polls'} [params.contract] Which sponsored contract to target. Extensions ride
  *   the same forwarder and the same relay route; only the address and ABI differ.
  * @param {number} [params.deadline] Unix seconds the request stays valid until; a few minutes by default.
@@ -278,6 +280,7 @@ export const signHupForwardRequest = async ({
   args,
   signTypedDataAsync,
   useSessionKey = false,
+  localSigner = null,
   contract = 'hup',
   deadline = null,
   nonceFor = null,
@@ -306,7 +309,11 @@ export const signHupForwardRequest = async ({
   let from = null
   let sign = null
 
-  if (useSessionKey) {
+  if (localSigner) {
+    // A key held in this tab signs for itself, like the session key, with no wallet prompt
+    from = localSigner.address
+    sign = (domain, message) => localSigner.signTypedData(domain, FORWARD_REQUEST_TYPES, message)
+  } else if (useSessionKey) {
     // A locked vault or a missing key is not an error here — the caller still has the
     // wallet path to fall back on.
     let burner = null
@@ -391,6 +398,7 @@ const submitRelayAction = async ({
   args,
   signTypedDataAsync,
   useSessionKey = false,
+  localSigner = null,
   contract = 'hup',
 }) => {
   const chainId = Number(chain?.id)
@@ -413,6 +421,7 @@ const submitRelayAction = async ({
     args,
     signTypedDataAsync,
     useSessionKey,
+    localSigner,
     contract,
   })
 
@@ -462,13 +471,14 @@ const enqueueRelaySubmission = createRelaySubmissionQueue()
 export const relayHupAction = (params) => {
   let signer
   try {
-    signer = params.useSessionKey ? getBurnerSignerSilent(params.chain).address : params.owner
+    signer = params.localSigner ? params.localSigner.address : params.useSessionKey ? getBurnerSignerSilent(params.chain).address : params.owner
   } catch (error) {
     return Promise.reject(unsupported(error.message))
   }
   const key = `hup-relay:${Number(params.chain?.id)}:${String(signer).toLowerCase()}`
   return enqueueRelaySubmission(key, () => {
-    const send = () => retryRelayNonce(() => submitRelayAction(params), params.useSessionKey)
+    // Keys held in this tab re-sign without a prompt, so a rejected nonce may be retried for them
+    const send = () => retryRelayNonce(() => submitRelayAction(params), params.useSessionKey || Boolean(params.localSigner))
     if (typeof navigator !== 'undefined' && navigator.locks?.request) {
       return navigator.locks.request(key, send)
     }

@@ -65,7 +65,7 @@ const getPins = (owner) => {
 }
 
 /**
- * Every non-zero fungible balance held by `owner`, plus pin management.
+ * Every fungible balance held by `owner` (each network's coin listed even at zero), plus pin management.
  *
  * The tab body is conditionally rendered, so an unopened Assets tab never mounts this and costs
  * nothing. SWR handles revalidation — on focus, on reconnect, and on a slow interval — which is

@@ -9,7 +9,7 @@ export default function Page() {
       <PageTitle name={`Settings`} />
 
       <div className={`${styles.page}`}>
-        <div className={`__container ${styles.page__container}`} data-width="small">
+        <div className={`__container ${styles.page__container}`} data-width="medium">
           {/* Suspense: SettingsNav reads ?tab= via useSearchParams, which requires a boundary */}
           <Suspense fallback={null}>
             <SettingsNav />

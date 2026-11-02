@@ -21,6 +21,7 @@ import {
   PlusIcon,
   PlayCircleIcon,
   PulseIcon,
+  RobotIcon,
   SquaresFourIcon,
   ToolboxIcon,
   TrophyIcon,
@@ -62,6 +63,8 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
   { id: 'tasks', name: 'Tasks', path: '/tasks', icon: ToolboxIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
+  // The directory; it lights up on /agents/mine too, where owners run their own
+  { id: 'agents', name: 'Agents', path: '/agents', icon: RobotIcon },
   { id: 'divider-secondary', type: 'divider' },
   { id: 'saved', name: 'Saved', path: '/saved', icon: BookmarkSimpleIcon },
   // Reads with Insights as a pair: what the network did, then what you did.

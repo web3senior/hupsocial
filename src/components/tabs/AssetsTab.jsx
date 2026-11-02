@@ -46,6 +46,14 @@ const formatUsd = (value) => {
 const formatChange = (percent) =>
   typeof percent === 'number' && Number.isFinite(percent) ? percentFormatter.format(percent / 100) : null
 
+const isHeld = (asset) => {
+  try {
+    return BigInt(asset.balance) > 0n
+  } catch {
+    return false
+  }
+}
+
 const usdValueOf = (asset, price) => {
   if (typeof price !== 'number' || !Number.isFinite(price)) return null
   try {
@@ -202,9 +210,11 @@ function NetworkFilter({ options, value, total, onChange }) {
  * Fungible token holdings for the wallet whose profile is open, across every supported chain.
  * The owner gets a Send action per row; everyone else sees the same list read-only.
  */
-export default function AssetsTab() {
+// `walletAddress` shows any wallet's holdings outside a profile route (an agent's, on My agents);
+// without it the wallet comes from the profile URL, as before
+export default function AssetsTab({ walletAddress: walletOverride = null } = {}) {
   const params = useParams()
-  const walletAddress = params?.wallet || ''
+  const walletAddress = walletOverride || params?.wallet || ''
   const { address, isConnected } = useConnection()
 
   const { assets, isLoading, isError, refresh, pinToken, unpinToken } = useWalletAssets(walletAddress)
@@ -220,17 +230,18 @@ export default function AssetsTab() {
   const isOwner = isConnected && normalizeAddress(address) !== null && normalizeAddress(address) === normalizeAddress(walletAddress)
 
   // Most valuable first once prices land, the way a wallet lists them; rows without a known
-  // price keep their chain order underneath
+  // price keep their chain order underneath, and the empty native coins come last of all
   const ordered = useMemo(() => {
-    const valued = assets.map((asset, index) => ({ asset, index, usd: usdValueOf(asset, market[asset.id]?.usd) }))
-    valued.sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1) || a.index - b.index)
+    const valued = assets.map((asset, index) => ({ asset, index, held: isHeld(asset), usd: usdValueOf(asset, market[asset.id]?.usd) }))
+    valued.sort((a, b) => Number(b.held) - Number(a.held) || (b.usd ?? -1) - (a.usd ?? -1) || a.index - b.index)
     return valued.map((entry) => entry.asset)
   }, [assets, market])
 
-  // Built from the unfiltered holdings so choosing a network never changes what the menu offers
+  // Built from the unfiltered holdings so choosing a network never changes what the menu offers.
+  // Every network lists its coin even at zero, so only networks actually holding something count.
   const networkOptions = useMemo(() => {
     const byChain = new Map()
-    for (const asset of assets) {
+    for (const asset of assets.filter(isHeld)) {
       const usd = usdValueOf(asset, market[asset.id]?.usd) ?? 0
       byChain.set(asset.chainId, (byChain.get(asset.chainId) ?? 0) + usd)
     }
@@ -242,7 +253,7 @@ export default function AssetsTab() {
   // Spending the last of a chain's holdings would otherwise strand the tab on a filter that can
   // never match again. Adjusted during render rather than in an effect so no frame shows the
   // dead filter; the load guard keeps a mid-refresh blank from clearing a deliberate choice.
-  if (networkFilter && !isLoading && assets.length > 0 && !assets.some((asset) => asset.chainId === networkFilter)) {
+  if (networkFilter && !isLoading && assets.length > 0 && !networkOptions.some((option) => option.chainId === networkFilter)) {
     setNetworkFilter(null)
   }
 
@@ -299,14 +310,7 @@ export default function AssetsTab() {
         <p className={styles.assets__error}>Could not load balances. Check your connection and try again.</p>
       )}
 
-      {!isLoading && !isError && assets.length === 0 && (
-        <>
-          <NoData name="tokens" />
-          <p className={styles.assets__hint}>
-            Outside LUKSO only well-known tokens are found automatically. Add a token address to track anything else.
-          </p>
-        </>
-      )}
+      {!isLoading && !isError && assets.length === 0 && <NoData name="tokens" />}
 
       {/* A filter that matches nothing is a dead end unless it says how to get out of it */}
       {!isLoading && !isError && assets.length > 0 && visible.length === 0 && filteredChain && (
@@ -332,6 +336,14 @@ export default function AssetsTab() {
             />
           ))}
         </ul>
+      )}
+
+      {/* Below the empty coins rather than instead of them: they show where the wallet can hold
+          funds, and this says how to find what a probe would miss */}
+      {!isLoading && !isError && !assets.some(isHeld) && (
+        <p className={styles.assets__hint}>
+          Outside LUKSO only well-known tokens are found automatically. Add a token address to track anything else.
+        </p>
       )}
 
       <NftGallery owner={normalizeAddress(walletAddress)} isOwner={isOwner} chainId={networkFilter} />

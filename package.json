@@ -43,6 +43,7 @@
     "@yogesharc/thinking-orbs": "^0.1.1",
     "@tanstack/react-db": "1.0.0-rc.1",
     "bs58": "^6.0.0",
+    "chainkeep": "0.1.0",
     "clsx": "^2.1.1",
     "cube-motion": "^0.1.0",
     "dompurify": "^3.4.2",

@@ -1,0 +1,115 @@
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  contain: paint;
+  isolation: isolate;
+  user-select: none;
+  font-family: inherit;
+
+  &__line {
+    stroke-width: 2;
+    opacity: 0.55;
+  }
+
+  &__signal {
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 10 300;
+    animation: agents-signal 4.2s linear infinite;
+  }
+
+  &__glow {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: agents-pulse 4s ease-in-out infinite;
+  }
+
+  &__orbit {
+    animation: agents-orbit 24s linear infinite;
+  }
+
+  &__ring {
+    stroke: var(--border, rgba(128, 128, 128, 0.3));
+    stroke-width: 1.5;
+    stroke-dasharray: 4 8;
+  }
+
+  &__float {
+    animation: agents-float 6s ease-in-out infinite;
+  }
+
+  &__card {
+    fill: var(--surface, var(--background));
+    stroke: var(--border, rgba(128, 128, 128, 0.25));
+    stroke-width: 1;
+  }
+
+  &__title {
+    fill: var(--foreground);
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  &__detail {
+    fill: color-mix(in srgb, var(--foreground) 60%, transparent);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &__signal {
+      animation: none;
+      stroke-dasharray: none;
+      opacity: 0.25;
+    }
+
+    &__glow,
+    &__orbit,
+    &__float {
+      animation: none;
+    }
+  }
+}
+
+// The dash travels from the robot out to the card
+@keyframes agents-signal {
+  from {
+    stroke-dashoffset: 310;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes agents-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(0.94);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes agents-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes agents-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}

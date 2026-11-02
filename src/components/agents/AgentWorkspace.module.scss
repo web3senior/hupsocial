@@ -1,0 +1,418 @@
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  &__body {
+    display: grid;
+    grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr);
+    gap: 0.75rem;
+
+    @media (max-width: 640px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  &__files {
+    display: flex;
+    flex-direction: column;
+    align-self: start;
+    gap: 0.15rem;
+  }
+
+  &__heading {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0.6rem 0 0.2rem;
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    color: var(--text-muted, #888);
+  }
+
+  &__info {
+    display: inline-flex;
+    padding: 0.15rem;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+      background: var(--surface-muted);
+    }
+  }
+
+  &__addSkill {
+    display: flex;
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 0.35rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: var(--surface);
+      color: inherit;
+      font-family: inherit;
+      font-size: var(--font-size-12);
+    }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  // One height with or without the remove button, so picking a file never shifts the editor
+  &__editorHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 2.25rem;
+    overflow-wrap: anywhere;
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  &__text {
+    // Fixed, not sized by its content: every file opens in the same box and scrolls inside it
+    width: 100%;
+    height: 18rem;
+    padding: 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    color: inherit;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: var(--font-size-12);
+    line-height: 1.55;
+    resize: none;
+
+    &[readonly] {
+      opacity: 0.75;
+    }
+  }
+
+  &__editorActions {
+    display: flex;
+    justify-content: flex-end;
+
+    // Read-only files keep the row's space, so the layout under it stays put
+    &--hidden {
+      visibility: hidden;
+    }
+  }
+
+  &__icon {
+    display: inline-flex;
+    padding: 0.35rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  &__primary,
+  &__secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.85rem;
+    border-radius: var(--global-border-radius);
+    font-family: inherit;
+    font-size: var(--font-size-12);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  &__primary {
+    border: none;
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+  }
+
+  &__secondary {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+  }
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: var(--global-border-radius);
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--font-size-12);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--surface-muted);
+  }
+
+  &--active {
+    background-color: var(--surface-muted);
+    font-weight: 600;
+  }
+
+  &__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.chain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+
+  &__head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  &__title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--font-size-14, 0.875rem);
+    font-weight: 600;
+  }
+
+  &__why {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.45rem;
+      padding: 0.6rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: var(--global-border-radius);
+      font-size: var(--font-size-12);
+      line-height: 1.45;
+      color: var(--text-muted, #888);
+
+      > svg {
+        flex: none;
+        margin-top: 0.1rem;
+        color: var(--primary, #0d6efd);
+      }
+
+      strong {
+        color: var(--text);
+      }
+    }
+  }
+
+  // Network and button share the row; the picker takes what the button leaves
+  &__actions {
+    display: flex;
+    gap: 0.5rem;
+
+    .chain__network {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
+  // Wide enough for its longest label, so "Pricing…" or a step never resizes it mid-press
+  &__button {
+    justify-content: center;
+    min-width: 11rem;
+  }
+
+  &__confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+  }
+
+  &__price {
+    font-size: var(--font-size-12);
+    line-height: 1.45;
+  }
+
+  &__confirmButtons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  &__muted {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__network {
+    padding: 0.42rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface, var(--background));
+    color: var(--text);
+    font-family: inherit;
+    font-size: var(--font-size-12);
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: var(--font-size-12);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    color: var(--primary, #0d6efd);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.info {
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(480px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 1.25rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &[open] {
+    display: flex;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-16, 1rem);
+    }
+  }
+
+  &__close {
+    all: unset;
+    display: flex;
+    padding: 0.25rem;
+    border-radius: 50%;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--surface-muted);
+    }
+  }
+
+  &__text,
+  &__steps,
+  &__notes {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.5;
+  }
+
+  &__steps,
+  &__notes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding-inline-start: 1.25rem;
+  }
+
+  &__notes {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__example {
+    margin: 0;
+    padding: 0.75rem;
+    border-radius: var(--global-border-radius);
+    background: var(--surface-muted);
+    font-size: var(--font-size-12);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}

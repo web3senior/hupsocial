@@ -80,6 +80,9 @@ importers:
       bs58:
         specifier: ^6.0.0
         version: 6.0.0
+      chainkeep:
+        specifier: 0.1.0
+        version: 0.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -2272,6 +2275,11 @@ packages:
 
   canvas-renderer@2.2.1:
     resolution: {integrity: sha512-RrBgVL5qCEDIXpJ6NrzyRNoTnXxYarqm/cS/W6ERhUJts5UQtt/XPEosGN3rqUkZ4fjBArlnCbsISJ+KCFnIAg==}
+
+  chainkeep@0.1.0:
+    resolution: {integrity: sha512-AbBjxDLjGB4Ql/oZfXjj8mXl0emH6/Y515a2RXWN6yc/ko3/0Z3F/9pghQsn+aeH5HjZXU3abqlurdQ7JH9seg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   chalk@4.1.2:
     resolution: {integrity: sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==}
@@ -7862,6 +7870,13 @@ snapshots:
   canvas-renderer@2.2.1:
     dependencies:
       '@types/node': 26.0.0
+
+  chainkeep@0.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+    dependencies:
+      ethers: 6.17.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   chalk@4.1.2:
     dependencies:

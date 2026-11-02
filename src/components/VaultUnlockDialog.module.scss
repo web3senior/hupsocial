@@ -77,6 +77,82 @@
     color: var(--danger-600, #dc2626);
   }
 
+  &__warning {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--warning-600, #d97706) 45%, transparent);
+    border-radius: var(--global-border-radius);
+    background: color-mix(in srgb, var(--warning-600, #d97706) 10%, transparent);
+    font-size: var(--font-size-12);
+    line-height: 1.5;
+
+    > svg {
+      flex: none;
+      margin-top: 0.1rem;
+      color: var(--warning-600, #d97706);
+    }
+
+    strong {
+      color: var(--color);
+    }
+  }
+
+  &__ack {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    input {
+      flex: none;
+      margin: 0;
+    }
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__generate {
+    all: unset;
+    align-self: flex-start;
+    cursor: pointer;
+    font-size: var(--font-size-12);
+    color: var(--primary, #0d6efd);
+
+    &:hover:not(:disabled) {
+      text-decoration: underline;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__generated {
+    margin: 0;
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+
+    code {
+      display: block;
+      margin-bottom: 0.3rem;
+      padding: 0.5rem 0.6rem;
+      border-radius: var(--global-border-radius);
+      background: var(--surface-muted);
+      color: var(--color);
+      font-size: var(--font-size-14, 0.875rem);
+      word-break: break-word;
+      user-select: all;
+    }
+  }
+
   &__actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);

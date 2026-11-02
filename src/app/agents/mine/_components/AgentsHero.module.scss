@@ -1,0 +1,52 @@
+@use '../../../../styles/components/responsive' as *;
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding-bottom: 0.5rem;
+
+  &__art {
+    width: 100%;
+    max-width: 52rem;
+
+    // On a phone the side cards would shrink past reading; the caption states them all anyway
+    @include sm-down {
+      max-width: 100%;
+    }
+  }
+
+  &__caption {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 34rem;
+    text-align: center;
+  }
+
+  &__title {
+    margin: 0;
+    color: var(--foreground);
+    font-size: clamp(1.3rem, 3vw, 1.75rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  &__lead {
+    margin: 0;
+    color: var(--text-muted, #888);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    text-wrap: balance;
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+  }
+}

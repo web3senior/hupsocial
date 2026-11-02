@@ -1,0 +1,168 @@
+.tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  &__empty {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    color: var(--text-muted, #888);
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__add {
+    all: unset;
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    font-size: var(--font-size-14, 0.875rem);
+    color: var(--primary, #0d6efd);
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.task {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+
+  &--off {
+    opacity: 0.6;
+  }
+
+  &__head,
+  &__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    font-size: var(--font-size-14, 0.875rem);
+  }
+
+  &__instructions {
+    margin: 0;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  &__meta {
+    font-size: var(--font-size-12);
+    color: var(--text-muted, #888);
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  &__icon,
+  &__run {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: var(--global-border-radius);
+    font-family: inherit;
+    font-size: var(--font-size-12);
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__icon {
+    padding: 0.4rem;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+  }
+
+  &__run {
+    padding: 0.4rem 0.75rem;
+    border: none;
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  background-color: var(--surface-muted);
+
+  &__input {
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background: var(--surface);
+    color: inherit;
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+    resize: vertical;
+  }
+
+  &__row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+
+    .form__input {
+      flex: 1;
+      min-width: 9rem;
+    }
+  }
+
+  &__cancel,
+  &__save {
+    padding: 0.5rem 0.9rem;
+    border-radius: var(--global-border-radius);
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__cancel {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+  }
+
+  &__save {
+    border: none;
+    background-color: var(--primary, #0d6efd);
+    color: #fff;
+  }
+}
