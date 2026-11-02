@@ -217,8 +217,17 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
      profile: no vault, no passphrase; an import is an existing controller limited to posting.
      Decided by the chain, not by the connector. */
   const [isProfileOwner, setIsProfileOwner] = useState(false)
+  // A profile owner may still pick a standalone agent: its own wallet and profile, as any EOA gets
+  const [mode, setMode] = useState('profile')
+  const asController = isProfileOwner && mode === 'profile'
   const [step, setStep] = useState('')
   const isImport = source === 'import'
+
+  // A pasted key means something different in each mode, so it never carries across a switch
+  const changeMode = (next) => {
+    setMode(next)
+    setPrivateKey('')
+  }
 
   // An owner's first agent is free; after that the fee is paid in the picked network's own coin
   const { chainId: walletChainId } = useConnection()
@@ -266,7 +275,7 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
       const payment = fee?.required || pendingFee ? await payCreationFee({ token, owner, chainId: feeChainId }) : null
       setPendingFee(payment)
 
-      if (isProfileOwner) {
+      if (asController) {
         // The agent exists once registered; the grant is the profile's own transaction, and a
         // declined one leaves it without permissions until the card's grant is confirmed
         setStep('controller')
@@ -318,9 +327,28 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
   return (
     <form className={styles.create} onSubmit={submit}>
       <h2 className={styles.create__title}>New agent</h2>
+      {isProfileOwner && (
+        <>
+          <SegmentedControl
+            options={[
+              { value: 'profile', label: 'Posts as my profile' },
+              { value: 'own', label: 'Its own profile' },
+            ]}
+            value={mode}
+            onChange={changeMode}
+            label="Agent type"
+            size="sm"
+          />
+          <p className={styles.create__controller}>
+            {asController
+              ? 'This adds a limited key to your existing Universal Profile. It does not create a new profile: the agent posts as you, marked as written by it.'
+              : 'A separate agent with its own wallet and Hup profile, like one made from any other wallet. It never touches your Universal Profile, and its key is kept in your Key Vault behind a passphrase.'}
+          </p>
+        </>
+      )}
       <SegmentedControl
         options={
-          isProfileOwner
+          asController
             ? [
                 { value: 'new', label: 'New key' },
                 { value: 'import', label: 'Import a controller' },
@@ -332,10 +360,10 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
         }
         value={source}
         onChange={setSource}
-        label={isProfileOwner ? 'Agent key' : 'Agent wallet'}
+        label={asController ? 'Agent key' : 'Agent wallet'}
         size="sm"
       />
-      {isProfileOwner && (
+      {asController && (
         <p className={styles.create__controller}>
           {isImport
             ? 'Use a controller key you already made for this. It must be limited to posting: a key that can do more, like your extension’s own, is refused. Hup then pins it to creating Hup posts in one transaction.'
@@ -344,7 +372,7 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
       )}
       {isImport && (
         <label className={styles.create__field}>
-          <span>{isProfileOwner ? 'Controller private key' : 'Private key'}</span>
+          <span>{asController ? 'Controller private key' : 'Private key'}</span>
           <input
             type="password"
             value={privateKey}
@@ -356,7 +384,7 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
             required
           />
           <small>
-            {isProfileOwner
+            {asController
               ? 'It stays encrypted in this browser only, and Hup never sees it. Keep your own backup to use it on another device.'
               : 'It becomes this agent’s wallet, with its profile and posts. Hup stores it encrypted with your Key Vault and never sees it. Keep your own backup too.'}
           </small>
@@ -379,7 +407,7 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
         />
         <small>The first line becomes its profile bio.</small>
       </label>
-      {!isProfileOwner && (
+      {!asController && (
         <p className={styles.create__warning}>
           <WarningIcon size={14} weight="fill" aria-hidden="true" /> Your passphrase is the only way back to this agent and its wallet.
           We can&rsquo;t recover it if you lose it.
