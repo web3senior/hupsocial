@@ -21,13 +21,10 @@
         font-weight: 500;
     }
 
+    // No hover fill here: the item wraps the reply and its nested answer, so a fill would light the
+    // reply while pointing at the answer. Each Post paints its own hover layer instead.
     &__item {
         cursor: pointer;
-        transition: background-color 0.15s ease;
-
-        &:hover {
-            background-color: var(--surface-muted);
-        }
     }
 
     &__divider {
