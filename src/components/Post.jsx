@@ -188,6 +188,8 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const { isBlocked } = useBlockedUsers()
   const displayItem = useDecryptedCommunityItem(baseDisplayItem)
   const commentTarget = displayItem || item
+  const viewedPostId = displayItem?.id ?? item.id
+  const viewedNetworkId = displayItem?.network_id ?? item.network_id
 
   // Fire view recording only when the post scrolls into the viewport.
   // `repostReady` is included so the observer re-attaches once the loading
@@ -201,6 +203,10 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
       ([entry]) => {
         if (entry.isIntersecting) {
           recordPostView(item.network_id, item.id, address)
+          // Keep repost attribution while also crediting the content being displayed.
+          if (String(viewedPostId) !== String(item.id) || String(viewedNetworkId) !== String(item.network_id)) {
+            recordPostView(viewedNetworkId, viewedPostId, address)
+          }
           io.disconnect()
         }
       },
@@ -208,7 +214,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
     )
     io.observe(el)
     return () => io.disconnect()
-  }, [item.network_id, item.id, address, repostReady])
+  }, [item.network_id, item.id, viewedNetworkId, viewedPostId, address, repostReady])
 
   // Extract raw source content string contextually based on data schema structure
   const getRawContentText = () => {
@@ -492,7 +498,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         </main>
 
         <footer className={`${styles.post__footer}`}>
-          {showContent && <PostMeta item={item} createdAt={displayItem?.created_at} />}
+          {showContent && <PostMeta item={displayItem || item} createdAt={displayItem?.created_at} />}
           <div
             onClick={(e) => {
               // Only real controls (and open popover panels) keep their clicks — blank
@@ -510,7 +516,7 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
 
               {actionsSet.has('tip') && <Tip post={displayItem || item} onTip={setShowTipModal} />}
 
-              {actionsSet.has('view') && <View post={item} />}
+              {actionsSet.has('view') && <View post={displayItem || item} />}
             </div>
             <div className={clsx(styles.post__actions__group, 'flex align-items-center')}>
               {actionsSet.has('bookmark') && <Bookmark post={displayItem || item} />}
@@ -532,7 +538,7 @@ const metaViewsFormatter = new Intl.NumberFormat('en', { notation: 'compact', ma
  * "6:22 PM · Oct 28, 2026 · 13.4K Views" under the open post, as X stamps its post page. The
  * views come from the same live stats as the View action, so the two never disagree.
  * @param {Object} props
- * @param {Object} props.item The row whose views are counted (a repost counts its own).
+ * @param {Object} props.item The displayed post, including the original behind a repost.
  * @param {string} props.createdAt
  */
 const PostMeta = ({ item, createdAt }) => {
