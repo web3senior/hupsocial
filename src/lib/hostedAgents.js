@@ -40,8 +40,9 @@ const createSchema = z.object({
   // Only for an imported wallet: its key, encrypted in the owner's browser (lib/agentWallet.js)
   keyCiphertext: z.string().regex(/^[A-Za-z0-9+/=._-]{40,2000}$/).optional(),
   kind: z.enum(['wallet', 'controller']).default('wallet'),
-  // The creation fee's payment, for an owner who already has an agent (lib/agentBilling.js)
-  fee: z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/), chainId: z.number().int().positive() }).optional(),
+  // The creation fee's payment, for an owner who already has an agent (lib/agentBilling.js); the
+  // browser sends null when the agent is free
+  fee: z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/), chainId: z.number().int().positive() }).nullish(),
 })
 
 const keySchema = z.object({
