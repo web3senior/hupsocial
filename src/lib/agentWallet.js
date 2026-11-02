@@ -294,12 +294,20 @@ export const topUpAgent = async ({ token, agent, amount, chainId = TOP_UP_CHAIN_
 
   const wallet = await walletForAgent(agent, 'Topping up your agent’s credits')
   const provider = new ethers.JsonRpcProvider(chain.rpcUrls.default.http[0], chain.id, { staticNetwork: true })
+  // Checked first, so a short balance names what the agent holds and what fits, not only "not enough"
+  const [balance, fees] = await Promise.all([provider.getBalance(wallet.address), provider.getFeeData()])
+  const reserve = 21000n * (fees.maxFeePerGas ?? fees.gasPrice ?? 0n) * 2n
+  if (value + reserve > balance) {
+    const held = `${agent.name} holds ${ethers.formatEther(balance)} ${symbol} on ${chain.name}`
+    if (balance <= reserve) throw new Error(`${held}. Send ${symbol} to ${wallet.address} on ${chain.name} first.`)
+    throw new Error(`${held}, which does not cover ${amount} ${symbol} plus gas. Top up at most ${ethers.formatEther(balance - reserve)} ${symbol}.`)
+  }
   let tx
   try {
     tx = await wallet.connect(provider).sendTransaction({ to: billing, value })
   } catch (error) {
     if (/insufficient funds/i.test(error?.shortMessage || error?.message || '')) {
-      throw new Error(`Your agent's wallet does not hold enough ${symbol} on ${chain.name} for that, plus gas. Send ${symbol} to it first.`)
+      throw new Error(`${agent.name} does not hold ${amount} ${symbol} on ${chain.name} plus gas. Try a smaller amount, or send more ${symbol} to ${wallet.address} first.`)
     }
     throw error
   }
