@@ -228,7 +228,8 @@ export const botAvatarSvg = (traits, { background = true, sleeping = false } = {
   const p = paletteFor(t.color, sleeping ? 0.45 : 1)
 
   return [
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">',
+    // Keep the chest badge fully visible; sleeping robots also need room for the snore.
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${sleeping ? '32 56 448 448' : '48 88 416 416'}">`,
     '<defs>',
     `<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.bgTop}"/><stop offset="1" stop-color="${p.bgBottom}"/></linearGradient>`,
     `<linearGradient id="shell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="${p.shellBottom}"/></linearGradient>`,
