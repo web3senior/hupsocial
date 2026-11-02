@@ -392,7 +392,7 @@ const robotPictureFile = async (agentAddress, traits = null) =>
  * challenge-and-burn every profile save uses.
  * @param {{name: string, description: string, picture?: File}} profile
  */
-const writeAgentProfile = async (wallet, { name, description, picture }) => {
+const writeAgentProfile = async (wallet, { name, description, picture } = {}) => {
   const address = wallet.address
   await fetch(`/api/v1/users/profile/${address}`, { method: 'POST' })
 
@@ -404,8 +404,9 @@ const writeAgentProfile = async (wallet, { name, description, picture }) => {
   )
   const issuedAt = Date.now()
   const form = new FormData()
-  form.set('name', name)
-  form.set('description', description)
+  // A field left out keeps what is stored, so a new picture never rewrites an approved bio
+  if (name !== undefined) form.set('name', name)
+  if (description !== undefined) form.set('description', description)
   form.set('tags', JSON.stringify(['ai-agent']))
   // Empty keeps the stored picture: the profile API never clears one on an empty field
   form.set('profileImage', profileImage)
@@ -589,7 +590,7 @@ export const changeAgentPicture = async (agent, file) => {
   if (!file || !PICTURE_TYPES.includes(file.type)) throw new Error('Pick a PNG, JPEG, GIF or WebP image')
   if (file.size > PICTURE_MAX_BYTES) throw new Error('Pick an image under 5 MB')
   const wallet = await walletForAgent(agent, 'Changing your agent’s picture')
-  await writeAgentProfile(wallet, { name: agent.name, description: describe(agent.persona), picture: file })
+  await writeAgentProfile(wallet, { picture: file })
 }
 
 /**
@@ -818,7 +819,22 @@ export const carryOutProposal = async ({ agent, proposal, chain, owner = null })
     like: 'Liking as your agent',
     tip: 'Tipping from your agent’s wallet',
     transfer: 'Sending from your agent’s wallet',
+    profile: 'Updating your agent’s profile',
   }[proposal.kind]
+
+  // A profile change is a signed save on Hup, no transaction: only the fields the card names change
+  if (proposal.kind === 'profile') {
+    if (isController) throw new Error(`${agent.name} posts as your Universal Profile and has no profile of its own`)
+    let change
+    try {
+      change = JSON.parse(proposal.text)
+    } catch {
+      throw new Error('This profile change could not be read')
+    }
+    const wallet = await walletForAgent(agent, reason)
+    await writeAgentProfile(wallet, { name: change.name, description: change.description })
+    return { txHash: null, networkId: null }
+  }
 
   // A transfer is a plain send from the agent's wallet, checked for gas first
   if (proposal.kind === 'transfer') {

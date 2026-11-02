@@ -405,13 +405,16 @@ const toProposal = (row) => ({
  * @param {string} address The agent.
  * @param {{kind?: string, text?: string, target?: object, sessionId?: number, amount?: string, recipient?: string, networkId?: number}} draft
  */
-export const addProposal = async (address, { kind = 'post', text = '', target = null, sessionId = null, amount = null, recipient = null, networkId = null }) => {
+export const addProposal = async (
+  address,
+  { kind = 'post', text = '', target = null, sessionId = null, amount = null, recipient = null, networkId = null, originalText = null },
+) => {
   const row = {
     kind,
     post_id: target?.id ?? null,
     network_id: target?.networkId ?? networkId,
     text,
-    original_text: target?.text ?? null,
+    original_text: target?.text ?? originalText,
     allow_comments: target?.allowComments === undefined ? null : Number(target.allowComments),
     amount,
     recipient: recipient ?? target?.author ?? null,
@@ -439,8 +442,9 @@ export const readProposals = async (address, { sessionId = null, limit = PROPOSA
 
 const resolveSchema = z.object({
   status: z.enum(['published', 'discarded']),
-  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).optional(),
-  networkId: z.number().int().positive().optional(),
+  // Null for a profile change, which is a signed save rather than a transaction
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).nullish(),
+  networkId: z.number().int().positive().nullish(),
 })
 
 /**
@@ -449,15 +453,32 @@ const resolveSchema = z.object({
  */
 export const resolveProposal = async (owner, address, id, input) => {
   const parsed = resolveSchema.safeParse(input)
-  if (!parsed.success || (parsed.data.status === 'published' && !parsed.data.txHash)) throw new AgentError(400, 'Invalid change')
+  if (!parsed.success) throw new AgentError(400, 'Invalid change')
 
   const agent = await getAgent(owner, address)
+  const [[draft]] = await pool.execute('SELECT kind, text FROM agent_proposals WHERE id = ? AND agent_address = ?', [Number(id), agent.address])
+  if (!draft) throw new AgentError(404, 'Draft not found')
+  // A profile change is a signed save, not a transaction; everything else published has a hash
+  if (parsed.data.status === 'published' && draft.kind !== 'profile' && !parsed.data.txHash) throw new AgentError(400, 'Invalid change')
+
   const { status, txHash = null, networkId = null } = parsed.data
   const [result] = await pool.execute(
     "UPDATE agent_proposals SET status = ?, tx_hash = ?, network_id = ? WHERE id = ? AND agent_address = ? AND status = 'pending'",
     [status, txHash, networkId, Number(id), agent.address],
   )
   if (result.affectedRows === 0) throw new AgentError(409, 'This draft was already handled')
+
+  // An approved rename shows on the owner's agent list too, not only on the profile
+  if (status === 'published' && draft.kind === 'profile') {
+    let change = {}
+    try {
+      change = JSON.parse(draft.text)
+    } catch {
+      // Unreadable: the profile itself was still saved by the browser
+    }
+    const name = typeof change.name === 'string' ? change.name.trim().slice(0, AGENT_NAME_MAX) : ''
+    if (name) await pool.execute('UPDATE hosted_agents SET name = ? WHERE agent_address = ?', [name, agent.address])
+  }
 }
 
 // --- The agent's own posts ---

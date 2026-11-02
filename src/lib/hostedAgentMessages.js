@@ -6,6 +6,8 @@
 
 export const AGENT_LIMIT = 5
 export const AGENT_NAME_MAX = 64
+/** An agent's Hup profile bio, as its owner approves it from a profile card. */
+export const AGENT_BIO_MAX = 280
 export const AGENT_PERSONA_MAX = 4000
 export const AGENT_POST_MAX = 1000
 

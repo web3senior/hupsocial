@@ -35,6 +35,16 @@ const CARD_COPY = {
   like: { label: 'Like a post', approve: 'Approve like', done: 'Liked', success: 'liked the post' },
   tip: { label: 'Tip from its wallet', approve: 'Approve tip', done: 'Tipped', success: 'sent the tip' },
   transfer: { label: 'Send from its wallet', approve: 'Approve transfer', done: 'Sent', success: 'sent the transfer' },
+  profile: { label: 'Change its profile', approve: 'Approve change', done: 'Updated', success: 'updated its profile' },
+}
+
+// A profile card stores the change and the profile before it as JSON: { name?, description? }
+const readProfile = (value) => {
+  try {
+    return JSON.parse(value) ?? {}
+  } catch {
+    return {}
+  }
 }
 
 // A tip or transfer names its network by id; the card shows its coin and name
@@ -324,7 +334,8 @@ function ProposalCard({ proposal, onApprove, onDiscard }) {
           {proposal.recipient && <code className={styles.proposal__address}>{proposal.recipient}</code>}
         </p>
       )}
-      {kind !== 'transfer' && (
+      {kind === 'profile' && <ProfileChange before={readProfile(proposal.originalText)} after={readProfile(proposal.text)} />}
+      {kind !== 'transfer' && kind !== 'profile' && (
         <p className={clsx(styles.proposal__text, kind === 'delete' && styles['proposal__text--removed'])}>
           {kind === 'delete' || kind === 'like' || kind === 'tip' ? proposal.originalText : proposal.text}
         </p>
@@ -346,5 +357,20 @@ function ProposalCard({ proposal, onApprove, onDiscard }) {
         </div>
       )}
     </div>
+  )
+}
+
+/** A profile card's body: each field that changes, its current value struck through above the new one. */
+function ProfileChange({ before, after }) {
+  return (
+    <dl className={styles.proposal__profile}>
+      {['name', 'description'].filter((field) => after[field] !== undefined).map((field) => (
+        <div key={field}>
+          <dt>{field === 'name' ? 'Name' : 'Bio'}</dt>
+          <dd className={clsx(styles.proposal__text, styles['proposal__text--before'])}>{before[field] || 'Empty'}</dd>
+          <dd className={styles.proposal__text}>{after[field] || 'Empty'}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
