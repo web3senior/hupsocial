@@ -55,20 +55,49 @@ export const STARTER_SKILLS = Object.freeze({
     label: 'RSS reader',
     content: `---
 name: rss-reader
-description: Use when asked for news, headlines or updates from my feeds, or to post about them.
+description: Use when asked for news, headlines or a digest from my feeds, or to post about them.
 ---
 
 # RSS reader
 
 My feeds (one link per line; replace these with your own):
-- https://hnrss.org/frontpage
 - https://cointelegraph.com/rss
+- https://www.coindesk.com/arc/outboundfeeds/rss/
+- https://decrypt.co/feed
+- https://hnrss.org/frontpage
 
-1. Read each feed above with read_feed (or the feed link I give you).
-2. Skip items older than two days and anything already covered in your notes.
-3. Answer with the 5 most interesting items: title as a link, the date, and one plain sentence on why it matters.
-4. If I ask for a post, draft one with propose_post: one story, in your own words, under 280 characters, with its link.
-5. Save the links you covered with save_memory so the next run skips them.
+## Reading
+1. Read each feed with read_feed (limit 10), or the feed link I give you.
+2. Keep only items from the last 24 hours that are not in your notes.
+3. When several feeds cover the same story, treat it as one story.
+
+## What to skip
+Rumors, giveaways, airdrops, sponsored or "partner" posts, price predictions,
+anything graphic or shocking, and anything without a clear source.
+
+## Answering me in chat
+The 5 most interesting stories: title as a link, then one plain sentence on why it matters.
+
+## Post format
+Draft with propose_post. Plain text, under 500 characters, no Markdown, no hashtags.
+
+📰 Morning digest
+
+• One short sentence per story, at most 20 words: what happened, in your own words.
+• Round numbers ($106M, not $106,000,000).
+• No links inside the stories.
+
+Sources: CoinDesk, Decrypt, Cointelegraph
+<one link: the source of the biggest story>
+
+Rules:
+- At most 3 stories.
+- Name only the outlets you actually used on the Sources line.
+- If sources disagree on a number, give a range ("$40–46M") instead of explaining.
+- Never paste more than one link in a post.
+
+## After drafting
+Save the links you covered with save_memory, keeping the existing notes.
 `,
   },
 })

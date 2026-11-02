@@ -44,6 +44,9 @@ const MAX_TOOL_CALLS = 12
 // Each feed is an outside request on Hup's servers; a digest of a few is plenty for one turn
 const MAX_FEEDS_PER_TURN = 5
 const MAX_COMPLETION_TOKENS = 1500
+// A reasoning model handed a lot of tool results (several feeds) can spend its whole budget
+// thinking and stream no words; the one retry gets room for both
+const RECOVERY_COMPLETION_TOKENS = 4000
 
 // Networks a tip or transfer can use: the app's, minus testnets
 const paymentNetworks = appChains.filter((chain) => !chain.testnet)
@@ -387,6 +390,7 @@ export const runAgentTurn = async ({ agent, owner, send, signal, task = null, se
   const messages = [{ role: 'system', content: systemPrompt(agent, pending, task, workspace, profile) }, ...recap, ...history]
   const tools = [...hupiToolDefs(), ...(await agentMcpTools()), ...agentToolDefs]
   let feedsRead = 0
+  let cardsShown = 0
 
   const runTool = async (call) => {
     const name = call.function.name
@@ -426,6 +430,7 @@ export const runAgentTurn = async ({ agent, owner, send, signal, task = null, se
     }
     // The rest are drafts: handed to the owner as a card, never executed here
     const shown = (proposal) => {
+      cardsShown += 1
       send({ type: 'proposal', proposal })
       return { status: 'shown_to_owner', note: 'Your owner now sees this as a card with an approve button and Discard. Tell them to press approve when it looks right.' }
     }
@@ -532,6 +537,22 @@ export const runAgentTurn = async ({ agent, owner, send, signal, task = null, se
         messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) })
       }
     }
+
+    // Tools ran but no words came back: ask once more, without tools and with room to think
+    if (!reply && toolCalls > 0) {
+      const { text, creditsUsed } = await streamRound({
+        client,
+        model,
+        // A user turn, not a system one: every provider accepts it after tool results
+        messages: [...messages, { role: 'user', content: '(Note from Hup, not your owner.) Now answer in a few short sentences from the tool results above. Do not call tools.' }],
+        tools: null,
+        signal,
+        onText: (piece) => send({ type: 'delta', text: piece }),
+        maxCompletionTokens: RECOVERY_COMPLETION_TOKENS,
+      })
+      credits += creditsUsed
+      reply = text.trim()
+    }
   } finally {
     // Charged whether or not the turn finished: the model was used either way
     await chargeRun(agent.address, { kind: task ? 'task' : 'chat', taskId: task?.id ?? null, model, credits }).catch((error) =>
@@ -539,6 +560,11 @@ export const runAgentTurn = async ({ agent, owner, send, signal, task = null, se
     )
   }
 
+  // The work is done when a card was drafted; a missing sign-off must not hide it behind an error
+  if (!reply && cardsShown > 0) {
+    reply = cardsShown === 1 ? 'Here is my draft. Approve it when it looks right.' : 'Here are my drafts. Approve each one when it looks right.'
+    send({ type: 'delta', text: reply })
+  }
   if (!reply) throw new AgentError(502, `${agent.name} could not put an answer together, try again`)
   await appendMessage(agent.address, 'assistant', reply, session.id)
   return { reply, credits }

@@ -20,7 +20,8 @@ const MAX_FEED_BYTES = 1024 * 1024
 const MAX_REDIRECTS = 3
 export const FEED_ITEMS_MAX = 20
 const FEED_ITEMS_DEFAULT = 10
-const SUMMARY_MAX_CHARS = 400
+// Five feeds of ten items is the most one turn reads; short summaries keep that within budget
+const SUMMARY_MAX_CHARS = 280
 const TITLE_MAX_CHARS = 200
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; Hupbot/1.0; +https://hup.social)'
