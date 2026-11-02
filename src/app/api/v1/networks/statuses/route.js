@@ -1,8 +1,8 @@
 /**
  * @file api/v1/networks/statuses/route.js
- * @description Reads the latest non-cleared, non-expired onchain Status per wallet
- * from the `statuses` table (populated by the cidex indexer's HupStatus sync),
- * optionally filtered by network_id. Backs the home page's "Status" tab.
+ * @description Reads every wallet's live offchain Status from `user_statuses`, newest first.
+ * Statuses belong to a wallet rather than a chain, so network_id is accepted and ignored.
+ * Backs the home page's "Status" tab.
  */
 
 import { NextResponse } from 'next/server'
@@ -18,33 +18,22 @@ export async function GET(request) {
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 20
     const offset = (page - 1) * limit
-    const networkId = searchParams.get('network_id')
     const viewerAddress = searchParams.get('viewer_address')
 
     let queryParams = []
 
     let query = `
       SELECT s.*, u.name AS display_name, u.profileImage AS profile_image
-      FROM (
-        SELECT *, ROW_NUMBER() OVER (PARTITION BY network_id, wallet_address ORDER BY event_timestamp DESC) AS rn
-        FROM statuses
-        WHERE is_cleared = 0
-          AND (period_hours = 0 OR event_timestamp + period_hours * 3600 > UNIX_TIMESTAMP())
-      ) s
+      FROM user_statuses s
       LEFT JOIN users u ON u.wallet_address = s.wallet_address
-      WHERE s.rn = 1
+      WHERE (s.expires_at IS NULL OR s.expires_at > UNIX_TIMESTAMP())
     `
-
-    if (networkId) {
-      query += ` AND s.network_id = ?`
-      queryParams.push(networkId)
-    }
 
     const blockFilter = blockedFeedFilter(await readUserBlocks(pool, viewerAddress), 's', false)
     query += blockFilter.sql
     queryParams.push(...blockFilter.params)
 
-    query += ` ORDER BY s.event_timestamp DESC LIMIT ? OFFSET ?`
+    query += ` ORDER BY s.updated_at DESC LIMIT ? OFFSET ?`
     queryParams.push(limit + 1, offset)
 
     const [rows] = await pool.execute(query, queryParams)
@@ -61,7 +50,6 @@ export async function GET(request) {
         page,
         count: statusesToSend.length,
         hasMore,
-        filter_chain_id: networkId || 'all',
       },
     }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {

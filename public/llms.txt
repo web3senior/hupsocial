@@ -83,7 +83,7 @@ like/bookmark/membership state.
 - `/networks/posts` — the feed. Filters: `network_id`, `wallet_address`, `community_id`, `feed_type`, `post_type`.
 - `/networks/{chainId}/{postId}` — one post, plus `/comments` and `/tips` subroutes. The same post as plain markdown is at `https://hup.social/networks/{chainId}/{postId}/markdown`.
 - `/networks/communities` — the community directory; `network_id`, `search`, `creator_address`, `visibility`.
-- `/networks/statuses` — short-lived status posts.
+- `/networks/statuses` — short-lived offchain status posts, one per wallet.
 - `/nfts` — listings; `networkId`, `collection`, `standard` (`erc721` or `lsp8`), `token`, `minPrice`, `maxPrice`, `seller`, `referral`, `sort`.
 - `/predict` — markets; `scope` (`open`, `upcoming`, `closed`, `settled`), `networkId`, `category`, `participant`, `q`.
 - `/events` — events; `scope` (`upcoming` or `past`), `networkId`.

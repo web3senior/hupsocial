@@ -30,7 +30,7 @@
  * file has to change.
  *   Waiting on mainnet — launch_trade (launch_trades), miner_run (miner_runs), store_sale
  *   (store_sales, since Bazaar only runs on LUKSO and Monad testnet).
- *   Waiting on rows — event_created (events), app_listed (apps), status (statuses): those
+ *   Waiting on rows — event_created (events), app_listed (apps), status (user_statuses): those
  *   features are on mainnet, but nothing records an actor-and-time row for them yet, so they
  *   need a cidex-side notification before a feed can show them.
  *

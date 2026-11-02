@@ -1,7 +1,6 @@
 import Web3 from 'web3'
 import { config, CONTRACTS } from '@/config/wagmi'
 import postAbi from '@/abi/post.json'
-import statusAbi from '@/abi/status.json'
 import commentAbi from '@/abi/post-comment.json'
 import  HupCommunityABI  from '@/abis/HupCommunity'
 
@@ -112,21 +111,6 @@ export function initPostCommentContract() {
   return { web3, contract }
 }
 
-/**
- * Initialize status contract
- */
-export function initStatusContract() {
-  const activeChain = getActiveChain()
-  const rpcUrl = activeChain[0].rpcUrls.default.http[0]
-
-  if (!rpcUrl) throw new Error('WEB3_RPC_URL is not defined in environment variables.')
-
-  // Initialize Web3 with an HttpProvider for server-side connection
-  const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl))
-  // Create a Contract instance
-  const contract = new web3.eth.Contract(statusAbi, activeChain[1].status)
-  return { web3, contract }
-}
 export async function getCommunityCount() {
   const { web3, contract } = initHupCommunityContract()
 
@@ -138,30 +122,6 @@ export async function getCommunityCount() {
     return { error }
   }
 }
-export async function getStatus(address) {
-  const { web3, contract } = initStatusContract()
-
-  try {
-    const result = await contract.methods.statuses(address).call()
-    return result
-  } catch (error) {
-    console.error('Error fetching contract data with Web3.js:', error)
-    return { error }
-  }
-}
-
-export async function getMaxLength() {
-  const { web3, contract } = initStatusContract()
-
-  try {
-    const result = await contract.methods.maxLength().call()
-    return result
-  } catch (error) {
-    console.error('Error fetching contract data with Web3.js:', error)
-    return { error }
-  }
-}
-
 export async function getUserSessions(address) {
   const { web3, contract } = initHupContract()
 

@@ -16,8 +16,7 @@ import styles from './StatusFeedTab.module.scss'
 const STATUSES_PAGE_SIZE = 20
 
 /**
- * Multichain feed of every wallet's latest onchain Status broadcast, backed
- * by the `statuses` table synced by the cidex indexer's HupStatus sync.
+ * Feed of every wallet's live offchain Status, backed by `user_statuses`.
  * Distinct from the single-status widget in UserProfile.jsx - this is a
  * many-users list.
  */
@@ -128,12 +127,12 @@ export default function StatusFeedTab() {
         <div className={styles['status-feed']}>
           {visibleStatuses.map((item) => (
             <article
-              key={`${item.network_id}-${item.id}`}
-              data-post-key={`${item.network_id}-${item.id}`}
-              style={cardStyle(`${item.network_id}-${item.id}`)}
+              key={item.wallet_address}
+              data-post-key={item.wallet_address}
+              style={cardStyle(item.wallet_address)}
               className={styles['status-feed__item']}
             >
-              <Profile creator={item.wallet_address} createdAt={item.event_timestamp} networkId={Number(item.network_id)} />
+              <Profile creator={item.wallet_address} createdAt={item.updated_at} />
               <p className={styles['status-feed__content']}>{item.content}</p>
             </article>
           ))}

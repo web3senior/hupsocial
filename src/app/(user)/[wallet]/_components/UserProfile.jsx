@@ -2,13 +2,13 @@
 
 import { Spinner } from '@/components/Loading'
 import Link from 'next/link'
-import { isEvmAddress, isSolanaAddress, shortAddress } from '@/lib/address'
+import { isEvmAddress, isSolanaAddress, normalizeAddress, sameAddress, shortAddress } from '@/lib/address'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useSolanaWalletStore } from '@/stores/useSolanaWalletStore'
 import { SOLANA_DEVNET_ID, solanaExplorerUrl } from '@/config/solana'
 import { useEffect, useState, useCallback, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView, getUserBadges, getCountries } from '@/lib/api'
+import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView, getUserBadges, getCountries, requestAuthNonce } from '@/lib/api'
 import { ORIGIN_OPTIONS } from '@/config/originOptions'
 import { INTEREST_OPTIONS, MAX_INTERESTS, normalizeInterests } from '@/config/interestOptions'
 import InterestIcon from '@/components/ui/InterestIcon'
@@ -19,9 +19,9 @@ import { formatName } from 'readable-sdk'
 import { useQuery } from '@tanstack/react-query'
 import { readableRegistry } from '@/config/readable'
 import { usePremium } from '@/hooks/usePremium'
-import { initHupContract, initStatusContract, getStatus, getMaxLength } from '@/lib/communication'
+import { initHupContract } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
-import statusAbi from '@/abi/status.json'
+import { STATUS_MAX_LENGTH, STATUS_PERIODS, userStatusMessage } from '@/lib/userStatus'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
 import { readFeedCache, saveFeedCache } from '@/db/feedCache'
@@ -1047,38 +1047,14 @@ const Status = ({ addr, profile, selfView }) => {
     'Tell us about your crush...',
     'What makes a perfect date?',
   ]
-  const [panelOpened, setPanelOpened] = useState(false)
-  const [status, setStatus] = useState()
+  const [status, setStatus] = useState(null)
   const [statusContent, setStatusContent] = useState('')
-  // Duration in hours, matching HupStatus.updateStatus(_periodHours); 0 = permanent
-  const [expirationTimestamp, setExpirationTimestamp] = useState(24)
-  const [maxLength, setMaxLength] = useState()
-  const { web3, contract } = initHupContract()
-  const { chain: walletChain, isConnected } = useConnection()
-  const [activeChain, setActiveChain] = useState(getActiveChain())
-  const { contract: statusContract } = initStatusContract()
-  const statusRef = useRef(``)
-  const activeChainId = activeChain?.[0]?.id
-  const statusAddress = activeChain?.[1]?.status
-
-  // getActiveChain() resolves to the wallet's chain (or the stored selection when
-  // disconnected), and NetworkSelect switches chains without remounting the profile —
-  // so this must be re-read on every switch, otherwise the write below keeps targeting
-  // the status contract of whichever chain was active when the profile first mounted.
-  useEffect(() => {
-    setActiveChain(getActiveChain())
-  }, [walletChain?.id, isConnected, panelOpened])
-
-  /* Error during submission (e.g., user rejected)  */
-  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
-  /* Error after mining (e.g., transaction reverted) */
-  const {
-    isLoading: isConfirming,
-    isSuccess: isConfirmed,
-    error: receiptError,
-  } = useWaitForTransactionReceipt({
-    hash,
-  })
+  // Hours until the status clears itself; 0 = permanent
+  const [periodHours, setPeriodHours] = useState(24)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
+  const { address, chain } = useConnection()
+  const { signMessageAsync } = useSignMessage()
 
   /**
    * Selects a random placeholder phrase from the list.
@@ -1092,104 +1068,83 @@ const Status = ({ addr, profile, selfView }) => {
     return placeholders[randomIndex]
   }
 
-  const clearStatus = () => {
-    if (!statusAddress) {
-      toast(`Status isn't available on ${activeChain?.[0]?.name ?? 'this network'}`, 'error')
+  // Status is offchain: the wallet signs a message and the server stores it — no gas, no chain.
+  const saveStatus = async (claim) => {
+    if (isSaving) return
+    if (!address || !sameAddress(address, addr)) {
+      toast('Connect the wallet that owns this profile', 'error')
       return
     }
 
+    setIsSaving(true)
+    setIsSaved(false)
     try {
-      // chainId pins the tx to the chain the address belongs to — without it wagmi signs on
-      // whatever chain the wallet happens to be on, against another chain's contract address.
-      const result = writeContract({
-        abi: statusAbi,
-        address: statusAddress,
-        chainId: activeChainId,
-        functionName: 'clearStatus',
-        args: [],
+      const owner = normalizeAddress(address)
+      const nonce = await requestAuthNonce(owner)
+      if (!nonce) throw new Error('Could not start wallet verification')
+      const signed = { ...claim, address: owner, nonce, issuedAt: Date.now(), chainId: chain?.id }
+      const signature = await signMessageAsync({ account: address, message: userStatusMessage(signed) })
+      const response = await fetch('/api/v1/users/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...signed, signature }),
       })
-      console.log('Transaction sent:', result)
+      const result = await response.json()
+      if (!response.ok || !result.success) throw new Error(result.error || 'Failed to update status')
+      setStatus(result.data)
+      if (claim.clear) setStatusContent('')
+      setIsSaved(true)
     } catch (error) {
-      console.error('Contract write failed:', error)
+      toast(error.shortMessage || error.message || 'Failed to update status', 'error')
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  const updateStatus = (e) => {
-    if (!statusAddress) {
-      toast(`Status isn't available on ${activeChain?.[0]?.name ?? 'this network'}`, 'error')
-      return
-    }
+  const clearStatus = () => saveStatus({ clear: true })
 
+  const updateStatus = () => {
     if (!statusContent.trim()) {
       toast(`Write a status first`, 'error')
       return
     }
-
-    writeContract({
-      abi: statusAbi,
-      address: statusAddress,
-      chainId: activeChainId,
-      functionName: 'updateStatus',
-      args: [statusContent, 'public', '', Number(expirationTimestamp)],
-    })
+    saveStatus({ content: statusContent.trim(), periodHours: Number(periodHours) })
   }
 
-  // const getStatus = async () => {
-  //   // const result = await readContract(config, {
-  //   //   statusAbi,
-  //   //   address: process.env.NEXT_PUBLIC_CONTRACT_STATUS,
-  //   //   functionName: 'notes',
-  //   //   args: [`${addr}`],
-  //   // })
-
-  //   // return result
-
-  //   statusContract
-  // }
-
-  // Both reads hit the status contract of the active chain, so they re-run on every switch
-  // and once a write confirms.
   useEffect(() => {
-    // Status lives on the EVM contracts; a Solana profile has none to read
+    // Statuses are signed by EVM wallets; a Solana profile has none to read
     if (!isEvmAddress(addr)) return
-    getStatus(addr).then((res) => {
-      if (res?.error) {
-        console.error('Failed to fetch status:', res.error)
-        return
-      }
-      setStatus(res)
-      // Only seed the editor from the profile being viewed when it is the viewer's own —
-      // otherwise Update would copy someone else's status onto the viewer's.
-      if (selfView) setStatusContent(res?.content ?? '')
-    })
+    let cancelled = false
+    fetch(`/api/v1/users/status?address=${encodeURIComponent(addr)}`, { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((res) => {
+        if (cancelled) return
+        if (!res?.success) throw new Error(res?.error || 'Failed to fetch status')
+        setStatus(res.data)
+        // Only seed the editor from the profile being viewed when it is the viewer's own —
+        // otherwise Update would copy someone else's status onto the viewer's.
+        if (selfView) setStatusContent(res.data?.content ?? '')
+      })
+      .catch((error) => console.error('Failed to fetch status:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [addr, selfView])
 
-    getMaxLength().then((res) => {
-      if (res?.error) {
-        console.error('Failed to fetch max length:', res.error)
-        return
-      }
-      setMaxLength(web3.utils.toNumber(res))
-    })
-  }, [addr, selfView, panelOpened, activeChainId, isConfirmed])
+  const handleToggle = useCallback((e) => {
+    if (e.newState === 'open') setIsSaved(false)
+  }, [])
 
-  useEffect(() => {
-    const error = submitError || receiptError
-    if (error) toast(error.shortMessage || error.message || 'Failed to update status', 'error')
-  }, [submitError, receiptError])
-
-  const handleToggle = useCallback((e) => setPanelOpened(e.newState === 'open'), [])
-
-  const hasStatus = Boolean(status && status.content !== '')
+  const hasStatus = Boolean(status?.content)
 
   // Nothing to read and nothing to write: the editor behind this bubble always sets the
-  // viewer own status, so on another profile an empty pill is a dead end. Status also only
-  // lives on the EVM contracts, so a Solana profile never has one to show.
+  // viewer own status, so on another profile an empty pill is a dead end. Statuses are signed
+  // by EVM wallets, so a Solana profile never has one to show.
   if (!isEvmAddress(addr) || (!hasStatus && !selfView)) return null
 
-  const expiresAt = hasStatus ? web3.utils.toNumber(status.expirationTimestamp) : 0
   const statusTitle = hasStatus
-    ? `Updated ${moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}${
-        expiresAt > 0 ? ` - clears ${moment.unix(expiresAt).utc().fromNow()}` : ' - no expiry'
+    ? `Updated ${moment.unix(status.updated_at).fromNow()}${
+        status.expires_at ? ` - clears ${moment.unix(status.expires_at).fromNow()}` : ' - no expiry'
       }`
     : 'Share a short status'
 
@@ -1217,8 +1172,8 @@ const Status = ({ addr, profile, selfView }) => {
             <div className={`flex-1`}>
               <h3>Set your status</h3>
             </div>
-            <div className={`pointer`} onClick={(e) => updateStatus(e)}>
-              {isSigning ? `Signing...` : isConfirming ? 'Confirming...' : status && status.content !== '' ? `Update` : `Share`}
+            <div className={`pointer`} onClick={updateStatus}>
+              {isSaving ? `Signing...` : hasStatus ? `Update` : `Share`}
             </div>
           </header>
 
@@ -1228,36 +1183,30 @@ const Status = ({ addr, profile, selfView }) => {
                 <Avatar src={profile.profileImage} size={64} />
               </figure>
 
-              <div
-                className={`d-f-c`}
-                title={status && status.content !== '' && moment.unix(web3.utils.toNumber(status.timestamp)).utc().fromNow()}
-              >
+              <div className={`d-f-c`} title={hasStatus ? moment.unix(status.updated_at).fromNow() : undefined}>
                 <textarea
                   autoFocus
                   value={statusContent}
                   onChange={(e) => setStatusContent(e.target.value)}
                   placeholder={`${getRandomPlaceholder()}`}
-                  maxLength={maxLength ? maxLength : 60}
+                  maxLength={STATUS_MAX_LENGTH}
                 />
               </div>
             </div>
 
             <div className={`${styles.statusPopover__expirationTimestamp} relative`}>
               <label htmlFor="">Clear after </label>
-              <select name="" id="" onChange={(e) => setExpirationTimestamp(e.target.value)}>
-                <option value={24}>24h</option>
-                <option value={8}>8h</option>
-                <option value={6}>6h</option>
-                <option value={4}>4h</option>
-                <option value={1}>1h</option>
-                <option value={0}>∞</option>
+              <select name="" id="" value={periodHours} onChange={(e) => setPeriodHours(Number(e.target.value))}>
+                {STATUS_PERIODS.map((hours) => (
+                  <option key={hours} value={hours}>{hours ? `${hours}h` : '∞'}</option>
+                ))}
               </select>
             </div>
 
-            {isConfirmed && <p className="text-center badge badge-success">Done</p>}
+            {isSaved && <p className="text-center badge badge-success">Done</p>}
 
-            <div title={`Expire: ${status && moment.unix(web3.utils.toNumber(status.expirationTimestamp)).utc().fromNow()}`}>
-              {status && status.content !== '' && selfView && <button onClick={(e) => clearStatus(e)}>Delete status</button>}
+            <div title={status?.expires_at ? `Expire: ${moment.unix(status.expires_at).fromNow()}` : undefined}>
+              {hasStatus && selfView && <button onClick={clearStatus} disabled={isSaving}>Delete status</button>}
             </div>
 
             <div className={`flex flex-row align-items-center gap-025`}>
