@@ -556,10 +556,19 @@ export const withdrawFromAgent = async ({ agent, chainId, to, amount }) => {
   const wallet = (await walletForAgent(agent, 'Withdrawing from your agent')).connect(
     new ethers.JsonRpcProvider(chain.rpcUrls.default.http[0], chain.id, { staticNetwork: true }),
   )
-  const [balance, fees] = await Promise.all([wallet.provider.getBalance(wallet.address), wallet.provider.getFeeData()])
+  // Estimated, not a flat 21,000: a Universal Profile runs its receive logic and reverts out of gas on 21,000
+  const [balance, fees, estimate] = await Promise.all([
+    wallet.provider.getBalance(wallet.address),
+    wallet.provider.getFeeData(),
+    wallet.provider.estimateGas({ from: wallet.address, to, value: 1n }).catch(() => {
+      throw new Error(`${agent.name} cannot send to that address on ${chain.name}. Check it holds enough to cover gas.`)
+    }),
+  ])
+  // A fifth on top, in case the receiver's code takes a slightly longer path for the real amount
+  const gasLimit = (estimate * 6n) / 5n
   const gasPrice = fees.maxFeePerGas ?? fees.gasPrice ?? 0n
-  // A plain transfer costs 21,000 gas; doubled so a fee rise between reading and sending still fits
-  const reserve = 21000n * gasPrice * 2n
+  // Doubled so a fee rise between reading and sending still fits
+  const reserve = gasLimit * gasPrice * 2n
 
   let value
   if (amount === 'max') {
@@ -575,7 +584,7 @@ export const withdrawFromAgent = async ({ agent, chainId, to, amount }) => {
   if (value <= 0n) throw new Error(`Not enough ${symbol} on ${chain.name} to cover gas`)
   if (value + reserve > balance) throw new Error(`${agent.name} holds ${ethers.formatEther(balance)} ${symbol} on ${chain.name}, which does not cover that plus gas`)
 
-  const tx = await wallet.sendTransaction({ to, value, gasLimit: 21000n })
+  const tx = await wallet.sendTransaction({ to, value, gasLimit })
   await tx.wait()
   return { txHash: tx.hash, value }
 }
