@@ -423,7 +423,7 @@ function SkillsInfoDialog({ ref, agentName }) {
       </ol>
       <pre className={styles.info__example}>{SKILL_EXAMPLE}</pre>
       <ul className={styles.info__notes}>
-        <li>A skill guides what {agentName} already can do — read Hup, keep notes and draft posts for your approval. It cannot add new powers like other apps or websites.</li>
+        <li>A skill guides what {agentName} already can do — read Hup, keep notes, and draft posts, replies, likes, tips and transfers for your approval. It cannot add new powers like other apps or websites.</li>
         <li>
           Up to {SKILL_LIMIT} skills, {FILE_MAX_CHARS.toLocaleString()} characters each. Keep them short: very long ones are cut when they are
           read.

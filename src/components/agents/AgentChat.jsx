@@ -31,7 +31,14 @@ const CARD_COPY = {
   post: { label: 'Proposed post · labeled as AI', approve: 'Approve and post', done: 'Posted', success: 'posted' },
   edit: { label: 'Edit to one of its posts', approve: 'Approve edit', done: 'Edited', success: 'edited its post' },
   delete: { label: 'Remove one of its posts', approve: 'Approve removal', done: 'Removed', success: 'removed its post' },
+  reply: { label: 'Reply · labeled as AI', approve: 'Approve reply', done: 'Replied', success: 'replied' },
+  like: { label: 'Like a post', approve: 'Approve like', done: 'Liked', success: 'liked the post' },
+  tip: { label: 'Tip from its wallet', approve: 'Approve tip', done: 'Tipped', success: 'sent the tip' },
+  transfer: { label: 'Send from its wallet', approve: 'Approve transfer', done: 'Sent', success: 'sent the transfer' },
 }
+
+// A tip or transfer names its network by id; the card shows its coin and name
+const chainOf = (networkId) => config.chains.find((item) => item.id === Number(networkId)) ?? null
 
 export default function AgentChat({ token, agent, initialSession = null }) {
   // The owner: a new post goes out as their Universal Profile when the agent controls it (lib/lsp6.js)
@@ -301,15 +308,27 @@ function ProposalCard({ proposal, onApprove, onDiscard }) {
   return (
     <div className={clsx(styles.proposal, styles[`proposal--${proposal.status}`], styles[`proposal--${kind}`])}>
       <span className={styles.proposal__label}>{copy.label}</span>
-      {kind === 'edit' && (
+      {(kind === 'edit' || kind === 'reply') && (
         <>
           <p className={clsx(styles.proposal__text, styles['proposal__text--before'])}>{proposal.originalText}</p>
-          <ArrowRightIcon size={14} className={styles.proposal__arrow} aria-label="becomes" />
+          <ArrowRightIcon size={14} className={styles.proposal__arrow} aria-label={kind === 'reply' ? 'reply' : 'becomes'} />
         </>
       )}
-      <p className={clsx(styles.proposal__text, kind === 'delete' && styles['proposal__text--removed'])}>
-        {kind === 'delete' ? proposal.originalText : proposal.text}
-      </p>
+      {(kind === 'tip' || kind === 'transfer') && (
+        <p className={styles.proposal__amount}>
+          <strong>
+            {proposal.amount} {chainOf(proposal.networkId)?.nativeCurrency.symbol ?? ''}
+          </strong>{' '}
+          on {chainOf(proposal.networkId)?.name ?? 'an unknown network'} to {proposal.text || 'the author'}
+          {/* The address itself, so the owner checks where money goes before approving */}
+          {proposal.recipient && <code className={styles.proposal__address}>{proposal.recipient}</code>}
+        </p>
+      )}
+      {kind !== 'transfer' && (
+        <p className={clsx(styles.proposal__text, kind === 'delete' && styles['proposal__text--removed'])}>
+          {kind === 'delete' || kind === 'like' || kind === 'tip' ? proposal.originalText : proposal.text}
+        </p>
+      )}
       {proposal.status === 'published' ? (
         <span className={styles.proposal__done}>
           <CheckIcon size={14} /> {copy.done}

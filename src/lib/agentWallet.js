@@ -24,7 +24,9 @@ import { isGaslessEnabled, relayHupAction } from './relayGasless'
 import { agentBillingAddress, TOP_UP_CHAIN_ID } from '@/config/agentModels'
 import { botAvatarPng, resolveBotTraits } from './botAvatar'
 import { erc8004For, identityRegistryAbi, REGISTRATION_TYPE } from './erc8004'
-import { encodeFunctionData } from 'viem'
+import { encodeFunctionData, zeroAddress } from 'viem'
+import tipperAbi from '@/abis/HupTipper.json'
+import { fromEvmNativeUnits, toEvmNativeUnits } from '@/config/contracts'
 import { lukso } from 'wagmi/chains'
 import { grantAgentController, hupCallPayload, readAgentController, rotateAgentController, signRelayCall, upExecuteAbi } from './lsp6'
 import { createAgentKey, forgetAgentKey, parseAgentKey, readAgentKey, saveAgentKey } from './agentKeys'
@@ -686,6 +688,30 @@ const sendAgentAction = async ({ wallet, chain, functionName, args, verb }) => {
 }
 
 /**
+ * Tips a post's author from the agent's wallet through HupTipper on the post's network, in that
+ * network's coin. HupTipper checks the amount against msg.value in its own units (fewer decimals on
+ * Hedera), so both are derived from one rounded amount, as TipModal does. Never gasless: it pays.
+ */
+const tipFromAgent = async ({ wallet, chain, postId, amount }) => {
+  const tipper = CONTRACTS[`chain${chain.id}`]?.tipper
+  if (!tipper) throw new Error(`Tips are not available on ${chain.name}`)
+  const symbol = chain.nativeCurrency?.symbol ?? 'coin'
+  const contractAmount = toEvmNativeUnits(chain.id, ethers.parseEther(String(amount)))
+  const provider = new ethers.JsonRpcProvider(chain.rpcUrls.default.http[0], chain.id, { staticNetwork: true })
+  const contract = new ethers.Contract(tipper, tipperAbi, wallet.connect(provider))
+  try {
+    const tx = await contract.tip(wallet.address, BigInt(postId), contractAmount, zeroAddress, false, '0x', { value: fromEvmNativeUnits(chain.id, contractAmount) })
+    await tx.wait()
+    return tx.hash
+  } catch (error) {
+    if (/insufficient funds/i.test(error?.shortMessage || error?.message || '')) {
+      throw new Error(`Your agent's wallet does not hold ${amount} ${symbol} on ${chain.name}, plus gas. Send ${symbol} to it first.`)
+    }
+    throw error
+  }
+}
+
+/**
  * An agent post's content: its text, moderated, pinned with the agent as author and an `agent`
  * label in the metadata — every agent post says so itself, not only its profile.
  * @returns {Promise<string>} The metadata URI.
@@ -717,8 +743,10 @@ const pinAgentContent = async (wallet, text, author = wallet.address) => {
  * Manager (lib/lsp6.js). Relayed when gasless is on; otherwise the agent sends UP.execute itself
  * and pays the LYX, which the Key Manager checks through LSP20.
  */
-const postAsProfile = async ({ wallet, profile, canRelay, metadata }) => {
-  const data = encodeFunctionData({ abi: hupAbi, functionName: 'create', args: [profile, ContentType.Post, metadata, 0n, true] })
+const postAsProfile = async ({ wallet, profile, canRelay, metadata, parentId = 0n }) => {
+  // A reply is the same `create` with the post it answers as parent, so it stays within the grant
+  const type = parentId ? ContentType.Comment : ContentType.Post
+  const data = encodeFunctionData({ abi: hupAbi, functionName: 'create', args: [profile, type, metadata, parentId, true] })
   const payload = hupCallPayload(data)
 
   let relayReason = isGaslessEnabled(lukso.id) ? '' : 'it is turned off for you on this network'
@@ -765,24 +793,54 @@ const postAsProfile = async ({ wallet, profile, canRelay, metadata }) => {
  * @returns {Promise<{txHash: string, networkId: number}>}
  */
 export const carryOutProposal = async ({ agent, proposal, chain, owner = null }) => {
-  /* A Universal Profile agent acts only as the profile, which lives on LUKSO, and it is allowed
-     nothing but new posts there. Its grant is read fresh, so a revoked agent fails here, not onchain. */
+  /* A Universal Profile agent acts as the profile only to post or reply there, on LUKSO: its grant
+     allows Hup's `create` and nothing else, so liking or tipping as the profile is refused here. A
+     transfer is its own key's coin, not the profile's. Its grant is read fresh, so a revoked agent
+     fails here, not onchain. */
   const isController = agent.kind === 'controller'
-  if (isController && proposal.kind !== 'post') throw new Error(`${agent.name} can only make new posts as your Universal Profile`)
-  if (isController && !owner) throw new Error('Connect your Universal Profile to post as it')
-  const grant = isController ? await readAgentController(owner, agent.controllerAddress) : null
-  if (isController && !grant.isController) throw new Error(`${agent.name} is not a controller of your Universal Profile. Add it from its card.`)
+  const asProfile = isController && (proposal.kind === 'post' || proposal.kind === 'reply')
+  if (isController && !asProfile && proposal.kind !== 'transfer') {
+    throw new Error(`${agent.name} can post, reply and send its own coin, but cannot ${proposal.kind} as your Universal Profile`)
+  }
+  if (asProfile && !owner) throw new Error('Connect your Universal Profile to post as it')
+  if (asProfile && proposal.kind === 'reply' && proposal.networkId !== lukso.id) throw new Error(`${agent.name} can only reply to posts on LUKSO`)
+  const grant = asProfile ? await readAgentController(owner, agent.controllerAddress) : null
+  if (asProfile && !grant.isController) throw new Error(`${agent.name} is not a controller of your Universal Profile. Add it from its card.`)
 
-  const target = isController ? chainById(lukso.id) : proposal.kind === 'post' ? chain : chainById(proposal.networkId)
-  if (!target) throw new Error('This post lives on a network this app does not support')
+  const target = asProfile ? chainById(lukso.id) : proposal.kind === 'post' ? chain : chainById(proposal.networkId)
+  if (!target) throw new Error('This lives on a network this app does not support')
 
-  const reason = { post: 'Posting as your agent', edit: 'Editing your agent’s post', delete: 'Removing your agent’s post' }[proposal.kind]
+  const reason = {
+    post: 'Posting as your agent',
+    edit: 'Editing your agent’s post',
+    delete: 'Removing your agent’s post',
+    reply: 'Replying as your agent',
+    like: 'Liking as your agent',
+    tip: 'Tipping from your agent’s wallet',
+    transfer: 'Sending from your agent’s wallet',
+  }[proposal.kind]
+
+  // A transfer is a plain send from the agent's wallet, checked for gas first
+  if (proposal.kind === 'transfer') {
+    const { txHash } = await withdrawFromAgent({ agent, chainId: target.id, to: proposal.recipient, amount: proposal.amount })
+    return { txHash, networkId: target.id }
+  }
+
   const wallet = await walletForAgent(agent, reason)
 
   let txHash
-  if (isController) {
+  if (asProfile) {
     const metadata = await pinAgentContent(wallet, proposal.text, owner)
-    txHash = await postAsProfile({ wallet, profile: owner, canRelay: grant.canRelay, metadata })
+    const parentId = proposal.kind === 'reply' ? BigInt(proposal.postId) : 0n
+    txHash = await postAsProfile({ wallet, profile: owner, canRelay: grant.canRelay, metadata, parentId })
+  } else if (proposal.kind === 'reply') {
+    const metadata = await pinAgentContent(wallet, proposal.text)
+    const args = [wallet.address, ContentType.Comment, metadata, BigInt(proposal.postId), true]
+    txHash = await sendAgentAction({ wallet, chain: target, functionName: 'create', args, verb: 'replying' })
+  } else if (proposal.kind === 'like') {
+    txHash = await sendAgentAction({ wallet, chain: target, functionName: 'batchLike', args: [wallet.address, [BigInt(proposal.postId)]], verb: 'liking' })
+  } else if (proposal.kind === 'tip') {
+    txHash = await tipFromAgent({ wallet, chain: target, postId: proposal.postId, amount: proposal.amount })
   } else if (proposal.kind === 'post') {
     const metadata = await pinAgentContent(wallet, proposal.text)
     txHash = await sendAgentAction({ wallet, chain: target, functionName: 'create', args: [wallet.address, ContentType.Post, metadata, 0n, true], verb: 'posting' })

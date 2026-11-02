@@ -389,29 +389,35 @@ const toProposal = (row) => ({
   text: row.text,
   originalText: row.original_text,
   allowComments: row.allow_comments === null ? null : Boolean(row.allow_comments),
+  // A tip or transfer: how much of the network's coin, and to whom
+  amount: row.amount ?? null,
+  recipient: row.recipient ?? null,
   status: row.status,
   txHash: row.tx_hash,
   createdAt: new Date(row.created_at).toISOString(),
 })
 
 /**
- * Something the agent drafted, waiting for its owner: a new post, or an edit or removal of one of
- * its own posts (`target` from readAgentPost).
+ * Something the agent drafted, waiting for its owner: a new post, an edit or removal of one of its
+ * own posts, a reply to, like of or tip on any post (`target` from readAgentPost or readPost), or a
+ * transfer of `amount` of a network's coin to `recipient`.
  * @param {string} address The agent.
- * @param {{kind?: 'post'|'edit'|'delete', text?: string, target?: object, sessionId?: number}} draft
+ * @param {{kind?: string, text?: string, target?: object, sessionId?: number, amount?: string, recipient?: string, networkId?: number}} draft
  */
-export const addProposal = async (address, { kind = 'post', text = '', target = null, sessionId = null }) => {
+export const addProposal = async (address, { kind = 'post', text = '', target = null, sessionId = null, amount = null, recipient = null, networkId = null }) => {
   const row = {
     kind,
     post_id: target?.id ?? null,
-    network_id: target?.networkId ?? null,
+    network_id: target?.networkId ?? networkId,
     text,
     original_text: target?.text ?? null,
-    allow_comments: target ? Number(target.allowComments) : null,
+    allow_comments: target?.allowComments === undefined ? null : Number(target.allowComments),
+    amount,
+    recipient: recipient ?? target?.author ?? null,
   }
   const [result] = await pool.execute(
-    'INSERT INTO agent_proposals (agent_address, session_id, kind, post_id, network_id, text, original_text, allow_comments) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [normalizeAddress(address), sessionId, row.kind, row.post_id, row.network_id, row.text, row.original_text, row.allow_comments],
+    'INSERT INTO agent_proposals (agent_address, session_id, kind, post_id, network_id, text, original_text, allow_comments, amount, recipient) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [normalizeAddress(address), sessionId, row.kind, row.post_id, row.network_id, row.text, row.original_text, row.allow_comments, row.amount, row.recipient],
   )
   return toProposal({ ...row, id: result.insertId, status: 'pending', tx_hash: null, created_at: new Date() })
 }
@@ -489,6 +495,39 @@ export const listAgentPosts = async (address, limit = AGENT_POSTS_MAX) => {
     [normalizeAddress(address)],
   )
   return rows.map(toAgentPost)
+}
+
+/**
+ * Any live, public post or comment, for a reply, like or tip: not deleted, not in a community
+ * (whose posts Hupi never reads either). `author` is the wallet that wrote it.
+ * @returns {Promise<object|null>}
+ */
+export const readPost = async (networkId, postId) => {
+  const [[row]] = await pool.execute(
+    `SELECT p.id, p.network_id, p.content, p.wallet_address, p.allow_comment, p.created_at, u.name
+       FROM posts p LEFT JOIN users u ON u.wallet_address = p.wallet_address
+      WHERE p.network_id = ? AND p.id = ? AND p.is_deleted = 0 AND p.community_id IS NULL LIMIT 1`,
+    [Number(networkId), String(postId)],
+  )
+  if (!row) return null
+  return { ...toAgentPost(row), author: normalizeAddress(row.wallet_address), authorName: row.name || null }
+}
+
+/**
+ * Who a transfer goes to: a wallet address as given, or a Hup @username looked up. Null when the
+ * name is unknown, so the agent never guesses an address.
+ * @returns {Promise<{address: string, name: string|null}|null>}
+ */
+export const resolveRecipient = async (value) => {
+  const text = String(value ?? '').trim()
+  if (isEvmAddress(text)) {
+    const [[row]] = await pool.execute('SELECT name FROM users WHERE wallet_address = ? LIMIT 1', [normalizeAddress(text)])
+    return { address: normalizeAddress(text), name: row?.name || null }
+  }
+  const username = text.replace(/^@/, '')
+  if (!/^[A-Za-z0-9_]{1,20}$/.test(username)) return null
+  const [[row]] = await pool.execute('SELECT wallet_address, name FROM users WHERE username = ? LIMIT 1', [username])
+  return row ? { address: normalizeAddress(row.wallet_address), name: row.name || `@${username}` } : null
 }
 
 /** One live post of the agent's own, or null — never someone else's, never a deleted one. */
