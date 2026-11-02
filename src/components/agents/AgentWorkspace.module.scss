@@ -79,6 +79,31 @@
     }
   }
 
+  &__starter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--global-border-radius);
+    background: transparent;
+    color: var(--text-muted, #888);
+    font-family: inherit;
+    font-size: var(--font-size-12);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+      background: var(--surface-muted);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
   &__editor {
     display: flex;
     flex-direction: column;

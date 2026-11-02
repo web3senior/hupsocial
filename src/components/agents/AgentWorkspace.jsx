@@ -7,7 +7,7 @@ import { ArrowSquareOutIcon, ArrowsLeftRightIcon, ClockCounterClockwiseIcon, Cub
 import { ContentSpinner, Spinner } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
 import NativeDialog from '@/components/ui/NativeDialog'
-import { CORE_FILES, FILE_MAX_CHARS, isSkillPath, SKILL_LIMIT, skillPath, skillSlug, skillTemplate } from '@/lib/agentWorkspaceFiles'
+import { CORE_FILES, FILE_MAX_CHARS, isSkillPath, SKILL_LIMIT, skillPath, skillSlug, skillTemplate, STARTER_SKILLS } from '@/lib/agentWorkspaceFiles'
 import { deleteWorkspaceSkill, fetchWorkspace, recordWorkspaceSnapshot, restoreWorkspaceFiles, writeWorkspaceFile } from '@/lib/agentWallet'
 import { quoteSnapshot, readWorkspaceOnchain, saveWorkspaceOnchain, storageChains, WORKSPACE_CHAIN_ID } from '@/lib/agentWorkspaceChain'
 import { config } from '@/config/wagmi'
@@ -120,17 +120,15 @@ export default function AgentWorkspace({ token, agent }) {
     }
   }
 
-  const addSkill = async (event) => {
-    event.preventDefault()
-    if (!skillSlug(newSkill)) return
-    const path = skillPath(newSkill)
+  // Opens the skill if it exists already, otherwise writes it with its starting text
+  const createSkill = async (path, content) => {
     if (workspace.files.some((file) => file.path === path)) {
       pick(path)
       return
     }
+    if (isDirty && !window.confirm('Discard your unsaved changes to this file?')) return
     setIsSaving(true)
     try {
-      const content = skillTemplate(newSkill)
       await writeWorkspaceFile(token, agent.address, path, content)
       setWorkspace((value) => ({ ...value, files: [...value.files, { path, content, editable: true }] }))
       setSelected(path)
@@ -141,6 +139,11 @@ export default function AgentWorkspace({ token, agent }) {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const addSkill = (event) => {
+    event.preventDefault()
+    if (skillSlug(newSkill)) createSkill(skillPath(newSkill), skillTemplate(newSkill))
   }
 
   const removeSkill = async () => {
@@ -241,6 +244,14 @@ export default function AgentWorkspace({ token, agent }) {
               <PlusIcon size={14} />
             </button>
           </form>
+          {skills.length < SKILL_LIMIT &&
+            Object.entries(STARTER_SKILLS)
+              .filter(([slug]) => !workspace.files.some((file) => file.path === skillPath(slug)))
+              .map(([slug, starter]) => (
+                <button key={slug} type="button" className={styles.workspace__starter} onClick={() => createSkill(skillPath(slug), starter.content)} disabled={busy}>
+                  <PlusIcon size={12} /> {starter.label}
+                </button>
+              ))}
         </nav>
 
         <div className={styles.workspace__editor}>
@@ -423,7 +434,11 @@ function SkillsInfoDialog({ ref, agentName }) {
       </ol>
       <pre className={styles.info__example}>{SKILL_EXAMPLE}</pre>
       <ul className={styles.info__notes}>
-        <li>A skill guides what {agentName} already can do — read Hup, keep notes, and draft posts, replies, likes, tips and transfers for your approval. It cannot add new powers like other apps or websites.</li>
+        <li>
+          A skill guides what {agentName} already can do — read Hup, read public RSS and Atom feeds, keep notes, and draft posts, replies, likes, tips and
+          transfers for your approval. It cannot add new powers like other apps or websites.
+        </li>
+        <li>For news, press <strong>RSS reader</strong> under Skills and put your own feed links in it.</li>
         <li>
           Up to {SKILL_LIMIT} skills, {FILE_MAX_CHARS.toLocaleString()} characters each. Keep them short: very long ones are cut when they are
           read.

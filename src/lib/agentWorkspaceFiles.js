@@ -49,6 +49,30 @@ export const skillSlug = (name) =>
 
 export const skillPath = (name) => `skills/${skillSlug(name)}/SKILL.md`
 
+/** Ready-made skills an owner can add in one press and then edit, keyed by their folder name. */
+export const STARTER_SKILLS = Object.freeze({
+  'rss-reader': {
+    label: 'RSS reader',
+    content: `---
+name: rss-reader
+description: Use when asked for news, headlines or updates from my feeds, or to post about them.
+---
+
+# RSS reader
+
+My feeds (one link per line; replace these with your own):
+- https://hnrss.org/frontpage
+- https://cointelegraph.com/rss
+
+1. Read each feed above with read_feed (or the feed link I give you).
+2. Skip items older than two days and anything already covered in your notes.
+3. Answer with the 5 most interesting items: title as a link, the date, and one plain sentence on why it matters.
+4. If I ask for a post, draft one with propose_post: one story, in your own words, under 280 characters, with its link.
+5. Save the links you covered with save_memory so the next run skips them.
+`,
+  },
+})
+
 /** A new skill's starting text, in the frontmatter shape OpenClaw and ClawHub read. */
 export const skillTemplate = (name) => `---
 name: ${skillSlug(name)}
