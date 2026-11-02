@@ -31,7 +31,7 @@ export default function SettingsNav() {
     {
       id: 'security',
       label: 'Security Vault',
-      desc: 'One PIN that protects private communities and your in-app wallet keys.',
+      desc: 'Your Key Vault for agents and the in-app wallet, and the PIN for private communities.',
       icon: <KeyIcon size={20} />,
     },
     {

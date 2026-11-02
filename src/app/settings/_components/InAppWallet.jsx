@@ -394,14 +394,14 @@ export default function InAppWallet({ onOpenSecurity }) {
               </div>
             )}
 
-            {/* UPGRADE TO KEY VAULT V2 — only for a key made under the original vault */}
+            {/* UPGRADE TO THE KEY VAULT — only for a key made under the original vault */}
             {burnerAddress && burnerVersion === 'v1' && (
               <div className={styles.secureSetup}>
                 <h5>
-                  <ShieldCheckIcon size={16} /> Upgrade to Key Vault v2
+                  <ShieldCheckIcon size={16} /> Upgrade to your Key Vault
                 </h5>
                 <p>
-                  Key Vault v2 replaces the short PIN with a strong passphrase that is far harder to guess, even by someone holding
+                  Your Key Vault replaces the short PIN with a strong passphrase that is far harder to guess, even by someone holding
                   your signature. Upgrading gives this wallet a new address: Hup moves the balance on every network to it,
                   keeps your current key as a backup, and asks you to authorize the new key on this network.
                 </p>
@@ -431,15 +431,15 @@ export default function InAppWallet({ onOpenSecurity }) {
             {needsVault && (
               <div className={styles.secureSetup}>
                 <h5>
-                  <KeyIcon size={16} /> Security Vault locked
+                  <KeyIcon size={16} /> Original vault locked
                 </h5>
                 <p>
-                  This session key was made under your original Security Vault (one signature + one PIN, shared with private
-                  communities). Unlock it once and come back, or upgrade the key to Key Vault v2.
+                  This session key was made under your original vault (one signature + one PIN, shared with private
+                  communities). Unlock it once and come back, or upgrade the key to your Key Vault.
                 </p>
                 <div className="flex justify-end">
                   <button onClick={onOpenSecurity} className={styles.btnPrimary} disabled={!onOpenSecurity}>
-                    Open Security Vault
+                    Open Security settings
                   </button>
                 </div>
               </div>
@@ -451,7 +451,7 @@ export default function InAppWallet({ onOpenSecurity }) {
                 <h5>
                   <UploadSimpleIcon size={16} /> Import Session Key
                 </h5>
-                <p>Paste the private key from your other device — it's stored encrypted under your Security Vault.</p>
+                <p>Paste the private key from your other device — it's stored encrypted under your Key Vault.</p>
                 <div className={styles.formGroup}>
                   <input
                     type="text"

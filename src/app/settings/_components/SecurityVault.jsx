@@ -1,8 +1,8 @@
 'use client'
 
-// The home of the security PIN. Every PIN-protected feature (private communities, in-app wallet
-// session keys, future features) derives its keys from the master secret unlocked here — pages
-// never ask for the PIN themselves, they link to this tab. The only other surfaces that may ask
+// The home of both vault secrets. The Key Vault passphrase protects agents and the in-app wallet;
+// the original vault's PIN protects private communities and the sell and task vaults — pages
+// never ask for either themselves, they link to this tab. The only other surfaces that may ask
 // are Hup's own unlock dialogs (VaultUnlockDialog, MiniAppVaultUnlockDialog), for an action
 // already underway that a locked vault would otherwise dead-end.
 
@@ -232,9 +232,9 @@ export default function SecurityVault() {
       </div>
 
       <p className={styles.vault__intro}>
-        One wallet signature and one PIN protect all of your encrypted Hup features — private communities and the
-        in-app wallet. The same wallet + same PIN always reproduces the same keys on any device, so there is nothing
-        to back up as long as you remember your PIN.
+        Your Key Vault protects your agents and the in-app wallet with one wallet signature and a passphrase. The
+        original vault protects private communities with a PIN, and once both are open on a device, unlocking the Key
+        Vault opens it too. The same wallet and secret always bring back the same keys on any device.
       </p>
 
       {!isConnected && <p className={styles.vault__muted}>Connect your wallet to activate the security vault.</p>}
@@ -242,7 +242,7 @@ export default function SecurityVault() {
       {isConnected && (
         <div className={styles.vault__section}>
           <div className={styles.vault__row}>
-            <h5 className={styles.vault__sectionTitle}>Key Vault v2 · agents and in-app wallet</h5>
+            <h5 className={styles.vault__sectionTitle}>Key Vault · agents and in-app wallet</h5>
             <span className={clsx(styles.vault__status, isV2Unlocked && styles['vault__status--unlocked'])}>
               {isV2Unlocked ? <LockOpenIcon size={14} /> : <LockIcon size={14} />} {isV2Unlocked ? 'Unlocked' : 'Locked'}
             </span>

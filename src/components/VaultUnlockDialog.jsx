@@ -165,7 +165,7 @@ export default function VaultUnlockDialog() {
     <NativeDialog
       ref={dialogRef}
       className={styles.vaultUnlock}
-      aria-label={isV2 ? 'Unlock Key Vault' : 'Unlock Security Vault'}
+      aria-label={isV2 ? 'Unlock Key Vault' : 'Unlock original vault'}
       onClick={(e) => e.stopPropagation()}
       onCancel={(e) => {
         // Esc is a cancel, not a dismissal — the caller is awaiting an answer either way
@@ -177,7 +177,7 @@ export default function VaultUnlockDialog() {
       <form className={styles.vaultUnlock__body} onSubmit={submit}>
         <header className={styles.vaultUnlock__header}>
           <h3>
-            <KeyIcon size={18} /> {isV2 ? (needsConfirm ? 'Set up your Key Vault' : 'Unlock your Key Vault') : 'Unlock your Security Vault'}
+            <KeyIcon size={18} /> {isV2 ? (needsConfirm ? 'Set up your Key Vault' : 'Unlock your Key Vault') : 'Unlock your original vault'}
           </h3>
           <button type="button" onClick={cancel} disabled={isBusy} aria-label="Cancel" className={styles.vaultUnlock__close}>
             <XIcon size={18} />
@@ -195,7 +195,7 @@ export default function VaultUnlockDialog() {
         ) : (
           <p className={styles.vaultUnlock__reason}>
             {request?.reason ? <strong>{request.reason}</strong> : <strong>This action</strong>} runs on your in-app session key, which
-            your Security Vault protects. Enter your vault PIN — you&rsquo;ll also confirm one signature in your wallet. This tab then
+            your original vault protects. Enter your vault PIN — you&rsquo;ll also confirm one signature in your wallet. This tab then
             stays unlocked.
           </p>
         )}
@@ -204,7 +204,7 @@ export default function VaultUnlockDialog() {
           className={styles.vaultUnlock__pin}
           type="password"
           autoComplete="off"
-          placeholder={isV2 ? 'Key Vault passphrase' : 'Security Vault PIN'}
+          placeholder={isV2 ? 'Key Vault passphrase' : 'Original vault PIN'}
           value={pin}
           onChange={(e) => {
             setPin(e.target.value)
