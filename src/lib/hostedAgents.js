@@ -40,9 +40,6 @@ const createSchema = z.object({
   // Only for an imported wallet: its key, encrypted in the owner's browser (lib/agentWallet.js)
   keyCiphertext: z.string().regex(/^[A-Za-z0-9+/=._-]{40,2000}$/).optional(),
   kind: z.enum(['wallet', 'controller']).default('wallet'),
-  // The creation fee's payment, for an owner who already has an agent (lib/agentBilling.js); the
-  // browser sends null when the agent is free
-  fee: z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/), chainId: z.number().int().positive() }).nullish(),
 })
 
 const keySchema = z.object({
@@ -134,12 +131,8 @@ export const getAgent = async (owner, address) => {
   return { ...present(row), memory: row.memory ?? '' }
 }
 
-/**
- * Registers a new agent. `payment` is its creation fee, already checked onchain by the route
- * (lib/agentBilling.js verifyCreationFee); it is stored with the agent in one transaction, keyed
- * by its hash, so one payment can never create two agents.
- */
-export const createAgent = async (owner, input, payment = null) => {
+/** Registers a new agent. Free: an owner may have up to AGENT_LIMIT. */
+export const createAgent = async (owner, input) => {
   const parsed = createSchema.safeParse(input)
   if (!parsed.success) throw new AgentError(400, 'Check the agent’s name and instructions')
   const { address, index, name, persona, proof, keyCiphertext = null, kind } = parsed.data
@@ -159,27 +152,12 @@ export const createAgent = async (owner, input, payment = null) => {
     throw new AgentError(400, 'Only a Universal Profile can have controller agents')
   }
 
-  const connection = await pool.getConnection()
   try {
-    await connection.beginTransaction()
-    await connection.execute(
+    await pool.execute(
       'INSERT INTO hosted_agents (agent_address, owner_address, agent_index, kind, controller_address, key_ciphertext, name, persona) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [normalizeAddress(address), owner, index, kind, kind === 'controller' ? normalizeAddress(address) : null, keyCiphertext, name, persona],
     )
-    if (payment) {
-      try {
-        await connection.execute(
-          'INSERT INTO agent_creation_fees (tx_hash, network_id, owner_address, agent_address, amount_wei, usd_price) VALUES (?, ?, ?, ?, ?, ?)',
-          [payment.txHash, payment.networkId, owner, normalizeAddress(address), payment.amountWei, payment.usdPrice],
-        )
-      } catch (error) {
-        if (error?.code === 'ER_DUP_ENTRY') throw Object.assign(new AgentError(409, 'That payment already created an agent'), { code: 'FEE_USED' })
-        throw error
-      }
-    }
-    await connection.commit()
   } catch (error) {
-    await connection.rollback()
     if (error?.code !== 'ER_DUP_ENTRY') throw error
     // Say which clash it was: the wallet is already an agent (here or under another owner), or
     // this owner's slot is taken — never a name, which agents may share
@@ -188,8 +166,6 @@ export const createAgent = async (owner, input, payment = null) => {
       throw new AgentError(409, taken.owner_address === owner ? `That wallet is already your agent ${taken.name}` : 'That wallet is already an agent on Hup')
     }
     throw new AgentError(409, 'That agent slot is taken. Reload the page and try again.')
-  } finally {
-    connection.release()
   }
   return getAgent(owner, address)
 }
@@ -245,36 +221,8 @@ export const setAgentKey = async (owner, address, input) => {
  * workspace snapshots — and a derived agent can be made again at the same index to reach them.
  * Top-ups are kept as the record of money received.
  */
-export const deleteAgent = async (owner, address) => removeAgent(owner, await getAgent(owner, address))
-
-// How long after creation a declined profile grant may still undo the agent and free its fee
-const ABANDON_WINDOW_MS = 15 * 60 * 1000
-// AddressPermissions:Permissions:<address>
-const LSP6_PERMISSIONS_PREFIX = '0x4b80742de2bf82acb3630000'
-
-const holdsProfilePermissions = async (owner, key) => {
-  const provider = await getServerProvider(LUKSO_CHAIN_ID)
-  if (!provider) throw new AgentError(503, 'LUKSO is unreachable right now. Try again in a moment.')
-  const profile = new ethers.Contract(owner, ['function getData(bytes32) view returns (bytes)'], provider)
-  const value = await profile.getData(ethers.concat([LSP6_PERMISSIONS_PREFIX, key]))
-  return value !== '0x' && BigInt(value) !== 0n
-}
-
-/**
- * Undoes a Universal Profile agent whose grant the profile declined, as if it was never made: the
- * row goes, and so does its creation fee's record, so the same payment creates the next try. Only
- * a fresh controller with no permissions on the profile — asked of the chain — qualifies; anything
- * else would let one payment cover agent after agent.
- */
-export const abandonAgent = async (owner, address) => {
+export const deleteAgent = async (owner, address) => {
   const agent = await getAgent(owner, address)
-  if (agent.kind !== 'controller') throw new AgentError(400, 'Only a Universal Profile agent can be abandoned')
-  if (Date.now() - Date.parse(agent.createdAt) > ABANDON_WINDOW_MS) throw new AgentError(409, 'This agent is past its setup. Remove it instead.')
-  if (await holdsProfilePermissions(owner, agent.controllerAddress)) throw new AgentError(409, 'Your profile already approved this agent')
-  await removeAgent(owner, agent, { releaseFee: true })
-}
-
-const removeAgent = async (owner, agent, { releaseFee = false } = {}) => {
   const connection = await pool.getConnection()
   try {
     await connection.beginTransaction()
@@ -282,7 +230,6 @@ const removeAgent = async (owner, agent, { releaseFee = false } = {}) => {
       await connection.execute(`DELETE FROM ${table} WHERE agent_address = ?`, [agent.address])
     }
     await connection.execute('DELETE FROM hosted_agents WHERE owner_address = ? AND agent_address = ?', [owner, agent.address])
-    if (releaseFee) await connection.execute('DELETE FROM agent_creation_fees WHERE owner_address = ? AND agent_address = ?', [owner, agent.address])
     await connection.commit()
   } catch (error) {
     await connection.rollback()

@@ -22,8 +22,7 @@ import AgentTasks from '@/components/agents/AgentTasks'
 import AgentWorkspace from '@/components/agents/AgentWorkspace'
 import AssetsTab from '@/components/tabs/AssetsTab'
 import useSWR from 'swr'
-import { formatEther } from 'viem'
-import { AGENT_MODELS, creditsToUsd, MIN_RUN_CREDITS, TOP_UP_CHAIN_ID } from '@/config/agentModels'
+import { AGENT_MODELS, creditsToUsd, MIN_RUN_CREDITS } from '@/config/agentModels'
 import { useChatToken } from '@/hooks/useChatToken'
 import { ensureChatSession } from '@/lib/chatApi'
 import { openConnect } from '@/lib/connectDialog'
@@ -33,12 +32,7 @@ import {
   createControllerAgent,
   createHostedAgent,
   fetchAgents,
-  fetchCreationFee,
-  forgetPendingFee,
   nextAgentIndex,
-  payCreationFee,
-  paymentChains,
-  readPendingFee,
   updateAgent,
 } from '@/lib/agentWallet'
 import { ownerIsUniversalProfile } from '@/lib/lsp6'
@@ -229,35 +223,6 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
     setPrivateKey('')
   }
 
-  // An owner's first agent is free; after that the fee is paid in the picked network's own coin
-  const { chainId: walletChainId } = useConnection()
-  const chains = paymentChains()
-  const [feeChainId, setFeeChainId] = useState(() => (chains.some((chain) => chain.id === walletChainId) ? walletChainId : TOP_UP_CHAIN_ID))
-  const [fee, setFee] = useState(null)
-  const [feeError, setFeeError] = useState('')
-  const feeChain = chains.find((chain) => chain.id === feeChainId)
-  // Paid before, but no agent came of it: the next create uses that payment instead of a new one
-  const [pendingFee, setPendingFee] = useState(() => readPendingFee(owner))
-  const mustPay = Boolean(fee?.required) && !pendingFee
-
-  useEffect(() => {
-    let live = true
-    fetchCreationFee(token, feeChainId)
-      .then((quote) => {
-        if (!live) return
-        setFee(quote)
-        setFeeError('')
-      })
-      .catch((quoteError) => {
-        if (!live) return
-        setFee(null)
-        setFeeError(quoteError.message)
-      })
-    return () => {
-      live = false
-    }
-  }, [token, feeChainId])
-
   useEffect(() => {
     let live = true
     ownerIsUniversalProfile(owner).then((confirmed) => live && setIsProfileOwner(confirmed))
@@ -271,13 +236,9 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
     setIsBusy(true)
     setError('')
     try {
-      setStep('paying')
-      const payment = fee?.required || pendingFee ? await payCreationFee({ token, owner, chainId: feeChainId }) : null
-      setPendingFee(payment)
-
       if (asController) {
         // The agent exists once registered; the grant is the profile's own transaction, and a
-        // declined one leaves it without permissions until the card's grant is confirmed
+        // declined one undoes it (lib/agentWallet.js createControllerAgent)
         setStep('controller')
         const { agent, granted, grantError } = await createControllerAgent({
           token,
@@ -286,9 +247,7 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
           name: name.trim(),
           persona: persona.trim(),
           privateKey: isImport ? privateKey : null,
-          fee: payment,
         })
-        forgetPendingFee(owner)
         setPrivateKey('')
         if (granted) toast(`${name.trim()} is ready and can post as your Universal Profile`, 'success')
         else if (isCancel(grantError)) toast(`${name.trim()} is ready. Add it to your Universal Profile from its card when you like.`, 'info')
@@ -305,18 +264,11 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
         name: name.trim(),
         persona: persona.trim(),
         privateKey: isImport ? privateKey : null,
-        fee: payment,
       })
-      forgetPendingFee(owner)
       setPrivateKey('')
       toast(`${name.trim()} is ready`, 'success')
       onCreated(agent)
     } catch (createError) {
-      // A kept payment the server will not take again is dropped, so the next try pays afresh
-      if (createError.code === 'FEE_USED' || createError.code === 'FEE_INVALID') {
-        forgetPendingFee(owner)
-        setPendingFee(null)
-      }
       if (!isCancel(createError)) setError(createError.message)
     } finally {
       setIsBusy(false)
@@ -413,31 +365,6 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
           We can&rsquo;t recover it if you lose it.
         </p>
       )}
-      {fee?.required && (
-        <div className={styles.create__fee}>
-          {pendingFee ? (
-            <span>Your earlier payment covers this agent.</span>
-          ) : (
-            <>
-              <span>
-                Your first agent was free. This one costs <strong>${fee.usd}</strong>
-                {fee.amountWei && feeChain && fee.chainId === feeChainId && (
-                  <> ({coinAmount.format(Number(formatEther(BigInt(fee.amountWei))))} {fee.symbol})</>
-                )}
-                , paid from your wallet in
-              </span>
-              <select value={feeChainId} onChange={(e) => setFeeChainId(Number(e.target.value))} disabled={isBusy} aria-label="Network to pay on">
-                {chains.map((chain) => (
-                  <option key={chain.id} value={chain.id}>
-                    {chain.nativeCurrency.symbol} · {chain.name}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-        </div>
-      )}
-      {feeError && <p className={styles.agents__error}>{feeError}</p>}
       {error && <p className={styles.agents__error}>{error}</p>}
       <div className={styles.create__actions}>
         <button type="button" className={styles.agents__secondary} onClick={onCancel} disabled={isBusy}>
@@ -446,15 +373,9 @@ function CreateAgentForm({ token, owner, index, onCancel, onCreated }) {
         <button
           type="submit"
           className={styles.agents__primary}
-          disabled={isBusy || !name.trim() || !persona.trim() || (isImport && !privateKey.trim()) || (mustPay && (!fee?.amountWei || Boolean(feeError)))}
+          disabled={isBusy || !name.trim() || !persona.trim() || (isImport && !privateKey.trim())}
         >
-          {step === 'paying'
-            ? 'Paying…'
-            : step === 'controller'
-              ? 'Adding to your profile…'
-              : isBusy
-                ? 'Creating…'
-                : `${mustPay ? `Pay $${fee.usd} and ` : ''}${isImport ? 'import agent' : 'create agent'}`.replace(/^./, (c) => c.toUpperCase())}
+          {step === 'controller' ? 'Adding to your profile…' : isBusy ? 'Creating…' : isImport ? 'Import agent' : 'Create agent'}
         </button>
       </div>
     </form>
@@ -471,7 +392,6 @@ const PANELS = [
 ]
 
 const usd = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 })
-const coinAmount = new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 })
 
 const STATUS_LABEL = { active: 'Active', paused: 'Paused', empty: 'Out of credits' }
 

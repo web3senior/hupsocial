@@ -31,13 +31,10 @@ export const CREDIT_MARGIN = 1.2
 /** Below this a run is refused before it starts: about what one short turn costs on the cheapest model. */
 export const MIN_RUN_CREDITS = 2_000
 
-/** The network a top-up or creation fee defaults to; any Hup network's own coin is accepted. */
+/** The network a top-up defaults to; any Hup network's own coin is accepted. */
 export const TOP_UP_CHAIN_ID = 42
 
-/** What an agent costs to create, in USD paid in a network's own coin. An owner's first agent is free. */
-export const AGENT_CREATION_FEE_USD = 5
-
-/** Where top-ups and creation fees go. Unset means both are off on this deployment. */
+/** Where top-ups go. Unset means they are off on this deployment. */
 export const agentBillingAddress = () => process.env.NEXT_PUBLIC_AGENT_BILLING_ADDRESS || ''
 
 export const creditsToUsd = (credits) => Number(credits) / CREDITS_PER_USD

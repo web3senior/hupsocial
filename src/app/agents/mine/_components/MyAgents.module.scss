@@ -174,32 +174,6 @@
     color: var(--text-muted);
   }
 
-  // The creation fee, with the network it is paid on
-  &__fee {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem 0.5rem;
-    padding: 0.65rem 0.75rem;
-    border: 1px solid color-mix(in srgb, var(--primary, #0d6efd) 35%, var(--border));
-    border-radius: var(--global-border-radius);
-    background: color-mix(in srgb, var(--primary, #0d6efd) 6%, var(--surface));
-    font-size: var(--font-size-12);
-    line-height: 1.5;
-
-    select {
-      min-width: 0;
-      max-width: 100%;
-      padding: 0.3rem 0.5rem;
-      border: 1px solid var(--border);
-      border-radius: var(--global-border-radius);
-      background: var(--surface, var(--background));
-      color: var(--text);
-      font-family: inherit;
-      font-size: var(--font-size-12);
-    }
-  }
-
   &__warning {
     display: flex;
     align-items: flex-start;

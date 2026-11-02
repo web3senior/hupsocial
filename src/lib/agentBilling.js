@@ -5,8 +5,7 @@
  * Hup resells AIML API: an agent's wallet sends any Hup network's own coin to Hup's billing
  * address, the transfer is checked onchain and credited at the USD price of the moment, and every
  * chat turn or task run is charged what AIML reported it cost (lib/hupiModel.js streamRound) plus
- * CREDIT_MARGIN. Creating an agent beyond an owner's first costs AGENT_CREATION_FEE_USD, paid the
- * same way from the owner's wallet or Universal Profile.
+ * CREDIT_MARGIN. Creating an agent is free.
  */
 
 import { ethers } from 'ethers'
@@ -15,17 +14,12 @@ import { normalizeAddress, sameAddress } from '@/lib/address'
 import { fetchUsdPrices, priceKeyFor } from '@/lib/prices'
 import { getServerProvider } from '@/lib/serverRpc'
 import { appChains } from '@/config/contracts'
-import { AGENT_CREATION_FEE_USD, agentBillingAddress, CREDIT_MARGIN, CREDITS_PER_USD, TOP_UP_CHAIN_ID } from '@/config/agentModels'
+import { agentBillingAddress, CREDIT_MARGIN, CREDITS_PER_USD, TOP_UP_CHAIN_ID } from '@/config/agentModels'
 import { AgentError } from '@/lib/hostedAgents'
 
 const NATIVE_TOKEN = '0x0000000000000000000000000000000000000000'
 const TX_HASH_RE = /^0x[0-9a-fA-F]{64}$/
 const HISTORY_SIZE = 20
-
-// A fee paid at the quoted amount still counts if the coin dipped this much before it was checked
-const FEE_PRICE_TOLERANCE = 0.97
-// The quote asks a little over the fee, so an ordinary price move never leaves a payment short
-const FEE_QUOTE_BUFFER = 1.02
 
 // ERC725X's Executed: a Universal Profile paying from execute() leaves this log, not a plain transfer.
 // Its indexing changed between versions (value in a topic, later in data), so both are read.
@@ -112,54 +106,6 @@ export const creditTopUp = async (agent, txHash, chainId = TOP_UP_CHAIN_ID) => {
   } finally {
     connection.release()
   }
-}
-
-// --- Creation fee ---
-
-/** Whether this owner's next agent costs the fee: the first one, while they have none, is free. */
-const feeRequired = async (owner) => {
-  if (!agentBillingAddress()) return false
-  const [[{ count }]] = await pool.execute('SELECT COUNT(*) AS count FROM hosted_agents WHERE owner_address = ?', [owner])
-  return Number(count) > 0
-}
-
-/**
- * What the owner's next agent costs on one network: nothing, or the fee in that network's coin at
- * the current price, with a small buffer.
- * @returns {Promise<{required: boolean, usd: number, chainId?: number, symbol?: string, amountWei?: string}>}
- */
-export const quoteCreationFee = async (owner, chainId = TOP_UP_CHAIN_ID) => {
-  if (!(await feeRequired(owner))) return { required: false, usd: 0 }
-  const chain = paymentChain(chainId)
-  const usdPrice = await coinPrice(chain)
-  const amount = ethers.parseEther(((AGENT_CREATION_FEE_USD / usdPrice) * FEE_QUOTE_BUFFER).toFixed(18))
-  return { required: true, usd: AGENT_CREATION_FEE_USD, chainId: chain.id, symbol: chain.nativeCurrency.symbol, amountWei: amount.toString() }
-}
-
-const feeError = (status, message, code) => Object.assign(new AgentError(status, message), { code })
-
-/**
- * Checks the fee for a new agent before it is stored: free for an owner with none, otherwise a
- * payment from the owner to the billing address worth the fee and not used for any agent before.
- * @returns {Promise<object|null>} The payment, for createAgent to record with the agent, or null when free.
- */
-export const verifyCreationFee = async (owner, fee) => {
-  if (!(await feeRequired(owner))) return null
-  if (!fee?.txHash) throw feeError(402, `Creating another agent costs $${AGENT_CREATION_FEE_USD}`, 'FEE_REQUIRED')
-  const chain = paymentChain(fee.chainId)
-
-  const txHash = String(fee.txHash).toLowerCase()
-  const [[used]] = await pool.execute('SELECT 1 FROM agent_creation_fees WHERE tx_hash = ? AND network_id = ?', [txHash, chain.id])
-  if (used) throw feeError(409, 'That payment already created an agent', 'FEE_USED')
-
-  const value = await paidInTx(chain, txHash, owner, agentBillingAddress())
-  if (value <= 0n) throw feeError(400, 'That payment is not from your wallet to Hup', 'FEE_INVALID')
-  const usdPrice = await coinPrice(chain)
-  const usd = Number(ethers.formatEther(value)) * usdPrice
-  if (usd < AGENT_CREATION_FEE_USD * FEE_PRICE_TOLERANCE) {
-    throw feeError(402, `That payment is worth $${usd.toFixed(2)}, short of the $${AGENT_CREATION_FEE_USD} fee`, 'FEE_INVALID')
-  }
-  return { txHash, networkId: chain.id, amountWei: value.toString(), usdPrice }
 }
 
 // --- Usage ---
