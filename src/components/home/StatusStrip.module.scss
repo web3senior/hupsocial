@@ -127,6 +127,12 @@
     &--idle::before {
       background: var(--border-strong);
     }
+
+    // Already opened, the way Instagram greys a watched story: thinner and without the drain
+    &--seen::before {
+      background: var(--border-strong);
+      mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+    }
   }
 
   &__avatar {

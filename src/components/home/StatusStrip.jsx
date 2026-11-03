@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
@@ -25,10 +25,11 @@ const fetchOwnStatus = async (address) => {
   return body.data
 }
 
-// Stamped with the fetch time so the rings are computed from one clock, outside render
+// Stamped with the fetch time so the rings are computed from one clock, outside render, and with
+// what the viewer had seen at that moment, which the order is taken from (see StatusStrip)
 const fetchStrip = async ([, viewer]) => {
   const response = await getStatuses(1, STRIP_SIZE, null, viewer, { following: true })
-  return { list: response?.data ?? [], fetchedAt: Date.now() }
+  return { list: response?.data ?? [], fetchedAt: Date.now(), seen: readSeen(viewer) }
 }
 
 /** Share of the status's lifetime still left, 0–1; a status that never clears stays full. */
@@ -40,12 +41,47 @@ const remainingShare = (status, now) => {
 
 const displayName = (status) => status.display_name || (status.username ? `@${status.username}` : shortAddress(status.wallet_address))
 
+/* Which statuses this viewer has opened, on this device: `{ [viewer]: { [wallet]: updated_at } }`.
+   A status counts as seen only at the version that was opened, so a new one from the same wallet
+   is unseen again. Capped so the list cannot grow without end. */
+const SEEN_KEY = 'hup:status-seen'
+const SEEN_LIMIT = 300
+
+const readAllSeen = () => {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}') || {}
+  } catch {
+    return {}
+  }
+}
+
+const readSeen = (viewer) => (viewer ? readAllSeen()[viewer.toLowerCase()] ?? {} : {})
+
+const markSeen = (viewer, status) => {
+  try {
+    const all = readAllSeen()
+    const mine = { ...(all[viewer.toLowerCase()] ?? {}), [status.wallet_address.toLowerCase()]: Number(status.updated_at) }
+    // Keep the most recently updated entries when over the cap
+    all[viewer.toLowerCase()] = Object.fromEntries(Object.entries(mine).sort((a, b) => b[1] - a[1]).slice(0, SEEN_LIMIT))
+    localStorage.setItem(SEEN_KEY, JSON.stringify(all))
+  } catch {
+    // Storage blocked: everything simply stays unseen
+  }
+}
+
+const isSeen = (status, seen) => Number(seen[status.wallet_address.toLowerCase()]) >= Number(status.updated_at)
+
 /**
  * A row of avatars over the For you feed, each with its owner's status in a bubble above it —
  * the bubble the profile page shows over the avatar, at feed scale. The viewer's own slot comes
  * first and opens the status editor; anyone else's opens a sheet with the whole status.
  * Only wallets the viewer follows are shown; the Status tab is where everyone is. Signed out
  * there is no one to follow, so the strip stays hidden.
+ *
+ * Ordered the way Instagram orders stories: statuses the viewer has not opened yet come first,
+ * newest first, and opened ones drop behind them with a grey ring. The order is taken when the
+ * strip loads, so opening one greys its ring but does not reshuffle the row under the viewer's
+ * finger; it moves back on the next load.
  */
 export default function StatusStrip() {
   const { address, isConnected, kind } = useActiveWallet()
@@ -56,6 +92,8 @@ export default function StatusStrip() {
   const viewerRef = useRef(null)
   const [selected, setSelected] = useState(null)
   const [openCount, setOpenCount] = useState(0)
+  // Bumped when a status is opened, so its ring greys at once
+  const [seenVersion, setSeenVersion] = useState(0)
 
   const { data: strip, mutate: mutateStrip } = useSWR(viewer ? ['status-strip', viewer, feedRefreshNonce] : null, fetchStrip, {
     revalidateOnFocus: false,
@@ -66,7 +104,15 @@ export default function StatusStrip() {
   })
 
   const now = strip?.fetchedAt ?? 0
-  const others = (strip?.list ?? []).filter((status) => !sameAddress(status.wallet_address, viewer))
+  // The order uses what was seen when the strip loaded; the rings use what is seen now, re-read
+  // on each render (`seenVersion` is what re-renders after an opening)
+  const seen = seenVersion >= 0 ? readSeen(viewer) : {}
+  const others = useMemo(() => {
+    const seenAtLoad = strip?.seen ?? {}
+    return (strip?.list ?? [])
+      .filter((status) => !sameAddress(status.wallet_address, viewer))
+      .sort((a, b) => isSeen(a, seenAtLoad) - isSeen(b, seenAtLoad) || Number(b.updated_at) - Number(a.updated_at))
+  }, [strip, viewer])
 
   // Signed out (or on a Solana wallet) there is no follow list to read
   if (!viewer || !strip) return null
@@ -74,6 +120,8 @@ export default function StatusStrip() {
   const openOwn = () => editorRef.current?.open()
 
   const openStatus = (status) => {
+    markSeen(viewer, status)
+    setSeenVersion((version) => version + 1)
     setSelected(status)
     setOpenCount((count) => count + 1)
     viewerRef.current?.open()
@@ -107,7 +155,7 @@ export default function StatusStrip() {
               <span className={styles.strip__bubble}>
                 <span className={styles.strip__text}>{status.content}</span>
               </span>
-              <span className={styles.strip__ring} style={{ '--status-left': remainingShare(status, now) }}>
+              <span className={clsx(styles.strip__ring, isSeen(status, seen) && styles['strip__ring--seen'])} style={{ '--status-left': remainingShare(status, now) }}>
                 <Avatar className={styles.strip__avatar} src={status.profile_image} size={52} />
               </span>
               <span className={styles.strip__name}>{displayName(status)}</span>
