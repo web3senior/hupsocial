@@ -9,6 +9,7 @@ import { resolveAgentProfile } from '@/lib/agentProfile'
 import { readAgentIdentities } from '@/lib/agentIdentities'
 import { readPremium } from '@/lib/premiumServer'
 import { readRoles, resolveReferrer } from '@/lib/rolesServer'
+import { readUserDecorations } from '@/lib/userDecorations'
 import { isAccentColor, parseAccentSelection } from '@/lib/premium'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
 import { readHandleSegment } from '@/lib/username'
@@ -197,7 +198,7 @@ function scheduleChainRecheck(address, row) {
  * A Universal Profile as the read serves it, from the onchain document — live, or the row's copy
  * of it. The row can be AHEAD of that document: see cidex/scripts/add-profile-sync-stamp.sql.
  */
-function shapeUniversalProfile(profile, row, address, { badge, origin, premium, roles, erc8004 }) {
+function shapeUniversalProfile(profile, row, address, { badge, origin, premium, roles, erc8004, decorations }) {
   const liveStamp = String(profile.lastMetadataUpdate ?? '')
   const storedStamp = row?.profile_sync_stamp ?? null
   const hupIsAhead = storedStamp !== null && storedStamp === liveStamp
@@ -261,12 +262,14 @@ function shapeUniversalProfile(profile, row, address, { badge, origin, premium, 
   profile.agent = resolveAgentProfile(profile)
   // Independent of the mark above: that one is declared, this one is registered onchain.
   profile.erc8004 = erc8004
+  // Avatar decorations are a Hup cosmetic, set by signature — LSP3 has no field for them.
+  profile.decorations = decorations
 
   return profile
 }
 
 /** A profile the chain has nothing for, from the row alone. */
-function shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004 }) {
+function shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004, decorations }) {
   const dbProfile = row
 
   // The notification email is private contact data on a public endpoint —
@@ -327,6 +330,7 @@ function shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004 }) {
      JSON-string form of `tags` this branch carries as readily as the array the branch above has. */
   dbProfile.agent = resolveAgentProfile(dbProfile)
   dbProfile.erc8004 = erc8004
+  dbProfile.decorations = decorations
 
   return dbProfile
 }
@@ -369,7 +373,7 @@ export async function GET(request, { params }) {
        and adds no latency running in the same batch. It is re-verified against
        community_members on every call — see lib/badge.js for why it is never stored already
        resolved. */
-    const [[rows], badge, premium, roles, erc8004] = await Promise.all([
+    const [[rows], badge, premium, roles, erc8004, decorations] = await Promise.all([
       pool.execute(
         `SELECT
           u.*,
@@ -403,6 +407,11 @@ export async function GET(request, { params }) {
         console.error('[AGENT_IDENTITY_RESOLVE_ERROR]:', identityError.message)
         return []
       }),
+      /* Same guard again: a database without 20261104-user-decorations.sql reads as none worn. */
+      readUserDecorations(pool, address).catch((decorationsError) => {
+        console.error('[DECORATIONS_RESOLVE_ERROR]:', decorationsError.message)
+        return {}
+      }),
     ])
     const row = rows[0]
 
@@ -423,11 +432,11 @@ export async function GET(request, { params }) {
       if (row.is_universal_profile) {
         return publicProfile({
           source: 'universal_profile',
-          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin, premium, roles, erc8004 }),
+          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin, premium, roles, erc8004, decorations }),
         })
       }
 
-      return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004 }) })
+      return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004, decorations }) })
     }
 
     const { answered, profile: live } = await readUniversalProfile(address)
@@ -446,7 +455,7 @@ export async function GET(request, { params }) {
     if (isUP) {
       return publicProfile({
         source: 'universal_profile',
-        data: shapeUniversalProfile(live, row, address, { badge, origin, premium, roles, erc8004 }),
+        data: shapeUniversalProfile(live, row, address, { badge, origin, premium, roles, erc8004, decorations }),
       })
     }
 
@@ -456,7 +465,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004 }) })
+    return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004, decorations }) })
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

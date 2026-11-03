@@ -107,6 +107,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
         alt={profile.name}
         src={profile.profileImage}
         size={size}
+        decorations={profile.decorations}
       />
       {/* The fingerprint tells lookalike profiles apart; a purely decorative picture — a corner
           of a tile — can drop it and show the face alone */}
@@ -322,7 +323,7 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref }) => {
           <span className={styles.hoverCard__handle}>{cardHandle}</span>
         </div>
         <Link href={profileHref} prefetch={false} className={styles.hoverCard__avatar} aria-label={`Open the profile of ${cardName}`}>
-          <Avatar className="rounded-full" alt={cardName} src={profile.profileImage} size={72} />
+          <Avatar className="rounded-full" alt={cardName} src={profile.profileImage} size={72} decorations={profile.decorations} />
         </Link>
       </div>
 

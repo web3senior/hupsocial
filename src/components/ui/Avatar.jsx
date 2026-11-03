@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { resolveAvatarImageUrl, resolveStorageGatewayUrl } from '@/lib/storageHelper'
 import { FALLBACK_AVATAR_SRC } from '@/lib/utils'
+import DecorationFrame from '@/components/decorations/DecorationFrame'
 
 /* How long a retry may hang before the default PFP takes the slot.
  *
@@ -50,8 +51,10 @@ const PLACEHOLDER_STYLE = { backgroundColor: 'var(--shimmer-bg)' }
  * @param {string} [props.className] Avatar class from the consumer's module.
  * @param {'lazy'|'eager'} [props.loading] Native loading hint.
  * @param {string} [props.title] Native tooltip.
+ * @param {Object} [props.decorations] The profile's `decorations`; drawn around the picture when
+ *   `size` is large enough for them (DecorationFrame). Omitted, the `<img>` is all that renders.
  */
-const Avatar = ({ src, size = 36, alt = '', className, loading = 'lazy', title }) => {
+const Avatar = ({ src, size = 36, alt = '', className, loading = 'lazy', title, decorations }) => {
   const proxied = resolveAvatarImageUrl(src, size)
   const gateway = resolveStorageGatewayUrl(src)
 
@@ -75,7 +78,7 @@ const Avatar = ({ src, size = 36, alt = '', className, loading = 'lazy', title }
     return () => clearTimeout(timer)
   }, [settled, stage, last, src])
 
-  return (
+  const image = (
     <img
       /* Keyed so a stage change remounts the element: the pending request on the stage that
          just failed is dropped, and `load`/`error` fire cleanly for the new one */
@@ -96,6 +99,8 @@ const Avatar = ({ src, size = 36, alt = '', className, loading = 'lazy', title }
       onError={() => setAttempt({ src, stage: Math.min(stage + 1, last), settled: false })}
     />
   )
+
+  return decorations ? <DecorationFrame decorations={decorations} size={size}>{image}</DecorationFrame> : image
 }
 
 export default Avatar

@@ -59,7 +59,8 @@ import BlockUserButton from '@/components/BlockUserButton'
 import ProfileLinks from './ProfileLinks'
 import PremiumNudge from './PremiumNudge'
 import BirthdayConfetti from '@/components/ui/BirthdayConfetti'
-import { CakeIcon, MapPinIcon, RobotIcon, RssSimpleIcon } from '@phosphor-icons/react'
+import { CakeIcon, MapPinIcon, RobotIcon, RssSimpleIcon, SparkleIcon } from '@phosphor-icons/react'
+import DecorationsSheet from '@/components/decorations/DecorationsSheet'
 import BannerEditor from '@/components/ui/BannerEditor'
 import { coverObjectPosition, readCoverPosition } from '@/lib/coverPosition'
 import styles from './UserProfile.module.scss'
@@ -764,12 +765,14 @@ const Profile = ({ addr }) => {
             <UniversalIdentity
               displayName={profile.name}
               profileImageUrl={profile.profileImage}
+              decorations={profile.decorations}
               smartContractAddress={addr}
               profile={profile}
               selfView={selfView}
             />
 
             <Status addr={addr} profile={profile} selfView={selfView} />
+            {selfView && isEvmAddress(addr) && <Decorate profile={profile} mutate={mutate} />}
           </div>
         </header>
 
@@ -1014,6 +1017,34 @@ const Status = ({ addr, profile, selfView }) => {
         <p>{hasStatus ? status.content : 'Share a status'}</p>
       </button>
       <StatusEditorSheet ref={editorRef} status={status} profileImage={profile.profileImage} onSaved={setStatus} />
+    </>
+  )
+}
+
+/**
+ * The owner's way into avatar decorations: a corner button on their own picture. A save writes
+ * the stored set straight into the cached profile, so the header redraws without a refetch.
+ */
+const Decorate = ({ profile, mutate }) => {
+  const sheetRef = useRef(null)
+
+  return (
+    <>
+      <button
+        type="button"
+        className={styles.decorate}
+        title="Decorate your avatar"
+        aria-label="Decorate your avatar"
+        onClick={() => sheetRef.current?.open()}
+      >
+        <SparkleIcon size={16} weight="fill" />
+      </button>
+      <DecorationsSheet
+        ref={sheetRef}
+        decorations={profile.decorations}
+        profileImage={profile.profileImage}
+        onSaved={(decorations) => mutate({ ...profile, decorations }, { revalidate: false })}
+      />
     </>
   )
 }

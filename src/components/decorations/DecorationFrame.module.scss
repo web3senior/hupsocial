@@ -1,0 +1,51 @@
+// Each slot's box, as insets off the picture. Percentages of a square box, so one figure scales
+// from a byline to the profile header; Decorations.jsx draws each piece for exactly this box.
+.frame {
+  position: relative;
+  display: grid;
+  width: max-content;
+  flex-shrink: 0;
+  // Its own stacking context, so the back slot's negative z-index lands behind the picture
+  // without falling behind the card the avatar sits on
+  isolation: isolate;
+
+  &--fill {
+    width: 100%;
+    height: 100%;
+  }
+
+  &__layer {
+    position: absolute;
+    z-index: 1;
+    // Decoration only: the picture under it keeps every click, hover and long-press
+    pointer-events: none;
+
+    > svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    // 160% wide, 100% tall: the wingspan, from well above the head down to the shoulders
+    &--back {
+      z-index: -1;
+      inset: -30% -30% 30%;
+    }
+
+    &--ring {
+      inset: -10%;
+    }
+
+    &--effect {
+      inset: -22%;
+    }
+
+    &--crown {
+      top: -20%;
+      left: 10%;
+      right: 10%;
+      height: 24%;
+    }
+  }
+}

@@ -1,0 +1,1590 @@
+// Colours are fixed per piece: a decoration is bought as it looks, so it must read the same on
+// the light and dark themes. Each one carries its own contrast — a darker outline on the pale
+// wings, a glow under the bright strokes.
+
+.neonRing {
+  &__stopStart {
+    stop-color: #22d3ee;
+  }
+
+  &__stopEnd {
+    stop-color: #a855f7;
+  }
+
+  &__glow,
+  &__core {
+    fill: none;
+  }
+
+  &__glow {
+    stroke-width: 10;
+    opacity: 0.3;
+    animation: neon-breathe 2.4s ease-in-out infinite alternate;
+  }
+
+  &__core {
+    stroke-width: 4;
+  }
+}
+
+.lightning {
+  &__bolt {
+    opacity: 0;
+    animation: lightning-strike 3.2s linear infinite;
+
+    &--2 {
+      animation-delay: 0.9s;
+    }
+
+    &--3 {
+      animation-delay: 1.7s;
+    }
+
+    &--4 {
+      animation-delay: 2.4s;
+    }
+  }
+
+  &__glow,
+  &__core {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &__glow {
+    stroke: #38bdf8;
+    stroke-width: 6;
+    opacity: 0.45;
+  }
+
+  &__core {
+    stroke: #f0f9ff;
+    stroke-width: 2.2;
+  }
+}
+
+.rain {
+  &__stopTail {
+    stop-color: #38bdf8;
+    stop-opacity: 0;
+  }
+
+  &__stopHead {
+    stop-color: #bae6fd;
+    stop-opacity: 0.9;
+  }
+
+  &__drop {
+    opacity: 0;
+    animation: rain-fall var(--rain-duration) linear var(--rain-delay) infinite;
+
+    &--distant {
+      .rain__trail {
+        stroke-width: 0.65;
+      }
+    }
+  }
+
+  &__trail {
+    fill: none;
+    stroke-width: 1.15;
+    stroke-linecap: round;
+  }
+
+  &__splash {
+    fill: none;
+    stroke: #7dd3fc;
+    stroke-width: 0.7;
+    transform-box: fill-box;
+    transform-origin: center;
+    opacity: 0;
+    animation: rain-splash 1.8s ease-out var(--rain-delay) infinite;
+  }
+}
+
+// Every stop carries its own opacity: the softness is all gradient, no blur filter to repaint
+.softFire {
+  &__ember {
+    fill: #ffc46b;
+    opacity: 0;
+    animation: fire-ember 2.2s ease-out var(--fire-delay) infinite;
+  }
+
+  &__stopEdge {
+    stop-color: #ffd365;
+    stop-opacity: 0;
+  }
+
+  &__stopCore {
+    stop-color: #fff3b0;
+    stop-opacity: 0.9;
+  }
+
+  &__stopWarm {
+    stop-color: #ff982f;
+    stop-opacity: 0.95;
+  }
+
+  &__stopHot {
+    stop-color: #ff4d16;
+    stop-opacity: 0.7;
+  }
+
+  &__stopOut {
+    stop-color: #ff2929;
+    stop-opacity: 0;
+  }
+
+  // A slow swell of the whole glow, from the picture's centre
+  &__body {
+    transform-box: view-box;
+    transform-origin: 50% 50%;
+    animation: soft-fire-swell 1.9s ease-in-out infinite alternate;
+  }
+
+  // The second outline's crests sit between the first's; fading it in and out rolls the edge
+  &__layer--alt {
+    animation: soft-fire-shimmer 0.85s ease-in-out infinite alternate;
+  }
+}
+
+.clouds {
+  &__stopLight {
+    stop-color: #f0f9ff;
+    stop-opacity: 0.75;
+  }
+
+  &__stopMiddle {
+    stop-color: #bdd8f1;
+    stop-opacity: 0.35;
+  }
+
+  &__stopShade {
+    stop-color: #7299c2;
+    stop-opacity: 0.35;
+  }
+
+  &__drift {
+    animation: clouds-drift 5s ease-in-out var(--cloud-delay) infinite alternate;
+  }
+
+  &__body {
+    stroke: #7798ba;
+    stroke-opacity: 0.85;
+    stroke-width: 1;
+    stroke-linejoin: round;
+  }
+
+  &__highlight {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1;
+    stroke-linecap: round;
+    opacity: 0.65;
+  }
+}
+
+.snow {
+  .clouds__stopLight {
+    stop-color: #fff;
+    stop-opacity: 0.98;
+  }
+
+  .clouds__stopMiddle {
+    stop-color: #f0f9ff;
+    stop-opacity: 0.8;
+  }
+
+  .clouds__stopShade {
+    stop-color: #dbefff;
+    stop-opacity: 0.5;
+  }
+
+  .clouds__body {
+    stroke: #f0f9ff;
+    stroke-opacity: 0.85;
+  }
+
+  &__flake {
+    opacity: 0;
+    animation: snow-fall var(--snow-duration) linear var(--snow-delay) infinite;
+  }
+
+  &__crystal {
+    fill: none;
+    stroke: #effaff;
+    stroke-width: 0.9;
+    stroke-linecap: round;
+  }
+
+  &__dot {
+    fill: #e0f2fe;
+    stroke: #7aa6c2;
+    stroke-width: 0.25;
+  }
+}
+
+.halo {
+  animation: halo-float 3s ease-in-out infinite alternate;
+
+  &__glow,
+  &__core {
+    fill: none;
+  }
+
+  &__glow {
+    stroke: #fde68a;
+    stroke-width: 7;
+    opacity: 0.45;
+  }
+
+  &__core {
+    stroke: #facc15;
+    stroke-width: 3;
+  }
+}
+
+.wings {
+  &__wing {
+    // The beat pivots on the shoulder — the right edge of the left wing's own box. fill-box is
+    // measured in the wing's local space, so the mirrored copy pivots on its shoulder as well.
+    transform-box: fill-box;
+    transform-origin: 100% 70%;
+    animation: wings-beat 2.6s ease-in-out infinite;
+  }
+
+  &__stopStart {
+    stop-color: #ffffff;
+  }
+
+  &__stopEnd {
+    stop-color: #bfdbfe;
+  }
+
+  &__primaries {
+    stroke: #93c5fd;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+  }
+
+  &__coverts {
+    fill: #ffffff;
+    stroke: #bfdbfe;
+    stroke-width: 1;
+    stroke-linejoin: round;
+  }
+}
+
+.particles {
+  &__motion {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: particle-float var(--particle-duration) ease-in-out var(--particle-delay) infinite;
+  }
+
+  &--starlight &__motion {
+    animation-name: star-twinkle;
+  }
+
+  &__starGlow {
+    fill: #fbbf24;
+    opacity: 0.25;
+  }
+
+  &__star {
+    fill: #fff2b5;
+    stroke: #fbbf24;
+    stroke-width: 0.4;
+  }
+
+  &__bubble {
+    fill: #7dd3fc;
+    fill-opacity: 0.14;
+    stroke: #a5def7;
+    stroke-opacity: 0.8;
+    stroke-width: 0.8;
+  }
+
+  &__bubbleShine,
+  &__bubbleTint,
+  &__heartShine {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1;
+    stroke-linecap: round;
+    opacity: 0.8;
+  }
+
+  &__bubbleTint {
+    stroke: #d8b4fe;
+    opacity: 0.7;
+  }
+
+  &__heart {
+    fill: #fb7185;
+    fill-opacity: 0.85;
+    stroke: #fecdd3;
+    stroke-width: 0.6;
+  }
+}
+
+@keyframes particle-float {
+  0%,
+  100% {
+    transform: translate(-2px, 4px) rotate(-6deg);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: translate(2px, -5px) rotate(6deg);
+    opacity: 1;
+  }
+}
+
+@keyframes star-twinkle {
+  0%,
+  100% {
+    transform: scale(0.65);
+    opacity: 0.3;
+  }
+
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+.halloween {
+  &__pumpkin,
+  &__bat {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: particle-float 4s ease-in-out var(--halloween-delay) infinite;
+  }
+
+  &__bat {
+    animation-duration: 2.8s;
+  }
+
+  &__stem {
+    fill: #8ca34a;
+  }
+
+  &__body {
+    fill: #f97316;
+    stroke: #ffb454;
+    stroke-width: 0.8;
+  }
+
+  &__ribs {
+    fill: none;
+    stroke: #c2410c;
+    stroke-width: 0.8;
+  }
+
+  &__face {
+    fill: #fff2a6;
+    stroke: #9a3412;
+    stroke-width: 0.5;
+  }
+
+  &__wings {
+    fill: #312044;
+    stroke: #b491da;
+    stroke-width: 0.8;
+    stroke-linejoin: round;
+  }
+
+  &__eyes {
+    fill: #ffcf72;
+  }
+}
+
+.galaxy {
+  &__clear {
+    stop-color: #6366f1;
+    stop-opacity: 0;
+  }
+
+  &__violet {
+    stop-color: #c084fc;
+    stop-opacity: 0.55;
+  }
+
+  &__blue {
+    stop-color: #38bdf8;
+    stop-opacity: 0.3;
+  }
+
+  &__orbitBlue {
+    stop-color: #7dd3fc;
+    stop-opacity: 0.3;
+  }
+
+  &__orbitPink {
+    stop-color: #e9b5ff;
+    stop-opacity: 0.9;
+  }
+
+  &__nebula {
+    transform-origin: center;
+    animation: galaxy-breathe 4s ease-in-out infinite alternate;
+  }
+
+  &__orbit,
+  &__arc {
+    fill: none;
+    stroke-width: 0.8;
+  }
+
+  &__arc {
+    stroke-width: 2;
+    stroke-linecap: round;
+    animation: galaxy-breathe 3s ease-in-out -1s infinite alternate;
+  }
+
+  &__planet {
+    fill: #e9d5ff;
+    stroke: #a78bfa;
+    stroke-width: 1.5;
+  }
+
+  &__star {
+    fill: #f5f3ff;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: star-twinkle 3.5s ease-in-out var(--galaxy-delay) infinite;
+  }
+}
+
+@keyframes galaxy-breathe {
+  from {
+    opacity: 0.5;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.sun {
+  &__glowCore {
+    stop-color: #fbbf24;
+    stop-opacity: 0.4;
+  }
+
+  &__glowEdge {
+    stop-color: #f59e0b;
+    stop-opacity: 0;
+  }
+
+  &__glow {
+    animation: galaxy-breathe 3s ease-in-out infinite alternate;
+  }
+
+  &__rays {
+    transform-box: view-box;
+    transform-origin: 105px 28px;
+    animation: sun-turn 24s linear infinite;
+    fill: none;
+    stroke: #fbbf24;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  &__disc {
+    fill: #fcd34d;
+    stroke: #f59e0b;
+    stroke-width: 1.5;
+  }
+
+  &__shine,
+  &__rim {
+    fill: none;
+    stroke: #fff3b0;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  &__rim {
+    stroke: #fbbf24;
+    stroke-width: 1;
+    opacity: 0.5;
+  }
+}
+
+@keyframes sun-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.coffee {
+  &__saucer {
+    fill: #c7ad95;
+    stroke: #f1ddc5;
+    stroke-width: 0.7;
+  }
+
+  &__handle {
+    fill: none;
+    stroke: #f5e5d4;
+    stroke-width: 4;
+  }
+
+  &__cup {
+    fill: #f5e5d4;
+    stroke: #b78d69;
+    stroke-width: 0.8;
+  }
+
+  &__rim {
+    fill: #fff5e9;
+  }
+
+  &__drink,
+  &__bean {
+    fill: #70432d;
+    stroke: #be936f;
+    stroke-width: 0.7;
+  }
+
+  &__foam {
+    fill: #f5d5a8;
+  }
+
+  &__steam,
+  &__beanLine {
+    fill: none;
+    stroke: #e8cfb1;
+    stroke-width: 1.3;
+    stroke-linecap: round;
+  }
+
+  &__steam {
+    animation: coffee-steam 2.8s ease-out var(--steam-delay) infinite;
+  }
+}
+
+@keyframes coffee-steam {
+  0% {
+    transform: translateY(3px);
+    opacity: 0;
+  }
+
+  30% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+}
+
+.sea {
+  &__surface {
+    stop-color: #99f6e4;
+    stop-opacity: 0.85;
+  }
+
+  &__middle {
+    stop-color: #06b6d4;
+    stop-opacity: 0.65;
+  }
+
+  &__depth {
+    stop-color: #1d4ed8;
+    stop-opacity: 0.85;
+  }
+
+  &__back {
+    fill: #38bdf8;
+    fill-opacity: 0.35;
+    animation: sea-swell 2.8s ease-in-out infinite alternate;
+  }
+
+  &__front {
+    animation: sea-swell 2.3s ease-in-out -1.15s infinite alternate-reverse;
+  }
+
+  &__middleWave {
+    fill: #2dd4bf;
+    fill-opacity: 0.38;
+    animation: sea-swell 3.2s ease-in-out -1.6s infinite alternate-reverse;
+  }
+
+  &__crest {
+    animation: sea-crest 2.6s ease-in-out -0.6s infinite alternate;
+  }
+
+  &__crestFoam,
+  &__trail {
+    fill: none;
+    stroke: #ecfeff;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &__crestFoam {
+    stroke-width: 2;
+    stroke-opacity: 0.85;
+  }
+
+  &__trail {
+    stroke-width: 1;
+    opacity: 0.7;
+  }
+
+  &__fleck {
+    fill: #ecfeff;
+    opacity: 0.8;
+  }
+
+  &__foam {
+    fill: none;
+    stroke: #cffafe;
+    stroke-width: 1.8;
+    stroke-opacity: 0.85;
+  }
+
+  &__bubble {
+    fill: #a5f3fc;
+    fill-opacity: 0.15;
+    stroke: #a5f3fc;
+    stroke-width: 1.2;
+    animation: sea-bubble 2.6s ease-out var(--sea-delay) infinite;
+  }
+}
+
+@keyframes sea-swell {
+  from {
+    transform: translate(-9px, 2px);
+  }
+
+  to {
+    transform: translate(9px, -2px);
+  }
+}
+
+@keyframes sea-crest {
+  from {
+    transform: translate(-2px, 3px);
+  }
+
+  to {
+    transform: translate(2px, -2px);
+  }
+}
+
+@keyframes sea-bubble {
+  0% {
+    transform: translateY(3px);
+    opacity: 0;
+  }
+
+  30% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+}
+
+.devil {
+  &__hornLight {
+    stop-color: #fb7185;
+  }
+
+  &__hornDark {
+    stop-color: #9f1239;
+  }
+
+  &__glowClear {
+    stop-color: #e11d48;
+    stop-opacity: 0;
+  }
+
+  &__glowRed {
+    stop-color: #f43f5e;
+    stop-opacity: 0.3;
+  }
+
+  &__aura {
+    animation: galaxy-breathe 3s ease-in-out infinite alternate;
+  }
+
+  &__horn,
+  &__tip {
+    stroke: #881337;
+    stroke-width: 0.7;
+    stroke-linejoin: round;
+  }
+
+  &__tip {
+    fill: #e11d48;
+  }
+
+  &__shine {
+    fill: none;
+    stroke: #fecdd3;
+    stroke-width: 1.2;
+    stroke-linecap: round;
+    opacity: 0.65;
+  }
+
+  &__tail {
+    transform-box: view-box;
+    transform-origin: 103px 115px;
+    animation: devil-tail 2.8s ease-in-out infinite alternate;
+  }
+
+  &__tailLine {
+    fill: none;
+    stroke: #e11d48;
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+}
+
+@keyframes devil-tail {
+  from {
+    transform: rotate(-4deg);
+  }
+
+  to {
+    transform: rotate(4deg);
+  }
+}
+
+.snake {
+  &__body {
+    transform-box: view-box;
+    transform-origin: 72px 100px;
+    animation: snake-sway 3.5s ease-in-out infinite alternate;
+  }
+
+  &__outline,
+  &__skin,
+  &__belly,
+  &__scales,
+  &__tongue {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &__outline {
+    stroke: #166534;
+    stroke-width: 9;
+  }
+
+  &__skin {
+    stroke: #4ade80;
+    stroke-width: 7;
+  }
+
+  &__belly {
+    stroke: #d9f99d;
+    stroke-width: 2;
+  }
+
+  &__scales {
+    stroke: #15803d;
+    stroke-width: 1.2;
+  }
+
+  &__head {
+    fill: #4ade80;
+    stroke: #166534;
+    stroke-width: 0.9;
+  }
+
+  &__eye {
+    fill: #172b1b;
+  }
+
+  &__tongue {
+    stroke: #fb7185;
+    stroke-width: 1;
+    animation: snake-tongue 3s ease-in-out infinite;
+  }
+}
+
+@keyframes snake-sway {
+  from {
+    transform: rotate(-1deg);
+  }
+
+  to {
+    transform: rotate(1deg);
+  }
+}
+
+@keyframes snake-tongue {
+  0%,
+  65%,
+  100% {
+    opacity: 0;
+  }
+
+  72%,
+  86% {
+    opacity: 1;
+  }
+
+  79% {
+    opacity: 0.2;
+  }
+}
+
+.ghost {
+  &__light {
+    stop-color: #f8fafc;
+    stop-opacity: 0.95;
+  }
+
+  &__fade {
+    stop-color: #c4b5fd;
+    stop-opacity: 0.35;
+  }
+
+  &__shadow {
+    fill: #64748b;
+    opacity: 0.2;
+  }
+
+  &__body {
+    animation: ghost-float 3.5s ease-in-out infinite alternate;
+  }
+
+  &__outline {
+    stroke: #94a3b8;
+    stroke-width: 0.8;
+    stroke-linejoin: round;
+  }
+
+  &__eye {
+    fill: #475569;
+  }
+
+  &__smile,
+  &__shine {
+    fill: none;
+    stroke: #64748b;
+    stroke-width: 1;
+    stroke-linecap: round;
+  }
+
+  &__shine {
+    stroke: #fff;
+    stroke-width: 1.5;
+  }
+}
+
+.solar {
+  &__jupiter {
+    fill: #e8c39e;
+    stroke: #a87751;
+    stroke-width: 0.7;
+  }
+
+  &__bands {
+    fill: none;
+    stroke: #bb805a;
+    stroke-width: 1.2;
+  }
+
+  &__spot {
+    fill: #be6745;
+  }
+
+  &__neptune {
+    fill: #4f6bf5;
+    stroke: #93c5fd;
+    stroke-width: 0.8;
+  }
+
+  &__cloudBand {
+    fill: none;
+    stroke: #bfdbfe;
+    stroke-width: 0.8;
+  }
+
+  &__sunGlow {
+    fill: #fbbf24;
+    opacity: 0.2;
+  }
+
+  &__sun {
+    fill: #fcd34d;
+    stroke: #f59e0b;
+    stroke-width: 1;
+  }
+
+  &__track,
+  &__outerTrack {
+    fill: none;
+    stroke: #818cf8;
+    stroke-width: 0.9;
+    opacity: 0.5;
+  }
+
+  &__outerTrack {
+    stroke-dasharray: 1 5;
+    opacity: 0.3;
+  }
+
+  &__orbit {
+    transform-box: view-box;
+    transform-origin: 72px 72px;
+    animation: solar-orbit 26s linear infinite;
+
+    &--saturn {
+      animation-duration: 38s;
+      animation-delay: -5s;
+    }
+
+    &--mars {
+      animation-duration: 19s;
+      animation-delay: -3s;
+    }
+
+    &--sun {
+      animation-duration: 48s;
+    }
+
+    &--jupiter {
+      animation-duration: 34s;
+      animation-delay: -12s;
+    }
+
+    &--neptune {
+      animation-duration: 44s;
+      animation-delay: -17s;
+    }
+  }
+
+  &__earth {
+    fill: #38bdf8;
+    stroke: #bae6fd;
+    stroke-width: 1;
+  }
+
+  &__land {
+    fill: #4ade80;
+  }
+
+  &__moon {
+    fill: #cbd5e1;
+    stroke: #64748b;
+    stroke-width: 0.4;
+  }
+
+  &__saturn {
+    fill: #fcd9a0;
+    stroke: #c0945d;
+    stroke-width: 0.7;
+  }
+
+  &__rings {
+    fill: none;
+    stroke: #c4a1e8;
+    stroke-width: 2;
+  }
+
+  &__mars {
+    fill: #fb923c;
+    stroke: #fed7aa;
+    stroke-width: 0.6;
+  }
+
+  &__crater {
+    fill: #c2410c;
+    opacity: 0.6;
+  }
+}
+
+@keyframes ghost-float {
+  from {
+    transform: translate(-1px, 1px);
+  }
+
+  to {
+    transform: translate(1px, -3px);
+  }
+}
+
+@keyframes solar-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghost__body,
+  .solar__orbit {
+    animation: none;
+  }
+
+  .snake__body,
+  .snake__tongue {
+    animation: none;
+  }
+
+  .devil__aura,
+  .devil__tail {
+    animation: none;
+  }
+
+  .sea__back,
+  .sea__middleWave,
+  .sea__crest,
+  .sea__front,
+  .sea__bubble {
+    animation: none;
+  }
+
+  .sun__glow,
+  .sun__rays,
+  .coffee__steam {
+    animation: none;
+    opacity: 0.8;
+  }
+
+  .galaxy__nebula,
+  .galaxy__arc,
+  .galaxy__star {
+    animation: none;
+  }
+
+  .halloween__pumpkin,
+  .halloween__bat {
+    animation: none;
+  }
+
+  .particles .particles__motion {
+    animation: none;
+    opacity: 0.8;
+  }
+
+  .rain__drop {
+    animation: none;
+    opacity: 0.55;
+  }
+
+  .snow__flake {
+    animation: none;
+    opacity: 0.65;
+  }
+
+  .softFire__ember {
+    animation: none;
+    opacity: 0.5;
+  }
+
+  .rain__splash {
+    animation: none;
+    opacity: 0.3;
+  }
+
+  .neonRing__glow,
+  .clouds__drift,
+  .halo,
+  .wings__wing,
+  .softFire__body,
+  .softFire__layer--alt {
+    animation: none;
+  }
+
+  // A strike is the whole piece, so the still version shows every bolt at once
+  .lightning__bolt {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+@keyframes snow-fall {
+  0% {
+    transform: translate(-2px, -12px);
+    opacity: 0;
+  }
+
+  20%,
+  65% {
+    opacity: 0.8;
+  }
+
+  50% {
+    transform: translate(3px, 12px);
+  }
+
+  100% {
+    transform: translate(-1px, 38px);
+    opacity: 0;
+  }
+}
+
+@keyframes fire-ember {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: translate(4px, -14px);
+    opacity: 0;
+  }
+}
+
+@keyframes rain-fall {
+  0% {
+    transform: translate(-9px, -30px);
+    opacity: 0;
+  }
+
+  15%,
+  70% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translate(9px, 30px);
+    opacity: 0;
+  }
+}
+
+@keyframes rain-splash {
+  0% {
+    transform: scale(0.25);
+    opacity: 0;
+  }
+
+  15% {
+    opacity: 0.6;
+  }
+
+  80%,
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes clouds-drift {
+  from {
+    transform: translate(-3px, 1px);
+    opacity: 0.8;
+  }
+
+  to {
+    transform: translate(3px, -2px);
+    opacity: 1;
+  }
+}
+
+@keyframes neon-breathe {
+  from {
+    opacity: 0.2;
+  }
+
+  to {
+    opacity: 0.6;
+  }
+}
+
+@keyframes lightning-strike {
+  0%,
+  10%,
+  100% {
+    opacity: 0;
+  }
+
+  2%,
+  6% {
+    opacity: 1;
+  }
+
+  4% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes soft-fire-swell {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes soft-fire-shimmer {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes halo-float {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-8%);
+  }
+}
+
+@keyframes wings-beat {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  50% {
+    transform: rotate(7deg);
+  }
+}
+
+.butterflyWings {
+  &__wing {
+    transform-box: fill-box;
+    transform-origin: 100% 65%;
+    animation: butterfly-wingbeat 2.8s ease-in-out infinite alternate;
+  }
+
+  &__edge {
+    stroke: #5b21b6;
+    stroke-width: 1.3;
+    stroke-linejoin: round;
+  }
+
+  &__veins {
+    fill: none;
+    stroke: #6d28d9;
+    stroke-width: 0.8;
+    opacity: 0.6;
+  }
+
+  &__panel {
+    fill: #fbcfe8;
+    opacity: 0.5;
+  }
+
+  &__spots {
+    fill: #fff1f2;
+    opacity: 0.9;
+  }
+}
+
+@keyframes butterfly-wingbeat {
+  from {
+    transform: scaleX(0.85) rotate(-3deg);
+  }
+
+  to {
+    transform: scaleX(1) rotate(2deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .butterflyWings__wing {
+    animation: none;
+  }
+}
+
+.extras {
+  &__purple { fill: #a78bfa; stroke: #6d28d9; stroke-width: 0.7; }
+  &__pink { fill: #f9a8d4; stroke: #db2777; stroke-width: 0.5; }
+  &__gold { fill: #fde68a; }
+  &__detail { fill: none; stroke: #f5f3ff; stroke-width: 1.2; stroke-linecap: round; }
+  &__float { animation: ghost-float 3.5s ease-in-out infinite alternate; }
+  &__flutter { transform-box: fill-box; transform-origin: center; animation: extra-flutter 1.6s ease-in-out infinite alternate; }
+  &__breathe { animation: galaxy-breathe 4s ease-in-out infinite alternate; }
+  &__tail { fill: none; stroke: #a78bfa; stroke-width: 7; stroke-linecap: round; transform-origin: 100px 119px; animation: devil-tail 3s ease-in-out infinite alternate; }
+  &__cyberBase { fill: none; stroke: #22d3ee; stroke-width: 2; stroke-dasharray: 23 9; opacity: 0.65; }
+  &__scanner { fill: none; stroke: #c084fc; stroke-width: 3; stroke-dasharray: 30 341; transform-origin: 72px 72px; animation: solar-orbit 8s linear infinite; }
+  &__circuit { fill: none; stroke: #22d3ee; stroke-width: 1.5; }
+  &__tentacles { fill: none; stroke: #c084fc; stroke-width: 1.8; stroke-linecap: round; }
+  &__jelly { fill: #a5b4fc; fill-opacity: 0.55; stroke: #a78bfa; stroke-width: 1; }
+  &__dragonBody { fill: none; stroke: #0d9488; stroke-width: 9; stroke-linecap: round; }
+  &__dragonSpines { fill: #fcd34d; stroke: #b45309; stroke-width: 0.5; }
+  &__dragonWing { fill: #5eead4; fill-opacity: 0.65; stroke: #0f766e; stroke-width: 1; }
+  &__dragonHead { fill: #14b8a6; stroke: #115e59; stroke-width: 0.8; stroke-linejoin: round; }
+}
+
+@keyframes extra-flutter {
+  from { transform: scaleX(0.65) rotate(-5deg); }
+  to { transform: scaleX(1) rotate(5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .extras__float,
+  .extras__flutter,
+  .extras__breathe,
+  .extras__tail,
+  .extras__scanner { animation: none; }
+}
+
+.butterflyWings__innerGlow {
+  fill: none;
+  stroke: #fce7f3;
+  stroke-width: 2;
+  opacity: 0.45;
+  stroke-linecap: round;
+}
+
+.extras {
+  &__stamens { fill: none; stroke: #fef08a; stroke-width: 0.7; stroke-linecap: round; }
+  &__note { fill: #38bdf8; stroke: #0369a1; stroke-width: 0.7; }
+  &__catEar { fill: #7c6ba7; stroke: #4c3c70; stroke-width: 1; stroke-linejoin: round; }
+  &__catFur { fill: none; stroke: #f5d0fe; stroke-width: 1.2; stroke-linecap: round; }
+  &__node { fill: #a5f3fc; stroke: #0891b2; stroke-width: 0.7; }
+  &__auroraFlow { transform-origin: 72px 72px; animation: aurora-flow 5s ease-in-out infinite alternate; }
+  &__jellyRibs { fill: none; stroke: #e9d5ff; stroke-width: 0.7; opacity: 0.6; }
+  &__jellySpot { fill: #f5d0fe; opacity: 0.85; }
+  &__jelly { fill: #a5b4fc; fill-opacity: 0.65; stroke: #7c3aed; stroke-width: 0.8; }
+  &__tentacles { animation: jelly-sway 3s ease-in-out infinite alternate; transform-origin: 119px 95px; }
+  &__dragonBelly { fill: none; stroke: #99f6e4; stroke-width: 3; stroke-linecap: round; }
+  &__dragonVeins { fill: none; stroke: #0f766e; stroke-width: 0.8; }
+  &__dragonFace { fill: none; stroke: #134e4a; stroke-width: 0.9; stroke-linecap: round; }
+  &__dragonNostril { fill: #134e4a; }
+}
+
+@keyframes aurora-flow {
+  from { transform: rotate(-4deg) scale(0.98); opacity: 0.65; }
+  to { transform: rotate(4deg) scale(1.02); opacity: 1; }
+}
+
+@keyframes jelly-sway {
+  from { transform: skewX(-4deg); }
+  to { transform: skewX(4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .extras__auroraFlow,
+  .extras__tentacles { animation: none; }
+}
+
+.cyber {
+  &__base { fill: none; stroke: #312e81; stroke-width: 4; opacity: 0.45; }
+  &__frame { fill: none; stroke-width: 1.5; stroke-linejoin: round; opacity: 0.8; }
+  &__corners { fill: none; stroke-width: 3; stroke-linejoin: bevel; }
+  &__scanner { fill: none; stroke: #a5f3fc; stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 26 307; transform-origin: 72px 72px; animation: solar-orbit 10s linear infinite; }
+  &__lights { fill: #a5f3fc; stroke: #22d3ee; stroke-width: 1.3; stroke-linecap: round; }
+}
+
+.dragon {
+  &__body,
+  &__face { stroke: #115e59; stroke-width: 0.8; stroke-linejoin: round; }
+  &__belly { fill: none; stroke: #a7f3d0; stroke-width: 3; stroke-linecap: round; opacity: 0.8; }
+  &__spines,
+  &__horns { fill: #fcd9a0; stroke: #a97e47; stroke-width: 0.6; stroke-linejoin: round; }
+  &__wing { transform-box: view-box; transform-origin: 115px 88px; animation: dragon-wing 3s ease-in-out infinite alternate; }
+  &__membrane { fill: #2dd4bf; fill-opacity: 0.55; stroke: #0f766e; stroke-width: 1; }
+  &__veins { fill: none; stroke: #0f766e; stroke-width: 0.7; }
+  &__head { transform-box: view-box; transform-origin: 118px 61px; animation: dragon-look 4s ease-in-out infinite alternate; }
+  &__brow,
+  &__mouth,
+  &__pupil { fill: none; stroke: #134e4a; stroke-width: 1; stroke-linecap: round; }
+  &__eye { fill: #fde68a; }
+  &__nostril { fill: #134e4a; }
+  &__fang { fill: #fff7ed; }
+}
+
+@keyframes dragon-wing {
+  from { transform: rotate(-4deg); }
+  to { transform: rotate(5deg); }
+}
+
+@keyframes dragon-look {
+  from { transform: rotate(-2deg); }
+  to { transform: rotate(2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cyber__scanner,
+  .dragon__wing,
+  .dragon__head { animation: none; }
+}
+
+.topHat {
+  &__dark {
+    stop-color: #1e293b;
+  }
+
+  &__light {
+    stop-color: #64748b;
+  }
+
+  &__body {
+    transform-box: view-box;
+    transform-origin: 50px 25px;
+    animation: hat-tilt 4s ease-in-out infinite alternate;
+  }
+
+  &__brim,
+  &__top {
+    fill: #334155;
+    stroke: #94a3b8;
+    stroke-width: 0.6;
+  }
+
+  &__crown {
+    stroke: #94a3b8;
+    stroke-width: 0.6;
+  }
+
+  &__band {
+    fill: #a78bfa;
+    stroke: #7c3aed;
+    stroke-width: 0.5;
+  }
+
+  &__buckle {
+    fill: none;
+    stroke: #fde68a;
+    stroke-width: 1;
+  }
+
+  &__shine {
+    fill: none;
+    stroke: #cbd5e1;
+    stroke-width: 0.8;
+    stroke-linecap: round;
+    opacity: 0.6;
+  }
+}
+
+.goldenDragon {
+  &__orbit {
+    transform-box: view-box;
+    transform-origin: 72px 72px;
+    animation: solar-orbit 32s linear infinite;
+  }
+
+  &__outline,
+  &__coil,
+  &__scales {
+    fill: none;
+    stroke-linecap: round;
+  }
+
+  &__outline {
+    stroke: #92400e;
+    stroke-width: 10;
+  }
+
+  &__coil {
+    stroke-width: 8;
+  }
+
+  &__scales {
+    stroke: #fff1b0;
+    stroke-width: 2;
+    stroke-dasharray: 1 5;
+    opacity: 0.85;
+  }
+
+  &__spines,
+  &__mane {
+    fill: #f59e0b;
+    stroke: #a16207;
+    stroke-width: 0.6;
+    stroke-linejoin: round;
+  }
+
+  &__horns,
+  &__whiskers,
+  &__claws {
+    fill: none;
+    stroke: #fef3c7;
+    stroke-width: 1.3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &__horns {
+    stroke: #b7791f;
+    stroke-width: 2.4;
+  }
+
+  &__head {
+    stroke: #92400e;
+    stroke-width: 0.8;
+  }
+
+  &__eye {
+    fill: #fff7d6;
+    stroke: #92400e;
+    stroke-width: 0.6;
+  }
+
+  &__pupil,
+  &__nostril,
+  &__mouth {
+    fill: #652515;
+  }
+
+  &__fangs {
+    fill: #fff7d6;
+  }
+
+  &__brow {
+    fill: none;
+    stroke: #b45309;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  &__cheek,
+  &__maneDetail {
+    fill: none;
+    stroke: #ffedaa;
+    stroke-width: 1;
+    stroke-linecap: round;
+  }
+
+  &__beard {
+    fill: #fde68a;
+    stroke: #a16207;
+    stroke-width: 0.5;
+  }
+}
+
+@keyframes hat-tilt {
+  from {
+    transform: rotate(-3deg);
+  }
+
+  to {
+    transform: rotate(1deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topHat__body,
+  .goldenDragon__orbit {
+    animation: none;
+  }
+
+  .solar__orbit--jupiter {
+    transform: rotate(125deg);
+  }
+
+  .solar__orbit--neptune {
+    transform: rotate(60deg);
+  }
+}

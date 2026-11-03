@@ -473,6 +473,36 @@
       }
     }
 
+    // The owner's corner button into avatar decorations — bottom-left, opposite nothing else
+    // on the picture, and over any decoration layer since it comes later in the stack
+    .decorate {
+      position: absolute;
+      left: 4%;
+      bottom: 4%;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border-radius: 50%;
+      background-color: var(--background);
+      box-shadow: var(--shadow-md);
+      color: var(--accent-primary);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+
+      &:hover {
+        transform: scale(1.08);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--accent-primary);
+        outline-offset: 2px;
+      }
+    }
+
     .status {
       border: none;
       font-family: inherit;

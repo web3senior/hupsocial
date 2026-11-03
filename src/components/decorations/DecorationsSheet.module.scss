@@ -1,0 +1,556 @@
+.decorations {
+  &__dialog.decorations__dialog {
+    --dialog-width: min(920px, calc(100vw - 32px));
+
+    @media (max-width: 639px) {
+      --dialog-width: 100vw;
+    }
+  }
+
+  // Options on the left, the live preview pinned on the right while the options scroll
+  &__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 272px;
+    grid-template-areas: 'options aside';
+    align-items: start;
+    gap: 1.5rem;
+    padding-block: 0.75rem 0.25rem;
+
+    @media (max-width: 767px) {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: 'aside' 'options';
+      gap: 1rem;
+    }
+  }
+
+  // Sticks inside DialogSheet.Body, which is the scroller
+  &__aside {
+    grid-area: aside;
+    position: sticky;
+    top: 0.75rem;
+    z-index: 1;
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface-muted);
+
+    @media (max-width: 767px) {
+      top: 0;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      // Opaque, so the options scrolling underneath do not show through
+      background: linear-gradient(var(--surface-muted), var(--surface-muted)), var(--surface, var(--background));
+      box-shadow: 0 8px 16px -12px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  // Room on every side for what spills past the picture: the wings reach about half its width out
+  &__stage {
+    display: grid;
+    place-items: center;
+    min-height: 200px;
+    border-radius: 12px;
+    background:
+      radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--accent-primary) 16%, transparent), transparent 65%),
+      var(--surface, var(--background));
+
+    @media (max-width: 767px) {
+      width: 120px;
+      min-height: 104px;
+      height: 104px;
+      overflow: hidden;
+
+      > * {
+        transform: scale(0.62);
+      }
+    }
+  }
+
+  &__summary {
+    display: grid;
+    gap: 0.6rem;
+    min-width: 0;
+  }
+
+  &__summaryHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+
+    strong {
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+  }
+
+  &__reset {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+      border-color: var(--accent-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  &__equipped {
+    display: grid;
+    gap: 0.15rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    @media (max-width: 767px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.15rem 0.5rem;
+    }
+  }
+
+  &__equippedRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 26px;
+    font-size: 0.78rem;
+
+    &--empty .decorations__equippedName {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    @media (max-width: 767px) {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0;
+      min-height: 0;
+      font-size: 0.72rem;
+    }
+  }
+
+  &__equippedSlot {
+    flex-shrink: 0;
+    width: 3.5rem;
+    color: var(--text-muted);
+
+    @media (max-width: 767px) {
+      width: auto;
+      font-size: 0.65rem;
+    }
+  }
+
+  &__equippedName {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  &__remove {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+      background: color-mix(in srgb, var(--text) 10%, transparent);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 1px;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    // No room for a remove control in the compact strip; the "None" card does the same
+    @media (max-width: 767px) {
+      display: none;
+    }
+  }
+
+  &__hint {
+    margin: 0;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    line-height: 1.5;
+
+    @media (max-width: 767px) {
+      display: none;
+    }
+  }
+
+  &__options {
+    grid-area: options;
+    display: grid;
+    gap: 1.5rem;
+    min-width: 0;
+  }
+
+  &__slot {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  &__slotHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  &__label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  &__current {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  &__chips {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 0.5rem;
+
+    @media (max-width: 439px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    overflow: hidden;
+    min-width: 0;
+    background: var(--surface-muted);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+
+    &:hover,
+    &:focus-within {
+      border-color: var(--accent-primary);
+    }
+
+    &--active {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 1px var(--accent-primary);
+      background: color-mix(in srgb, var(--accent-primary) 10%, var(--surface-muted));
+    }
+  }
+
+  &__art {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 68px;
+    height: 68px;
+    margin: 0.25rem auto;
+  }
+
+  &__avatar {
+    display: block;
+    flex-shrink: 0;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  &__artLayer {
+    position: absolute;
+    inset: 2px;
+    pointer-events: none;
+
+    > svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+  }
+
+  &__purchase {
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface-muted);
+  }
+
+  &__basket {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.85rem 1rem;
+  }
+
+  &__summaryLabel {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  &__basketItem {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text);
+    font-size: 0.8rem;
+
+    > svg {
+      flex-shrink: 0;
+      color: var(--text-muted);
+    }
+
+    > strong {
+      margin-left: auto;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+  }
+
+  &__total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.8rem;
+
+    strong {
+      font-size: 1rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    small {
+      margin-left: 0.2rem;
+      color: var(--text-muted);
+      font-size: 0.65rem;
+      font-weight: 500;
+    }
+  }
+
+  &__name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  &__checkout {
+    display: grid;
+    gap: 0.65rem;
+    width: 100%;
+  }
+
+  // The coin a purchase is paid in: any Hup mainnet's own, as agent credits take it
+  &__payWith {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  &__networkControl {
+    position: relative;
+    width: min(65%, 16rem);
+    min-width: 0;
+
+    > svg {
+      position: absolute;
+      top: 50%;
+      right: 0.7rem;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: var(--text-muted);
+    }
+  }
+
+  &__network {
+    appearance: none;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 16rem;
+    padding: 0.55rem 2rem 0.55rem 0.7rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--background);
+    text-overflow: ellipsis;
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__note {
+    margin: 0;
+    font-size: 0.72rem;
+    text-align: center;
+    color: var(--text-muted);
+  }
+
+  // The price, and where a loud piece stops showing, before someone buys it expecting the feed
+  &__scope {
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    line-height: 1.45;
+    text-align: center;
+  }
+
+  &__tier {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: inline-flex;
+    padding: 0.18rem 0.45rem;
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent);
+    border-radius: 999px;
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+    font-size: 0.62rem;
+    font-weight: 600;
+    line-height: 1.3;
+
+    &[data-tier='free'] {
+      border-color: color-mix(in srgb, #34d399 25%, transparent);
+      background: color-mix(in srgb, #34d399 15%, transparent);
+    }
+
+    &[data-tier='seasonal'] {
+      border-color: color-mix(in srgb, #fb923c 25%, transparent);
+      background: color-mix(in srgb, #fb923c 18%, transparent);
+    }
+  }
+
+  &__chip {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    min-height: 38px;
+    padding: 2rem 0.65rem 0.75rem;
+    flex: 1;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--accent-primary) 6%, transparent);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: -2px;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+  }
+
+  &__save {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.65rem 1rem;
+    border: 0;
+    border-radius: 10px;
+    background: var(--accent-primary);
+    color: var(--app-accent-text);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 3px;
+    }
+  }
+}
