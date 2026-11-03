@@ -596,7 +596,7 @@ function AgentCard({ agent, owner, token, isOpen, onChange, onRemoved }) {
             className={styles.card__tabs}
           />
 
-          <div className={styles.card__panel}>
+          <div className={clsx(styles.card__panel, panel === 'chat' && styles['card__panel--chat'])}>
             {panel === 'chat' && <AgentChat key={chatVersion} token={token} agent={agent} initialSession={chatSession} />}
             {panel === 'tasks' && <AgentTasks
                 token={token}

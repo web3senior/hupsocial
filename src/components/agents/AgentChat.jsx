@@ -62,6 +62,14 @@ export default function AgentChat({ token, agent, initialSession = null }) {
   const [status, setStatus] = useState('')
   const [isBusy, setIsBusy] = useState(false)
   const endRef = useRef(null)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input) return
+    input.style.height = 'auto'
+    input.style.height = `${input.scrollHeight}px`
+  }, [draft])
 
   // Which session to open: a number, null for the latest chat, or 'new' for a fresh one
   const [requested, setRequested] = useState(initialSession)
@@ -294,17 +302,23 @@ export default function AgentChat({ token, agent, initialSession = null }) {
       </div>
 
       <form className={styles.chat__composer} onSubmit={send}>
-        <input
+        <textarea
+          ref={inputRef}
           className={styles.chat__input}
+          rows={1}
+          aria-label={`Message ${agent.name}`}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={isTaskRun ? 'A task run is read-only. Start a new chat to reply.' : `Message ${agent.name}`}
           maxLength={2000}
           disabled={isBusy || isTaskRun}
         />
-        <button type="submit" className={styles.chat__send} disabled={isBusy || isTaskRun || !draft.trim()} aria-label="Send">
-          <ArrowUpIcon size={16} />
-        </button>
+        <div className={styles.chat__composerFooter}>
+          <span className={styles.chat__hint}>Enter for a new line</span>
+          <button type="submit" className={styles.chat__send} disabled={isBusy || isTaskRun || !draft.trim()} aria-label="Send message">
+            <ArrowUpIcon size={18} />
+          </button>
+        </div>
       </form>
     </div>
   )

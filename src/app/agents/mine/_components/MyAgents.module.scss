@@ -457,6 +457,13 @@
     overscroll-behavior: contain;
     // A scrollbar coming and going must not shift the panel's content sideways
     scrollbar-gutter: stable;
+
+    // The chat scrolls its own log and keeps the composer docked, so the panel itself must not scroll
+    &--chat {
+      overflow: hidden;
+      padding-bottom: 0.75rem;
+      scrollbar-gutter: auto;
+    }
   }
 }
 
