@@ -4,15 +4,21 @@
   position: relative;
   border-bottom: 1px solid var(--border);
 
-  // Centred on the avatar row; touch screens swipe, so the arrows are for pointers only
+  // Pointer screens get a gutter at each end for the arrows, with the row scrolling inside it,
+  // so an avatar never slides under an arrow
+  @media (hover: hover) {
+    padding-inline: 36px;
+  }
+
+  // Centred on the avatar row, in the gutter; touch screens swipe, so the arrows are for pointers only
   &__arrow {
     position: absolute;
-    top: 72px;
+    top: 78px;
     z-index: 2;
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     padding: 0;
     border: 1px solid var(--border);
     border-radius: 999px;
@@ -34,11 +40,11 @@
     }
 
     &--left {
-      left: 6px;
+      left: 4px;
     }
 
     &--right {
-      right: 6px;
+      right: 4px;
     }
 
     @media (hover: none) {
@@ -58,6 +64,10 @@
 
     &::-webkit-scrollbar {
       display: none;
+    }
+
+    @media (hover: hover) {
+      padding-inline: 0;
     }
 
     > li {
@@ -94,9 +104,14 @@
 
   // The profile page's status bubble at strip scale: up to two lines, the thought-dots
   // trailing down toward the avatar. Pulled over the ring's top edge the way the profile does.
+  // Always two lines tall, a one-line status centred in it, so every bubble in the row matches.
   &__bubble {
     position: relative;
     z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(2 * 1.25em + 0.7rem + 2px);
     max-width: 100%;
     margin-bottom: -0.65rem;
     padding: 0.35rem 0.6rem;
