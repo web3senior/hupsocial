@@ -29,7 +29,7 @@ const fetchOwnStatus = async (address) => {
 // what the viewer had seen at that moment, which the order is taken from (see StatusStrip)
 const fetchStrip = async ([, viewer]) => {
   const response = await getStatuses(1, STRIP_SIZE, null, viewer, { following: true })
-  return { list: response?.data ?? [], fetchedAt: Date.now(), seen: readSeen(viewer) }
+  return { list: response?.data ?? [], fetchedAt: Date.now(), seen: readSeen(viewer), viewer }
 }
 
 /** Share of the status's lifetime still left, 0–1; a status that never clears stays full. */
@@ -102,10 +102,16 @@ export default function StatusStrip() {
   // Bumped when a status is opened, so its ring greys at once
   const [seenVersion, setSeenVersion] = useState(0)
 
-  const { data: strip, mutate: mutateStrip } = useSWR(viewer ? ['status-strip', viewer, feedRefreshNonce] : null, fetchStrip, {
+  /* A Home tap bumps feedRefreshNonce, which is a new key with no data yet; without keeping the
+     last answer the strip unmounted for the length of the refetch and popped back in. The kept
+     answer is only used for the wallet it was fetched for, so a wallet switch never shows the
+     previous wallet's follows. */
+  const { data: lastStrip, mutate: mutateStrip } = useSWR(viewer ? ['status-strip', viewer, feedRefreshNonce] : null, fetchStrip, {
     revalidateOnFocus: false,
     dedupingInterval: 30_000,
+    keepPreviousData: true,
   })
+  const strip = lastStrip && sameAddress(lastStrip.viewer, viewer) ? lastStrip : null
   const { data: ownStatus, mutate: mutateOwn } = useSWR(viewer ? ['own-status', viewer] : null, ([, wallet]) => fetchOwnStatus(wallet), {
     revalidateOnFocus: false,
   })
