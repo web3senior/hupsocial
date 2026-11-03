@@ -2,6 +2,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { MENTION_HREF_PATTERN } from '@/lib/mentions'
+import { validateUsername } from '@/lib/username'
 
 const isMentionLink = (token) => MENTION_HREF_PATTERN.test(String(token?.href || '')) && String(token?.text || '').startsWith('@')
 
@@ -19,6 +20,15 @@ function escapeAttr(value) {
 // Exported so the cashtag cards detect exactly what the renderer turns blue — two regexes
 // would drift, and a card for a token the text never linked reads as a bug.
 export const CASHTAG_PATTERN = /(^|[^A-Za-z0-9_$])\$([A-Za-z][A-Za-z0-9]{0,9})\b/g
+
+// A typed `@alice` (not one picked from the mention list, which carries its address) links to the
+// handle's profile path. Not after a word, dot or slash, so emails and `site.com/@user` stay text.
+const HANDLE_PATTERN = /(^|[^A-Za-z0-9_@./:&])@([A-Za-z][A-Za-z0-9_]{2,19})(?![A-Za-z0-9_])/g
+
+const linkHandles = (html) =>
+  html.replace(HANDLE_PATTERN, (match, prefix, handle) =>
+    validateUsername(handle).ok ? `${prefix}<a href="/@${handle.toLowerCase()}" class="mention">@${handle}</a>` : match,
+  )
 
 // Hosts that count as "inside Hup" no matter which deployment renders the post.
 const HUP_HOSTS = ['hup.social']
@@ -196,9 +206,11 @@ function renderSafeMarkdown(markdown, { breaks = false, linkPostPaths = false } 
 
     /* Escaped rather than trusted, because the cashtag pass injects real markup and everything
        around it has to be inert. */
-    const text = escapeHtml(rawText).replace(CASHTAG_PATTERN, (match, prefix, symbol) => {
+    let text = escapeHtml(rawText).replace(CASHTAG_PATTERN, (match, prefix, symbol) => {
       return `${prefix}<span class="ticker-trigger" data-symbol="${symbol.toUpperCase()}">$${symbol}</span>`
     })
+    // Never inside a link's label: a link cannot hold another link
+    if (linkDepth === 0) text = linkHandles(text)
     if (!linkPostPaths || linkDepth > 0) return text
 
     return text.replace(/(^|[\s(])(\/networks\/\d+\/\d+\/?)(?=$|[\s).,!?:;])/g, (_match, prefix, path) => {
