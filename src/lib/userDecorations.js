@@ -59,21 +59,30 @@ export async function readUserDecorations(db, address) {
 /**
  * Replaces the wallet's decorations with the signed set.
  * @param {Function} verifySignature lib/walletSignature's verifyWalletSignature.
- * @param {Function} readOwned `(db, address) => Promise<string[]>`, the paid decorations the wallet
- *   owns (lib/decorationShop.js). Handed in rather than imported: this module is also the client's
- *   message builder, and the shop is server-only.
+ * @param {Object} shop Server-only reads, handed in rather than imported: this module is also the
+ *   client's message builder.
+ * @param {Function} shop.readOwned `(db, address) => Promise<string[]>`, the paid decorations the
+ *   wallet owns (lib/decorationShop.js).
+ * @param {Function} shop.readCatalog `(db) => Promise<Map>`, the live catalog
+ *   (lib/decorationCatalog.js) — prices and shop listing as the admin has them.
  */
-export async function saveUserDecorations(db, body, verifySignature, readOwned) {
+export async function saveUserDecorations(db, body, verifySignature, { readOwned, readCatalog }) {
   const claim = validateDecorationsClaim(body)
   if (!await verifySignature(claim.address, userDecorationsMessage(claim), claim.signature, { chainId: claim.chainId })) {
     throw new DecorationError('Signature does not match this wallet', 401)
   }
 
-  const unpaid = Object.values(claim.equipped).map(findDecoration).filter(isPaid)
-  if (unpaid.length) {
-    const owned = new Set(await readOwned(db, claim.address))
-    const missing = unpaid.find((item) => !owned.has(item.id))
-    if (missing) throw new DecorationError(`Buy ${missing.name} before wearing it`, 403)
+  /* What may be worn: anything already worn (an admin repricing or delisting a piece never strips
+     it off someone), anything bought, and otherwise only what is free and still in the shop. */
+  const ids = Object.values(claim.equipped)
+  if (ids.length) {
+    const [catalog, owned, worn] = await Promise.all([readCatalog(db), readOwned(db, claim.address), readUserDecorations(db, claim.address)])
+    const keep = new Set([...owned, ...Object.values(worn)])
+    for (const item of ids.map((id) => catalog.get(id))) {
+      if (keep.has(item.id)) continue
+      if (isPaid(item)) throw new DecorationError(`Buy ${item.name} before wearing it`, 403)
+      if (!item.listed) throw new DecorationError(`${item.name} is not available right now`, 403)
+    }
   }
 
   const connection = await db.getConnection()

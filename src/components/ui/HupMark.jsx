@@ -1,3 +1,6 @@
+/** The mark's outline in its 51×51 box, for artwork that draws the logo inside a larger SVG. */
+export const HUP_MARK_PATH = 'M19.2024 1L10 4.98374V46.003L19.2024 50L28.6439 46.003V39.3634L34.6859 42.0856L40.9271 39.3634V11.6499L34.6859 9.03388L28.6439 11.6499V4.98374L19.2024 1ZM19.468 45.4054V5.66098L24.5539 7.82547V23.3886H34.6859V12.0615L38.258 13.6683V37.4512L34.6859 38.965V27.3192H24.5539V43.2409L19.468 45.4054Z'
+
 /**
  * Hup Mark
  * The Hup logo as an inline SVG rather than an <img src="/logo.svg">, so the mark paints
@@ -28,7 +31,7 @@ export default function HupMark({ size = 24, className, title }) {
       <path
         fillRule="evenodd"
         clipRule="evenodd"
-        d="M19.2024 1L10 4.98374V46.003L19.2024 50L28.6439 46.003V39.3634L34.6859 42.0856L40.9271 39.3634V11.6499L34.6859 9.03388L28.6439 11.6499V4.98374L19.2024 1ZM19.468 45.4054V5.66098L24.5539 7.82547V23.3886H34.6859V12.0615L38.258 13.6683V37.4512L34.6859 38.965V27.3192H24.5539V43.2409L19.468 45.4054Z"
+        d={HUP_MARK_PATH}
         fill="currentColor"
       />
     </svg>

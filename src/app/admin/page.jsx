@@ -2692,6 +2692,11 @@ export default function Page() {
                 Refresh all balances
               </button>
 
+              <Link href="/admin/decorations" className={styles['admin-contracts__tool-link']}>
+                <span className={styles['admin-contracts__tool-name']}>✨ Avatar decorations</span>
+                <span className={styles['admin-contracts__tool-hint']}>Prices, profile-only and shop listing for every decoration, plus sales</span>
+              </Link>
+
               <Link href="/admin/deploy-lsp7" className={styles['admin-contracts__tool-link']}>
                 <span className={styles['admin-contracts__tool-name']}>🧪 Deploy HupTestLSP7</span>
                 <span className={styles['admin-contracts__tool-hint']}>

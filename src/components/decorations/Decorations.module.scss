@@ -539,8 +539,17 @@
     stroke-width: 0.8;
   }
 
+  // The Hup mark printed on the cup, in the drink's brown
+  &__logo {
+    fill: #70432d;
+  }
+
   &__rim {
     fill: #fff5e9;
+  }
+
+  &__logo {
+    fill: #70432d;
   }
 
   &__drink,

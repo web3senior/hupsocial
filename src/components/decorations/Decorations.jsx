@@ -2,6 +2,7 @@
 
 import { useId } from 'react'
 import clsx from 'clsx'
+import { HUP_MARK_PATH } from '@/components/ui/HupMark'
 import styles from './Decorations.module.scss'
 
 /* The artwork for each catalog id (config/decorations.js). Every piece is drawn for the box its
@@ -387,6 +388,8 @@ const Coffee = () => (
       <ellipse className={styles.coffee__saucer} cx="14" cy="28" rx="23" ry="4" />
       <path className={styles.coffee__handle} d="M29 6 H34 C46 6 44 22 30 21" />
       <path className={styles.coffee__cup} d="M-3 4 H31 L28 22 Q14 33 0 22Z" />
+      {/* The Hup mark printed on the cup: its 51-unit box scaled to about 11, centred on the body */}
+      <path className={styles.coffee__logo} d={HUP_MARK_PATH} fillRule="evenodd" transform="translate(8.4 9.6) scale(0.22)" />
       <ellipse className={styles.coffee__rim} cx="14" cy="4" rx="17" ry="5" />
       <ellipse className={styles.coffee__drink} cx="14" cy="4" rx="13" ry="3" />
       <path className={styles.coffee__foam} d="M14 6 C8 3 10 0 14 2 C18 0 20 3 14 6Z" />

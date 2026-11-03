@@ -1,0 +1,261 @@
+.decorationsAdmin {
+  display: grid;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1.5rem 16px 3rem;
+
+  &__gate {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface);
+  }
+
+  &__back {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  &__title {
+    margin: 0.35rem 0 0;
+    font-size: 1.4rem;
+  }
+
+  &__lede {
+    margin: 0.4rem 0 0;
+    max-width: 640px;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--text-muted);
+  }
+
+  &__stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+
+    @media (max-width: 639px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  &__stat {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+
+    strong {
+      font-size: 1.2rem;
+    }
+  }
+
+  &__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  &__filter {
+    padding: 0.45rem 0.9rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &--active {
+      border-color: transparent;
+      background: var(--accent-primary);
+      color: var(--app-accent-text);
+    }
+  }
+
+  &__list {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  // Preview, identity, price, the two switches, then the actions; wraps to two lines on a phone
+  &__row {
+    display: grid;
+    grid-template-columns: 96px minmax(8rem, 1fr) auto auto auto minmax(9rem, auto);
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+
+    &--unlisted {
+      opacity: 0.6;
+    }
+
+    @media (max-width: 799px) {
+      grid-template-columns: 96px minmax(0, 1fr);
+    }
+  }
+
+  // Room for what spills past the picture: wings reach about a third of it out on each side
+  &__preview {
+    display: grid;
+    place-items: center;
+    height: 96px;
+  }
+
+  &__identity {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  &__price {
+    display: grid;
+    gap: 0.2rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  &__money {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--text);
+
+    input {
+      width: 5.5rem;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      background: var(--surface-muted);
+      color: inherit;
+      font: inherit;
+
+      &[aria-invalid='true'] {
+        border-color: #e5484d;
+      }
+    }
+  }
+
+  &__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__primary,
+  &__secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__primary {
+    border: 0;
+    background: var(--accent-primary);
+    color: var(--app-accent-text);
+  }
+
+  &__secondary {
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text);
+  }
+
+  &__result {
+    font-size: 0.75rem;
+    color: var(--green-400, #4caf50);
+
+    &--error {
+      color: #e5484d;
+    }
+  }
+
+  &__recent {
+    display: grid;
+    gap: 0.6rem;
+
+    ul {
+      display: grid;
+      gap: 0.4rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  &__sale {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    gap: 1rem;
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    font-size: 0.8rem;
+
+    @media (max-width: 639px) {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+  }
+
+  &__muted {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  &__note,
+  &__error {
+    margin: 0;
+    font-size: 0.8rem;
+  }
+
+  &__note {
+    color: var(--text-muted);
+  }
+
+  &__error {
+    color: #e5484d;
+  }
+}

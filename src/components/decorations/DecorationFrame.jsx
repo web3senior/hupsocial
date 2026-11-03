@@ -1,14 +1,16 @@
 'use client'
 
 import clsx from 'clsx'
-import { DECORATION_SLOTS, findDecoration } from '@/config/decorations'
+import { DECORATION_SLOTS } from '@/config/decorations'
+import { useDecorationCatalog } from '@/hooks/useDecorationCatalog'
 import { DECORATION_ART } from './Decorations'
 import styles from './DecorationFrame.module.scss'
 
-/** The decorations to draw at this size, in paint order. */
-const layersFor = (decorations, size) =>
+/** The decorations to draw at this size, in paint order, by the live catalog's `minSize` — which
+    is where the admin's profile-only switch lands. */
+const layersFor = (catalog, decorations, size) =>
   DECORATION_SLOTS.flatMap((slot) => {
-    const item = findDecoration(decorations?.[slot])
+    const item = catalog.get(decorations?.[slot])
     return item?.slot === slot && size >= item.minSize && DECORATION_ART[item.id] ? [item] : []
   })
 
@@ -27,7 +29,8 @@ const layersFor = (decorations, size) =>
  * @param {React.ReactNode} props.children The picture.
  */
 const DecorationFrame = ({ decorations, size, fill = false, className, children }) => {
-  const layers = layersFor(decorations, size)
+  const catalog = useDecorationCatalog()
+  const layers = layersFor(catalog, decorations, size)
   if (!layers.length) return children
 
   return (

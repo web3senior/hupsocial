@@ -9,6 +9,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { readOwnedDecorations } from '@/lib/decorationShop'
+import { readDecorationCatalog } from '@/lib/decorationCatalog'
 import { DecorationError, readUserDecorations, saveUserDecorations } from '@/lib/userDecorations'
 import { verifyWalletSignature } from '@/lib/walletSignature'
 
@@ -29,7 +30,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json().catch(() => null)
-    const decorations = await saveUserDecorations(pool, body, verifyWalletSignature, readOwnedDecorations)
+    const decorations = await saveUserDecorations(pool, body, verifyWalletSignature, { readOwned: readOwnedDecorations, readCatalog: readDecorationCatalog })
     return NextResponse.json({ success: true, data: decorations }, { headers })
   } catch (error) {
     if (!(error instanceof DecorationError)) console.error('[USER_DECORATIONS_WRITE_ERROR]:', error.message)

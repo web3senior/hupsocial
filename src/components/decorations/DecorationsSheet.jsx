@@ -13,7 +13,8 @@ import Avatar from '@/components/ui/Avatar'
 import { DECORATION_ART } from './Decorations'
 import { requestAuthNonce } from '@/lib/api'
 import { normalizeAddress } from '@/lib/address'
-import { DECORATION_SLOTS, DECORATIONS, decorationLabel, findDecoration, isPaid, isProfileOnly, normalizeDecorations, SLOT_LABELS } from '@/config/decorations'
+import { DECORATION_SLOTS, decorationLabel, isPaid, isProfileOnly, normalizeDecorations, SLOT_LABELS } from '@/config/decorations'
+import { useDecorationCatalog } from '@/hooks/useDecorationCatalog'
 import { userDecorationsMessage } from '@/lib/userDecorations'
 import styles from './DecorationsSheet.module.scss'
 
@@ -93,6 +94,13 @@ const DecorationsSheet = forwardRef(function DecorationsSheet({ decorations, pro
   const config = useConfig()
   const { address, chain } = useConnection()
   const { signMessageAsync } = useSignMessage()
+
+  /* The catalog as the admin has it (prices, profile-only, in shop). The shop shows what is listed,
+     plus anything this wallet owns or already wears — delisting never hides someone's own piece. */
+  const catalog = useDecorationCatalog()
+  const findDecoration = (id) => catalog.get(id)
+  const worn = Object.values(decorations ?? {})
+  const shown = [...catalog.values()].filter((item) => item.listed || owned.has(item.id) || worn.includes(item.id))
 
   /* Every network whose own coin the shop accepts — the server's rule (lib/onchainPayment.js) */
   const payChains = config.chains.filter((item) => !item.testnet)
@@ -292,7 +300,7 @@ const DecorationsSheet = forwardRef(function DecorationsSheet({ decorations, pro
 
           <div className={styles.decorations__options}>
             {DECORATION_SLOTS.map((slot) => {
-              const items = DECORATIONS.filter((item) => item.slot === slot)
+              const items = shown.filter((item) => item.slot === slot)
               if (!items.length) return null
               const labelId = `decorations-${slot}`
               const current = findDecoration(draft[slot])

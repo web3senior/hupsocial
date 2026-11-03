@@ -14,6 +14,7 @@ import { isEvmAddress, normalizeAddress } from '@/lib/address'
 import { findDecoration, isPaid } from '@/config/decorations'
 import { blockTime, coinPrice, isTxHash, paymentChain, readPayment } from '@/lib/onchainPayment'
 import { DecorationError } from '@/lib/userDecorations'
+import { readDecorationCatalog } from '@/lib/decorationCatalog'
 
 const QUOTE_TTL_SECONDS = 15 * 60
 // A transfer stamped this long before its order was created is still accepted: block times and
@@ -69,8 +70,12 @@ export async function quoteDecoration(db, body) {
 
   const ids = Array.isArray(body?.decorationIds) ? [...new Set(body.decorationIds)] : []
   if (!ids.length) throw new DecorationError('Choose a decoration to buy')
-  const items = ids.map(findDecoration)
+  // Priced and offered as the admin has them right now (lib/decorationCatalog.js)
+  const catalog = await readDecorationCatalog(db)
+  const items = ids.map((id) => catalog.get(id))
   if (items.some((item) => !item)) throw new DecorationError('That decoration does not exist')
+  const unlisted = items.find((item) => !item.listed)
+  if (unlisted) throw new DecorationError(`${unlisted.name} is not for sale right now`)
   const free = items.find((item) => !isPaid(item))
   if (free) throw new DecorationError(`${free.name} is free — equip it without buying`)
 
