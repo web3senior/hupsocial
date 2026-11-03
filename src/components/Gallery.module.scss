@@ -1,9 +1,11 @@
 .galleryWrapper {
 }
 
+// A host can retune the tiles through --gallery-radius, --gallery-strip-height and --gallery-gap
+// (a post sets Threads' 8px / 280px / 6px); everywhere else keeps these defaults.
 .mediaItem {
   position: relative;
-  border-radius: 12px;
+  border-radius: var(--gallery-radius, 12px);
   overflow: hidden;
   width: fit-content;
   will-change: transform;
@@ -347,7 +349,7 @@
 .embla {
   overflow: hidden;
   .mediaItem {
-    height: 340px;
+    height: var(--gallery-strip-height, 340px);
     width: auto;
     img,
     video {
@@ -359,13 +361,15 @@
     }
   }
 }
-.embla__container {
+// Nested for weight: the global `div[class*='__container']` reset (0,1,1) also matches this
+// class name and was zeroing the margin, which left the first tile one gap in from the text
+.embla .embla__container {
   display: flex;
-  margin-left: -12px;
+  margin-left: calc(-1 * var(--gallery-gap, 12px));
 }
 .embla__slide {
   flex: 0 0 auto;
-  padding-left: 12px;
+  padding-left: var(--gallery-gap, 12px);
 }
 
 /* Single-media post (reserves space via aspect-ratio to prevent layout shift) */

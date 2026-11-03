@@ -294,7 +294,8 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
         {isRepost && <RepostLabel walletAddress={item.wallet_address} />}
         <header className={`${styles.post__header} flex align-items-start justify-content-between w-100`}>
           <Profile
-            size={38}
+            size={36}
+            showAddress={false}
             creator={displayItem?.wallet_address}
             createdAt={displayItem?.created_at}
             networkId={displayItem?.network_id}

@@ -16,6 +16,7 @@ import { getAddress } from 'viem'
 import AgentBadge from './ui/AgentBadge'
 import AmbassadorBadge from './ui/AmbassadorBadge'
 import Avatar from './ui/Avatar'
+import CopyButton from './ui/CopyButton'
 import PremiumBadge from './ui/PremiumBadge'
 import Shimmer from './ui/Shimmer'
 import { Identicon } from './ui/UniversalIdentity/Identicon'
@@ -25,7 +26,7 @@ import { CaretRightIcon, UsersThreeIcon } from '@phosphor-icons/react'
 import UPlogo from '@/../public/up.png'
 import styles from './Profile.module.scss'
 
-export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, fingerprint = true, linkBox = false, onNavigate, className, fallback, tag = null, community = null }) {
+export default function Profile({ creator, createdAt, networkId, variant = 'full', size = 32, hoverCard = true, fingerprint = true, linkBox = false, onNavigate, className, fallback, tag = null, community = null, showAddress = true }) {
   const router = useRouter()
   // `fallback` is the name and picture a post row already carries (profileFallbackFromRow):
   // the byline paints with it at once and the fetched profile replaces it
@@ -240,8 +241,9 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
           </div>
 
           {/* The address stays under the name whether or not a handle sits beside it: a name is
-              chosen and a handle is claimed, but this is the account itself. */}
-          {isFullLike && creator && <code className={styles.address}>{truncatedAddress}</code>}
+              chosen and a handle is claimed, but this is the account itself. A post card opts out
+              (showAddress={false}) for Threads' one-line byline; the hover card still shows it. */}
+          {isFullLike && showAddress && creator && <code className={styles.address}>{truncatedAddress}</code>}
         </div>
       )}
     </Container>
@@ -305,9 +307,12 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref }) => {
   const tunnelTarget = profile.tunnelAddress ?? (isEvmAddress(creator) ? getAddress(creator.toLowerCase()) : null)
 
   // The byline already names the account by its handle, so the card leads with the chosen name
-  // and keeps the handle as the line under it
+  // and keeps the handle as the line under it. Without a claimed handle the address row below
+  // already says who this is, so the handle line is left out rather than repeating it.
   const cardName = profile.fullName || profile.name || displayName
-  const cardHandle = profile.username || shortAddress(creator)
+  const cardHandle = profile.username
+  // Checksummed where it can be, so a copied EVM address pastes the way wallets print it
+  const cardAddress = isEvmAddress(creator) ? getAddress(creator.toLowerCase()) : creator
 
   const handleFollow = (e) => {
     e.stopPropagation()
@@ -318,14 +323,24 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref }) => {
     <div className={styles.hoverCard} onClick={(e) => e.stopPropagation()}>
       <div className={styles.hoverCard__header}>
         <div className={styles.hoverCard__identity}>
-          <Link href={profileHref} prefetch={false} className={styles.hoverCard__name}>
-            {cardName}
-          </Link>
-          {/* The wallet's fingerprint beside the handle: where lookalike accounts get told apart */}
-          <span className={styles.hoverCard__handleRow}>
-            <Identicon address={creator} size={16} className={styles.hoverCard__fingerprint} />
-            <span className={styles.hoverCard__handle}>{cardHandle}</span>
+          <span className={styles.hoverCard__nameRow}>
+            <Link href={profileHref} prefetch={false} className={styles.hoverCard__name}>
+              {cardName}
+            </Link>
+            <PremiumBadge premium={profile.premium} />
           </span>
+          {cardHandle && <span className={styles.hoverCard__handle}>{cardHandle}</span>}
+          {/* The account itself: its fingerprint, where lookalike accounts get told apart, the
+              short address with the full one on hover, and a copy of the full one */}
+          {cardAddress && (
+            <span className={styles.hoverCard__address}>
+              <Identicon address={creator} size={16} className={styles.hoverCard__fingerprint} />
+              <code className={styles.hoverCard__addressText} title={cardAddress}>
+                {shortAddress(cardAddress)}
+              </code>
+              <CopyButton value={cardAddress} title="Copy address" copiedTitle="Address copied" size={14} className={styles.hoverCard__copy} />
+            </span>
+          )}
         </div>
         <Link href={profileHref} prefetch={false} className={styles.hoverCard__avatar} aria-label={`Open the profile of ${cardName}`}>
           <Avatar className="rounded-full" alt={cardName} src={profile.profileImage} size={72} decorations={profile.decorations} />
@@ -340,7 +355,10 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref }) => {
         <Shimmer className={styles.hoverCard__followersShimmer} />
       ) : (
         <span className={styles.hoverCard__followers}>
-          {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(followerCount ?? 0)} followers
+          <strong className={styles.hoverCard__followersCount}>
+            {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(followerCount ?? 0)}
+          </strong>{' '}
+          {followerCount === 1 ? 'follower' : 'followers'}
         </span>
       )}
 

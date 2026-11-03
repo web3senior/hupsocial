@@ -631,6 +631,8 @@ export default function MediaGallery({ data = [] }) {
         <div
           className={isCarousel ? styles.embla : styles.singleView}
           ref={isCarousel ? emblaRef : null}
+          // Lets a host restyle the strip without reaching into this module (a post bleeds it to the card edge)
+          data-carousel={isCarousel ? '' : undefined}
         >
           <div className={isCarousel ? styles.embla__container : styles.singleContainer}>
             {visualData.map((item, i) => (

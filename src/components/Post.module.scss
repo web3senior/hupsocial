@@ -56,6 +56,11 @@
   --post-link: var(--blue-500);
   --post-action: var(--blue-gray-500);
   --post-meta-size: 15px;
+  // Threads' card: 24px gutters (16px on phones), 16px above the avatar, 8px under the actions.
+  // Media bleeds through the right gutter, so the gutter is a token rather than a bare padding.
+  --post-gutter: 24px;
+  // The byline is one 21px line, the body's own line height, so the two stack on one rhythm
+  --profile-text-line-height: 21px;
   // Owns its text colour: the post details wrapper paints --text, which dims to 65% white in dark
   color: var(--post-text);
   // Threads sets the whole card at 15px: the name inherits it, the time and the body match it
@@ -65,7 +70,7 @@
   position: relative;
   isolation: isolate;
   cursor: pointer;
-  padding: 20px 20px 0 20px;
+  padding: 16px var(--post-gutter) 4px;
   place-items: stretch;
 
   &::before {
@@ -84,7 +89,8 @@
   }
 
   @media (max-width: 640px) {
-    padding: 10px;
+    --post-gutter: 16px;
+    padding-top: 12px;
   }
 
   // Hidden the moment its owner confirms the delete, while the transaction is still in flight.
@@ -94,8 +100,8 @@
     display: none;
   }
 
-  // Body and actions line up under the name, the open post included, so a reply reads in line
-  // with the parent above it
+  // Body and actions line up under the name (36px avatar + 12px), so a reply reads in line with
+  // the parent above it
   .post {
     &__main {
       padding-left: 3rem;
@@ -103,6 +109,44 @@
 
     &__footer {
       padding-left: 3rem;
+    }
+  }
+
+  // Threads sets the name on the avatar's top edge and starts the body on the very next line,
+  // still beside the picture: the body rises by the avatar's height less the 21px byline line.
+  // The header stays on top for the picture and name, but lets clicks through everywhere else
+  // so the first line's links and text stay reachable.
+  &:not([data-content='true']) {
+    > .post__header {
+      position: relative;
+      z-index: 1;
+      pointer-events: none;
+
+      > :first-child {
+        align-items: flex-start;
+      }
+
+      > :first-child > *,
+      > :last-child {
+        pointer-events: auto;
+      }
+    }
+
+    > .post__main {
+      margin-top: calc(var(--profile-text-line-height) - 36px);
+    }
+  }
+
+  // The open post on its own page reads full width, as Threads draws a thread's head: the byline
+  // centred on the avatar, then body, media and actions from the left gutter
+  &[data-content='true'] {
+    > .post__main {
+      padding-left: 0;
+      margin-top: 12px;
+    }
+
+    > .post__footer {
+      padding-left: 0;
     }
   }
 
@@ -244,12 +288,13 @@
 
   &[data-has-comments='true'] {
     // Span the entire post, including its footer, to the next avatar's top gap.
+    // Centred on the 36px avatar, from 4px under it to 4px above the next one
     &::after {
       content: '';
       position: absolute;
-      left: 38px;
-      top: 62px;
-      bottom: -16px;
+      left: calc(var(--post-gutter) + 17px);
+      top: 56px;
+      bottom: -12px;
       width: 2px;
       background-color: var(--border);
       pointer-events: none;
@@ -258,10 +303,13 @@
 
     @media (max-width: 640px) {
       &::after {
-        left: 28px;
         top: 52px;
-        bottom: -6px;
       }
+    }
+
+    // The open post's body runs full width, so a line down from its avatar would cross it
+    &[data-content='true']::after {
+      display: none;
     }
   }
 
@@ -373,8 +421,19 @@
     position: relative;
 
     &__media {
+      --gallery-radius: 8px;
+      --gallery-strip-height: 280px;
+      --gallery-gap: 6px;
+      margin-top: 8px;
       overflow: hidden;
       border-radius: var(--global-border-radius);
+
+      // A strip of several runs on through the right gutter to the card's edge, as Threads' does;
+      // the card clips it there, so its own corners go square
+      &:has([data-carousel]) {
+        margin-right: calc(-1 * var(--post-gutter));
+        border-radius: 0;
+      }
     }
 
     &__content {
@@ -422,8 +481,8 @@
   &__actions {
     --post-action-color: var(--post-action);
     color: var(--post-action-color);
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
+    padding-top: 6px;
+    padding-bottom: 4px;
     // Threads' counts: 13px beside the glyph
     font-size: 13px;
     font-weight: 400;
@@ -441,11 +500,15 @@
       flex: 1;
       min-width: 0;
       justify-content: flex-start;
-      margin-left: -8px; // Optically align the first icon, not its halo, with the text above
+      margin-left: -12px; // Align the first icon, not its pill, with the text above
 
       // Tracks the buttons' tighter padding below
+      @media (max-width: 600px) {
+        margin-left: -10px;
+      }
+
       @media (max-width: 400px) {
-        margin-left: -6px;
+        margin-left: -8px;
       }
     }
 
@@ -459,13 +522,9 @@
     button,
     a {
       @extend %icon-ripple-button;
-      // Square around a bare icon, so its halo is a 1:1 circle; a count (the Counter div)
-      // stretches it into a pill the way Threads draws its action buttons
-      padding: 8px;
-
-      &:has(> div) {
-        padding-inline-end: 12px;
-      }
+      // Threads' 36px action pill: 12px either side of the glyph and its count alike, so the row
+      // keeps one rhythm whether or not a button carries a number
+      padding: 8px 12px;
       transition:
         color 0.2s ease,
         transform 0.12s ease;
@@ -487,13 +546,13 @@
         height: 20px;
       }
 
-      // Narrow phones shrink the padding on every side, so a bare icon stays 1:1 (32px)
-      @media (max-width: 400px) {
-        padding: 6px;
+      // Phones give up inline padding first, so seven actions still fit one row
+      @media (max-width: 600px) {
+        padding-inline: 10px;
+      }
 
-        &:has(> div) {
-          padding-inline-end: 9px;
-        }
+      @media (max-width: 400px) {
+        padding: 6px 8px;
       }
 
       // The same pill the mobile nav uses (Footer.module.scss): full size behind the button,

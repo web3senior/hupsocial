@@ -34,7 +34,7 @@
     // Under the nested answer, in the replies' text column, as Threads' "Show replies"
     &__more {
         display: block;
-        margin: 0 0 0.75rem calc(20px + 38px + 0.7rem);
+        margin: 0 0 0.75rem calc(24px + 36px + 12px);
         padding: 4px 0;
         border: none;
         background: none;
@@ -48,7 +48,7 @@
         }
 
         @media (max-width: 640px) {
-            margin-left: calc(10px + 38px + 0.7rem);
+            margin-left: calc(16px + 36px + 12px);
         }
     }
 }

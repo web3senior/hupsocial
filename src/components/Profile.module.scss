@@ -332,8 +332,18 @@
   &__identity {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    align-items: flex-start;
+    gap: 0.35rem;
     min-width: 0;
+  }
+
+  // The name truncates; the premium mark beside it holds its size
+  &__nameRow {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+    max-width: 100%;
   }
 
   &__name {
@@ -352,27 +362,54 @@
     }
   }
 
-  &__handleRow {
-    display: flex;
+  &__handle {
+    max-width: 100%;
+    font-size: var(--system-15-font-size, 15px);
+    color: var(--text, inherit);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // A quiet pill: fingerprint, short address, copy. Sized to its contents so the copy sits
+  // right after the address instead of out at the card's far edge.
+  &__address {
+    display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    min-width: 0;
+    margin-top: 0.15rem;
+    padding: 2px 2px 2px 6px;
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+    color: var(--text-muted);
   }
 
   // Same rounded square as the corner mark. Nested so it outranks the Identicon's own inline-flex,
   // which would sit the picture on the text baseline.
-  &__handleRow &__fingerprint {
+  &__address &__fingerprint {
     display: block;
     flex-shrink: 0;
     border-radius: 4px;
   }
 
-  &__handle {
-    font-size: var(--system-14-font-size);
-    color: var(--text, inherit);
-    overflow: hidden;
-    text-overflow: ellipsis;
+  // <code> otherwise falls to the UA monospace default; tabular digits keep addresses the same width
+  &__addressText {
+    font-family: var(--font-sans);
+    font-size: var(--system-13-font-size);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
+  }
+
+  // Nested to outrank CopyButton's ghost rules, whose hover fill is this pill's own grey
+  &__address &__copy {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+
+    &:hover {
+      background-color: var(--background);
+    }
   }
 
   &__avatar {
@@ -407,6 +444,11 @@
   &__followers {
     font-size: var(--system-14-font-size);
     color: var(--gray-400);
+  }
+
+  &__followersCount {
+    font-weight: 600;
+    color: var(--text, inherit);
   }
 
   &__followersShimmer {
