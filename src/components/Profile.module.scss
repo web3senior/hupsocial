@@ -134,14 +134,6 @@
   height: 14px;
   flex-shrink: 0; // A chain glyph never pays for a long name beside it
 
-  // The wallet's identicon among the name badges: the corner mark's rounded square, at badge
-  // size. Scoped under .badge so it outranks the Identicon's own inline-flex, which sat the
-  // picture on the text baseline, a few pixels below the glyphs beside it.
-  .fingerprint {
-    display: block;
-    border-radius: 3px;
-  }
-
   svg,
   img {
     width: inherit;
@@ -358,6 +350,21 @@
     &:hover {
       text-decoration: underline;
     }
+  }
+
+  &__handleRow {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  // Same rounded square as the corner mark. Nested so it outranks the Identicon's own inline-flex,
+  // which would sit the picture on the text baseline.
+  &__handleRow &__fingerprint {
+    display: block;
+    flex-shrink: 0;
+    border-radius: 4px;
   }
 
   &__handle {

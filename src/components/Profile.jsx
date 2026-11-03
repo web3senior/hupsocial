@@ -110,8 +110,8 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
         decorations={profile.decorations}
       />
       {/* The fingerprint tells lookalike profiles apart; a purely decorative picture — a corner
-          of a tile — can drop it and show the face alone. With a name row it sits among the
-          badges instead (below), clear of the decorations that now ring the picture. */}
+          of a tile — can drop it and show the face alone. Beside a name it is shown in the hover
+          card instead, next to the handle, which keeps the byline's badge row short. */}
       {fingerprint && variant === 'imageOnly' && (
         <Identicon
           name={profile.name}
@@ -202,12 +202,6 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               <div className={styles.badge} title={chainInfo.name}>
                 <img src={chainInfo.iconUrl} alt="" />
               </div>
-            )}
-            {/* The wallet's fingerprint, right after the chain it posted on */}
-            {fingerprint && (
-              <span className={styles.badge} title={`Wallet fingerprint · ${truncatedAddress}`}>
-                <Identicon name={profile.name} profileImage={profile.profileImage} address={creator} size={14} className={styles.fingerprint} />
-              </span>
             )}
             {profile.source === `universal_profile` && (
               <div className={clsx(styles.badge, !linkBox && styles['badge--link'])} title={`Universal Profile`} onClick={linkBox ? undefined : handleUniversalProfile}>
@@ -327,7 +321,11 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref }) => {
           <Link href={profileHref} prefetch={false} className={styles.hoverCard__name}>
             {cardName}
           </Link>
-          <span className={styles.hoverCard__handle}>{cardHandle}</span>
+          {/* The wallet's fingerprint beside the handle: where lookalike accounts get told apart */}
+          <span className={styles.hoverCard__handleRow}>
+            <Identicon address={creator} size={16} className={styles.hoverCard__fingerprint} />
+            <span className={styles.hoverCard__handle}>{cardHandle}</span>
+          </span>
         </div>
         <Link href={profileHref} prefetch={false} className={styles.hoverCard__avatar} aria-label={`Open the profile of ${cardName}`}>
           <Avatar className="rounded-full" alt={cardName} src={profile.profileImage} size={72} decorations={profile.decorations} />
