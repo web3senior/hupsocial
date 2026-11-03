@@ -6,9 +6,9 @@ import { setAutoplayPreference, useAutoplayPreference } from '@/hooks/useAutopla
 import styles from './PlaybackPreference.module.scss'
 
 /**
- * Whether feed videos start on their own. Off by default — autoplay spends the reader's data
- * without asking and pulls their eye away from whatever they were reading — so this is where
- * someone who wants the scrolling-video behaviour turns it on.
+ * Whether feed videos start on their own. On by default, always muted — the reader unmutes from
+ * the card's volume control — and this is where someone who would rather save data or keep the
+ * feed still turns it off.
  *
  * Shorts is exempt: that page is a video surface the reader navigated to deliberately, so it
  * always plays.
@@ -36,7 +36,7 @@ export default function PlaybackPreference() {
             <span className={styles.playback__label}>Autoplay videos</span>
             <span className={styles.playback__hint}>
               {autoplay
-                ? 'Videos start as soon as they scroll into view.'
+                ? 'Videos play muted as soon as they scroll into view.'
                 : 'Videos wait on their thumbnail until you press play.'}
             </span>
           </label>

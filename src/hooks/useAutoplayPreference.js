@@ -12,10 +12,9 @@ let enabled
 
 const notify = () => listeners.forEach((listener) => listener())
 
-/* Off unless the reader turned it on. Video that starts by itself costs data the reader never
-   agreed to spend and moves under their eyes while they are reading something else — the poster
-   frame plus a play button says the same thing without taking the decision away. */
-const readPreference = () => localStorage.getItem(STORAGE_KEY) === 'true'
+/* On unless the reader turned it off. Players always start muted, so autoplay only moves the
+   picture — sound waits for the reader's own tap on the volume control. */
+const readPreference = () => localStorage.getItem(STORAGE_KEY) !== 'false'
 
 const handleStorage = (event) => {
   if (event.key && event.key !== STORAGE_KEY) return
@@ -38,9 +37,9 @@ const getSnapshot = () => {
   return enabled
 }
 
-// Browser state, so the server renders the paused form and React swaps in the reader's choice
+// Browser state, so the server renders the default and React swaps in the reader's choice
 // after hydration
-const getServerSnapshot = () => false
+const getServerSnapshot = () => true
 
 /**
  * Persist the autoplay choice and wake every player on the page.
