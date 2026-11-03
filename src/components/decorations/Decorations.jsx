@@ -764,7 +764,80 @@ const GoldenDragon = () => {
   )
 }
 
+function FluffyKitten() {
+  return (
+    <svg viewBox="0 0 144 144" fill="none" aria-hidden="true">
+      <g className={styles.kitten__ears} strokeLinejoin="round">
+        <path d="M23 43 L16 9 Q34 11 48 27 L40 28 L41 33 L34 32 L35 38 L29 37Z" fill="#f7fcff" stroke="#7585a4" strokeWidth="1.5" />
+        <path d="M121 43 L128 9 Q110 11 96 27 L104 28 L103 33 L110 32 L109 38 L115 37Z" fill="#f7fcff" stroke="#7585a4" strokeWidth="1.5" />
+        <path d="M24 33 L22 17 Q32 20 39 27 L33 27 L34 31 L28 29Z" fill="#f4b6cf" />
+        <path d="M120 33 L122 17 Q112 20 105 27 L111 27 L110 31 L116 29Z" fill="#f4b6cf" />
+        <path d="M22 38 L25 32 L29 35 M122 38 L119 32 L115 35" stroke="#c3e1ef" strokeWidth="2" strokeLinecap="round" />
+      </g>
+      <g className={styles.kitten__tail}>
+        <path d="M100 119 C119 127 132 118 126 107 C119 95 123 86 135 83 L132 88 L138 87 L135 93 L139 94 Q129 96 134 106 C145 128 125 141 106 132 L108 129 L101 128 L104 125 L98 123Z" fill="#f7fcff" stroke="#7585a4" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M105 125 Q126 136 133 120 Q137 112 131 104 Q125 93 133 90" stroke="#c3e1ef" strokeWidth="3" strokeLinecap="round" />
+      </g>
+    </svg>
+  )
+}
+
+function NineTailedFox() {
+  const maskId = useId()
+  const pairs = [
+    {
+      fur: 'M65 109 C42 113 37 135 12 137 Q29 156 49 142 C65 131 66 119 65 109Z',
+      tip: 'M12 137 Q28 138 36 129 L34 139 L43 136 L40 143 L49 142 Q29 156 12 137Z',
+    },
+    {
+      fur: 'M60 103 C36 79 10 87 -6 110 Q12 105 27 120 C40 133 55 116 60 103Z',
+      tip: 'M-6 110 Q8 88 26 91 L22 95 L30 99 L20 100 L27 105 L16 106 L21 112 Q8 105 -6 110Z',
+    },
+    {
+      fur: 'M60 87 C35 58 9 73 5 36 C-12 63 -3 83 21 94 Q43 108 60 87Z',
+      tip: 'M5 36 Q6 56 22 61 L12 61 L19 69 L9 66 L16 76 L7 73 L13 83 C-5 72 -8 57 5 36Z',
+    },
+    {
+      fur: 'M59 70 C58 32 38 3 3 4 C26 23 15 45 27 64 Q39 81 59 70Z',
+      tip: 'M3 4 C28 3 44 18 51 36 L43 30 L43 39 L35 29 L34 40 L26 34 L24 43 C20 26 19 17 3 4Z',
+    },
+  ]
+
+  return (
+    <svg viewBox="0 0 144 144" fill="none" aria-hidden="true">
+      <defs>
+        <mask id={maskId} maskUnits="userSpaceOnUse" x="-16" y="-24" width="176" height="192">
+          <rect x="-16" y="-24" width="176" height="192" fill="white" />
+          <circle cx="72" cy="72" r="49.5" fill="black" />
+        </mask>
+      </defs>
+      <g mask={`url(#${maskId})`} strokeLinejoin="round">
+        {pairs.map((tail, index) => (
+          <g key={index}>
+            {[false, true].map((mirrored) => (
+              <g key={String(mirrored)} transform={mirrored ? 'translate(144 0) scale(-1 1)' : undefined}>
+                <g className={styles.fox__tail} style={{ '--tail-delay': `${index * -0.6}s` }}>
+                  <path d={tail.fur} fill="#fffaf7" />
+                  <path d={tail.tip} fill="#ed171f" />
+                  <path d={tail.fur} stroke="#403039" strokeWidth="1.5" />
+                </g>
+              </g>
+            ))}
+          </g>
+        ))}
+        <g className={styles.fox__tail} style={{ '--tail-delay': '-2.8s' }}>
+          <path d="M58 46 C54 20 53 -4 87 -15 C72 6 82 23 86 43 Q74 56 58 46Z" fill="#fffaf7" />
+          <path d="M87 -15 C73 -10 53 -1 56 23 L61 14 L65 22 L70 8 L75 18 L78 12 Q73 -1 87 -15Z" fill="#ed171f" />
+          <path d="M58 46 C54 20 53 -4 87 -15 C72 6 82 23 86 43 Q74 56 58 46Z" stroke="#403039" strokeWidth="1.5" />
+        </g>
+      </g>
+    </svg>
+  )
+}
+
 export const DECORATION_ART = {
+  'fluffy-kitten': FluffyKitten,
+  'nine-tailed-fox': NineTailedFox,
   'top-hat': TopHat,
   'golden-dragon': GoldenDragon,
   'butterflies': Butterflies,

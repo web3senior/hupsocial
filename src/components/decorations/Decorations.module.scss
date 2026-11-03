@@ -1597,3 +1597,47 @@
     transform: rotate(60deg);
   }
 }
+
+.kitten {
+  &__ears {
+    animation: kitten-ear-twitch 6s ease-in-out infinite;
+    transform-origin: 72px 40px;
+  }
+
+  &__tail {
+    animation: companion-tail 3s ease-in-out infinite alternate;
+    transform-origin: 102px 124px;
+  }
+}
+
+.fox {
+  &__tail {
+    animation: fox-tail-sway 5s ease-in-out infinite alternate;
+    animation-delay: var(--tail-delay);
+    transform-origin: 72px 72px;
+  }
+}
+
+@keyframes kitten-ear-twitch {
+  0%, 85%, 100% { transform: scaleX(1); }
+  90% { transform: scaleX(0.97); }
+  95% { transform: scaleX(1.01); }
+}
+
+@keyframes companion-tail {
+  from { transform: rotate(-2deg); }
+  to { transform: rotate(2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kitten__ears,
+  .kitten__tail,
+  .fox__tail {
+    animation: none;
+  }
+}
+
+@keyframes fox-tail-sway {
+  from { transform: rotate(-1.5deg); }
+  to { transform: rotate(1.5deg); }
+}

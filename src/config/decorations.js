@@ -26,6 +26,8 @@ export const PROFILE_ONLY_SIZE = 64
    `priceUsd` makes it a purchase (lib/decorationShop.js), charged in the network's coin at the
    price of the moment; without one it is free for anyone to wear. */
 export const DECORATIONS = [
+  { id: 'fluffy-kitten', slot: 'effect', name: 'Fluffy Kitten', minSize: PROFILE_ONLY_SIZE, priceUsd: 2 },
+  { id: 'nine-tailed-fox', slot: 'effect', name: 'Nine-Tailed Fox', minSize: PROFILE_ONLY_SIZE, priceUsd: 2 },
   { id: 'neon-ring', slot: 'ring', name: 'Neon ring', minSize: 24 },
   { id: 'lightning', slot: 'effect', name: 'Lightning', minSize: PROFILE_ONLY_SIZE, priceUsd: 2 },
   { id: 'soft-fire', slot: 'effect', name: 'Soft fire', minSize: 32, priceUsd: 2 },
