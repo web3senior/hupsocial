@@ -7,7 +7,6 @@ import Link from 'next/link'
 import { openPost } from '@/stores/usePostOverlayStore'
 import { useWaitForTransactionReceipt, useConnection, useSignTypedData, useWriteContract, usePublicClient } from 'wagmi'
 import { getPublicClient } from 'wagmi/actions'
-import { initHupContract } from '@/lib/communication'
 import { getPostById, recordPostView } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useProfile, profileFallbackFromRow } from '@/hooks/useProfile'
@@ -138,7 +137,6 @@ export default function Post({ item, showContent, actions, chainId, hasCommentBe
   const [showCommentModal, setShowCommentModal] = useState()
   const [showTipModal, setShowTipModal] = useState()
   const [showQuoteModal, setShowQuoteModal] = useState(null)
-  const { web3, contract } = initHupContract()
   const mounted = useClientMounted()
   // The viewer is the wallet for the active network — stats keys, view records, quote lookups
   const { address } = useActiveWallet()
@@ -1417,6 +1415,9 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
     if (!el) return
 
     const measure = () => {
+      // Hidden under a post opened in place (PostOverlayHost), everything measures 0: dropping the
+      // button there makes every card above the reader shorter on return, and the feed lands lower
+      if (!el.getClientRects().length) return
       if (!isExpanded) setCanShowMore(el.scrollHeight > el.clientHeight)
     }
     measure()

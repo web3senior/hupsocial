@@ -82,12 +82,13 @@ export function useFeedScrollRestore({ containerRef, restore = null, ready = fal
 
   useEffect(() => {
     // Measured on a frame rather than per scroll event: this walks the cards, and the events fire
-    // far denser than paints.
+    // far denser than paints. Even the rendered check forces a layout mid-burst, so it waits too.
     let frame = 0
     const measure = () => {
       frame = 0
       const container = containerRef.current
-      if (!container) return
+      if (!container || !isRendered(container)) return
+      lastScrollYRef.current = window.scrollY
       lastFeedHeightRef.current = container.offsetHeight || lastFeedHeightRef.current
       lastFeedWidthRef.current = container.offsetWidth || lastFeedWidthRef.current
       const anchor = findAnchor(container)
@@ -95,9 +96,6 @@ export function useFeedScrollRestore({ containerRef, restore = null, ready = fal
     }
 
     const handleScroll = () => {
-      const container = containerRef.current
-      if (container && !isRendered(container)) return
-      lastScrollYRef.current = window.scrollY
       if (!frame) frame = requestAnimationFrame(measure)
     }
 

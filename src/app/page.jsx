@@ -34,22 +34,31 @@ if (typeof window !== 'undefined' && performance.getEntriesByType('navigation')[
   else window.addEventListener('load', restore, { once: true })
 }
 
+// Owns the scroll-dim state on its own: held in Page, every direction change mid-scroll
+// re-rendered the whole feed and stalled the scroll
+function TabBar() {
+  const isDimmed = useScrollDim()
+  const chromeRef = useScrollChrome(isDimmed)
+
+  return (
+    <div ref={chromeRef} className={styles['page__tab-bar']}>
+      <div className={`__container`} data-width={`small`}>
+        <HomeTabStrip />
+      </div>
+    </div>
+  )
+}
+
 export default function Page() {
   const tabs = useHomeTabsStore((state) => state.tabs)
   const resolvedTabs = useMemo(() => resolveTabs(tabs), [tabs])
   const activeTabId = useHomeTabsStore((state) => state.activeTabId)
 
   const activeTab = resolvedTabs.find((tab) => tab.id === activeTabId) ?? resolvedTabs[0]
-  const isDimmed = useScrollDim()
-  const chromeRef = useScrollChrome(isDimmed)
 
   return (
     <div className={clsx(styles.page, styles.home)}>
-      <div ref={chromeRef} className={styles['page__tab-bar']}>
-        <div className={`__container`} data-width={`small`}>
-          <HomeTabStrip />
-        </div>
-      </div>
+      <TabBar />
 
       {/* Keyed per tab: switching between two network tabs must remount the
           feed (not reuse the instance) so each one hydrates its own session

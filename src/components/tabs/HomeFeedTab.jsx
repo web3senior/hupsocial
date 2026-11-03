@@ -173,7 +173,10 @@ export default function HomeFeedTab({
   }, [isFetching, hasMore])
 
   useEffect(() => {
-    const handleScroll = () => {
+    // Read once per frame: each read forces a layout, and scroll events fire far denser than paints
+    let frame = 0
+    const checkNearEnd = () => {
+      frame = 0
       const scrollElement = document.documentElement
       if (!scrollElement) return
       // Hidden under a post opened in place (PostOverlayHost): the window is scrolling the post
@@ -189,10 +192,15 @@ export default function HomeFeedTab({
       }
     }
 
+    const handleScroll = () => {
+      if (!frame) frame = requestAnimationFrame(checkNearEnd)
+    }
+
     if (mounted) {
       window.addEventListener('scroll', handleScroll, { passive: true })
       return () => {
         window.removeEventListener('scroll', handleScroll)
+        if (frame) cancelAnimationFrame(frame)
       }
     }
   }, [mounted])
