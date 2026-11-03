@@ -25,7 +25,7 @@ import { STATUS_MAX_LENGTH, STATUS_PERIODS, userStatusMessage } from '@/lib/user
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
 import { readFeedCache, saveFeedCache } from '@/db/feedCache'
-import Post from '@/components/Post'
+import { PostCard } from '@/components/Post'
 import { getActiveChain } from '@/lib/communication'
 import { CommunityBadge } from '@/components/Profile'
 import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, usePublicClient, useReadContract, useSignMessage, useWriteContract } from 'wagmi'
@@ -363,7 +363,7 @@ export default function UserProfile({ address: routeAddress }) {
 
 /**
  * Paginated post list shared by the Posts and Reposts tabs — a repost row renders
- * through the same <Post>, which resolves it to the original it points at.
+ * through the same <PostCard> as the home feed, which resolves it to the original it points at.
  * @param {*} param0
  * @returns
  */
@@ -392,7 +392,7 @@ const PostFeed = ({ feed, emptyLabel, cardStyle, onPostClick, onPostPrefetch }) 
               onMouseEnter={() => onPostPrefetch(item.id, item.network_id)}
               onTouchStart={() => onPostPrefetch(item.id, item.network_id)}
             >
-              <Post item={item} actions={[`like`, `comment`, `repost`, `tip`, `view`, `share`, `bookmark`]} />
+              <PostCard item={item} networkName={item.network_name} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'quote', 'bookmark']} />
               {i < feed.posts.list.length - 1 && <hr />}
             </section>
           )
