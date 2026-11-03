@@ -3,7 +3,9 @@
 .frame {
   position: relative;
   display: grid;
-  width: max-content;
+  // The avatar's laid-out size (DecorationFrame sets it), so a percent-sized picture has a box
+  width: var(--frame-size, max-content);
+  height: var(--frame-size, auto);
   flex-shrink: 0;
   // Its own stacking context, so the back slot's negative z-index lands behind the picture
   // without falling behind the card the avatar sits on

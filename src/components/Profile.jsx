@@ -110,8 +110,9 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
         decorations={profile.decorations}
       />
       {/* The fingerprint tells lookalike profiles apart; a purely decorative picture — a corner
-          of a tile — can drop it and show the face alone */}
-      {fingerprint && (
+          of a tile — can drop it and show the face alone. With a name row it sits among the
+          badges instead (below), clear of the decorations that now ring the picture. */}
+      {fingerprint && variant === 'imageOnly' && (
         <Identicon
           name={profile.name}
           profileImage={profile.profileImage}
@@ -201,6 +202,12 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               <div className={styles.badge} title={chainInfo.name}>
                 <img src={chainInfo.iconUrl} alt="" />
               </div>
+            )}
+            {/* The wallet's fingerprint, right after the chain it posted on */}
+            {fingerprint && (
+              <span className={styles.badge} title={`Wallet fingerprint · ${truncatedAddress}`}>
+                <Identicon name={profile.name} profileImage={profile.profileImage} address={creator} size={14} className={styles.fingerprint} />
+              </span>
             )}
             {profile.source === `universal_profile` && (
               <div className={clsx(styles.badge, !linkBox && styles['badge--link'])} title={`Universal Profile`} onClick={linkBox ? undefined : handleUniversalProfile}>

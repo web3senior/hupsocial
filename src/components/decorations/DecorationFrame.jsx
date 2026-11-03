@@ -33,8 +33,16 @@ const DecorationFrame = ({ decorations, size, fill = false, className, children 
   const layers = layersFor(catalog, decorations, size)
   if (!layers.length) return children
 
+  /* Sized to the avatar rather than shrunk to the picture: a consumer that sizes its <img> in
+     percent (`width: 100%` of its slot) needs a definite box to resolve against, or the picture
+     falls back to its natural size — megapixels, in a 72px hover card. `data-decorated` lets a
+     consumer make room for what spills past the edge. */
   return (
-    <span className={clsx(styles.frame, fill && styles['frame--fill'], className)}>
+    <span
+      className={clsx(styles.frame, fill && styles['frame--fill'], className)}
+      style={fill ? undefined : { '--frame-size': `${size}px` }}
+      data-decorated=""
+    >
       {children}
       {layers.map(({ id, slot }) => {
         const Art = DECORATION_ART[id]

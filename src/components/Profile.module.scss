@@ -129,6 +129,12 @@
   }
 }
 
+// The wallet's identicon among the name badges: the corner mark's rounded square, at badge size
+.fingerprint {
+  display: block;
+  border-radius: 3px;
+}
+
 .badge {
   width: 14px;
   height: 14px;
@@ -365,6 +371,12 @@
     flex-shrink: 0;
     width: 72px;
     height: 72px;
+
+    // A decorated picture spills past its circle — wings about 22px out — and the card is the
+    // popover's scroll box, so without room the spill turned into scrollbars
+    &:has([data-decorated]) {
+      margin: 22px 22px 14px 0;
+    }
 
     img {
       display: block;
