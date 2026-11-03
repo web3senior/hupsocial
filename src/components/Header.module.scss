@@ -68,8 +68,13 @@
 
     // Seated over the page's measured shell (Header.jsx), so the title centres on the card and
     // the back arrow starts at its edge. Match the square page shell below it.
+    // Portalled into <body> (Header.jsx), so it is laid out against the document and scrolls
+    // with the page; inset:0 there would stretch it the whole page tall
     &--cell {
+      z-index: 1;
       right: auto;
+      bottom: auto;
+      height: var(--header-height);
       left: var(--title-cell-left);
       width: var(--title-cell-width);
       box-sizing: border-box;
@@ -79,6 +84,11 @@
       background-color: color-mix(in srgb, var(--background) 75%, transparent);
       -webkit-backdrop-filter: blur(16px) saturate(150%);
       backdrop-filter: blur(16px) saturate(150%);
+
+      // A wide shell runs under the right-hand controls; keep the bar's own action clear of them
+      .header__inner {
+        padding-inline-end: var(--title-cell-clear, 0px);
+      }
     }
   }
 
@@ -200,6 +210,9 @@
   // The one flex child in the row on most routes, so it has to push itself to the end
   flex: none;
   margin-inline-start: auto;
+  // Above the title bar, which is positioned and would otherwise paint over these controls
+  position: relative;
+  z-index: 1;
 }
 
 // Opens the phone nav drawer (components/Aside); desktops have the sidebar instead

@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ConnectWallet } from '@/components/ConnectWallet'
+import HeaderActions from '@/components/HeaderActions'
 import BackLink from '@/components/ui/BackLink'
 import { useScrollDim } from '@/hooks/useScrollDim'
 import { useScrollChrome } from '@/hooks/useScrollChrome'
@@ -31,8 +33,11 @@ const findPageShell = (main) =>
  * back arrow starts at its edge. Pages never say how wide they are (PageTitle's containerWidth
  * goes unused), so the shell is measured.
  * Null on phones, where shells go borderless, and while no shell is on the page.
+ *
+ * `clear` is how far a wide shell runs under the header's right-hand controls, so the bar can
+ * keep its own contents (a page action) out from under them.
  */
-const useTitleCell = (isActive, pathname) => {
+const useTitleCell = (isActive, pathname, controlsRef) => {
   const [cell, setCell] = useState(null)
 
   useEffect(() => {
@@ -57,14 +62,18 @@ const useTitleCell = (isActive, pathname) => {
       }
 
       const rect = shell.getBoundingClientRect()
-      const next = { left: Math.round(rect.left), width: Math.round(rect.width) }
-      setCell((prev) => (prev && prev.left === next.left && prev.width === next.width ? prev : next))
+      const controls = controlsRef.current?.getBoundingClientRect()
+      const clear = controls?.width ? Math.max(0, Math.round(rect.right - controls.left + 12)) : 0
+      const next = { left: Math.round(rect.left), width: Math.round(rect.width), clear }
+      setCell((prev) => (prev && prev.left === next.left && prev.width === next.width && prev.clear === next.clear ? prev : next))
     }
 
     measure()
     // <main> resizes as the page's content arrives, which is also when a late shell mounts
     const observer = new ResizeObserver(measure)
     observer.observe(main)
+    // The controls widen once the balance loads, and narrow on sign-out
+    if (controlsRef.current) observer.observe(controlsRef.current)
     window.addEventListener('resize', measure)
 
     return () => {
@@ -72,7 +81,7 @@ const useTitleCell = (isActive, pathname) => {
       window.removeEventListener('resize', measure)
       markedShell?.removeAttribute('data-page-shell')
     }
-  }, [isActive, pathname])
+  }, [isActive, pathname, controlsRef])
 
   return cell
 }
@@ -92,7 +101,8 @@ export default function Header() {
   // desktop and needs the clicks. Matched by path so a post opened in place gets it too.
   const isBare = pathname === '/' || POST_ROUTE.test(pathname ?? '')
   const hasTitle = Boolean(title || back)
-  const cell = useTitleCell(hasTitle, pathname)
+  const controlsRef = useRef(null)
+  const cell = useTitleCell(hasTitle, pathname, controlsRef)
   // Fades with the footer nav while browsing down (phones only, see Header.module.scss)
   const isDimmed = useScrollDim()
   const chromeRef = useScrollChrome(isDimmed)
@@ -100,7 +110,39 @@ export default function Header() {
   const cellStyle = cell && {
     '--title-cell-left': `${cell.left}px`,
     '--title-cell-width': `${cell.width}px`,
+    '--title-cell-clear': `${cell.clear}px`,
   }
+
+  // Full-width layer so the container inside centres against the same box as the page's own
+  // containers, clearing the aside the same way. With a measured shell it sits over that shell
+  // instead.
+  const titleBar = hasTitle && (
+    <div className={clsx(styles.header__bar, cell && styles['header__bar--cell'])} style={cellStyle || undefined}>
+      <div className={clsx('__container', styles.header__inner)} data-width={cell ? undefined : width || undefined}>
+        {back && <BackLink href={back.href} label={back.label} className={styles.back} />}
+        {title && (
+          <div className={clsx(styles.header__heading, back && styles['header__heading--start'])}>
+            <h1 className={styles.header__title}>
+              <span>{title}</span>
+            </h1>
+            {subtitle && <p className={styles.header__subtitle}>{subtitle}</p>}
+          </div>
+        )}
+        {action?.pathname === pathname && (
+          <button
+            type="button"
+            className={styles.header__action}
+            onClick={action.onClick}
+            disabled={action.disabled}
+            title={action.label}
+            aria-label={action.label}
+          >
+            <action.icon size={20} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
 
   return (
     <header ref={chromeRef} className={clsx(styles.header, isBare && styles['header--bare'])}>
@@ -122,38 +164,12 @@ export default function Header() {
         </Link>
       )}
 
-      {hasTitle && (
-        // Full-width layer so the container inside centres against the same box as the page's
-        // own containers, clearing the aside the same way. With a measured shell it sits over
-        // that shell instead.
-        <div className={clsx(styles.header__bar, cell && styles['header__bar--cell'])} style={cellStyle || undefined}>
-          <div className={clsx('__container', styles.header__inner)} data-width={cell ? undefined : width || undefined}>
-            {back && <BackLink href={back.href} label={back.label} className={styles.back} />}
-            {title && (
-              <div className={clsx(styles.header__heading, back && styles['header__heading--start'])}>
-                <h1 className={styles.header__title}>
-                  <span>{title}</span>
-                </h1>
-                {subtitle && <p className={styles.header__subtitle}>{subtitle}</p>}
-              </div>
-            )}
-            {action?.pathname === pathname && (
-              <button
-                type="button"
-                className={styles.header__action}
-                onClick={action.onClick}
-                disabled={action.disabled}
-                title={action.label}
-                aria-label={action.label}
-              >
-                <action.icon size={20} />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Over a card the bar belongs to the page and scrolls away with it; only the controls stay
+          pinned. Phones keep it in the fixed header, where it is the only title there is. */}
+      {cell ? createPortal(titleBar, document.body) : titleBar}
 
-      <div className={clsx(styles.connectWallet, 'flex justify-content-end align-items-center gap-050')}>
+      <div ref={controlsRef} className={clsx(styles.connectWallet, 'flex justify-content-end align-items-center gap-050')}>
+        <HeaderActions />
         <ConnectWallet />
       </div>
     </header>

@@ -32,6 +32,9 @@ const CHAIN_BUDGET_MS = 6_000
 // Enough that a busy feed reuses nearly every read, small enough to never be the leak
 const MAX_CACHE_ENTRIES = 500
 
+// The header's balance panel lists this many positions; the rest only count toward the total
+const MAX_HOLDINGS = 8
+
 const SOLANA_TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
 const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 
@@ -73,7 +76,7 @@ async function readEvmChain(chainId, holder) {
         client.readContract({ address: token.address, abi: erc20Abi, functionName: 'decimals' }).catch(() => null),
       ])
       if (!balance || decimals === null) return null
-      return { chainId, address: token.address, balance: balance.toString(), decimals: Number(decimals) }
+      return { chainId, address: token.address, symbol: token.symbol, balance: balance.toString(), decimals: Number(decimals) }
     })
   )
 
@@ -160,7 +163,13 @@ async function readHoldings(address) {
       const key = `${chain.id}:${holding.address.toLowerCase()}`
       if (seen.has(key)) continue
       seen.add(key)
-      rows.push({ chainId: chain.id, address: holding.address, balance: holding.balance, decimals: holding.decimals })
+      rows.push({
+        chainId: chain.id,
+        address: holding.address,
+        symbol: holding.symbol,
+        balance: holding.balance,
+        decimals: holding.decimals,
+      })
     }
   })
 
@@ -238,6 +247,22 @@ export async function fetchPortfolioSummary(address, networkId = null) {
   const requested = natives.find((row) => Number(row.chainId) === Number(networkId))
   const headline = requested ?? [...natives].sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1))[0] ?? null
 
+  const nativeSymbol = (chainId) => (isSolanaNetworkId(chainId) ? 'SOL' : nativeCurrencyFor(chainId).symbol)
+
+  // Priced positions only, largest first — the same rule that keeps an airdropped spoof out of the
+  // total keeps it out of the list
+  const holdings = valued
+    .filter((row) => row.usd !== null && row.usd > 0)
+    .sort((a, b) => b.usd - a.usd)
+    .slice(0, MAX_HOLDINGS)
+    .map((row) => ({
+      chainId: row.chainId,
+      address: row.address,
+      symbol: row.address === null ? nativeSymbol(row.chainId) : row.symbol || 'Token',
+      amount: toNumber(row.balance, row.decimals),
+      usd: row.usd,
+    }))
+
   const chainOf = (chainId) =>
     isSolanaNetworkId(chainId) ? solanaChainFor(chainId) : appChains.find((chain) => chain.id === Number(chainId)) ?? null
 
@@ -253,13 +278,14 @@ export async function fetchPortfolioSummary(address, networkId = null) {
     native: headline
       ? {
           chainId: headline.chainId,
-          symbol: isSolanaNetworkId(headline.chainId) ? 'SOL' : nativeCurrencyFor(headline.chainId).symbol,
+          symbol: nativeSymbol(headline.chainId),
           name: chainOf(headline.chainId)?.name ?? null,
           balance: headline.balance,
           decimals: headline.decimals,
           usd: headline.usd,
         }
       : null,
+    holdings,
   }
 }
 
