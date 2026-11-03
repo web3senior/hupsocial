@@ -106,8 +106,13 @@
     text-decoration: none;
     cursor: pointer;
 
-    &:hover {
+    &:hover:not(:disabled) {
       background: var(--surface-muted);
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
   }
 }

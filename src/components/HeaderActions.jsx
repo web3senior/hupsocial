@@ -1,7 +1,6 @@
 'use client'
 
 import { useRef } from 'react'
-import Link from 'next/link'
 import clsx from 'clsx'
 import { useConnection } from 'wagmi'
 import { CaretDownIcon, CoinsIcon, PencilSimpleLineIcon, PlusIcon } from '@phosphor-icons/react'
@@ -94,10 +93,11 @@ export default function HeaderActions() {
               <PencilSimpleLineIcon size={20} aria-hidden="true" />
               New post
             </button>
-            <Link href="/launchpad/launch" prefetch={false} className={styles.menu__item} onClick={close}>
+            {/* Shown but off until coin launches open to everyone */}
+            <button type="button" className={styles.menu__item} disabled>
               <CoinsIcon size={20} aria-hidden="true" />
               New coin
-            </Link>
+            </button>
           </>
         )}
       </NativePopover>
