@@ -519,8 +519,9 @@ export const getTrendingPosts = async (page = 1, limit = 20, networkId = null, v
   return response.json()
 }
 
-export const getStatuses = async (page = 1, limit = 20, networkId = null, viewerAddress = null) => {
+export const getStatuses = async (page = 1, limit = 20, networkId = null, viewerAddress = null, { following = false } = {}) => {
   let url = `/api/v1/networks/statuses?page=${page}&limit=${limit}`
+  if (following) url += '&following=1'
 
   if (networkId) {
     url += `&network_id=${networkId}`

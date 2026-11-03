@@ -11,8 +11,6 @@ import { useProfile } from '@/hooks/useProfile'
 import { usePostStore } from '@/stores/usePostStore'
 import { getStatuses } from '@/lib/api'
 import { isEvmAddress, sameAddress, shortAddress } from '@/lib/address'
-import { openConnect } from '@/lib/connectDialog'
-import { toast } from '@/components/NextToast'
 import Avatar from '@/components/ui/Avatar'
 import DialogSheet from '@/components/ui/DialogSheet'
 import StatusEditorSheet, { describeStatus } from '@/components/status/StatusEditorSheet'
@@ -29,7 +27,7 @@ const fetchOwnStatus = async (address) => {
 
 // Stamped with the fetch time so the rings are computed from one clock, outside render
 const fetchStrip = async ([, viewer]) => {
-  const response = await getStatuses(1, STRIP_SIZE, null, viewer)
+  const response = await getStatuses(1, STRIP_SIZE, null, viewer, { following: true })
   return { list: response?.data ?? [], fetchedAt: Date.now() }
 }
 
@@ -46,8 +44,8 @@ const displayName = (status) => status.display_name || (status.username ? `@${st
  * A row of avatars over the For you feed, each with its owner's status in a bubble above it —
  * the bubble the profile page shows over the avatar, at feed scale. The viewer's own slot comes
  * first and opens the status editor; anyone else's opens a sheet with the whole status.
- * Wallets the viewer follows come first (the API orders them). Renders nothing until there is
- * a status to show or a wallet that could share one.
+ * Only wallets the viewer follows are shown; the Status tab is where everyone is. Signed out
+ * there is no one to follow, so the strip stays hidden.
  */
 export default function StatusStrip() {
   const { address, isConnected, kind } = useActiveWallet()
@@ -59,7 +57,7 @@ export default function StatusStrip() {
   const [selected, setSelected] = useState(null)
   const [openCount, setOpenCount] = useState(0)
 
-  const { data: strip, mutate: mutateStrip } = useSWR(['status-strip', viewer, feedRefreshNonce], fetchStrip, {
+  const { data: strip, mutate: mutateStrip } = useSWR(viewer ? ['status-strip', viewer, feedRefreshNonce] : null, fetchStrip, {
     revalidateOnFocus: false,
     dedupingInterval: 30_000,
   })
@@ -70,21 +68,10 @@ export default function StatusStrip() {
   const now = strip?.fetchedAt ?? 0
   const others = (strip?.list ?? []).filter((status) => !sameAddress(status.wallet_address, viewer))
 
-  // Signed out on an empty strip there is nothing to read and no one to write
-  if (!isConnected && others.length === 0) return null
-  if (!strip) return null
+  // Signed out (or on a Solana wallet) there is no follow list to read
+  if (!viewer || !strip) return null
 
-  const openOwn = () => {
-    if (!isConnected) {
-      if (!openConnect()) toast('Please connect wallet', 'error')
-      return
-    }
-    if (!viewer) {
-      toast('Statuses are signed by EVM wallets', 'error')
-      return
-    }
-    editorRef.current?.open()
-  }
+  const openOwn = () => editorRef.current?.open()
 
   const openStatus = (status) => {
     setSelected(status)

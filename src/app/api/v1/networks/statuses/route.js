@@ -21,21 +21,28 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 20
     const offset = (page - 1) * limit
     const viewerAddress = searchParams.get('viewer_address')
+    const followingOnly = searchParams.get('following') === '1'
 
     // A viewer sees the wallets they follow first; without one, followed is 0 for every row
     const viewer = isEvmAddress(viewerAddress) ? viewerAddress.toLowerCase() : null
     let queryParams = [viewer]
 
     let query = `
-      SELECT s.*, u.name AS display_name, u.username, u.profileImage AS profile_image,
-        EXISTS (
-          SELECT 1 FROM follows f
-          WHERE f.follower_address = ? AND f.followed_address = s.wallet_address AND f.is_following = 1
-        ) AS followed
-      FROM user_statuses s
-      LEFT JOIN users u ON u.wallet_address = s.wallet_address
-      WHERE (s.expires_at IS NULL OR s.expires_at > UNIX_TIMESTAMP())
+      SELECT * FROM (
+        SELECT s.*, u.name AS display_name, u.username, u.profileImage AS profile_image,
+          EXISTS (
+            SELECT 1 FROM follows f
+            WHERE f.follower_address = ? AND f.followed_address = s.wallet_address AND f.is_following = 1
+          ) AS followed
+        FROM user_statuses s
+        LEFT JOIN users u ON u.wallet_address = s.wallet_address
+        WHERE (s.expires_at IS NULL OR s.expires_at > UNIX_TIMESTAMP())
+      ) s
+      WHERE 1 = 1
     `
+
+    // following=1 narrows to wallets the viewer follows — none at all without a viewer
+    if (followingOnly) query += ` AND s.followed = 1`
 
     const blockFilter = blockedFeedFilter(await readUserBlocks(pool, viewerAddress), 's', false)
     query += blockFilter.sql
