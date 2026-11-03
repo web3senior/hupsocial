@@ -21,9 +21,18 @@
         font-weight: 500;
     }
 
-    // No hover fill here: the item wraps the reply and its nested answer, so a fill would light the
-    // reply while pointing at the answer. Each Post paints its own hover layer instead.
     &__item {
+        // Card gutters live on .post; the connector rows outside it restate them
+        --comments-gutter: 24px;
+
+        @media (max-width: 640px) {
+            --comments-gutter: 16px;
+        }
+    }
+
+    // No hover fill here: an answer sits inside its reply's subtree, so a fill would light the
+    // reply while pointing at the answer. Each Post paints its own hover layer instead.
+    &__reply {
         cursor: pointer;
     }
 
@@ -31,24 +40,77 @@
         margin: 0;
     }
 
-    // Under the nested answer, in the replies' text column, as Threads' "Show replies"
+    // Threads' "Show replies": the reply's avatar line bends right into the faces of who answered.
+    // The line above (Post's data-has-comments) already reaches 12px into this row.
     &__more {
-        display: block;
-        margin: 0 0 0.75rem calc(24px + 36px + 12px);
-        padding: 4px 0;
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-height: 36px;
+        margin: 0;
+        padding: 2px var(--comments-gutter) 12px calc(var(--comments-gutter) + 32px);
         border: none;
         background: none;
         color: var(--post-muted, var(--text-muted));
         font: inherit;
         font-size: 15px;
+        text-align: left;
         cursor: pointer;
 
-        &:hover {
-            text-decoration: underline;
+        // The elbow: down from the avatar's centre line, then right into the faces
+        &::before {
+            content: '';
+            position: absolute;
+            left: calc(var(--comments-gutter) + 17px);
+            top: 0;
+            width: 13px;
+            height: calc(50% - 5px);
+            border-left: 2px solid var(--border);
+            border-bottom: 2px solid var(--border);
+            border-bottom-left-radius: 10px;
+            pointer-events: none;
         }
 
-        @media (max-width: 640px) {
-            margin-left: calc(16px + 36px + 12px);
+        // A sibling answer follows: the line carries straight on past the bend as well
+        &--through::after {
+            content: '';
+            position: absolute;
+            left: calc(var(--comments-gutter) + 17px);
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: var(--border);
+            pointer-events: none;
+        }
+
+        &:disabled {
+            cursor: default;
+        }
+
+        @media (hover: hover) {
+            &:not(:disabled):hover .commentsList__moreLabel {
+                text-decoration: underline;
+            }
+        }
+    }
+
+    &__faces {
+        display: inline-flex;
+        flex-shrink: 0;
+    }
+
+    // Overlapped, each ringed in the page colour so the one behind reads as a separate face
+    &__face {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        box-shadow: 0 0 0 2px var(--background);
+        object-fit: cover;
+
+        & + & {
+            margin-left: -5px;
         }
     }
 }

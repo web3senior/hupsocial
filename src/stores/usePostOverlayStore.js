@@ -42,7 +42,10 @@ export const setPostOverlayHostMounted = (value) => {
  * @param {{ push: Function }} router Next's router, for the fallback.
  */
 export function openPost(item, router) {
-  if (hostMounted && typeof window !== 'undefined') {
+  // One overlay at a time: replacing an open entry would leave back on the old post's path with
+  // nothing to show but the hidden page, so a post opened from inside the overlay navigates
+  const overlayOpen = typeof window !== 'undefined' && usePostOverlayStore.getState().entry?.path === window.location.pathname
+  if (hostMounted && !overlayOpen && typeof window !== 'undefined') {
     usePostOverlayStore.getState().open(item)
     return
   }

@@ -49,7 +49,7 @@ import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import { buildLinks, displayLinks, emptySocials, parseLinks } from '@/lib/socialLinks'
 import { asClause, describeWalletError } from '@/lib/walletErrors'
 import { toast } from '@/components/NextToast'
-import { seedPost } from '@/db/posts'
+import { openPost } from '@/stores/usePostOverlayStore'
 import { readFeedCache, saveFeedCache } from '@/db/feedCache'
 import BrandingLinksFields from './_components/BrandingLinksFields'
 import CommunityBrandingEditor from './_components/CommunityBrandingEditor'
@@ -2847,8 +2847,7 @@ export function CommunityCard({ id, networkId = null, hideHeader = false, member
                         // Hand the row to the post store first, exactly as the home feed does: the
                         // detail page paints that copy immediately instead of shimmering while its
                         // own fetch runs
-                        seedPost(post)
-                        router.push(`/networks/${post.network_id ?? chainId}/${post.id}`)
+                        openPost({ ...post, network_id: post.network_id ?? chainId }, router)
                       }}
                     >
                       <PostCard item={post} chainId={chainId} actions={['like', 'comment', 'share', 'repost', 'tip', 'view', 'bookmark']} />

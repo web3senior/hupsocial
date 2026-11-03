@@ -15,7 +15,7 @@ import SearchBox, { MIN_SEARCH_LENGTH, profileHref } from '@/components/SearchBo
 import useRecipientSuggestions from '@/hooks/useRecipientSuggestions'
 import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
 import { readFeedCache, saveFeedCache } from '@/db/feedCache'
-import { seedPost } from '@/db/posts'
+import { openPost } from '@/stores/usePostOverlayStore'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
 import styles from '../page.module.scss'
 
@@ -248,8 +248,7 @@ export default function SearchPanel() {
   }, [committedQuery, isCommitted, address, retryNonce])
 
   const handlePostClick = (item) => {
-    seedPost(item)
-    router.push(`/networks/${item.network_id}/${item.id}`)
+    openPost(item, router)
   }
 
   const prefetchPost = (item) => router.prefetch(`/networks/${item.network_id}/${item.id}`)

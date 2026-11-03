@@ -10,6 +10,45 @@ import { parsePostContent, postRowSelect } from '@/lib/postRowQuery'
 
 export const runtime = 'nodejs'
 
+// Faces in a reply's "Show replies" stack, as Threads draws it
+const REPLIERS_MAX = 3
+
+/**
+ * The newest distinct authors answering each of these replies, in one query for the whole page,
+ * so the thread can draw its avatar stacks without a request per reply. Matches a child to its
+ * reply the same two ways total_comments counts it (is_comment, or a non-zero parent_id).
+ * @returns {Promise<Map<string, Array<{ wallet_address: string, display_name: string|null, profile_image: string|null }>>>}
+ */
+async function readRepliers(networkId, comments) {
+  const byId = new Map()
+  const ids = comments.filter((comment) => Number(comment.total_comments) > 0).map((comment) => comment.id)
+  if (ids.length === 0) return byId
+
+  const marks = ids.map(() => '?').join(', ')
+  const [rows] = await pool.execute(
+    `
+      SELECT child.is_comment, child.parent_id, child.wallet_address, u.name AS display_name, u.profileImage AS profile_image
+      FROM posts child
+      LEFT JOIN users u ON child.wallet_address = u.wallet_address
+      WHERE child.network_id = ?
+        AND child.is_deleted = 0
+        AND (child.is_comment IN (${marks}) OR (child.parent_id IN (${marks}) AND (child.content_type = 1 OR child.is_comment IS NOT NULL)))
+      ORDER BY child.created_at DESC, child.id DESC
+    `,
+    [networkId, ...ids, ...ids]
+  )
+
+  const wanted = new Set(ids.map(String))
+  for (const row of rows) {
+    const key = wanted.has(String(row.is_comment)) ? String(row.is_comment) : String(row.parent_id)
+    const faces = byId.get(key) ?? []
+    if (faces.length >= REPLIERS_MAX || faces.some((face) => face.wallet_address === row.wallet_address)) continue
+    faces.push({ wallet_address: row.wallet_address, display_name: row.display_name, profile_image: row.profile_image })
+    byId.set(key, faces)
+  }
+  return byId
+}
+
 export async function GET(request, { params }) {
   try {
     const { networkId, postId } = await params
@@ -57,12 +96,15 @@ export async function GET(request, { params }) {
     // Fulfill any missing Universal Profile fields
     await fulfillUniversalProfiles(commentsToSend, pool)
 
+    const repliers = lastOnly ? new Map() : await readRepliers(networkId, commentsToSend)
+
     return NextResponse.json({
       success: true,
       data: commentsToSend.map((comment) => ({
         ...comment,
         is_liked: Boolean(comment.has_liked),
         content: parsePostContent(comment.content),
+        repliers: repliers.get(String(comment.id)) ?? [],
       })),
       nextPage,
     })

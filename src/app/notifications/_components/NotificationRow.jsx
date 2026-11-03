@@ -11,7 +11,7 @@ import { useProfile } from '@/hooks/useProfile'
 import { profilePath } from '@/lib/username'
 import { getPostById } from '@/lib/api'
 import { rememberCardPointerDown, isTextSelectionDrag } from '@/lib/cardClick'
-import { seedPost } from '@/db/posts'
+import { openPost } from '@/stores/usePostOverlayStore'
 import { toRelativeTime } from '@/lib/dateHelper'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import Avatar from '@/components/ui/Avatar'
@@ -121,8 +121,7 @@ export default function NotificationRow({ group, viewerAddress, onRead }) {
         onPointerDown={rememberCardPointerDown}
         onClick={(event) => {
           if (isTextSelectionDrag(event) || !href) return
-          seedPost(post)
-          router.push(href)
+          openPost(post, router)
         }}
         onMouseEnter={() => href && router.prefetch(href)}
       >

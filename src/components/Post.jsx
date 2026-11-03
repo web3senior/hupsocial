@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useId, useRef, useCallback, useMe
 import { useRouter } from 'next/navigation'
 import { isArticle } from '@/lib/article'
 import Link from 'next/link'
-import { seedPost } from '@/db/posts'
+import { openPost } from '@/stores/usePostOverlayStore'
 import { useWaitForTransactionReceipt, useConnection, useSignTypedData, useWriteContract, usePublicClient } from 'wagmi'
 import { getPublicClient } from 'wagmi/actions'
 import { initHupContract } from '@/lib/communication'
@@ -917,8 +917,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
                 description="Open the full post"
                 onClick={(e) => {
                   e.stopPropagation()
-                  seedPost(item)
-                  router.push(`/networks/${item.network_id}/${item.id}`)
+                  openPost(item, router)
                 }}
               />
               {item.tx_hash && (
@@ -1072,8 +1071,7 @@ function ThreadMarker({ item, showThreadLink }) {
           data-capture-ignore
           onClick={(e) => {
             e.stopPropagation()
-            seedPost(item)
-            router.push(`/networks/${item.network_id}/${item.id}`)
+            openPost(item, router)
           }}
         >
           Show thread
@@ -1120,8 +1118,7 @@ export function PostCard({ item, actions, chainId, networkName, threadAuthor = n
   const openLastComment = (e) => {
     e.stopPropagation()
     if (isTextSelectionDrag(e)) return
-    seedPost(lastComment)
-    router.push(`/networks/${lastComment.network_id}/${lastComment.id}`)
+    openPost(lastComment, router)
   }
 
   return (
@@ -1293,7 +1290,7 @@ const QuotedPost = ({ networkId, quoteId, quotedBy }) => {
       className={styles.post__quoteCard}
       onClick={(e) => {
         e.stopPropagation()
-        router.push(`/networks/${networkId}/${quoteId}`)
+        openPost({ ...quotedPost, id: quoteId, network_id: networkId }, router)
       }}
     >
       <Profile variant="fullWithoutTime" creator={quotedPost.wallet_address} networkId={quotedPost.network_id} />
