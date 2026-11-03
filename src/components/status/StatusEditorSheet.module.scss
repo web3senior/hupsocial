@@ -1,0 +1,129 @@
+.statusEditor {
+  &__content {
+    --field-hint-font-size: 0.72rem;
+    display: grid;
+    gap: 1.1rem;
+    padding-top: 1rem;
+  }
+
+  &__composer {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+  }
+
+  &__field {
+    min-width: 0;
+
+    textarea {
+      resize: none;
+    }
+  }
+
+  &__period {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  &__label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  &__chips {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.4rem;
+
+    @media (max-width: 400px) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  &__chip {
+    min-height: 38px;
+    padding: 0 0.5rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: var(--surface-muted);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &--active,
+    &--active:hover:not(:disabled) {
+      border-color: transparent;
+      background: var(--accent-primary);
+      color: var(--app-accent-text);
+    }
+  }
+
+  &__meta {
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+  }
+
+  &__actions {
+    display: flex;
+    gap: 0.7rem;
+  }
+
+  &__button {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0.65rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 3px;
+    }
+
+    &--primary {
+      border-color: transparent;
+      background: var(--accent-primary);
+      color: var(--app-accent-text);
+    }
+
+    &--danger {
+      color: #e5484d;
+    }
+  }
+}

@@ -1,0 +1,306 @@
+// A row of avatars with status bubbles over the feed. Same inset and rule as ComposePrompt,
+// so the two read as one header block above the posts.
+.strip {
+  border-bottom: 1px solid var(--border);
+
+  &__track {
+    display: flex;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 12px 20px 10px;
+    list-style: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    > li {
+      flex: none;
+      scroll-snap-align: start;
+    }
+  }
+
+  &__item {
+    width: 92px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 2px;
+      border-radius: 12px;
+    }
+
+    &:active .strip__ring {
+      transform: scale(0.96);
+    }
+  }
+
+  // The profile page's status bubble at strip scale: up to two lines, the thought-dots
+  // trailing down toward the avatar. Pulled over the ring's top edge the way the profile does.
+  &__bubble {
+    position: relative;
+    z-index: 1;
+    max-width: 100%;
+    margin-bottom: -0.65rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 11px;
+    background-color: var(--surface-muted);
+    box-shadow: var(--shadow-md);
+    color: var(--text);
+    font-size: 11px;
+    line-height: 1.25;
+    text-align: center;
+    overflow-wrap: anywhere;
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      background-color: var(--surface-muted);
+      border: 1px solid var(--border-strong);
+    }
+
+    &::before {
+      width: 7px;
+      height: 7px;
+      bottom: -5px;
+      left: 34%;
+    }
+
+    &::after {
+      width: 4px;
+      height: 4px;
+      bottom: -9px;
+      left: 40%;
+    }
+
+    &--add {
+      color: var(--accent-primary);
+      font-weight: 600;
+    }
+  }
+
+  // Clamped inside the bubble rather than on it, so the clamp's overflow can't clip the dots
+  &__text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+
+  // Ring drains as the status nears its clear time; masked so it needs no backdrop colour
+  &__ring {
+    --status-left: 1;
+    position: relative;
+    width: 60px;
+    height: 60px;
+    display: grid;
+    place-items: center;
+    transition: transform 0.15s ease;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(var(--accent-primary) calc(var(--status-left) * 1turn), var(--border-strong) 0);
+      mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+    }
+
+    &--idle::before {
+      background: var(--border-strong);
+    }
+  }
+
+  &__avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  &__name {
+    max-width: 100%;
+    color: var(--text-muted);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+// The tapped status, shown the way the profile page shows it: a large avatar with the bubble
+// sitting over its top edge. Rise brings the avatar in first, then the bubble.
+.viewer {
+  position: relative;
+
+  &__close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--surface-muted);
+      color: var(--foreground);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__stage {
+    display: grid;
+    justify-items: center;
+    gap: 0.35rem;
+    padding: 4.5rem var(--dialog-padding, 1.25rem) var(--dialog-padding, 1.25rem);
+    text-align: center;
+  }
+
+  &__figure {
+    position: relative;
+    margin-bottom: 0.65rem;
+  }
+
+  &__ring {
+    --status-left: 1;
+    position: relative;
+    width: 164px;
+    height: 164px;
+    display: grid;
+    place-items: center;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(var(--accent-primary) calc(var(--status-left) * 1turn), var(--border-strong) 0);
+      mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+    }
+  }
+
+  &__avatar {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  // Centred by a full-width slot rather than a transform, so Rise's own transform can't
+  // knock the bubble off-centre while it animates
+  &__bubbleSlot {
+    position: absolute;
+    left: -3rem;
+    right: -3rem;
+    bottom: calc(100% - 1.6rem);
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  &__bubble {
+    position: relative;
+    max-width: 100%;
+    margin: 0;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    background-color: var(--surface-muted);
+    box-shadow: var(--shadow-md);
+    color: var(--text);
+    font-size: 0.9rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    pointer-events: auto;
+
+    // The profile bubble's thought-dots trailing down toward the avatar
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      background-color: var(--surface-muted);
+      border: 1px solid var(--border-strong);
+    }
+
+    &::before {
+      width: 10px;
+      height: 10px;
+      bottom: -7px;
+      left: 38%;
+    }
+
+    &::after {
+      width: 5px;
+      height: 5px;
+      bottom: -14px;
+      left: 42%;
+    }
+  }
+
+  &__name {
+    color: var(--foreground);
+    font-size: 1rem;
+  }
+
+  &__meta {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  &__profile {
+    justify-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    margin-top: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--foreground);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      background: var(--surface-muted);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 3px;
+    }
+  }
+}

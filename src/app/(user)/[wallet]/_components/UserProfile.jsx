@@ -2,13 +2,13 @@
 
 import { Spinner } from '@/components/Loading'
 import Link from 'next/link'
-import { isEvmAddress, isSolanaAddress, normalizeAddress, sameAddress, shortAddress } from '@/lib/address'
+import { isEvmAddress, isSolanaAddress, sameAddress, shortAddress } from '@/lib/address'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useSolanaWalletStore } from '@/stores/useSolanaWalletStore'
 import { SOLANA_DEVNET_ID, solanaExplorerUrl } from '@/config/solana'
 import { useEffect, useState, useCallback, lazy, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView, getUserBadges, getCountries, requestAuthNonce } from '@/lib/api'
+import { updateProfile, subscribeUser, unsubscribeUser, sendNotification, getPosts, recordProfileView, getUserBadges, getCountries } from '@/lib/api'
 import { ORIGIN_OPTIONS } from '@/config/originOptions'
 import { INTEREST_OPTIONS, MAX_INTERESTS, normalizeInterests } from '@/config/interestOptions'
 import InterestIcon from '@/components/ui/InterestIcon'
@@ -21,7 +21,6 @@ import { readableRegistry } from '@/config/readable'
 import { usePremium } from '@/hooks/usePremium'
 import { initHupContract } from '@/lib/communication'
 import { toast } from '@/components/NextToast'
-import { STATUS_MAX_LENGTH, STATUS_PERIODS, userStatusMessage } from '@/lib/userStatus'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useFeedScrollRestore } from '@/hooks/useFeedScrollRestore'
 import { readFeedCache, saveFeedCache } from '@/db/feedCache'
@@ -33,7 +32,7 @@ import { lukso } from 'wagmi/chains'
 import { getAddress } from 'viem'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
-import { InfoIcon, ThreeDotIcon } from '@/components/Icons'
+import { ThreeDotIcon } from '@/components/Icons'
 import { SealCheckIcon } from '@phosphor-icons/react'
 import ReadableNumber from '@/components/ReadableNumber'
 import UPlogo from '@/../public/up.png'
@@ -53,7 +52,7 @@ import PremiumBadge from '@/components/ui/PremiumBadge'
 import Avatar from '@/components/ui/Avatar'
 import UsernameField from '@/components/UsernameField'
 import clsx from 'clsx'
-import NativePopover from '@/components/ui/NativePopover'
+import StatusEditorSheet, { describeStatus } from '@/components/status/StatusEditorSheet'
 import { ProfileQRCode } from './ProfileQRCode'
 import FollowListDialog from './FollowListDialog'
 import BlockUserButton from '@/components/BlockUserButton'
@@ -500,7 +499,6 @@ const ProfileSkeleton = () => (
  */
 const Profile = ({ addr }) => {
   const [data, setData] = useState(null)
-  const [selfView, setSelfView] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [isItUp, setIsItUp] = useState(false)
   const [viewCount, setViewCount] = useState(null)
@@ -513,6 +511,7 @@ const Profile = ({ addr }) => {
   const params = useParams()
   // Self-view and disconnect follow the active network's wallet
   const { address, isConnected, kind: walletKind } = useActiveWallet()
+  const selfView = Boolean(isConnected && address && sameAddress(address, addr))
   const { disconnect: disconnectEvm } = useDisconnect()
   const disconnectSolana = useSolanaWalletStore((state) => state.disconnect)
   const activeChain = getActiveChain()
@@ -1018,98 +1017,12 @@ const ProfileLink = ({ targetWallet, displayWalletString, username }) => {
   )
 }
 /**
- * Status
- * @param {*} param0
- * @returns
+ * The status bubble over the avatar. On the viewer's own profile it opens the status sheet to
+ * set or clear it; on anyone else's it only shows what they wrote.
  */
 const Status = ({ addr, profile, selfView }) => {
-  const placeholders = [
-    'Share a short status',
-    "What's on your mind?",
-    'Working on a new idea...',
-    'The best thing I saw today was...',
-    "What's the next big thing in Web3?",
-    'Launching something new soon!',
-    'Share one emoji that describes your day.',
-    'I just learned something new about...',
-    'How are you feeling in 3 emojis?',
-    'A random memory that popped up today...',
-    'What book/podcast should everyone check out?',
-    'Best DAO right now?',
-    'Next trend?',
-    'Your biggest gain today?',
-    'Share a mini dapp',
-    'Bull or bear today?',
-    'My last trade was...',
-    'Watching [Coin Ticker]...',
-    'Favorite yield farm?',
-    'Best dating advice received?',
-    'Tell us about your crush...',
-    'What makes a perfect date?',
-  ]
+  const editorRef = useRef(null)
   const [status, setStatus] = useState(null)
-  const [statusContent, setStatusContent] = useState('')
-  // Hours until the status clears itself; 0 = permanent
-  const [periodHours, setPeriodHours] = useState(24)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isSaved, setIsSaved] = useState(false)
-  const { address, chain } = useConnection()
-  const { signMessageAsync } = useSignMessage()
-
-  /**
-   * Selects a random placeholder phrase from the list.
-   * @returns {string} The randomly selected placeholder text.
-   */
-  function getRandomPlaceholder() {
-    // 1. Math.random() generates a floating point number between 0 (inclusive) and 1 (exclusive).
-    // 2. We multiply it by the array's length to get a number between 0 and array.length.
-    // 3. Math.floor() rounds this number down to the nearest whole integer, giving us a valid array index.
-    const randomIndex = Math.floor(Math.random() * placeholders.length)
-    return placeholders[randomIndex]
-  }
-
-  // Status is offchain: the wallet signs a message and the server stores it — no gas, no chain.
-  const saveStatus = async (claim) => {
-    if (isSaving) return
-    if (!address || !sameAddress(address, addr)) {
-      toast('Connect the wallet that owns this profile', 'error')
-      return
-    }
-
-    setIsSaving(true)
-    setIsSaved(false)
-    try {
-      const owner = normalizeAddress(address)
-      const nonce = await requestAuthNonce(owner)
-      if (!nonce) throw new Error('Could not start wallet verification')
-      const signed = { ...claim, address: owner, nonce, issuedAt: Date.now(), chainId: chain?.id }
-      const signature = await signMessageAsync({ account: address, message: userStatusMessage(signed) })
-      const response = await fetch('/api/v1/users/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...signed, signature }),
-      })
-      const result = await response.json()
-      if (!response.ok || !result.success) throw new Error(result.error || 'Failed to update status')
-      setStatus(result.data)
-      if (claim.clear) setStatusContent('')
-      setIsSaved(true)
-    } catch (error) {
-      toast(error.shortMessage || error.message || 'Failed to update status', 'error')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const clearStatus = () => saveStatus({ clear: true })
-
-  const updateStatus = () => {
-    if (!statusContent.trim()) {
-      toast(`Write a status first`, 'error')
-      return
-    }
-    saveStatus({ content: statusContent.trim(), periodHours: Number(periodHours) })
-  }
 
   useEffect(() => {
     // Statuses are signed by EVM wallets; a Solana profile has none to read
@@ -1121,102 +1034,41 @@ const Status = ({ addr, profile, selfView }) => {
         if (cancelled) return
         if (!res?.success) throw new Error(res?.error || 'Failed to fetch status')
         setStatus(res.data)
-        // Only seed the editor from the profile being viewed when it is the viewer's own —
-        // otherwise Update would copy someone else's status onto the viewer's.
-        if (selfView) setStatusContent(res.data?.content ?? '')
       })
       .catch((error) => console.error('Failed to fetch status:', error))
     return () => {
       cancelled = true
     }
-  }, [addr, selfView])
-
-  const handleToggle = useCallback((e) => {
-    if (e.newState === 'open') setIsSaved(false)
-  }, [])
+  }, [addr])
 
   const hasStatus = Boolean(status?.content)
 
-  // Nothing to read and nothing to write: the editor behind this bubble always sets the
-  // viewer own status, so on another profile an empty pill is a dead end. Statuses are signed
-  // by EVM wallets, so a Solana profile never has one to show.
+  // Nothing to read and nothing to write: on another profile an empty bubble is a dead end.
+  // Statuses are signed by EVM wallets, so a Solana profile never has one to show.
   if (!isEvmAddress(addr) || (!hasStatus && !selfView)) return null
 
-  const statusTitle = hasStatus
-    ? `Updated ${moment.unix(status.updated_at).fromNow()}${
-        status.expires_at ? ` - clears ${moment.unix(status.expires_at).fromNow()}` : ' - no expiry'
-      }`
-    : 'Share a short status'
+  const statusTitle = hasStatus ? describeStatus(status) : 'Share a short status'
+
+  if (!selfView) {
+    return (
+      <div className={clsx(styles.status, styles['status--readonly'])} title={statusTitle}>
+        <p>{status.content}</p>
+      </div>
+    )
+  }
 
   return (
-    <NativePopover
-      placement="center"
-      className={styles.statusPopover}
-      onToggle={handleToggle}
-      trigger={
-        <button className={clsx(styles.status, !hasStatus && styles['status--empty'], 'animate pointer')} title={statusTitle}>
-          <p>{hasStatus ? status.content : 'Share a status'}</p>
-        </button>
-      }
-    >
-      {({ close }) => (
-        <>
-          <header className={styles.statusPopover__header}>
-            <button type="button" aria-label="Close" onClick={close}>
-              <svg fill="currentColor" height="16" role="img" viewBox="0 0 24 24" width="16">
-                <title>Close</title>
-                <line fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" x1="21" x2="3" y1="3" y2="21"></line>
-                <line fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" x1="21" x2="3" y1="21" y2="3"></line>
-              </svg>
-            </button>
-            <div className={`flex-1`}>
-              <h3>Set your status</h3>
-            </div>
-            <div className={`pointer`} onClick={updateStatus}>
-              {isSaving ? `Signing...` : hasStatus ? `Update` : `Share`}
-            </div>
-          </header>
-
-          <main className={`flex flex-column align-items-center gap-1 `}>
-            <div className={`${styles.statusPopover__pfp} rounded relative`}>
-              <figure className={`rounded`}>
-                <Avatar src={profile.profileImage} size={64} />
-              </figure>
-
-              <div className={`d-f-c`} title={hasStatus ? moment.unix(status.updated_at).fromNow() : undefined}>
-                <textarea
-                  autoFocus
-                  value={statusContent}
-                  onChange={(e) => setStatusContent(e.target.value)}
-                  placeholder={`${getRandomPlaceholder()}`}
-                  maxLength={STATUS_MAX_LENGTH}
-                />
-              </div>
-            </div>
-
-            <div className={`${styles.statusPopover__expirationTimestamp} relative`}>
-              <label htmlFor="">Clear after </label>
-              <select name="" id="" value={periodHours} onChange={(e) => setPeriodHours(Number(e.target.value))}>
-                {STATUS_PERIODS.map((hours) => (
-                  <option key={hours} value={hours}>{hours ? `${hours}h` : '∞'}</option>
-                ))}
-              </select>
-            </div>
-
-            {isSaved && <p className="text-center badge badge-success">Done</p>}
-
-            <div title={status?.expires_at ? `Expire: ${moment.unix(status.expires_at).fromNow()}` : undefined}>
-              {hasStatus && selfView && <button onClick={clearStatus} disabled={isSaving}>Delete status</button>}
-            </div>
-
-            <div className={`flex flex-row align-items-center gap-025`}>
-              <InfoIcon />
-              <small>Your status is viewable by all users.</small>
-            </div>
-          </main>
-        </>
-      )}
-    </NativePopover>
+    <>
+      <button
+        type="button"
+        className={clsx(styles.status, !hasStatus && styles['status--empty'], 'animate')}
+        title={statusTitle}
+        onClick={() => editorRef.current?.open()}
+      >
+        <p>{hasStatus ? status.content : 'Share a status'}</p>
+      </button>
+      <StatusEditorSheet ref={editorRef} status={status} profileImage={profile.profileImage} onSaved={setStatus} />
+    </>
   )
 }
 
