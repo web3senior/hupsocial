@@ -26,15 +26,22 @@ const isRendered = (container) => container.getClientRects().length > 0
 const measureExit = (container) => {
   if (!container?.isConnected || !isRendered(container)) return null
 
-  const cardHeights = {}
-  let anchor = null
-  for (const card of container.querySelectorAll(CARD_SELECTOR)) {
-    const rect = card.getBoundingClientRect()
-    cardHeights[card.dataset.postKey] = Math.round(rect.height)
-    if (!anchor && rect.bottom > 0) anchor = { key: card.dataset.postKey, offset: Math.round(rect.top) }
-  }
+  const cards = [...container.querySelectorAll(CARD_SELECTOR)]
+  const anchor = findAnchor(container)
+  const feedHeight = container.offsetHeight
 
-  return { anchor, cardHeights, feedHeight: container.offsetHeight, feedWidth: container.offsetWidth, scrollY: window.scrollY }
+  // A card still holding its restore reservation measures as that reservation, not its content.
+  // Saving it would carry a stale height (and the gap under the card) into every later return,
+  // so the reservations are lifted for the measurement and put back for a StrictMode remount.
+  const held = new Map(cards.filter((card) => card.style.minHeight).map((card) => [card, card.style.minHeight]))
+  for (const card of held.keys()) card.style.minHeight = ''
+
+  const cardHeights = {}
+  for (const card of cards) cardHeights[card.dataset.postKey] = Math.round(card.getBoundingClientRect().height)
+
+  for (const [card, minHeight] of held) card.style.minHeight = minHeight
+
+  return { anchor, cardHeights, feedHeight, feedWidth: container.offsetWidth, scrollY: window.scrollY }
 }
 
 /**
@@ -218,10 +225,14 @@ export function useFeedScrollRestore({ containerRef, restore = null, ready = fal
       if (Math.abs(delta) < 2) {
         stableFrames += 1
       } else {
-        stableFrames = 0
+        const before = window.scrollY
         // 'instant' overrides the app's global scroll-behavior: smooth, which would animate the
         // correction into a visible crawl.
-        window.scrollTo({ top: window.scrollY + delta, behavior: 'instant' })
+        window.scrollTo({ top: before + delta, behavior: 'instant' })
+        // A target past either end of the page clamps and never closes the gap; this is as close
+        // as it gets, so it counts as still. Otherwise the loop never settles and every card keeps
+        // its reservation (a blank gap under it) until the reader happens to touch the page.
+        stableFrames = Math.abs(window.scrollY - before) < 1 ? stableFrames + 1 : 0
       }
 
       // Hold past the first stable frames: content that has not started loading yet will move the
