@@ -24,34 +24,19 @@
 .compact {
   width: 64px;
 
+  // Same insets as the expanded rail (aside 0.5rem + container 0.25rem + row 0.5rem), so the
+  // logo and every icon stay put when the rail collapses: only the labels go.
   .linkText {
     display: none;
   }
 
-  .navContainer {
-    align-items: center;
-    padding-inline: 0;
-  }
-
-  .header {
-    align-self: flex-start;
-    margin-inline-start: 8px;
-    padding-inline-start: 0;
-  }
-
-  .navList {
-    width: 100%;
-    padding-inline: 0;
-    margin-inline-end: 0;
-    scrollbar-gutter: stable;
-  }
-
+  // A 36px square: the row's 0.5rem padding on both sides of the 20px icon, so the icon sits
+  // centered in the hover/active pill without moving from its expanded position
   .link {
-    box-sizing: border-box;
-    width: 40px;
-    height: 40px;
-    padding-inline: 0;
-    margin-inline: 4px 0;
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    justify-content: center;
   }
 }
 
@@ -266,6 +251,39 @@
     &:focus-visible {
       outline: 2px solid var(--app-accent);
       outline-offset: -2px;
+    }
+  }
+}
+
+// Centered on the rail's right edge, level with the header row (1rem padding + (36px - 20px) / 2).
+// --aside-width is published by Aside.jsx from the rendered rail, so it tracks both widths.
+.railToggle {
+  position: fixed;
+  top: calc(1rem + 8px);
+  left: calc(var(--aside-width, 220px) - 10px);
+  z-index: 4;
+
+  &__button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background-color: var(--background);
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+      background-color: var(--hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--app-accent);
+      outline-offset: 2px;
     }
   }
 }

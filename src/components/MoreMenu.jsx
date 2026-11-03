@@ -1,6 +1,7 @@
 'use client'
 
 import { useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
@@ -108,10 +109,13 @@ export default function MoreMenu({ trigger, placement }) {
       trigger={trigger}
       placement={placement}
       type="auto"
-      onToggle={(event) => {
-        if (event.newState === 'closed') {
+      // Reset to the root as it opens, not as it closes: resetting on close swapped the sub-page
+      // back to the root mid fade-out, so the menu blinked before vanishing. flushSync commits
+      // the root before the browser paints the newly opened popover.
+      onBeforeToggle={(event) => {
+        if (event.newState === 'open') {
           lastSubmenu.current = null
-          setView('root')
+          flushSync(() => setView('root'))
         }
       }}
     >

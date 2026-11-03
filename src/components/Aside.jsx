@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import clsx from 'clsx'
-import { CircleIcon, EqualsIcon, PlusIcon, UserIcon, XIcon } from '@phosphor-icons/react'
+import { CaretDoubleLeftIcon, CaretDoubleRightIcon, CircleIcon, EqualsIcon, PlusIcon, UserIcon, XIcon } from '@phosphor-icons/react'
 import logo from '@/../public/logo.svg'
 import NewPost from '@/components/NewPost'
 import { toast } from '@/components/NextToast'
@@ -201,6 +201,7 @@ export default function Aside({ inLayoutGrid = false }) {
   // Safe item fallback array structure avoids runtime evaluation crash errors
   const navItems = useMemo(() => getNavItems(address) ?? [], [getNavItems, address])
   const isMenuOpen = useSidebarStore((state) => state.isMenuOpen)
+  const toggleMenu = useSidebarStore((state) => state.toggleMenu)
   const isMobileMenuOpen = useSidebarStore((state) => state.isMobileMenuOpen)
   const closeMobileMenu = useSidebarStore((state) => state.closeMobileMenu)
   const isComponentOpen = useSidebarStore((state) => state.isComponentOpen)
@@ -265,6 +266,9 @@ export default function Aside({ inLayoutGrid = false }) {
   const isMobileLayout = !isWideScreen
   const isExpanded = isMobileLayout || (!isTablet && isMenuOpen)
   const isCompact = !isExpanded
+  // Only the desktop rail is the viewer's choice: tablet is always compact and mobile is the drawer.
+  // isMenuOpen is persisted by the store, so the choice survives reloads.
+  const canToggleRail = !isMobileLayout && !isTablet
   const shouldShowMobileMenu = isMobileLayout && isMobileMenuOpen
   const closeSidebar = closeMobileMenu
 
@@ -379,20 +383,11 @@ export default function Aside({ inLayoutGrid = false }) {
               </Link>
             </div>
 
-            {isExpanded && (
+            {isMobileLayout && (
               <div className={styles.header__actions}>
-                {renderMoreMenu(
-                  <button type="button" className={clsx(styles.header__button, isMoreActive && styles['header__button--active'])} aria-label="More">
-                    <EqualsIcon size={20} aria-hidden="true" />
-                  </button>,
-                  'bottom-start'
-                )}
-
-                {isMobileLayout && (
-                  <button type="button" className={styles.header__button} onClick={closeMobileMenu} aria-label="Close menu">
-                    <XIcon size={20} aria-hidden="true" />
-                  </button>
-                )}
+                <button type="button" className={styles.header__button} onClick={closeMobileMenu} aria-label="Close menu">
+                  <XIcon size={20} aria-hidden="true" />
+                </button>
               </div>
             )}
           </header>
@@ -417,8 +412,8 @@ export default function Aside({ inLayoutGrid = false }) {
                     </li>
                   ))}
 
-                  {/* The compact rail has no header room, so More rides at the end of the list */}
-                  {isCompact && groupIndex === navGroups.length - 1 && (
+                  {/* More closes the list in every width, so it never moves between rail states */}
+                  {groupIndex === navGroups.length - 1 && (
                     <li>
                       {renderMoreMenu(
                         <Tooltip content={tooltipReady ? 'More' : null} placement="right" size="compact" hoverOnly>
@@ -426,9 +421,10 @@ export default function Aside({ inLayoutGrid = false }) {
                             <div className={styles.iconWrapper}>
                               <EqualsIcon size={20} />
                             </div>
+                            <span className={styles.linkText}>More</span>
                           </button>
                         </Tooltip>,
-                        'right-end'
+                        isCompact ? 'right-end' : 'top-start'
                       )}
                     </li>
                   )}
@@ -438,6 +434,25 @@ export default function Aside({ inLayoutGrid = false }) {
           </div>
         </div>
       </SidebarSurface>
+
+      {/* Straddles the rail's edge, outside the aside (which clips its overflow), so it sits in the
+          same spot in both widths and never displaces the header's More button */}
+      {canToggleRail && (
+        <div className={styles.railToggle}>
+          <Tooltip content={isExpanded ? 'Collapse menu' : 'Expand menu'} placement="right" size="compact" hoverOnly>
+            <button
+              type="button"
+              className={styles.railToggle__button}
+              onClick={toggleMenu}
+              aria-label={isExpanded ? 'Collapse menu' : 'Expand menu'}
+              aria-expanded={isExpanded}
+              aria-controls="main-sidebar"
+            >
+              {isExpanded ? <CaretDoubleLeftIcon size={12} aria-hidden="true" /> : <CaretDoubleRightIcon size={12} aria-hidden="true" />}
+            </button>
+          </Tooltip>
+        </div>
+      )}
 
       {/* The composer must stay outside the drawer that closes when Post is tapped. */}
       {isComponentOpen && <NewPost onClose={() => setIsComponentOpen(false)} />}
