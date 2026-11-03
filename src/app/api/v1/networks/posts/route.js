@@ -9,7 +9,7 @@ import { communityJoin, communityJoinPin } from '@/lib/communityJoin'
 import { fulfillUniversalProfiles } from '@/lib/profileHelper'
 import { attachTipUsdTotals } from '@/lib/tipTotals'
 import { attachSalesUsdTotals } from '@/lib/salesTotals'
-import { getFollowingAddresses } from '@/lib/followSystem'
+import { readFollowingAddresses } from '@/lib/socialFollows'
 import { hasTable } from '@/lib/schema'
 import { HUPSTER_TAG } from '@/lib/roles'
 import { blockedFeedFilter, readUserBlocks } from '@/lib/blockUsers'
@@ -139,8 +139,8 @@ export async function GET(request) {
       return await handleTrendingFeed({ networkId, viewerAddress, page, limit, offset })
     }
 
-    // "Following" mode reads the followed-address list live on-chain (no indexer),
-    // so it needs to short-circuit before touching MySQL when unsupported/empty.
+    // "Following" mode reads the one follow graph (offchain plus LUKSO, config/socialGraph.js), so
+    // it is the same list on every network; an empty one short-circuits before the feed query.
     let followingAddresses = null
     if (feedType === 'following') {
       if (!networkId || !viewerAddress) {
@@ -150,13 +150,13 @@ export async function GET(request) {
         )
       }
 
-      const { supported, addresses } = await getFollowingAddresses(networkId, viewerAddress)
-      if (!supported || addresses.length === 0) {
+      const addresses = await readFollowingAddresses(pool, viewerAddress.toLowerCase())
+      if (addresses.length === 0) {
         return NextResponse.json({
           success: true,
           data: [],
           nextPage: null,
-          meta: { page, count: 0, hasMore: false, followingSupported: supported },
+          meta: { page, count: 0, hasMore: false, followingSupported: true },
         })
       }
       followingAddresses = addresses

@@ -6,6 +6,7 @@ import { parseEventLogs, zeroAddress } from 'viem'
 import { useConnection, usePublicClient, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
 import { CONTRACTS, config } from '@/config/wagmi'
 import { appChains } from '@/config/contracts'
+import { SOCIAL_GRAPH_CHAIN_ID } from '@/config/socialGraph'
 import { canSessionPayGas, isSessionActive, isSessionUnusableError, writeWithBurnerSession } from '@/lib/burnerSession'
 import { uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
 import { MAX_POLL_OPTIONS, MIN_POLL_OPTIONS, POLL_DURATIONS, REQUIREMENT_MODE, REQUIREMENT_TYPE } from '@/lib/polls'
@@ -29,7 +30,7 @@ const GATES = [
   { key: 'community', label: 'Community members' },
   { key: 'token', label: 'Token holders' },
   { key: 'nft', label: 'NFT holders' },
-  { key: 'followers', label: 'People who follow me' },
+  { key: 'followers', label: 'My LSP26 followers' },
   { key: 'allowlist', label: 'A list I choose' },
 ]
 
@@ -118,15 +119,17 @@ const CreatePollDialog = forwardRef(function CreatePollDialog({ onCreated, fixed
   // can answer. Asked of the contract rather than the config: the config says which registry
   // a chain should use, only the contract knows whether it has been told yet. Offered while the
   // read is still in flight so a slow RPC hides nothing — the effect below corrects a pick the
-  // answer then rules out.
+  // answer then rules out. Only LUKSO keeps an onchain follow system (config/socialGraph.js); a
+  // registry still wired in elsewhere no longer receives follows, so nobody could pass it there.
   const { data: followerSystem } = useReadContract({
     abi: pollsAbi,
     address: pollsAddress,
     functionName: 'followerSystem',
     chainId,
-    query: { enabled: Boolean(pollsAddress && chainId) },
+    query: { enabled: Boolean(pollsAddress && chainId === SOCIAL_GRAPH_CHAIN_ID) },
   })
-  const followersGateAvailable = followerSystem === undefined || String(followerSystem).toLowerCase() !== zeroAddress
+  const followersGateAvailable =
+    chainId === SOCIAL_GRAPH_CHAIN_ID && (followerSystem === undefined || String(followerSystem).toLowerCase() !== zeroAddress)
   const gates = followersGateAvailable ? GATES : GATES.filter((entry) => entry.key !== 'followers')
 
   const [question, setQuestion] = useState('')
@@ -617,7 +620,7 @@ const CreatePollDialog = forwardRef(function CreatePollDialog({ onCreated, fixed
               </>
             )}
 
-            {gate === 'followers' && <small>Checked against the LSP26 follower registry onchain at the moment each ballot lands.</small>}
+            {gate === 'followers' && <small>Checked against LUKSO&apos;s LSP26 follower registry onchain as each ballot lands. Follows made in Hup are offchain and don&apos;t count.</small>}
 
             {gate === 'allowlist' && (
               <>

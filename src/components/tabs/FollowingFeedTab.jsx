@@ -22,9 +22,8 @@ import styles from '@/app/page.module.scss'
 const POSTS_PAGE_SIZE = 20
 
 /**
- * Feed of posts from wallets the connected address follows, scoped to the
- * currently active network (getFollowingAddresses only supports one chain at
- * a time - see src/lib/followSystem.js).
+ * Feed of posts from wallets the connected address follows, on the currently active network. The
+ * follow graph itself is the same on every network (config/socialGraph.js); only the posts are per chain.
  */
 export default function FollowingFeedTab() {
   const feedRefreshNonce = usePostStore((state) => state.feedRefreshNonce)
@@ -36,7 +35,7 @@ export default function FollowingFeedTab() {
   const [activeChain] = getActiveChain()
 
   // Switching tabs away and back restores the loaded posts and scroll place, like For you.
-  // Keyed per chain: the follow graph is read from one network at a time.
+  // Keyed per chain: the posts come from one network at a time.
   const { initialCache, remember, containerRef, containerStyle, cardStyle } = useFeedTabCache(
     `following-${activeChain?.id}`,
     address,

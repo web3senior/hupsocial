@@ -2,30 +2,27 @@
 
 /**
  * Instagram-style followers/following modal for the profile page.
- * Lists come from the cross-network aggregate APIs (cidex `follows` table) so
- * counts match the profile header. Follow vs Following per row comes from the
- * viewer's following list on the connected chain — the chain the tx lands on —
- * with the aggregate standing in only until that read answers.
+ * Lists come from the aggregate APIs over the `follows` table (offchain follows plus
+ * LUKSO's LSP26, config/socialGraph.js), so counts match the profile header and every
+ * row's Follow vs Following comes with the page that lists it.
  *
- * Rows the viewer doesn't follow yet carry a checkbox — the selection is sent as
- * one followBatch transaction from the action bar, preflighted against the active
- * chain first because a single already-followed address reverts the whole array.
+ * Rows the viewer doesn't follow yet carry a checkbox — the selection is followed in
+ * one go from the action bar, offchain and free (lib/follow.js).
  */
 
 import Link from 'next/link'
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { useConnection, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from 'wagmi'
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react'
+import { useChainId, useConnection, useSignMessage } from 'wagmi'
 import clsx from 'clsx'
 import NativeDialog from '@/components/ui/NativeDialog'
 import { toast } from '@/components/NextToast'
 import { useProfile } from '@/hooks/useProfile'
 import { profilePath } from '@/lib/username'
-import { getActiveChain } from '@/lib/communication'
-import { chunk, describeDropped } from '@/lib/batchLike'
-import { MAX_BATCH_FOLLOW_COUNT, preflightSelection, readFollowingSet } from '@/lib/batchFollow'
+import { chunk } from '@/lib/batchLike'
+import { fetchFollowRelations, setFollowing } from '@/lib/follow'
+import { MAX_FOLLOW_TARGETS } from '@/config/socialGraph'
 import { shortTxError } from '@/lib/utils'
 import Avatar from '@/components/ui/Avatar'
-import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import styles from './FollowListDialog.module.scss'
 
 const PAGE_SIZE = 20
@@ -42,60 +39,21 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
   const dialogRef = useRef(null)
   const listRef = useRef(null)
   const { address } = useConnection()
-  const publicClient = usePublicClient()
-  const { mutateAsync: writeContractAsync } = useWriteContract()
+  const chainId = useChainId()
+  const { signMessageAsync } = useSignMessage()
   const [activeTab, setActiveTab] = useState('followers')
   const [tabs, setTabs] = useState({ followers: emptyTabState(), following: emptyTabState() })
-  // Cross-network "does the viewer follow this address" flags, keyed by lowercase
-  // address — the fallback for row state until the connected chain has answered.
+  // "Does the viewer follow this address" flags, keyed by lowercase address
   const [viewerFollowing, setViewerFollowing] = useState({})
-  // Lowercased addresses the viewer follows on the connected chain; null until read (or unreadable)
-  const [onchainFollowing, setOnchainFollowing] = useState(null)
-  const [followStateLoading, setFollowStateLoading] = useState(false)
   // Batch-follow selection, keyed by lowercase address (shared across both tabs
-  // since the same profile can appear in each). Sent as one followBatch tx.
+  // since the same profile can appear in each)
   const [selected, setSelected] = useState(() => new Set())
   const [isBatchSending, setIsBatchSending] = useState(false)
 
   // Guards against double-fetching the same page (scroll events fire faster than state settles)
   const loadingRef = useRef({ followers: false, following: false })
-  const followerSystemAddress = getActiveChain()?.[1]?.followerSystem
-  // Only the newest read may land — a chain or wallet switch mid-flight would seed rows with the old chain's list
-  const followingReadRef = useRef(0)
-  const openedRef = useRef(false)
 
-  const loadOnchainFollowing = useCallback(async () => {
-    const requestId = ++followingReadRef.current
-    if (!address || !publicClient || !followerSystemAddress) {
-      setOnchainFollowing(null)
-      setFollowStateLoading(false)
-      return
-    }
-    setFollowStateLoading(true)
-    try {
-      const following = await readFollowingSet({ client: publicClient, contractAddress: followerSystemAddress, viewer: address })
-      if (requestId === followingReadRef.current) setOnchainFollowing(following)
-    } catch (error) {
-      console.error('Could not read the following list onchain:', error)
-      if (requestId === followingReadRef.current) setOnchainFollowing(null)
-    } finally {
-      if (requestId === followingReadRef.current) setFollowStateLoading(false)
-    }
-  }, [address, publicClient, followerSystemAddress])
-
-  // The list is read when the dialog opens, and again whenever the wallet or chain changes while it has been used
-  useEffect(() => {
-    setOnchainFollowing(null)
-    if (openedRef.current) loadOnchainFollowing()
-  }, [loadOnchainFollowing])
-
-  const isFollowedByViewer = useCallback(
-    (profileAddress) => {
-      const key = profileAddress.toLowerCase()
-      return onchainFollowing ? onchainFollowing.has(key) : Boolean(viewerFollowing[key])
-    },
-    [onchainFollowing, viewerFollowing]
-  )
+  const isFollowedByViewer = useCallback((profileAddress) => Boolean(viewerFollowing[profileAddress.toLowerCase()]), [viewerFollowing])
 
   const loadPage = useCallback(
     async (tabId, page) => {
@@ -151,13 +109,11 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
         // Both counts show in the header, so prime both tabs on first open
         if (tabs.followers.page === 0) loadPage('followers', 1)
         if (tabs.following.page === 0) loadPage('following', 1)
-        openedRef.current = true
-        loadOnchainFollowing()
         dialogRef.current?.open()
       },
       close: () => dialogRef.current?.close(),
     }),
-    [loadPage, loadOnchainFollowing, tabs.followers.page, tabs.following.page]
+    [loadPage, tabs.followers.page, tabs.following.page]
   )
 
   // The list is the scroll container; pull the next page as it nears the bottom
@@ -197,17 +153,11 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
     })
   }, [])
 
-  // One place flips follow state for every reader: the chain set, the aggregate fallback,
-  // and the basket (a followed row has no checkbox, so it must leave the selection).
+  // One place flips follow state for every reader: the row flags and the basket
+  // (a followed row has no checkbox, so it must leave the selection).
   const markFollowing = useCallback(
     (addresses, following) => {
       const keys = addresses.map((entry) => entry.toLowerCase())
-      setOnchainFollowing((prev) => {
-        if (!prev) return prev
-        const next = new Set(prev)
-        for (const key of keys) following ? next.add(key) : next.delete(key)
-        return next
-      })
       setViewerFollowing((prev) => {
         const next = { ...prev }
         for (const key of keys) next[key] = following
@@ -238,71 +188,22 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
       return
     }
 
-    if (!followerSystemAddress) {
-      toast(`Follow system isn't deployed on this network yet`, `warning`)
-      return
-    }
-
-    const selection = [...selected]
-    if (selection.length === 0) return
+    const queue = [...selected]
+    if (queue.length === 0) return
 
     setIsBatchSending(true)
 
     try {
-      let queue = selection
-
-      if (publicClient) {
-        try {
-          const result = await preflightSelection({
-            client: publicClient,
-            contractAddress: followerSystemAddress,
-            addresses: selection,
-            viewer: address,
-          })
-
-          queue = result.followable
-
-          // These addresses revert forever on this chain, and one takes the whole array down
-          if (result.dropped.length > 0) {
-            result.dropped.forEach((entry) => pruneSelection(entry.address))
-            toast(`Skipped ${describeDropped(result.dropped)}`, 'info')
-          }
-        } catch (error) {
-          // A failed read is no reason to block the batch; the wallet surfaces
-          // anything the preflight would have caught
-          console.error('Batch follow preflight failed:', error)
-          toast('Could not verify selection, sending as staged', 'info')
-        }
-      }
-
-      if (queue.length === 0) {
-        toast('Everyone selected is already followed', 'info')
-        return
-      }
-
-      const batches = chunk(queue, MAX_BATCH_FOLLOW_COUNT)
-
-      for (let index = 0; index < batches.length; index++) {
-        const batch = batches[index]
-
-        if (batches.length > 1) toast(`Signing batch ${index + 1} of ${batches.length}`, 'info')
-
-        await writeContractAsync({
-          abi: followerSystemAbi,
-          address: followerSystemAddress,
-          functionName: 'followBatch',
-          args: [batch],
-        })
-
-        // Flip the signed rows to Following immediately instead of waiting for
-        // cidex. Marking per batch keeps the unsigned remainder selected if a
-        // later chunk fails.
+      // Following someone already followed is a no-op offchain, so nothing needs weeding out first
+      for (const batch of chunk(queue, MAX_FOLLOW_TARGETS)) {
+        await setFollowing({ address, targets: batch, following: true, signMessageAsync, chainId })
+        // Marked per batch, so the remainder stays selected if a later one fails
         markFollowing(batch, true)
       }
 
       toast(queue.length === 1 ? 'Profile followed' : `Following ${new Intl.NumberFormat('en').format(queue.length)} profiles`, 'success')
     } catch (error) {
-      console.error('Batch follow transaction failed:', error)
+      console.error('Batch follow failed:', error)
       toast(shortTxError(error, 'Batch follow failed'), 'error')
     } finally {
       setIsBatchSending(false)
@@ -341,7 +242,6 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
             key={profileAddress}
             profileAddress={profileAddress}
             following={isFollowedByViewer(profileAddress)}
-            followStateLoading={followStateLoading}
             isSelected={selected.has(profileAddress.toLowerCase())}
             isBatchSending={isBatchSending}
             onToggleSelect={toggleSelect}
@@ -389,50 +289,36 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
 
 /**
  * Single list entry: SWR-cached profile lookup plus a follow toggle. The dialog owns
- * the follow state; the row flips it optimistically around the tx on the active
- * chain's contract and hands it back if that tx fails.
+ * the follow state; the row flips it optimistically and hands it back if the follow fails.
  *
- * The batch checkbox only shows on rows that are still followable — a followed
- * profile can't join a followBatch without reverting the whole array.
+ * The batch checkbox only shows on rows that are still followable.
  */
-const ProfileRow = ({ profileAddress, following, followStateLoading, isSelected, isBatchSending, onToggleSelect, onFollowChanged, onNavigate }) => {
+const ProfileRow = ({ profileAddress, following, isSelected, isBatchSending, onToggleSelect, onFollowChanged, onNavigate }) => {
   const { profile, isLoading } = useProfile(profileAddress)
   const { address, isConnected } = useConnection()
-  const activeChain = getActiveChain()
-  const followerSystemAddress = activeChain?.[1]?.followerSystem
+  const chainId = useChainId()
+  const { signMessageAsync } = useSignMessage()
   const isSelf = address && address.toLowerCase() === profileAddress.toLowerCase()
-  // The state before the pending tx, so a failure can put the row back
-  const revertToRef = useRef(null)
+  const [isBusy, setIsBusy] = useState(false)
 
-  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
-  const { isLoading: isConfirming, error: receiptError } = useWaitForTransactionReceipt({ hash })
-
-  useEffect(() => {
-    const error = submitError || receiptError
-    if (!error) return
-    toast(error.shortMessage || error.message || 'Failed to update follow status', 'error')
-    if (revertToRef.current !== null) onFollowChanged?.([profileAddress], revertToRef.current)
-    revertToRef.current = null
-  }, [submitError, receiptError])
-
-  const handleFollow = () => {
+  const handleFollow = async () => {
     if (!isConnected) {
       toast(`Please connect wallet`, `error`)
       return
     }
-    if (!followerSystemAddress) {
-      toast(`Follow system isn't deployed on this network yet`, `warning`)
-      return
-    }
-    revertToRef.current = following
+    setIsBusy(true)
     onFollowChanged?.([profileAddress], !following)
-    writeContract({
-      address: followerSystemAddress,
-      abi: followerSystemAbi,
-      functionName: following ? 'unfollow' : 'follow',
-      args: [profileAddress],
-      chainId: activeChain?.[0]?.id,
-    })
+    try {
+      // An unfollow also has to clear a LUKSO LSP26 follow, if this is one
+      const onchain = following ? (await fetchFollowRelations(address, [profileAddress])).onchain : []
+      await setFollowing({ address, targets: [profileAddress], following: !following, signMessageAsync, chainId, onchain })
+    } catch (error) {
+      toast(error.shortMessage || error.message || 'Failed to update follow status', 'error')
+      // Put the row back unless only the onchain half failed — the offchain change did land
+      if (error.code !== 'ONCHAIN_UNFOLLOW_FAILED') onFollowChanged?.([profileAddress], following)
+    } finally {
+      setIsBusy(false)
+    }
   }
 
   const truncatedAddress = `${profileAddress.slice(0, 6)}…${profileAddress.slice(-4)}`
@@ -470,9 +356,9 @@ const ProfileRow = ({ profileAddress, following, followStateLoading, isSelected,
           type="button"
           className={clsx(styles.row__followBtn, following && styles['row__followBtn--following'])}
           onClick={handleFollow}
-          disabled={isSigning || isConfirming || isBatchSending || followStateLoading}
+          disabled={isBusy || isBatchSending}
         >
-          {isSigning || isConfirming ? '…' : following ? 'Following' : 'Follow'}
+          {isBusy ? '…' : following ? 'Following' : 'Follow'}
         </button>
       )}
     </div>

@@ -228,16 +228,16 @@ function ActivityPerson({ entry, networkId }) {
         <span suppressHydrationWarning>{toRelativeTime(entry.at)}</span>
       </span>
 
-      <FollowToggle target={row.wallet_address} networkId={networkId} />
+      <FollowToggle target={row.wallet_address} />
     </li>
   )
 }
 
-function FollowToggle({ target, networkId }) {
-  const { followerSystemAddress, isSelf, isFollowing, isLoading, isBusy, isSigning, toggle } = useFollowState(target, networkId)
+function FollowToggle({ target }) {
+  const { isSelf, isFollowing, isLoading, isBusy, toggle } = useFollowState(target)
 
-  // Nothing to follow yourself with, and nothing to follow on a chain without the system
-  if (isSelf || !followerSystemAddress) return null
+  // Nothing to follow yourself with
+  if (isSelf) return null
   if (isLoading) return <Shimmer className={styles.person__followShimmer} />
 
   return (
@@ -247,7 +247,7 @@ function FollowToggle({ target, networkId }) {
       onClick={toggle}
       disabled={isBusy}
     >
-      {isSigning ? 'Confirm…' : isBusy ? '…' : isFollowing ? 'Following' : 'Follow'}
+      {isBusy ? '…' : isFollowing ? 'Following' : 'Follow'}
     </button>
   )
 }

@@ -6,11 +6,13 @@ import { CONTRACTS } from '@/config/wagmi'
 import { DROP_GATES } from '@/lib/drops'
 import styles from './DropGatePicker.module.scss'
 
-// The follower and community systems exist per chain, so the gate menu is chain-shaped
+// The follower and community systems exist per chain, so the gate menu is chain-shaped. Only LUKSO
+// keeps an onchain follow system (config/socialGraph.js), and the gate counts onchain follows only —
+// a follow made in Hup is offchain and does not open it.
 export const dropGateOptions = ({ chainId, hasCommunityGate }) => [
   { id: DROP_GATES.OPEN, label: 'Open', icon: <LockSimpleOpenIcon size={13} /> },
   { id: DROP_GATES.ALLOWLIST, label: 'Allowlist', icon: <LockSimpleIcon size={13} /> },
-  ...(CONTRACTS[`chain${chainId}`]?.followerSystem ? [{ id: DROP_GATES.FOLLOWERS, label: 'Followers', icon: <UsersIcon size={13} /> }] : []),
+  ...(CONTRACTS[`chain${chainId}`]?.followerSystem ? [{ id: DROP_GATES.FOLLOWERS, label: 'LSP26 followers', icon: <UsersIcon size={13} /> }] : []),
   ...(hasCommunityGate ? [{ id: DROP_GATES.COMMUNITY, label: 'Community', icon: <UsersThreeIcon size={13} /> }] : []),
   /* Both gates are a plain balanceOf against a contract the creator names, so unlike the follower
      and community gates they need nothing deployed per chain and are always on offer. */

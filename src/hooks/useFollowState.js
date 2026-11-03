@@ -1,71 +1,71 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useConnection, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
-import { CONTRACTS } from '@/config/wagmi'
-import { getActiveChain } from '@/lib/communication'
+import { useState } from 'react'
+import useSWR from 'swr'
+import { useChainId, useConnection, useSignMessage } from 'wagmi'
+import { fetchFollowRelations, setFollowing } from '@/lib/follow'
 import { openConnect } from '@/lib/connectDialog'
-import { sameAddress } from '@/lib/address'
+import { isEvmAddress, sameAddress } from '@/lib/address'
 import { toast } from '@/components/NextToast'
-import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 
 /**
- * Whether the viewer follows `target` on LSP26, and the toggle that flips it. Read on the given
- * network rather than whichever chain the wallet is on, so a post's byline asks the post's chain.
- * Shared by the profile hover card and the post activity list.
+ * Whether the viewer follows `target`, and the toggle that flips it. Following is offchain and the
+ * same on every chain (lib/follow.js); an unfollow also clears a LUKSO LSP26 follow when there is
+ * one. Shared by the profile page, the profile hover card and the post activity list.
  * @param {string} target Wallet to follow.
- * @param {string|number} [networkId] Chain whose follower system to use.
- * @param {{ onConfirmed?: Function }} [options] Runs after a follow/unfollow lands onchain.
+ * @param {{ onConfirmed?: (following: boolean) => void }} [options] Runs after a follow/unfollow is saved.
  */
-export function useFollowState(target, networkId, { onConfirmed } = {}) {
+export function useFollowState(target, { onConfirmed } = {}) {
   const { address, isConnected } = useConnection()
-  const [fallbackChain] = getActiveChain()
-  const followerSystemAddress = CONTRACTS[`chain${networkId || fallbackChain?.id}`]?.followerSystem
+  const chainId = useChainId()
+  const { signMessageAsync } = useSignMessage()
   const isSelf = sameAddress(address, target)
+  const canRead = isEvmAddress(address) && isEvmAddress(target) && !isSelf
 
-  const { data, isLoading, refetch } = useReadContract({
-    address: followerSystemAddress,
-    abi: followerSystemAbi,
-    functionName: 'isFollowing',
-    args: [address, target],
-    query: { enabled: !!followerSystemAddress && !!address && !!target && !isSelf },
+  const { data, isLoading, mutate } = useSWR(canRead ? ['follow-relation', address.toLowerCase(), target.toLowerCase()] : null, async () => {
+    const key = target.toLowerCase()
+    const { following, onchain } = await fetchFollowRelations(address, [target])
+    return { following: following.has(key), onchain: onchain.has(key) }
   })
-  const isFollowing = Boolean(data)
+  const relation = data ?? { following: false, onchain: false }
+  const [isBusy, setIsBusy] = useState(false)
 
-  const { data: hash, isPending: isSigning, mutate: writeContract } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
-
-  useEffect(() => {
-    if (!isConfirmed) return
-    refetch()
-    onConfirmed?.()
-  }, [isConfirmed, refetch]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const toggle = () => {
+  const toggle = async () => {
     if (!isConnected) {
       if (!openConnect()) toast(`Please connect wallet`, `error`)
       return
     }
-    if (!followerSystemAddress) {
-      toast(`Follow system isn't deployed on this network yet`, `warning`)
-      return
+    if (!canRead || isBusy) return
+
+    const wasFollowing = relation.following
+    setIsBusy(true)
+    mutate({ ...relation, following: !wasFollowing }, { revalidate: false })
+    try {
+      await setFollowing({
+        address,
+        targets: [target],
+        following: !wasFollowing,
+        signMessageAsync,
+        chainId,
+        onchain: relation.onchain ? [target] : [],
+      })
+      // Trusted rather than re-read: an onchain unfollow reaches the table only once cidex indexes it
+      mutate({ following: !wasFollowing, onchain: wasFollowing ? false : relation.onchain }, { revalidate: false })
+      onConfirmed?.(!wasFollowing)
+    } catch (error) {
+      toast(error.shortMessage || error.message || 'Failed to update follow status', 'error')
+      mutate()
+    } finally {
+      setIsBusy(false)
     }
-    writeContract({
-      address: followerSystemAddress,
-      abi: followerSystemAbi,
-      functionName: isFollowing ? 'unfollow' : 'follow',
-      args: [target],
-    })
   }
 
   return {
-    followerSystemAddress,
     isSelf,
-    isFollowing,
+    isFollowing: relation.following,
     // Only meaningful with a wallet: signed out there is nothing to read, and the button says Follow
-    isLoading: isConnected && !isSelf && isLoading,
-    isBusy: isSigning || isConfirming,
-    isSigning,
+    isLoading: isConnected && canRead && isLoading,
+    isBusy,
     toggle,
   }
 }

@@ -544,7 +544,7 @@ const DropCard = ({ drop, referral, showDetailsLink = true, compact = false, pre
 
         {show.mint && isLive && gateBlocked && (
           <span className={styles.dropCard__badge}>
-            {gate === DROP_GATES.FOLLOWERS ? 'Follow the creator to mint' : 'Requires the gated asset'}
+            {gate === DROP_GATES.FOLLOWERS ? 'Follow the creator via LSP26 on LUKSO to mint' : 'Requires the gated asset'}
           </span>
         )}
 

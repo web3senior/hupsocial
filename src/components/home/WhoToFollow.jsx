@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
-import { useConnection, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useChainId, useConnection, useSignMessage } from 'wagmi'
 import clsx from 'clsx'
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import useRailScroll from '@/hooks/useRailScroll'
@@ -13,11 +13,9 @@ import Shimmer from '@/components/ui/Shimmer'
 import { toast } from '@/components/NextToast'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { profileFallbackFromRow, useProfile } from '@/hooks/useProfile'
-import { CONTRACTS } from '@/config/wagmi'
-import { getActiveChain } from '@/lib/communication'
 import { openConnect } from '@/lib/connectDialog'
 import { shortAddress } from '@/lib/address'
-import followerSystemAbi from '@/abis/LSP26FollowerSystem'
+import { setFollowing } from '@/lib/follow'
 import styles from './WhoToFollow.module.scss'
 
 const SUGGESTIONS_ENDPOINT = '/api/v1/users/suggested'
@@ -26,10 +24,9 @@ const SUGGESTION_COUNT = 10
 const SKELETON_COUNT = 4
 const AVATAR_SIZE = 80
 
-const fetchSuggestions = async (viewer, chainId) => {
+const fetchSuggestions = async (viewer) => {
   const params = new URLSearchParams({ limit: String(SUGGESTION_COUNT) })
   if (viewer) params.set('viewer', viewer)
-  if (viewer && chainId) params.set('chain', String(chainId))
   const response = await fetch(`${SUGGESTIONS_ENDPOINT}?${params}`)
   if (!response.ok) throw new Error(`Suggestions request failed (${response.status})`)
   const body = await response.json()
@@ -44,9 +41,7 @@ const fetchSuggestions = async (viewer, chainId) => {
  */
 export default function WhoToFollow() {
   const { address: viewer } = useActiveWallet()
-  const [activeChain] = getActiveChain()
-  const chainId = activeChain?.id
-  const { data, isLoading } = useSWR(['suggested-users', viewer ?? 'anon', chainId], () => fetchSuggestions(viewer, chainId), {
+  const { data, isLoading } = useSWR(['suggested-users', viewer ?? 'anon'], () => fetchSuggestions(viewer), {
     revalidateOnFocus: false,
     keepPreviousData: true,
   })
@@ -142,42 +137,31 @@ const SuggestionCard = ({ user }) => {
 }
 
 /**
- * One LSP26 `follow` on the connected chain. The list already leaves out anyone the viewer
- * follows, so the button starts at "Follow" and flips on the transaction hash — the receipt only
- * has to confirm it, or roll it back with a word.
+ * One offchain follow (lib/follow.js). The list already leaves out anyone the viewer follows, so the
+ * button starts at "Follow" and flips as soon as it is tapped; a failure flips it back with a word.
  */
 const FollowButton = ({ target }) => {
-  const { isConnected } = useConnection()
-  const [activeChain] = getActiveChain()
-  const followerSystemAddress = CONTRACTS[`chain${activeChain?.id}`]?.followerSystem
-  const [following, setFollowing] = useState(false)
+  const { address, isConnected } = useConnection()
+  const chainId = useChainId()
+  const { signMessageAsync } = useSignMessage()
+  const [isFollowing, setIsFollowing] = useState(false)
+  const [isBusy, setIsBusy] = useState(false)
 
-  const { data: hash, isPending: isSigning, mutate: writeContract } = useWriteContract()
-  const { isSuccess: isConfirmed, isError: isFailed } = useWaitForTransactionReceipt({ hash })
-  // Optimistic from the hash, rolled back by a failed receipt — derived, so no effect has to undo it
-  const isFollowing = following && !isFailed
-
-  useEffect(() => {
-    if (isConfirmed) toast(`You're now following`, `success`)
-  }, [isConfirmed])
-
-  useEffect(() => {
-    if (isFailed) toast(`Follow didn't go through`, `error`)
-  }, [isFailed])
-
-  const handleFollow = () => {
+  const handleFollow = async () => {
     if (!isConnected) {
       if (!openConnect()) toast(`Please connect wallet`, `error`)
       return
     }
-    if (!followerSystemAddress) {
-      toast(`Follow system isn't deployed on this network yet`, `warning`)
-      return
+    setIsBusy(true)
+    setIsFollowing(true)
+    try {
+      await setFollowing({ address, targets: [target], following: true, signMessageAsync, chainId })
+    } catch (error) {
+      setIsFollowing(false)
+      toast(error.shortMessage || `Follow didn't go through`, `error`)
+    } finally {
+      setIsBusy(false)
     }
-    writeContract(
-      { address: followerSystemAddress, abi: followerSystemAbi, functionName: 'follow', args: [target] },
-      { onSuccess: () => setFollowing(true) },
-    )
   }
 
   return (
@@ -185,9 +169,9 @@ const FollowButton = ({ target }) => {
       type="button"
       className={clsx(styles.follow__button, isFollowing && styles['follow__button--following'])}
       onClick={handleFollow}
-      disabled={isSigning || isFollowing}
+      disabled={isBusy || isFollowing}
     >
-      {isSigning ? 'Confirm…' : isFollowing ? 'Following' : 'Follow'}
+      {isFollowing ? 'Following' : 'Follow'}
     </button>
   )
 }

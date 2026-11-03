@@ -27,10 +27,9 @@ import { readFeedCache, saveFeedCache } from '@/db/feedCache'
 import { PostCard } from '@/components/Post'
 import { getActiveChain } from '@/lib/communication'
 import { CommunityBadge } from '@/components/Profile'
-import { useBalance, useWaitForTransactionReceipt, useConnection, useDisconnect, usePublicClient, useReadContract, useSignMessage, useWriteContract } from 'wagmi'
+import { useBalance, useConnection, useDisconnect, usePublicClient, useSignMessage } from 'wagmi'
 import { lukso } from 'wagmi/chains'
 import { getAddress } from 'viem'
-import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import moment from 'moment'
 import { ThreeDotIcon } from '@/components/Icons'
 import { SealCheckIcon } from '@phosphor-icons/react'
@@ -44,6 +43,7 @@ import AssetsTab from '@/components/tabs/AssetsTab'
 import PostSkeletonGrid from '@/components/ui/PostSkeleton'
 import UniversalIdentity from '@/components/ui/UniversalIdentity/UniversalIdentity'
 import { useProfile } from '@/hooks/useProfile'
+import { useFollowState } from '@/hooks/useFollowState'
 import { handleBrokenAvatar } from '@/lib/utils'
 import AgentBadge from '@/components/ui/AgentBadge'
 import AmbassadorBadge from '@/components/ui/AmbassadorBadge'
@@ -516,16 +516,6 @@ const Profile = ({ addr }) => {
   const disconnectSolana = useSolanaWalletStore((state) => state.disconnect)
   const activeChain = getActiveChain()
   const { profile, isLoading, mutate } = useProfile(addr)
-  /* Error during submission (e.g., user rejected)  */
-  const { data: hash, isPending: isSigning, error: submitError, mutate: writeContract } = useWriteContract()
-  /* Error after mining (e.g., transaction reverted) */
-  const {
-    isLoading: isConfirming,
-    isSuccess: isConfirmed,
-    error: receiptError,
-  } = useWaitForTransactionReceipt({
-    hash,
-  })
 
   useEffect(() => {
     fetch(`/api/v1/users/${addr}/view`)
@@ -553,30 +543,9 @@ const Profile = ({ addr }) => {
     window.history.replaceState(null, '', `${canonical}${window.location.search}${window.location.hash}`)
   }, [profile?.username])
 
-  // The connected chain decides follow vs unfollow — that is where the tx lands, and the
-  // cross-network aggregate can disagree with it (indexer lag, or a follow made on another chain).
-  const followerSystemAddress = activeChain?.[1]?.followerSystem
-  const activeChainId = activeChain?.[0]?.id
-  const canReadFollowState = Boolean(followerSystemAddress && walletKind !== 'solana' && isEvmAddress(address) && isEvmAddress(addr))
-
-  const {
-    data: onchainFollowing,
-    isLoading: isFollowStateLoading,
-    refetch: refetchOnchainFollowing,
-  } = useReadContract({
-    address: followerSystemAddress,
-    abi: followerSystemAbi,
-    functionName: 'isFollowing',
-    args: [address, addr],
-    chainId: activeChainId,
-    query: { enabled: canReadFollowState },
-  })
-
-  // The count stays the cross-network aggregate from cidex; only the button is per-chain
+  // The count is the aggregate of every follow (offchain, LUKSO and older chains); the button is the
+  // viewer's own relation, read and written through the one offchain graph
   const [followerCount, setFollowerCount] = useState(0)
-  // Set on click, cleared once the chain has been re-read after the tx settles or fails
-  const [optimisticFollowing, setOptimisticFollowing] = useState(null)
-  const isFollowingTarget = optimisticFollowing ?? Boolean(onchainFollowing)
 
   const refetchFollowerCount = () => {
     if (!addr) return
@@ -590,37 +559,14 @@ const Profile = ({ addr }) => {
     refetchFollowerCount()
   }, [addr])
 
-  useEffect(() => {
-    if (!isConfirmed) return
-    refetchOnchainFollowing().finally(() => setOptimisticFollowing(null))
-  }, [isConfirmed])
-
-  const follow = () => {
-    if (!followerSystemAddress) {
-      toast(`Follow system isn't deployed on this network yet`, `warning`)
-      return
-    }
-    const wasFollowing = isFollowingTarget
-    setOptimisticFollowing(!wasFollowing)
-    setFollowerCount((prev) => Math.max(0, prev + (wasFollowing ? -1 : 1)))
-
-    writeContract({
-      address: followerSystemAddress,
-      abi: followerSystemAbi,
-      functionName: wasFollowing ? 'unfollow' : 'follow',
-      args: [addr],
-      chainId: activeChainId,
-    })
-  }
-
-  useEffect(() => {
-    const error = submitError || receiptError
-    if (!error) return
-    toast(error.shortMessage || error.message || 'Failed to update follow status', 'error')
-    // Nothing changed onchain — drop the optimistic flip and put the count back
-    setOptimisticFollowing(null)
-    refetchFollowerCount()
-  }, [submitError, receiptError])
+  const {
+    isFollowing: isFollowingTarget,
+    isLoading: isFollowStateLoading,
+    isBusy: isFollowBusy,
+    toggle: follow,
+  } = useFollowState(walletKind === 'solana' ? null : addr, {
+    onConfirmed: (nowFollowing) => setFollowerCount((prev) => Math.max(0, prev + (nowFollowing ? 1 : -1))),
+  })
 
   const handleDisconnect = async () => {
     if (walletKind === 'solana') await disconnectSolana()
@@ -935,9 +881,9 @@ const Profile = ({ addr }) => {
                   className={`${styles.profile__btnFollow} flex-1`}
                   type="button"
                   onClick={follow}
-                  disabled={isSigning || isConfirming || isFollowStateLoading}
+                  disabled={isFollowBusy || isFollowStateLoading}
                 >
-                  {isSigning ? 'Confirm Wallet...' : isConfirming ? 'Confirming...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
+                  {isFollowBusy ? 'Saving...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
                 </button>
                 <BlockUserButton target={addr} />
               </li>

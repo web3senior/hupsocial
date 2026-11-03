@@ -4,17 +4,15 @@ import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useReadContract } from 'wagmi'
+import useSWR from 'swr'
 import { useProfile } from '@/hooks/useProfile'
 import { useFollowState } from '@/hooks/useFollowState'
 import { toRelativeTime } from '@/lib/dateHelper'
-import { config, CONTRACTS } from '@/config/wagmi'
-import { getActiveChain } from '@/lib/communication'
+import { config } from '@/config/wagmi'
 import { isSolanaNetworkId, solanaChainFor } from '@/config/solana'
 import { addressTag, isEvmAddress, shortAddress } from '@/lib/address'
 import { tunnelChatUrl } from '@/lib/tunnel'
 import { getAddress } from 'viem'
-import followerSystemAbi from '@/abis/LSP26FollowerSystem'
 import AgentBadge from './ui/AgentBadge'
 import AmbassadorBadge from './ui/AmbassadorBadge'
 import Avatar from './ui/Avatar'
@@ -138,7 +136,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
       }}
     >
       {() => (popoverOpened ? (
-        <ProfileHoverCard creator={creator} profile={profile} displayName={displayName} profileHref={profileHref} networkId={networkId} />
+        <ProfileHoverCard creator={creator} profile={profile} displayName={displayName} profileHref={profileHref} />
       ) : null)}
     </NativePopover>
   )
@@ -279,28 +277,27 @@ export const CommunityBadge = ({ badge, size = 'sm', iconOnly = false, linked = 
 }
 
 // Popup shown when the avatar or name is hovered (tapped, on pointers without hover): who the
-// account is, and the two things a reader does next — follow it or message it. Follows are read
-// on the post's own chain instead of whichever chain the wallet is currently connected to.
-const ProfileHoverCard = ({ creator, profile, displayName, profileHref, networkId }) => {
-  const [fallbackChain] = getActiveChain()
-  const followerSystemAddress = CONTRACTS[`chain${networkId || fallbackChain?.id}`]?.followerSystem
+// account is, and the two things a reader does next — follow it or message it. Following is one
+// offchain graph, so neither the count nor the button depends on the post's chain.
+const fetchFollowerTotal = (url) =>
+  fetch(url)
+    .then((response) => response.json())
+    .then((body) => (body?.success ? Number(body.meta.total) : 0))
 
-  const { data: followerCountData, isLoading: isFollowerCountLoading, refetch: refetchFollowerCount } = useReadContract({
-    address: followerSystemAddress,
-    abi: followerSystemAbi,
-    functionName: 'followerCount',
-    args: [creator],
-    query: { enabled: !!followerSystemAddress && !!creator },
-  })
+const ProfileHoverCard = ({ creator, profile, displayName, profileHref }) => {
+  const {
+    data: followerCount,
+    isLoading: isFollowerCountLoading,
+    mutate: refetchFollowerCount,
+  } = useSWR(creator ? `/api/v1/users/${creator}/followers?limit=1` : null, fetchFollowerTotal)
 
   const {
     isSelf,
     isFollowing: isFollowingTarget,
     isLoading: isFollowStateLoading,
     isBusy,
-    isSigning,
     toggle,
-  } = useFollowState(creator, networkId, { onConfirmed: refetchFollowerCount })
+  } = useFollowState(creator, { onConfirmed: () => refetchFollowerCount() })
 
   // Same target the profile page's Message button opens
   const tunnelTarget = profile.tunnelAddress ?? (isEvmAddress(creator) ? getAddress(creator.toLowerCase()) : null)
@@ -331,13 +328,13 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref, networkI
 
       {profile.description && <p className={styles.hoverCard__bio}>{profile.description}</p>}
 
-      {/* Shimmers until the contract answers, so neither the count nor the Follow label flips
+      {/* Shimmers until the count is in, so neither the count nor the Follow label flips
           from a default to the real value in front of the reader */}
       {isFollowerCountLoading ? (
         <Shimmer className={styles.hoverCard__followersShimmer} />
       ) : (
         <span className={styles.hoverCard__followers}>
-          {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(followerCountData ?? 0))} followers
+          {new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(followerCount ?? 0)} followers
         </span>
       )}
 
@@ -349,7 +346,7 @@ const ProfileHoverCard = ({ creator, profile, displayName, profileHref, networkI
             onClick={handleFollow}
             disabled={isBusy}
           >
-            {isSigning ? 'Confirm Wallet...' : isBusy ? 'Confirming...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
+            {isBusy ? 'Saving...' : isFollowingTarget ? 'Unfollow' : 'Follow'}
           </button>}
           {tunnelTarget && (
             <a className={styles.hoverCard__btn} href={tunnelChatUrl(tunnelTarget)} target="_blank" rel="noopener noreferrer">

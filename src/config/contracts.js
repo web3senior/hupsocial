@@ -128,7 +128,7 @@ export const CONTRACTS = {
     forwarderName: 'HupForwarder',
     hup: '0xd1aEc7Bb7679FA30E74Ab30877FbdF96d51333D4',
     status: '0x130BD13f5A7AcA97cfF4Ed32ac2EbF94197Be88f',
-    followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+    followerSystem: '', // The follow graph is offchain plus LUKSO's LSP26 only (config/socialGraph.js)
     sell: '',
     tipper: '0x9a8Daf359280eb03D734530992691888fA33D476',
     trade: '0x7eb333Ad710d398A38c45d49A6A96568c8276b5f',
@@ -225,7 +225,7 @@ export const CONTRACTS = {
     hup: '0x8b76923EA3BFAA8EB29FC58e81E49F3c4Fa9Ba8A',
     scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0xcDc18688D98Ff84fF5352d1ddDe183De7817Df98',
-    followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+    followerSystem: '', // The follow graph is offchain plus LUKSO's LSP26 only (config/socialGraph.js)
     sell: '0xf3A6EB5811CDc207FB7dF25be49930C3Bd7a49A9',
     tipper: '0xCf7C449F5dF10E3FD4ae46C25E9B0895C1Be90e4',
     trade: '0x80218c06A00316687957951036bbD1326a6790C1',
@@ -254,7 +254,7 @@ export const CONTRACTS = {
     hup: '0xdda507afa7be1e70b9dceeb3b34c9b886c98ff73',
     scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0xe7A1F3601b6dCA2F0D5176cd9d8FFA10479D3Ed0',
-    followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+    followerSystem: '', // The follow graph is offchain plus LUKSO's LSP26 only (config/socialGraph.js)
     sell: '0xB7DE0a90D911D7eBA245526cEe3F2deF44346C40',
     tipper: '0x04771ed6223C237Ae6eA9F5e7126871a46cb2583',
     trade: '0x94D81b00b1e4596343e84298dD705e93E36eAb14',
@@ -288,7 +288,7 @@ export const CONTRACTS = {
     status: '0xc9ddc0E09eFa8D3333DFEdFFd68157BC2a9026F3',
     community: '0x77986dE55d0C746351F3A0797b745306c5Fc072C',
     communityGovernance: '',
-    followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+    followerSystem: '', // The follow graph is offchain plus LUKSO's LSP26 only (config/socialGraph.js)
     sell: '',
     tipper: '0x01F725975b17dB66DBF26ebAa02bc74F8a433A18',
     trade: '0x7E14bB18b370b59e0b70759C915f5E3A79599091',
@@ -318,7 +318,7 @@ export const CONTRACTS = {
     hup: '0xA5e73b15c1C3eE477AED682741f0324C6787bbb8',
     scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0x81c5a8fd5771cB398e2461cEF9Abb2eCD308d4c8',
-    followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+    followerSystem: '', // The follow graph is offchain plus LUKSO's LSP26 only (config/socialGraph.js)
     sell: '',
     tipper: '0x74AC93C4A4a67f56af9d1Bd3153910D90F802632',
     trade: '0x594d084D863446cd1618244de695d574a5DfADD5',
@@ -353,7 +353,7 @@ export const CONTRACTS = {
     hup: '0x4E6Bab4961Ab53D70745E791FA727993A4221d1F',
     scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0xc407722d150c8a65e890096869f8015D90a89EfD',
-    followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+    followerSystem: '', // The follow graph is offchain plus LUKSO's LSP26 only (config/socialGraph.js)
     sell: '',
     tipper: '0x3EF07D888e4B4d91e5b6c889E6Bdb7A37BE76CDE',
     trade: '0x77F884698945883841384bCA8bE6df17fCB7c04D',
@@ -398,7 +398,7 @@ export const CONTRACTS = {
     hup: '0x1EC0B3b802aFE596929a038f40F832EA01eCc281',
     scheduleForwarder: SCHEDULE_FORWARDER,
     status: '0x2269Fb436d594902e3c38085CBB3f350532531B3',
-    followerSystem: '0xf01103E5a9909Fc0DBe8166dA7085e0285daDDcA',
+    followerSystem: '', // The follow graph is offchain plus LUKSO's LSP26 only (config/socialGraph.js)
     community: '',
     sell: '',
     tipper: '0x0Fc1223079367ADC73F9960E48d786705e992e14',
