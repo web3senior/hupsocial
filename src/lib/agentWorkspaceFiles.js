@@ -55,7 +55,7 @@ export const STARTER_SKILLS = Object.freeze({
     label: 'RSS reader',
     content: `---
 name: rss-reader
-description: Use when asked for news, headlines or a digest from my feeds, or to post about them.
+description: Use when asked for news, headlines, coin prices or a digest from my feeds, or to post about them.
 ---
 
 # RSS reader
@@ -70,6 +70,12 @@ My feeds (one link per line; replace these with your own):
 1. Read each feed with read_feed (limit 10), or the feed link I give you.
 2. Keep only items from the last 24 hours that are not in your notes.
 3. When several feeds cover the same story, treat it as one story.
+
+## Prices
+Coins I track: BTC, ETH, SOL, LYX
+1. Read them with read_prices before writing a digest.
+2. Give the price rounded ($106.4K, $3,210, $0.84) and the 24h move (+2.1%).
+3. If a coin has no price, leave it out; never guess one.
 
 ## What to skip
 Rumors, giveaways, airdrops, sponsored or "partner" posts, price predictions,
@@ -86,6 +92,8 @@ Draft with propose_post. Plain text, under 500 characters, no Markdown, no hasht
 • One short sentence per story, at most 20 words: what happened, in your own words.
 • Round numbers ($106M, not $106,000,000).
 • No links inside the stories.
+
+💹 BTC $106.4K (+2.1%) · ETH $3,210 (−0.8%)
 
 Sources: CoinDesk, Decrypt, Cointelegraph
 <one link: the source of the biggest story>
