@@ -568,6 +568,13 @@
           opacity 0.2s ease;
       }
 
+      // No count yet: the button is wider than tall (inline padding keeps the row's rhythm), so
+      // the pill takes the height as its width and sits on the glyph as a circle, not an oval
+      &[data-action]:has(> svg:only-child):before {
+        width: auto;
+        aspect-ratio: 1;
+      }
+
       [data-theme='dark'] & {
         &:before {
           background-color: var(--background);
