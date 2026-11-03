@@ -34,6 +34,12 @@
     // reply while pointing at the answer. Each Post paints its own hover layer instead.
     &__reply {
         cursor: pointer;
+
+        // Before "Show replies" the elbow draws the rest of the line; letting the post's line run
+        // into that row leaves a square corner poking out past the bend
+        &:has(+ .commentsList__more) [data-has-comments='true']::after {
+            bottom: 0;
+        }
     }
 
     &__divider {
@@ -41,7 +47,7 @@
     }
 
     // Threads' "Show replies": the reply's avatar line bends right into the faces of who answered.
-    // The line above (Post's data-has-comments) already reaches 12px into this row.
+    // The line above (Post's data-has-comments) stops at this row's top edge; the elbow picks it up.
     &__more {
         position: relative;
         display: flex;
