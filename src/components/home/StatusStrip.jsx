@@ -71,6 +71,13 @@ const markSeen = (viewer, status) => {
 
 const isSeen = (status, seen) => Number(seen[status.wallet_address.toLowerCase()]) >= Number(status.updated_at)
 
+/** A followed wallet's picture with its avatar decorations — from the same profile read (and
+    cache) the feed's bylines use, so the strip costs no request a byline has not already made. */
+const StatusAvatar = ({ status }) => {
+  const { profile } = useProfile(status.wallet_address)
+  return <Avatar className={styles.strip__avatar} src={status.profile_image} size={52} decorations={profile?.decorations} />
+}
+
 /**
  * A row of avatars over the For you feed, each with its owner's status in a bubble above it —
  * the bubble the profile page shows over the avatar, at feed scale. The viewer's own slot comes
@@ -143,7 +150,7 @@ export default function StatusStrip() {
               <span className={styles.strip__text}>{ownHasStatus ? ownStatus.content : '+ Share'}</span>
             </span>
             <span className={clsx(styles.strip__ring, !ownHasStatus && styles['strip__ring--idle'])} style={{ '--status-left': ownHasStatus ? remainingShare(ownStatus, now) : 0 }}>
-              <Avatar className={styles.strip__avatar} src={viewer ? profile?.profileImage : null} size={52} />
+              <Avatar className={styles.strip__avatar} src={viewer ? profile?.profileImage : null} size={52} decorations={profile?.decorations} />
             </span>
             <span className={styles.strip__name}>You</span>
           </button>
@@ -156,7 +163,7 @@ export default function StatusStrip() {
                 <span className={styles.strip__text}>{status.content}</span>
               </span>
               <span className={clsx(styles.strip__ring, isSeen(status, seen) && styles['strip__ring--seen'])} style={{ '--status-left': remainingShare(status, now) }}>
-                <Avatar className={styles.strip__avatar} src={status.profile_image} size={52} />
+                <StatusAvatar status={status} />
               </span>
               <span className={styles.strip__name}>{displayName(status)}</span>
             </button>
