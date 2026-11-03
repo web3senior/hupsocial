@@ -1125,6 +1125,11 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
   // onchain half ships with the build, so the picker is usable the instant the modal opens and
   // this only fills in the rest.
   const [countries, setCountries] = useState([])
+  /* Controlled, not defaultValue: when the list lands, the stand-in option holding the saved
+     country is swapped for the real one, and an uncontrolled select drops to "Not shown" the moment
+     its selected option leaves the DOM — the next save then erased the country. A controlled value
+     is re-applied by React after every render, so the swap keeps the selection. */
+  const [originCode, setOriginCode] = useState(profile?.origin?.code || '')
   /* The picked files wait in state until save, when they are pinned (see handleSubmit). `coverCleared`
      is separate from `coverPreview` being null: only the former is an instruction to erase what is
      stored, and a profile that simply never had a cover must not send one. */
@@ -1816,7 +1821,13 @@ const ProfileModal = ({ profile, setShowProfileModal, getActiveChain, mutate, is
               <label className={styles.profileModal__label} htmlFor="pm-origin">
                 From
               </label>
-              <select id="pm-origin" name="origin" className={styles.profileModal__select} defaultValue={savedOrigin?.code || ''}>
+              <select
+                id="pm-origin"
+                name="origin"
+                className={styles.profileModal__select}
+                value={originCode}
+                onChange={(e) => setOriginCode(e.target.value)}
+              >
                 <option value="">Not shown</option>
                 <optgroup label="Onchain">
                   {ORIGIN_OPTIONS.map((option) => (
