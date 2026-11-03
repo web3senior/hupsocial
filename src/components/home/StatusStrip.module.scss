@@ -1,7 +1,50 @@
 // A row of avatars with status bubbles over the feed. Same inset and rule as ComposePrompt,
 // so the two read as one header block above the posts.
 .strip {
+  position: relative;
   border-bottom: 1px solid var(--border);
+
+  // Centred on the avatar row; touch screens swipe, so the arrows are for pointers only
+  &__arrow {
+    position: absolute;
+    top: 72px;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--surface);
+    box-shadow: var(--shadow-md);
+    color: var(--text);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+
+    &:hover {
+      border-color: var(--text-muted);
+      background-color: var(--surface-muted);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 2px;
+    }
+
+    &--left {
+      left: 6px;
+    }
+
+    &--right {
+      right: 6px;
+    }
+
+    @media (hover: none) {
+      display: none;
+    }
+  }
 
   &__track {
     display: flex;

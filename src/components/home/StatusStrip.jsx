@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
 import clsx from 'clsx'
 import { Rise } from 'cube-motion/react'
-import { XIcon } from '@phosphor-icons/react'
+import { CaretLeftIcon, CaretRightIcon, XIcon } from '@phosphor-icons/react'
+import useRailScroll from '@/hooks/useRailScroll'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useProfile } from '@/hooks/useProfile'
 import { usePostStore } from '@/stores/usePostStore'
@@ -97,6 +98,7 @@ export default function StatusStrip() {
   const { profile } = useProfile(viewer)
   const editorRef = useRef(null)
   const viewerRef = useRef(null)
+  const trackRef = useRef(null)
   const [selected, setSelected] = useState(null)
   const [openCount, setOpenCount] = useState(0)
   // Bumped when a status is opened, so its ring greys at once
@@ -115,6 +117,18 @@ export default function StatusStrip() {
   const { data: ownStatus, mutate: mutateOwn } = useSWR(viewer ? ['own-status', viewer] : null, ([, wallet]) => fetchOwnStatus(wallet), {
     revalidateOnFocus: false,
   })
+
+  /* The list re-keys on a Home tap by itself; the viewer's own status and the scroll position
+     don't, so refresh those here too and bring the row back to its first slot */
+  const lastNonceRef = useRef(feedRefreshNonce)
+  useEffect(() => {
+    if (feedRefreshNonce === lastNonceRef.current) return
+    lastNonceRef.current = feedRefreshNonce
+    if (viewer) mutateOwn()
+    trackRef.current?.scrollTo({ left: 0, behavior: 'smooth' })
+  }, [feedRefreshNonce, viewer, mutateOwn])
+
+  const { canScrollLeft, canScrollRight, scrollByPage } = useRailScroll(trackRef, [strip])
 
   const now = strip?.fetchedAt ?? 0
   // The order uses what was seen when the strip loaded; the rings use what is seen now, re-read
@@ -149,7 +163,20 @@ export default function StatusStrip() {
 
   return (
     <section className={styles.strip} aria-label="Statuses">
-      <ul className={styles.strip__track}>
+      {/* Overlaid at the row's ends rather than in a header the strip doesn't have, and only
+          where the row can still move that way */}
+      {canScrollLeft && (
+        <button type="button" className={clsx(styles.strip__arrow, styles['strip__arrow--left'])} aria-label="Scroll statuses left" onClick={() => scrollByPage(-1)}>
+          <CaretLeftIcon size={16} weight="bold" aria-hidden="true" />
+        </button>
+      )}
+      {canScrollRight && (
+        <button type="button" className={clsx(styles.strip__arrow, styles['strip__arrow--right'])} aria-label="Scroll statuses right" onClick={() => scrollByPage(1)}>
+          <CaretRightIcon size={16} weight="bold" aria-hidden="true" />
+        </button>
+      )}
+
+      <ul ref={trackRef} className={styles.strip__track}>
         <li>
           <button type="button" className={styles.strip__item} onClick={openOwn} title={ownHasStatus ? describeStatus(ownStatus) : 'Share a status'}>
             <span className={clsx(styles.strip__bubble, !ownHasStatus && styles['strip__bubble--add'])}>
