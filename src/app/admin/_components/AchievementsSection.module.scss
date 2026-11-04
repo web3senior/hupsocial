@@ -7,7 +7,8 @@
   input:not([type='checkbox']), select { padding: 12px; background: var(--background); color: var(--text); border: 1px solid var(--border); border-radius: 10px; font: inherit; }
   button { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--background); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
   button:disabled { opacity: 0.45; cursor: default; }
-  &__checkbox { display: flex; gap: 8px; align-items: center; padding: 8px 0; }
+  &__checkbox { display: flex; gap: 8px; align-items: center; padding: 8px 0 0; }
+  &__hint { margin: 0 0 8px !important; font-size: 12px; }
   &__actions { display: flex; flex-wrap: wrap; gap: 8px; }
   &__holders { list-style: none; margin: 0; padding: 0; }
   &__holder { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: 12px; overflow-wrap: anywhere; }

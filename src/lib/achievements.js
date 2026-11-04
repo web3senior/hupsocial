@@ -1,9 +1,10 @@
 import { isEvmAddress, normalizeAddress } from './address.js'
-import { achievementById } from '../config/achievements.js'
+import { ACHIEVEMENTS, achievementById } from '../config/achievements.js'
 import { POINTS_SEASONS } from '../config/points.js'
 
-// Separate from SQL so catalog coverage can be checked without loading the server.
-export const AUTO_ACHIEVEMENT_IDS = ['og', 'first-post', 'first-tip', 'generous', 'rising-voice', 'season-top-10']
+// Read off the catalog, never listed by hand: a second list is one more place to forget a new
+// achievement. Lives here, apart from the SQL, so validation never loads the server.
+export const AUTO_ACHIEVEMENT_IDS = ACHIEVEMENTS.filter((item) => item.kind === 'auto').map((item) => item.id)
 
 export class AchievementError extends Error {
   constructor(message, status = 400) {

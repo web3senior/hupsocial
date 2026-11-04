@@ -3,13 +3,14 @@ import { isEvmAddress, normalizeAddress } from '@/lib/address'
 import { hasColumn, hasTable } from '@/lib/schema'
 import { achievementById } from '@/config/achievements'
 import { AchievementError, validateAchievementScope } from '@/lib/achievements'
-import { RULES } from '@/lib/achievementRules'
 
 export const achievementsAreMigrated = async () => await hasTable('user_achievements') && await hasTable('user_featured_achievement')
 const requireMigration = async () => {
   if (!await achievementsAreMigrated()) throw new AchievementError('Run deploy/migrations/20261105-user-achievements.sql first.', 503)
 }
+const HOLDER_CACHE_TTL_MS = 60_000
 let holderCache = null
+let walletTotalCache = null
 
 export async function readAchievements(address) {
   const wallet = normalizeAddress(address)
@@ -38,13 +39,17 @@ export async function readHolderCounts() {
   if (holderCache?.expiresAt > Date.now()) return holderCache.value
   const [rows] = await pool.execute('SELECT achievement_id AS id, COUNT(DISTINCT wallet_address) AS count FROM user_achievements GROUP BY achievement_id')
   const value = Object.fromEntries(rows.filter((row) => achievementById(row.id)).map((row) => [row.id, Number(row.count)]))
-  holderCache = { value, expiresAt: Date.now() + 60_000 }
+  holderCache = { value, expiresAt: Date.now() + HOLDER_CACHE_TTL_MS }
   return value
 }
 
+/** The rarity denominator. A full scan of `users`, so it is held as long as the holder counts it
+ * divides — the two are only ever shown together. */
 export async function readTotalWallets() {
+  if (walletTotalCache?.expiresAt > Date.now()) return walletTotalCache.value
   const [[row]] = await pool.execute('SELECT COUNT(DISTINCT LOWER(wallet_address)) AS count FROM users')
-  return Number(row.count)
+  walletTotalCache = { value: Number(row.count), expiresAt: Date.now() + HOLDER_CACHE_TTL_MS }
+  return walletTotalCache.value
 }
 
 export async function listAchievementHolders(id, scope = '') {
@@ -155,8 +160,25 @@ export async function setFeaturedAchievement({ wallet, id, scope = '', nonce }) 
   })
 }
 
-export async function runAchievementRules({ only, notify = true } = {}) {
+const hasHolders = async (id, scope) => {
+  const [rows] = await pool.execute('SELECT 1 FROM user_achievements WHERE achievement_id = ? AND scope = ? LIMIT 1', [id, scope])
+  return rows.length > 0
+}
+
+/**
+ * Runs the automatic rules and awards whoever newly qualifies.
+ *
+ * `notify` left unset — the scheduler — announces awards only once a rule already has holders in
+ * that scope. A rule's first run is a backfill of everyone who qualified before it existed (OG
+ * alone is every existing account), and announcing that would fill every inbox at once, a minute
+ * after deploy. An explicit true or false, the admin's choice, always wins.
+ *
+ * The rules are loaded here rather than at the top of the file: they pull in the points and
+ * leaderboard modules, and every profile read imports this file for readAchievementSummary.
+ */
+export async function runAchievementRules({ only, notify } = {}) {
   await requireMigration()
+  const { RULES } = await import('@/lib/achievementRules')
   if (only && !RULES[only]) throw new AchievementError('Unknown automatic rule')
   const counts = {}
   for (const [id, rule] of Object.entries(RULES)) {
@@ -165,7 +187,8 @@ export async function runAchievementRules({ only, notify = true } = {}) {
     const scopes = new Set(winners.map((row) => row.scope))
     counts[id] = 0
     for (const scope of scopes) {
-      const inserted = await awardAchievement({ wallets: winners.filter((row) => row.scope === scope).map((row) => row.wallet), id, scope, source: 'rule', notify })
+      const announce = typeof notify === 'boolean' ? notify : await hasHolders(id, scope)
+      const inserted = await awardAchievement({ wallets: winners.filter((row) => row.scope === scope).map((row) => row.wallet), id, scope, source: 'rule', notify: announce })
       counts[id] += inserted.length
     }
   }

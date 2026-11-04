@@ -7,17 +7,31 @@ import { getSeasonStandings } from '@/lib/points'
 
 const collate = (column) => `CONVERT(${column} USING utf8mb4) COLLATE utf8mb4_general_ci`
 
-/** Hosted wallets and explicitly tagged bots are excluded, including mixed-case addresses. */
-export async function excludeAchievementAgents(candidates) {
-  const excluded = new Set()
+/* Every rule filters through the agent list, and building it scans every tagged user. One run
+   evaluates all the rules back to back, so the list is built once and shared for a short while
+   instead of once per rule. */
+const AGENT_LIST_TTL_MS = 60_000
+let agentList = null
+
+async function readAgentWallets() {
+  if (agentList?.expiresAt > Date.now()) return agentList.wallets
+  const wallets = new Set()
   if (await hasTable('hosted_agents')) {
     const [rows] = await pool.execute('SELECT LOWER(agent_address) AS wallet FROM hosted_agents')
-    for (const row of rows) excluded.add(row.wallet)
+    for (const row of rows) wallets.add(row.wallet)
   }
   if (await hasColumn('users', 'tags')) {
     const [rows] = await pool.execute('SELECT LOWER(wallet_address) AS wallet, tags FROM users WHERE tags IS NOT NULL')
-    for (const row of rows) if (hasAiAgentTag(row)) excluded.add(row.wallet)
+    for (const row of rows) if (hasAiAgentTag(row)) wallets.add(row.wallet)
   }
+  agentList = { wallets, expiresAt: Date.now() + AGENT_LIST_TTL_MS }
+  return wallets
+}
+
+/** Hosted wallets and explicitly tagged bots are excluded, including mixed-case addresses. */
+export async function excludeAchievementAgents(candidates) {
+  if (!candidates.length) return candidates
+  const excluded = await readAgentWallets()
   return candidates.filter(({ wallet }) => !excluded.has(wallet.toLowerCase()))
 }
 

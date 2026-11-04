@@ -81,6 +81,9 @@ export default function AchievementsSection() {
         <label htmlFor="achievement-note">Note (optional)</label>
         <input id="achievement-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={255} />
         <label className={styles.achievementsAdmin__checkbox}><input type="checkbox" checked={notify} onChange={(event) => setNotify(event.target.checked)} />Send notifications</label>
+        {/* The scheduler keeps a rule's first run silent on its own; a run from here does what the
+            box says, so a manual backfill has to be unticked to stay quiet. */}
+        <p className={styles.achievementsAdmin__hint}>Running a rule for the first time awards everyone who already qualifies. Untick this to backfill without notifying them.</p>
         <div className={styles.achievementsAdmin__actions}>
           <button type="button" disabled={!wallet.trim() || !address} onClick={() => submit('grant', wallet.trim())}>Grant achievement</button>
           {item.kind === 'auto' && <button type="button" disabled={!address} onClick={() => submit('run')}>Run this rule now</button>}

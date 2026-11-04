@@ -75,6 +75,18 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
       await assert.rejects(service.revokeAchievement({ wallet: a, id: 'og' }), { status: 403 })
       const [[count]] = await db.query('SELECT COUNT(*) AS n FROM notifications')
       assert.equal(count.n, 1, 'silent backfill and repeat runs do not notify')
+
+      // Left unset (the scheduler), a rule that already has holders announces newcomers…
+      await db.query('INSERT INTO tips VALUES ?', [Array.from({ length: 50 }, () => [b])])
+      assert.equal((await service.runAchievementRules({ only: 'generous' })).generous, 1)
+      const [[announced]] = await db.query("SELECT COUNT(*) AS n FROM notifications WHERE recipient_wallet_address = ? AND entity_id = 'generous'", [b])
+      assert.equal(announced.n, 1, 'a newcomer to a held rule is notified')
+
+      // …while a rule's first run, with no holders yet, is a silent backfill.
+      await db.query("DELETE FROM user_achievements WHERE achievement_id = 'og'")
+      assert.equal((await service.runAchievementRules({ only: 'og' })).og, 1)
+      const [[afterBackfill]] = await db.query('SELECT COUNT(*) AS n FROM notifications')
+      assert.equal(afterBackfill.n, 2, 'the first run of a rule notifies nobody')
     })
 
     await t.test('a closed season awards exactly its top ten once with a season scope', async () => {
