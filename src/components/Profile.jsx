@@ -93,7 +93,6 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
               <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 16, height: 16 }} />
               <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 16, height: 16 }} />
             </div>
-            {isFullLike && <div className={clsx(styles.profileShimmer__item,'rounded-full')} style={{ width: 80, height: 10 }} />}
           </div>
         )}
       </div>
