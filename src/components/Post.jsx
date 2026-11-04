@@ -1379,6 +1379,30 @@ function handleBodyLinkClick(event, router) {
   routeInternalLinkClick(event, router)
 }
 
+// scrollHeight > clientHeight is not "words are hidden": a line made a pixel taller by an inline
+// chip, or the whitespace between rendered paragraphs, overflows the 8lh clamp with nothing
+// behind it. Ask instead whether the last real content ends below the clamp.
+function hasClampedContent(el) {
+  if (el.scrollHeight <= el.clientHeight) return false
+  const boxBottom = el.getBoundingClientRect().bottom
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (node) =>
+      node.nodeType === Node.TEXT_NODE
+        ? node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+        : ['IMG', 'VIDEO', 'IFRAME', 'svg'].includes(node.nodeName) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP,
+  })
+  const range = document.createRange()
+  let contentBottom = -Infinity
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.nodeType === Node.TEXT_NODE) range.selectNodeContents(node)
+    else range.selectNode(node)
+    for (const rect of range.getClientRects()) contentBottom = Math.max(contentBottom, rect.bottom)
+  }
+  range.detach?.()
+  // A pixel of slack absorbs subpixel line heights
+  return contentBottom > boxBottom + 1
+}
+
 export function PostText({ sourceText, postId, styles, renderMarkdown, isCollapsible = false, baseClassName }) {
   const router = useRouter()
   const { address: readerAddress } = useActiveWallet()
@@ -1418,7 +1442,7 @@ export function PostText({ sourceText, postId, styles, renderMarkdown, isCollaps
       // Hidden under a post opened in place (PostOverlayHost), everything measures 0: dropping the
       // button there makes every card above the reader shorter on return, and the feed lands lower
       if (!el.getClientRects().length) return
-      if (!isExpanded) setCanShowMore(el.scrollHeight > el.clientHeight)
+      if (!isExpanded) setCanShowMore(hasClampedContent(el))
     }
     measure()
 
