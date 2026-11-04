@@ -1,0 +1,16 @@
+.achievementsAdmin {
+  padding: 24px 0;
+  h2, h3 { margin: 0 0 16px; }
+  p { margin: 12px 0; line-height: 1.6; color: var(--text-muted); }
+  &__form { display: flex; flex-direction: column; gap: 10px; border: 0; padding: 20px 0; max-width: 640px; }
+  label { font-size: 13px; }
+  input:not([type='checkbox']), select { padding: 12px; background: var(--background); color: var(--text); border: 1px solid var(--border); border-radius: 10px; font: inherit; }
+  button { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--background); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  &__checkbox { display: flex; gap: 8px; align-items: center; padding: 8px 0; }
+  &__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  &__holders { list-style: none; margin: 0; padding: 0; }
+  &__holder { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: 12px; overflow-wrap: anywhere; }
+  &__revoke { margin-left: auto; }
+  &__error { color: var(--danger, #d94040) !important; }
+}

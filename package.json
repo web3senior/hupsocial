@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "achievements:test": "node --import ./src/tests/achievements/loader.mjs --test src/tests/achievements/*.test.mjs",
     "vault:test": "node --import ./src/tests/personal-vault/loader.mjs --test src/tests/personal-vault/*.test.mjs",
     "dev:webpack": "next dev --webpack",
     "build:webpack": "next build --webpack",

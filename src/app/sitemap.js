@@ -37,6 +37,7 @@ const STATIC_ROUTES = [
   { path: '/drops', priority: 0.7, changeFrequency: 'daily' },
   { path: '/events', priority: 0.7, changeFrequency: 'daily' },
   { path: '/leaderboard', priority: 0.6, changeFrequency: 'daily' },
+  { path: '/achievements', priority: 0.6, changeFrequency: 'daily' },
   { path: '/nfts', priority: 0.7, changeFrequency: 'daily' },
   { path: '/p2p', priority: 0.7, changeFrequency: 'daily' },
   { path: '/polls', priority: 0.7, changeFrequency: 'daily' },

@@ -47,6 +47,8 @@ import { useFollowState } from '@/hooks/useFollowState'
 import { handleBrokenAvatar } from '@/lib/utils'
 import AgentBadge from '@/components/ui/AgentBadge'
 import AmbassadorBadge from '@/components/ui/AmbassadorBadge'
+import AchievementBadge from '@/components/ui/AchievementBadge'
+import AchievementsRow from '@/components/achievements/AchievementsRow'
 import AgentIdentityChip from '@/components/ui/AgentIdentityChip'
 import PremiumBadge from '@/components/ui/PremiumBadge'
 import Avatar from '@/components/ui/Avatar'
@@ -681,6 +683,7 @@ const Profile = ({ addr }) => {
               {/* Straight after the name, the same mark every post header shows. */}
               <PremiumBadge premium={profile.premium} size="lg" />
               <AmbassadorBadge roles={profile.roles} size="lg" />
+              <AchievementBadge featured={profile.achievements?.featured} size="lg" />
 
               {/* The worn tag, from the same component every post header uses, so one badge can
                   never look like two things — only its scale changes, so it holds its own beside a
@@ -777,6 +780,8 @@ const Profile = ({ addr }) => {
         </header>
 
         <footer className="w-100">
+          <AchievementsRow achievements={profile.achievements} address={addr} owner={selfView}
+            onSaved={(achievements) => mutate({ ...profile, achievements }, { revalidate: false })} />
           <ul className="flex flex-column align-items-center justify-content-between gap-1 padding-left-0">
             <li className="flex flex-row align-items-center justify-content-between gap-025 w-100">
              

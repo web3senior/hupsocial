@@ -194,6 +194,7 @@ export default function Profile({ creator, createdAt, networkId, variant = 'full
             <PremiumBadge premium={profile.premium} />
             {/* Hup's own mark for its ambassadors, given by an admin — beside the paid one, since
                 both are claims Hup makes about the account. */}
+            {/* TODO(achievements): byline — include featured achievements in feed payloads first. */}
             <AmbassadorBadge roles={profile.roles} linked={!linkBox} />
             <CommunityBadge badge={profile.badge} iconOnly linked={!linkBox} />
             {/* The automated mark sits ahead of the chain and Universal Profile glyphs: those two

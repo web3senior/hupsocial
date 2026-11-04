@@ -40,6 +40,7 @@ import ScheduleForwarderSection from './_components/ScheduleForwarderSection'
 import RelayerSweepSection from './_components/RelayerSweepSection'
 import UsernamesSection from './_components/UsernamesSection'
 import RolesSection from './_components/RolesSection'
+import AchievementsSection from './_components/AchievementsSection'
 import FeedbackSection from './_components/FeedbackSection'
 import ReportsSection from './_components/ReportsSection'
 import useAdminPass from './_components/useAdminPass'
@@ -124,6 +125,7 @@ const SECTIONS = [
   { id: 'relayer', label: 'Relayer', icon: '⛽', contractKey: null },
   { id: 'usernames', label: 'Usernames', icon: '🏷️', contractKey: null, offchain: true },
   { id: 'hupsters', label: 'Hupsters', icon: '📣', contractKey: null, offchain: true },
+  { id: 'achievements', label: 'Achievements', icon: '🏆', contractKey: null, offchain: true },
   { id: 'feedback', label: 'Feedback', icon: '💬', contractKey: null, offchain: true },
   { id: 'reports', label: 'Reports', icon: '🚩', contractKey: null, offchain: true },
   { id: 'forwarders', label: 'Forwarders', icon: '✍️', contractKey: 'forwarder' },
@@ -2850,6 +2852,7 @@ export default function Page() {
           {activeSection === 'usernames' && <UsernamesSection />}
 
           {activeSection === 'hupsters' && <RolesSection />}
+          {activeSection === 'achievements' && <AchievementsSection />}
 
           {activeSection === 'feedback' && <FeedbackSection adminFetch={adminPass.adminFetch} />}
 

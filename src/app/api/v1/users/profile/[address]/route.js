@@ -10,6 +10,7 @@ import { readAgentIdentities } from '@/lib/agentIdentities'
 import { readPremium } from '@/lib/premiumServer'
 import { readRoles, resolveReferrer } from '@/lib/rolesServer'
 import { readUserDecorations } from '@/lib/userDecorations'
+import { readAchievementSummary } from '@/lib/achievementsServer'
 import { isAccentColor, parseAccentSelection } from '@/lib/premium'
 import { describeOrigin, isCountryCode, normalizeOriginCode, parseOriginSelection } from '@/lib/origin'
 import { readHandleSegment } from '@/lib/username'
@@ -198,7 +199,7 @@ function scheduleChainRecheck(address, row) {
  * A Universal Profile as the read serves it, from the onchain document — live, or the row's copy
  * of it. The row can be AHEAD of that document: see cidex/scripts/add-profile-sync-stamp.sql.
  */
-function shapeUniversalProfile(profile, row, address, { badge, origin, premium, roles, erc8004, decorations }) {
+function shapeUniversalProfile(profile, row, address, { badge, origin, premium, roles, erc8004, decorations, achievements }) {
   const liveStamp = String(profile.lastMetadataUpdate ?? '')
   const storedStamp = row?.profile_sync_stamp ?? null
   const hupIsAhead = storedStamp !== null && storedStamp === liveStamp
@@ -264,12 +265,13 @@ function shapeUniversalProfile(profile, row, address, { badge, origin, premium, 
   profile.erc8004 = erc8004
   // Avatar decorations are a Hup cosmetic, set by signature — LSP3 has no field for them.
   profile.decorations = decorations
+  profile.achievements = achievements
 
   return profile
 }
 
 /** A profile the chain has nothing for, from the row alone. */
-function shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004, decorations }) {
+function shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004, decorations, achievements }) {
   const dbProfile = row
 
   // The notification email is private contact data on a public endpoint —
@@ -331,6 +333,7 @@ function shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004, dec
   dbProfile.agent = resolveAgentProfile(dbProfile)
   dbProfile.erc8004 = erc8004
   dbProfile.decorations = decorations
+  dbProfile.achievements = achievements
 
   return dbProfile
 }
@@ -373,7 +376,7 @@ export async function GET(request, { params }) {
        and adds no latency running in the same batch. It is re-verified against
        community_members on every call — see lib/badge.js for why it is never stored already
        resolved. */
-    const [[rows], badge, premium, roles, erc8004, decorations] = await Promise.all([
+    const [[rows], badge, premium, roles, erc8004, decorations, achievements] = await Promise.all([
       pool.execute(
         `SELECT
           u.*,
@@ -412,6 +415,10 @@ export async function GET(request, { params }) {
         console.error('[DECORATIONS_RESOLVE_ERROR]:', decorationsError.message)
         return {}
       }),
+      readAchievementSummary(address).catch((error) => {
+        console.error('[ACHIEVEMENTS_RESOLVE_ERROR]:', error.message)
+        return { earned: [], featured: null }
+      }),
     ])
     const row = rows[0]
 
@@ -432,11 +439,11 @@ export async function GET(request, { params }) {
       if (row.is_universal_profile) {
         return publicProfile({
           source: 'universal_profile',
-          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin, premium, roles, erc8004, decorations }),
+          data: shapeUniversalProfile(indexedFromRow(row), row, address, { badge, origin, premium, roles, erc8004, decorations, achievements }),
         })
       }
 
-      return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004, decorations }) })
+      return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004, decorations, achievements }) })
     }
 
     const { answered, profile: live } = await readUniversalProfile(address)
@@ -455,7 +462,7 @@ export async function GET(request, { params }) {
     if (isUP) {
       return publicProfile({
         source: 'universal_profile',
-        data: shapeUniversalProfile(live, row, address, { badge, origin, premium, roles, erc8004, decorations }),
+        data: shapeUniversalProfile(live, row, address, { badge, origin, premium, roles, erc8004, decorations, achievements }),
       })
     }
 
@@ -465,7 +472,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004, decorations }) })
+    return publicProfile({ source: 'database', data: shapeDatabaseProfile(row, { badge, origin, premium, roles, erc8004, decorations, achievements }) })
   } catch (error) {
     console.error('Database Error:', error.message)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

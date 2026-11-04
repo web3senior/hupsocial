@@ -16,6 +16,7 @@ import {
   ShoppingBagOpenIcon,
   StorefrontIcon,
   TrashIcon,
+  TrophyIcon,
   UserPlusIcon,
   UsersThreeIcon,
 } from '@phosphor-icons/react'
@@ -38,6 +39,7 @@ const DEFAULT_META = { icon: BellIcon, tone: 'neutral', group: 'none' }
 //   previewFrom— 'entity' previews the post the notification points at, 'child' previews the reply
 //                or quote that caused it.
 export const ACTION_META = {
+  achievement_earned: { icon: TrophyIcon, tone: 'neutral', weight: 'fill', group: 'none' },
   post_received_like: { icon: HeartIcon, tone: 'like', weight: 'fill', group: 'entity', verb: 'liked your post', previewFrom: 'entity' },
   content_liked: { icon: HeartIcon, tone: 'like', weight: 'fill', group: 'entity', verb: 'liked your post', previewFrom: 'entity' },
   // Likes always target the original post, so a reposter is credited through their own row keyed

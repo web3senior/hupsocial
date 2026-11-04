@@ -3,6 +3,21 @@ import { normalizeAddress } from './address'
 import { profileUpdateMessage } from './profileSignature'
 import { readReferral } from './referral'
 
+const achievementRequest = async (path, options = {}) => {
+  const response = await fetch(path, { cache: 'no-store', ...options })
+  const json = await response.json()
+  if (!response.ok || !json.success) throw new Error(json.error || 'Could not load achievements')
+  return json.data
+}
+
+export const getAchievementCatalog = () => achievementRequest('/api/v1/achievements')
+export const getUserAchievements = (address) => achievementRequest(`/api/v1/users/${normalizeAddress(address)}/achievements`)
+export const setFeaturedAchievement = (claim) => achievementRequest('/api/v1/users/achievements/featured', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(claim),
+})
+
 /**
  * @param {string} address
  * @param {{ fresh?: boolean }} [options] `fresh` reads past the CDN's copy (the route keeps one for

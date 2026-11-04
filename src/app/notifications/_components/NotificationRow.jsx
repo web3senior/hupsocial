@@ -188,6 +188,9 @@ function Sentence({ group }) {
   const { profile } = useProfile(meta.verb ? firstActor : null)
 
   if (!meta.verb || !firstActor) {
+    if (latest.action_type === 'achievement_earned') {
+      return <span className={styles.row__title}>{latest.title}{latest.message ? ` · ${latest.message}` : ''}</span>
+    }
     return <span className={styles.row__title}>{latest.message || latest.title}</span>
   }
 
