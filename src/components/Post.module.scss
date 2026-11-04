@@ -73,17 +73,8 @@
   padding: 16px var(--post-gutter) 4px;
   place-items: stretch;
 
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    z-index: -1;
-  }
-
   @media (hover: hover) {
-    &:hover::before {
+    &:hover {
       background-color: var(--post-hover-bg);
     }
   }
@@ -715,7 +706,7 @@
   }
 }
 
-// Keep the thread connector above both the post and comment hover layers.
+// Keep the thread connector above both the post and comment backgrounds.
 .postCard {
   position: relative;
   isolation: isolate;
