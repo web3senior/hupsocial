@@ -8,7 +8,7 @@ import { Rise } from 'cube-motion/react'
 import { CaretLeftIcon, CaretRightIcon, XIcon } from '@phosphor-icons/react'
 import useRailScroll from '@/hooks/useRailScroll'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
-import { useProfile } from '@/hooks/useProfile'
+import { profileFallbackFromRow, useProfile } from '@/hooks/useProfile'
 import { usePostStore } from '@/stores/usePostStore'
 import { getStatuses } from '@/lib/api'
 import { isEvmAddress, sameAddress, shortAddress } from '@/lib/address'
@@ -73,10 +73,12 @@ const markSeen = (viewer, status) => {
 const isSeen = (status, seen) => Number(seen[status.wallet_address.toLowerCase()]) >= Number(status.updated_at)
 
 /** A followed wallet's picture with its avatar decorations — from the same profile read (and
-    cache) the feed's bylines use, so the strip costs no request a byline has not already made. */
+    cache) the feed's bylines use, so the strip costs no request a byline has not already made.
+    The picture is the profile's, not the row's: `users.profileImage` can trail a Universal
+    Profile that changed its picture onchain, so the row only stands in until the read lands. */
 const StatusAvatar = ({ status }) => {
-  const { profile } = useProfile(status.wallet_address)
-  return <Avatar className={styles.strip__avatar} src={status.profile_image} size={52} decorations={profile?.decorations} />
+  const { profile } = useProfile(status.wallet_address, profileFallbackFromRow(status))
+  return <Avatar className={styles.strip__avatar} src={profile?.profileImage ?? status.profile_image} size={52} decorations={profile?.decorations} />
 }
 
 /**
@@ -100,6 +102,8 @@ export default function StatusStrip() {
   const viewerRef = useRef(null)
   const trackRef = useRef(null)
   const [selected, setSelected] = useState(null)
+  // Already cached by the strip avatar that was tapped, so the sheet opens on the live picture
+  const { profile: selectedProfile } = useProfile(selected?.wallet_address, profileFallbackFromRow(selected))
   const [openCount, setOpenCount] = useState(0)
   // Bumped when a status is opened, so its ring greys at once
   const [seenVersion, setSeenVersion] = useState(0)
@@ -224,7 +228,7 @@ export default function StatusStrip() {
               {/* The profile page's avatar-and-bubble, at sheet scale */}
               <div className={styles.viewer__figure}>
                 <span className={styles.viewer__ring} style={{ '--status-left': remainingShare(selected, now) }}>
-                  <Avatar className={styles.viewer__avatar} src={selected.profile_image} size={150} />
+                  <Avatar className={styles.viewer__avatar} src={selectedProfile?.profileImage ?? selected.profile_image} size={150} />
                 </span>
                 <div className={styles.viewer__bubbleSlot}>
                   <Rise as="p" delay={260} className={styles.viewer__bubble}>
