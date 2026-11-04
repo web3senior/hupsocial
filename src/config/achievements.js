@@ -1,4 +1,5 @@
 export const RARITIES = ['common', 'rare', 'epic', 'legendary']
+export const RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' }
 export const OG_CUTOFF = '2026-11-04 00:00:00'
 
 export const ACHIEVEMENTS = [

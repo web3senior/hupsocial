@@ -1,0 +1,17 @@
+// One rarity palette, shared by the mark beside a name and the achievements page, so a legendary
+// achievement is the same gold everywhere. Each theme sets `color-scheme`, which light-dark() reads.
+$rarity-colors: (
+  common: var(--text-muted, #687785),
+  rare: light-dark(#287cdb, #7cb9ff),
+  epic: light-dark(#8643c2, #c293ff),
+  legendary: light-dark(#a46b00, #efc45e),
+);
+
+// Emits `&--common`, `&--rare`… each setting --achievement-color for the block to paint with.
+@mixin rarity-modifiers {
+  @each $name, $color in $rarity-colors {
+    &--#{$name} {
+      --achievement-color: #{$color};
+    }
+  }
+}

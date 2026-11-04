@@ -1,3 +1,5 @@
+@use '../achievements/rarity' as *;
+
 .achievementBadge {
   display: inline-flex;
   align-items: center;
@@ -5,10 +7,7 @@
   vertical-align: middle;
   color: var(--achievement-color);
 
-  &--common { --achievement-color: var(--text-muted, #687785); }
-  &--rare { --achievement-color: light-dark(#287cdb, #7cb9ff); }
-  &--epic { --achievement-color: light-dark(#8643c2, #c293ff); }
-  &--legendary { --achievement-color: light-dark(#a46b00, #efc45e); }
+  @include rarity-modifiers;
 
   &:focus-visible {
     outline: 2px solid currentColor;

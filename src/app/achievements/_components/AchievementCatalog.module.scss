@@ -1,0 +1,257 @@
+@use '../../../components/achievements/rarity' as *;
+
+.catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  &__facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    @container achievements (max-width: 560px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__fact {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background-color: var(--background);
+
+    strong {
+      display: block;
+      color: var(--text);
+      font-size: var(--system-14-font-size);
+      line-height: var(--system-14-line-height);
+    }
+
+    p {
+      margin: 0.15rem 0 0;
+      color: var(--text-muted);
+      font-size: var(--system-13-font-size);
+      line-height: 1.45;
+    }
+  }
+
+  &__factIcon {
+    flex-shrink: 0;
+    color: var(--primary);
+  }
+
+  &__hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--system-13-font-size);
+  }
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+
+    h2 {
+      margin: 0;
+      color: var(--text);
+      font-size: var(--system-18-font-size);
+      line-height: var(--system-18-line-height);
+      font-weight: 700;
+    }
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background-color: var(--background);
+    overflow: hidden;
+  }
+
+  &__empty {
+    margin: 0;
+    padding: 2rem 1rem;
+    border: 1px dashed var(--border);
+    border-radius: 16px;
+    color: var(--text-muted);
+    font-size: var(--system-14-font-size);
+    text-align: center;
+  }
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+
+  &__summary {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    color: var(--text-muted);
+    font-size: var(--system-14-font-size);
+
+    strong {
+      color: var(--text);
+      font-size: var(--system-20-font-size);
+      font-weight: 700;
+    }
+  }
+
+  &__link {
+    color: var(--primary);
+    font-size: var(--system-13-font-size);
+    font-weight: 600;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__track {
+    height: 6px;
+    border-radius: 999px;
+    background-color: var(--surface-muted);
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      display: block;
+      width: var(--progress, 0%);
+      height: 100%;
+      border-radius: inherit;
+      background-color: var(--primary);
+      transition: width 400ms ease;
+    }
+  }
+}
+
+.achievementRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.1rem;
+  scroll-margin-top: 100px;
+
+  @include rarity-modifiers;
+
+  & + & {
+    border-top: 1px solid var(--border);
+  }
+
+  // A shared #id link lands here: mark which row it meant.
+  &:target {
+    background-color: color-mix(in srgb, var(--achievement-color) 8%, transparent);
+  }
+
+  &__icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    color: var(--achievement-color);
+    background-color: color-mix(in srgb, var(--achievement-color) 12%, transparent);
+  }
+
+  &__body {
+    min-width: 0;
+  }
+
+  &__heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+
+    h3 {
+      margin: 0;
+      color: var(--text);
+      font-size: var(--system-15-font-size);
+      line-height: var(--system-15-line-height);
+      font-weight: 700;
+    }
+  }
+
+  &__rarity {
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    color: var(--achievement-color);
+    background-color: color-mix(in srgb, var(--achievement-color) 12%, transparent);
+    font-size: var(--system-11-font-size);
+    line-height: var(--system-11-line-height);
+    font-weight: 600;
+  }
+
+  &__description {
+    margin: 0.2rem 0 0;
+    color: var(--text);
+    font-size: var(--system-14-font-size);
+    line-height: 1.45;
+  }
+
+  &__meta {
+    margin: 0.3rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--system-12-font-size);
+    line-height: var(--system-12-line-height);
+  }
+
+  &__status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    font-size: var(--system-12-font-size);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  &__earned,
+  &__locked {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  &__earned {
+    color: var(--success, #1f9d55);
+  }
+
+  &__locked {
+    color: var(--text-muted);
+  }
+
+  // Locked rows recede, so the eye lands on what the viewer already has.
+  &:not(&--earned) &__icon {
+    opacity: 0.7;
+  }
+
+  @container achievements (max-width: 560px) {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+
+    &__status {
+      grid-column: 2;
+      align-items: flex-start;
+    }
+  }
+}

@@ -1,52 +1,19 @@
-.achievements {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 48px 28px 80px;
-  color: var(--text, CanvasText);
+// The same shell as the leaderboard: one bordered surface on the page, flush on phones.
+.page {
+  min-height: 85svh;
 
-  &__header {
-    max-width: 580px;
-    margin-bottom: 48px;
+  &__container {
+    container-name: achievements;
+    container-type: inline-size;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--page-border-radius);
+    padding: 1.25rem;
 
-    h1 { font-size: clamp(34px, 5vw, 54px); line-height: 1.08; letter-spacing: -0.045em; margin: 20px 0; }
-    p { font-size: 16px; line-height: 1.7; opacity: 0.65; }
-  }
-
-  &__eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 0.12em; color: var(--brand-500, #287cdb); }
-  &__progress { display: inline-block; margin-top: 16px; padding: 8px 12px; border: 1px solid var(--border, #8884); border-radius: 20px; font-size: 12px; }
-  &__section {
-    margin-top: 32px;
-    h2 { text-transform: capitalize; font-size: 13px; font-weight: 500; opacity: 0.65; margin: 0 0 14px; }
-  }
-  &__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-  &__card {
-    scroll-margin-top: 100px;
-    padding: 24px;
-    border: 1px solid var(--border, #8884);
-    border-radius: 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-
-    &--earned { border-color: var(--brand-500, #287cdb); background: color-mix(in srgb, var(--brand-500, #287cdb) 4%, transparent); }
-    &:target { outline: 2px solid var(--brand-500, #287cdb); outline-offset: 4px; }
-    p { margin: 0; opacity: 0.65; font-size: 13px; line-height: 1.6; }
-    footer { margin-top: auto; padding-top: 14px; font-size: 11px; opacity: 0.5; }
-  }
-  &__icon { width: 56px; height: 56px; justify-content: center; border-radius: 16px; background: color-mix(in srgb, currentColor 8%, transparent); margin-bottom: 6px; }
-  &__cardHeading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    h3 { margin: 0; font-size: 18px; }
-    > svg { color: var(--brand-500, #287cdb); }
-  }
-  &__earned { font-size: 11px; color: var(--brand-500, #287cdb); }
-
-  @media (max-width: 600px) {
-    padding: 80px 16px 60px;
-    &__grid { grid-template-columns: 1fr; }
-    &__header { margin-bottom: 32px; }
+    @media (max-width: 600px) {
+      border: none;
+      border-radius: 0;
+      padding: 1rem;
+    }
   }
 }
