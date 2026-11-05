@@ -3,8 +3,9 @@
 import { useRef } from 'react'
 import clsx from 'clsx'
 import { useConnection } from 'wagmi'
-import { CaretDownIcon, CoinsIcon, PencilSimpleLineIcon, PlusIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, CoinsIcon, EyeIcon, EyeSlashIcon, PencilSimpleLineIcon, PlusIcon } from '@phosphor-icons/react'
 import { useClientMounted } from '@/hooks/useClientMount'
+import { setBalancePrivacy, useBalancePrivacy } from '@/hooks/useBalancePrivacy'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { useSolanaWallet } from '@/hooks/useSolanaWallet'
 import { useWalletPortfolio } from '@/hooks/useWalletPortfolio'
@@ -48,6 +49,7 @@ const chainName = (chainId) =>
  */
 export default function HeaderActions() {
   const mounted = useClientMounted()
+  const balancesHidden = useBalancePrivacy()
   const { address, isConnected, kind } = useActiveWallet()
   const { connector } = useConnection()
   const solana = useSolanaWallet()
@@ -112,7 +114,9 @@ export default function HeaderActions() {
           className={styles.balance}
           trigger={
             <button type="button" className={clsx(styles.actions__button, styles['actions__button--balance'])} aria-label="Your balance">
-              {formatPill(total)}
+              <span className={clsx(styles.actions__balanceValue, balancesHidden && styles['actions__balanceValue--hidden'])}>
+                {balancesHidden ? '****' : formatPill(total)}
+              </span>
               <CaretDownIcon size={14} aria-hidden="true" />
             </button>
           }
@@ -120,14 +124,26 @@ export default function HeaderActions() {
           {({ close }) => (
             <>
               <header className={styles.balance__header}>
-                <p className={styles.balance__title}>Your balance</p>
+                <div className={styles['balance__title-group']}>
+                  <p className={styles.balance__title}>Your balance</p>
+                  <button
+                    type="button"
+                    className={styles.balance__privacy}
+                    aria-label={balancesHidden ? 'Show balances' : 'Hide balances'}
+                    aria-pressed={balancesHidden}
+                    title={balancesHidden ? 'Show balances' : 'Hide balances'}
+                    onClick={() => setBalancePrivacy(!balancesHidden)}
+                  >
+                    {balancesHidden ? <EyeSlashIcon size={18} aria-hidden="true" /> : <EyeIcon size={18} aria-hidden="true" />}
+                  </button>
+                </div>
                 <span className={styles.balance__address}>
                   {shortAddress(address)}
                   <CopyButton value={address} title="Copy address" size={14} />
                 </span>
               </header>
 
-              <p className={styles.balance__total}>{usd.format(total)}</p>
+              <p className={styles.balance__total}>{balancesHidden ? '****' : usd.format(total)}</p>
 
               {holdings.length > 0 ? (
                 <ul className={styles.balance__list}>
@@ -143,9 +159,9 @@ export default function HeaderActions() {
                         {chainName(holding.chainId) && <span className={styles.balance__chain}>{chainName(holding.chainId)}</span>}
                       </span>
                       <span className={styles.balance__amount}>
-                        {amount.format(holding.amount)} {holding.symbol}
+                        {balancesHidden ? '****' : amount.format(holding.amount)} {holding.symbol}
                       </span>
-                      <span className={styles.balance__usd}>{usd.format(holding.usd)}</span>
+                      <span className={styles.balance__usd}>{balancesHidden ? '****' : usd.format(holding.usd)}</span>
                     </li>
                   ))}
                 </ul>

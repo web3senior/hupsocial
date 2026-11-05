@@ -22,7 +22,9 @@ const DESKTOP_QUERY = '(min-width: 768px)'
 const POST_ROUTE = /^\/networks\/[^/]+\/[^/]+\/?$/
 
 // The page's bordered shell: the first wide container in <main> that draws a side border
+// An explicit shell avoids selecting a nested card whose border changes when marked.
 const findPageShell = (main) =>
+  main.querySelector('[data-header-shell]') ||
   [...main.querySelectorAll('div[class*="__container"]')].find((element) => {
     if (getComputedStyle(element).borderLeftWidth === '0px') return false
     return element.getBoundingClientRect().width > 300

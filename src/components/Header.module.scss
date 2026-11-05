@@ -14,6 +14,8 @@
 
   @include md-up() {
     background-color: transparent;
+    // The page title bar is portalled below this fixed header; let its back arrow receive clicks.
+    pointer-events: none;
   }
 
   @include md-down() {
@@ -213,6 +215,7 @@
   // Above the title bar, which is positioned and would otherwise paint over these controls
   position: relative;
   z-index: 1;
+  pointer-events: auto;
 }
 
 // Opens the phone nav drawer (components/Aside); desktops have the sidebar instead
