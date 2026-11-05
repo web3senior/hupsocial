@@ -5,6 +5,7 @@ import { ACHIEVEMENTS, achievementById, OG_CUTOFF } from '@/config/achievements'
 import { POINTS_SEASONS } from '@/config/points'
 import { getSeasonStandings } from '@/lib/points'
 import { readAchievementCatalog } from '@/lib/achievementCatalog'
+import { readBadStanding } from '@/lib/achievementStanding'
 
 const ruleSetting = async (id) => (await readAchievementCatalog()).find((item) => item.id === id)
 
@@ -46,7 +47,14 @@ async function newWinners(id, query, params = []) {
       WHERE a.wallet_address = ${collate('eligible.wallet')} AND a.achievement_id = ? AND a.scope = ''
     )`, [...params, id])
   // Achievements for agent accounts are the one place an agent may win; every other rule is for people.
-  return achievementById(id)?.audience === 'agents' ? rows : excludeAchievementAgents(rows)
+  return excludeBadStanding(achievementById(id)?.audience === 'agents' ? rows : await excludeAchievementAgents(rows))
+}
+
+/** No automatic achievement for a wallet the community has blocked (lib/achievementStanding.js). */
+async function excludeBadStanding(candidates) {
+  if (!candidates.length) return candidates
+  const blocked = await readBadStanding()
+  return blocked.size ? candidates.filter(({ wallet }) => !blocked.has(wallet.toLowerCase())) : candidates
 }
 
 /* A rule over a table some databases have not migrated yet reads as nobody qualifying, rather than
@@ -68,29 +76,36 @@ const FOLLOWED_BY_QUALIFIED = `
   WHERE f.is_following = 1
   GROUP BY LOWER(f.followed_address) HAVING COUNT(DISTINCT f.follower_address) >= ?`
 
-/** Trusted: standing over time, people who chose to follow, and a record moderation never acted on. */
+/** Trusted: standing over time and people who chose to follow. Good standing with the community
+ * is checked for every rule in newWinners, so it needs no clause of its own here. */
 async function trustedRule() {
   const { minDays, minFollowers } = await ruleSetting('trusted')
-  // Without a reports table there is nothing on anyone's record.
-  const cleanRecord = (await hasTable('user_reports'))
-    ? `AND NOT EXISTS (
-        SELECT 1 FROM user_reports r JOIN posts p ON p.id = r.post_id AND p.network_id = r.network_id
-        WHERE r.status = 'actioned' AND ${collate('LOWER(p.wallet_address)')} = ${collate('veteran.wallet')}
-      )`
-    : ''
   return newWinners('trusted', `
     SELECT veteran.wallet FROM (
       SELECT LOWER(wallet_address) AS wallet FROM posts WHERE is_repost IS NULL
       GROUP BY LOWER(wallet_address) HAVING MIN(created_at) <= NOW() - INTERVAL ? DAY
     ) veteran
-    JOIN (${FOLLOWED_BY_QUALIFIED}) followed ON ${collate('followed.wallet')} = ${collate('veteran.wallet')}
-    WHERE 1 = 1 ${cleanRecord}`, [minDays, minFollowers])
+    JOIN (${FOLLOWED_BY_QUALIFIED}) followed ON ${collate('followed.wallet')} = ${collate('veteran.wallet')}`, [minDays, minFollowers])
+}
+
+/** OG: real part taken before the cutoff — posts, comments on posts, and replies to comments.
+ * A comment whose post is gone counts as a comment, since that is the most it can prove. */
+async function ogRule() {
+  const { minPosts, minComments, minReplies } = achievementById('og')
+  return newWinners('og', `
+    SELECT LOWER(c.wallet_address) AS wallet FROM posts c
+    LEFT JOIN posts parent ON parent.id = c.is_comment AND parent.network_id = c.network_id
+    WHERE c.is_deleted = 0 AND c.is_repost IS NULL AND c.created_at < ?
+    GROUP BY LOWER(c.wallet_address)
+    HAVING SUM(c.is_comment IS NULL) >= ?
+      AND SUM(c.is_comment IS NOT NULL AND (parent.id IS NULL OR parent.is_comment IS NULL)) >= ?
+      AND SUM(parent.is_comment IS NOT NULL) >= ?`, [OG_CUTOFF, minPosts, minComments, minReplies])
 }
 
 export const RULES = {
-  // A post or reply before the cutoff, never a repost. Read off the posts themselves, not the users
-  // row: that row can be written after a wallet's first post, and would cost an early poster OG.
-  og: () => newWinners('og', 'SELECT LOWER(wallet_address) AS wallet FROM posts WHERE is_repost IS NULL AND created_at < ?', [OG_CUTOFF]),
+  // Read off the posts themselves, not the users row: that row can be written after a wallet's
+  // first post, and would cost an early poster OG.
+  og: ogRule,
   'first-post': () => newWinners('first-post', 'SELECT LOWER(wallet_address) AS wallet FROM posts WHERE is_comment IS NULL AND is_repost IS NULL'),
   'first-tip': tipsRule('first-tip', 1),
   generous: async () => tipsRule('generous', (await ruleSetting('generous')).threshold)(),
@@ -125,7 +140,7 @@ export const RULES = {
         if (row.rank !== null && row.rank <= 10 && !existing.has(wallet)) winners.push({ wallet, scope })
       }
     }
-    return excludeAchievementAgents(winners)
+    return excludeBadStanding(await excludeAchievementAgents(winners))
   },
 }
 

@@ -4,6 +4,7 @@ import { hasColumn, hasTable } from '@/lib/schema'
 import { achievementById } from '@/config/achievements'
 import { AchievementError, validateAchievementScope } from '@/lib/achievements'
 import { readAchievementCatalog } from '@/lib/achievementCatalog'
+import { isInBadStanding, readBadStanding } from '@/lib/achievementStanding'
 
 export const achievementsAreMigrated = async () => await hasTable('user_achievements') && await hasTable('user_featured_achievement')
 const requireMigration = async () => {
@@ -30,15 +31,24 @@ export async function readFeaturedAchievement(address) {
   return row && achievementById(row.id) ? row : null
 }
 
+/**
+ * What a profile shows. A wallet in bad standing with the community (lib/achievementStanding.js)
+ * shows nothing, and says so with `hidden`, so its owner can see why; the awards themselves stay,
+ * and return the moment enough blocks are lifted.
+ */
 export async function readAchievementSummary(address) {
+  if (await isInBadStanding(address)) return { earned: [], featured: null, hidden: true }
   const [earned, featured] = await Promise.all([readAchievements(address), readFeaturedAchievement(address)])
-  return { earned, featured }
+  return { earned, featured, hidden: false }
 }
 
 export async function readHolderCounts() {
   if (!await hasTable('user_achievements')) return {}
   if (holderCache?.expiresAt > Date.now()) return holderCache.value
-  const [rows] = await pool.execute('SELECT achievement_id AS id, COUNT(DISTINCT wallet_address) AS count FROM user_achievements GROUP BY achievement_id')
+  // Holders in bad standing are out of view on their profiles, so they are out of the counts too.
+  const hidden = [...(await readBadStanding())]
+  const [rows] = await pool.execute(`SELECT achievement_id AS id, COUNT(DISTINCT wallet_address) AS count FROM user_achievements
+    ${hidden.length ? `WHERE wallet_address NOT IN (${hidden.map(() => '?').join(',')})` : ''} GROUP BY achievement_id`, hidden)
   const value = Object.fromEntries(rows.filter((row) => achievementById(row.id)).map((row) => [row.id, Number(row.count)]))
   holderCache = { value, expiresAt: Date.now() + HOLDER_CACHE_TTL_MS }
   return value

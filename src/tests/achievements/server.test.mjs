@@ -20,18 +20,36 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
     const a = wallet(1)
     const b = wallet(2)
     await db.query('CREATE TABLE users (wallet_address VARCHAR(64) PRIMARY KEY, name TEXT, username TEXT, profileImage TEXT, tags TEXT, created_at DATETIME, is_universal_profile TINYINT NOT NULL DEFAULT 0)')
-    await db.query('CREATE TABLE posts (wallet_address VARCHAR(64), is_comment BIGINT NULL, is_repost BIGINT NULL, created_at DATETIME NOT NULL, id BIGINT AUTO_INCREMENT PRIMARY KEY, network_id INT NOT NULL DEFAULT 1)')
+    await db.query('CREATE TABLE posts (wallet_address VARCHAR(64), is_comment BIGINT NULL, is_repost BIGINT NULL, created_at DATETIME NOT NULL, id BIGINT AUTO_INCREMENT PRIMARY KEY, network_id INT NOT NULL DEFAULT 1, is_deleted TINYINT NOT NULL DEFAULT 0)')
     await db.query('CREATE TABLE post_likes (liker_address VARCHAR(64))')
     await db.query('CREATE TABLE follows (follower_address VARCHAR(42), followed_address VARCHAR(42), is_following TINYINT)')
     await db.query('CREATE TABLE tips (tipper VARCHAR(42), creator VARCHAR(42) NULL)')
     await db.query('CREATE TABLE hosted_agents (agent_address VARCHAR(42), owner_address VARCHAR(42) NULL)')
     await db.query('CREATE TABLE premium_subscriptions (account VARCHAR(42), complimentary TINYINT NOT NULL DEFAULT 0, purchase_count INT NOT NULL DEFAULT 0)')
     await db.query('CREATE TABLE agent_identities (wallet_address VARCHAR(42))')
-    await db.query('CREATE TABLE user_reports (post_id BIGINT, network_id INT, status VARCHAR(20))')
+    await db.query('CREATE TABLE user_blocks (blocker_address VARCHAR(42), blocked_address VARCHAR(42))')
     await db.query('CREATE TABLE nonces (nonce VARCHAR(64), wallet_address VARCHAR(42), expires_at DATETIME)')
     await db.query('CREATE TABLE notifications (recipient_wallet_address VARCHAR(64), action_type VARCHAR(80), entity_type VARCHAR(80), entity_id VARCHAR(191), title VARCHAR(191), message TEXT, action_url VARCHAR(500), email_status VARCHAR(20))')
     const migration = (await readFile(new URL('../../../deploy/migrations/20261105-user-achievements.sql', import.meta.url), 'utf8')).replace(/^--.*$/gm, '')
     for (const sql of migration.split(';').filter((sql) => sql.trim())) await db.query(sql)
+
+    // Fixtures. A post defaults to a top-level one made before the OG cutoff.
+    const early = '2026-11-03 12:00:00'
+    const post = async (author, { comment = null, repost = null, at = early, deleted = 0 } = {}) => (await db.query(
+      'INSERT INTO posts (wallet_address, is_comment, is_repost, created_at, is_deleted) VALUES (?, ?, ?, ?, ?)', [author, comment, repost, at, deleted]))[0].insertId
+    // OG's bar: posts, comments on a post, and replies to a comment.
+    const activity = async (author, { posts = 5, comments = 2, replies = 3, deleted = 0, repliesAt = early } = {}) => {
+      const roots = []
+      for (let i = 0; i < posts; i++) roots.push(await post(author, { deleted: i < deleted ? 1 : 0 }))
+      const firstComment = await post(author, { comment: roots.at(-1) })
+      for (let i = 1; i < comments; i++) await post(author, { comment: roots.at(-1) })
+      for (let i = 0; i < replies; i++) await post(author, { comment: firstComment, at: repliesAt })
+    }
+    // OG holders are who community standing listens to.
+    const ogHolders = Array.from({ length: 5 }, (_, i) => wallet(400 + i))
+    const makeOgHolders = () => db.query("INSERT IGNORE INTO user_achievements (wallet_address, achievement_id, scope, source, awarded_at) VALUES ?",
+      [ogHolders.map((holder) => [holder, 'og', '', 'rule', 1])])
+    const block = (blockers, target) => db.query('INSERT INTO user_blocks VALUES ?', [blockers.map((blocker) => [blocker, target])])
 
     await t.test('concurrent grants preserve the first award and notify once', async () => {
       const awards = await Promise.all(Array.from({ length: 3 }, () => service.awardAchievement({ wallets: [a, a], id: 'bug-hunter', source: 'admin', grantedBy: b })))
@@ -62,14 +80,13 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
         [wallet(4), 'Hosted', null, null, null, '2026-11-01 00:00:00'],
       ]])
       await db.execute('INSERT INTO hosted_agents (agent_address) VALUES (?)', [wallet(4)])
-      // OG: `a` posted before the cutoff; `b` only replied after it; wallet(5) only reposted before it;
-      // the bot posted early but agents never qualify.
-      await db.query('INSERT INTO posts (wallet_address, is_comment, is_repost, created_at) VALUES ?', [[
-        [a.toUpperCase().replace('0X', '0x'), null, null, '2026-11-03 12:00:00'],
-        [b, 10, null, '2026-11-06 00:00:00'],
-        [wallet(5), null, 7, '2026-11-01 00:00:00'],
-        [wallet(3), null, null, '2026-11-01 00:00:00'],
-      ]])
+      // OG: `a` took full part before the cutoff, one post under a mixed-case address; `b` only
+      // commented after it; wallet(5) only reposted; the bot did everything, but agents never qualify.
+      await post(a.toUpperCase().replace('0X', '0x'))
+      await activity(a, { posts: 4 })
+      await post(b, { comment: 1, at: '2026-11-06 00:00:00' })
+      await post(wallet(5), { repost: 1 })
+      await activity(wallet(3))
       await db.query('INSERT INTO tips (tipper) VALUES ?', [Array.from({ length: 50 }, () => [a])])
       await db.query('INSERT INTO post_likes VALUES ?', [Array.from({ length: 100 }, (_, i) => [wallet(i + 100)])])
       await db.query('INSERT INTO follows VALUES ?', [Array.from({ length: 100 }, (_, i) => [wallet(i + 100), a, 1]).concat([[wallet(999), b, 1]])])
@@ -116,12 +133,13 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
       ]])
       assert.deepEqual(await rules['community-backed'](), [{ wallet: b, scope: '' }])
 
-      // Trusted: wallet(6) and wallet(7) both posted 100 days ago with 25 qualified followers, but
-      // moderation acted on a report against wallet(7). wallet(6)'s dismissed report counts for nothing.
-      const [early6] = await db.query('INSERT INTO posts (wallet_address, created_at) VALUES (?, NOW() - INTERVAL 100 DAY)', [wallet(6)])
-      const [early7] = await db.query('INSERT INTO posts (wallet_address, created_at) VALUES (?, NOW() - INTERVAL 100 DAY)', [wallet(7)])
+      // Trusted: wallet(6) and wallet(7) both posted 100 days ago with 25 qualified followers, but five
+      // OG holders blocked wallet(7). wallet(6)'s four OG blockers and three others fall short.
+      await db.query('INSERT INTO posts (wallet_address, created_at) VALUES (?, NOW() - INTERVAL 100 DAY), (?, NOW() - INTERVAL 100 DAY)', [wallet(6), wallet(7)])
       await db.query('INSERT INTO follows VALUES ?', [[6, 7].flatMap((n) => Array.from({ length: 25 }, (_, i) => [wallet(100 + i), wallet(n), 1]))])
-      await db.query('INSERT INTO user_reports VALUES ?', [[[early6.insertId, 1, 'dismissed'], [early7.insertId, 1, 'actioned']]])
+      await makeOgHolders()
+      await block(ogHolders, wallet(7))
+      await block([...ogHolders.slice(0, 4), wallet(500), wallet(501), wallet(502)], wallet(6))
       assert.deepEqual(await rules.trusted(), [{ wallet: wallet(6), scope: '' }])
 
       // Agent Builder goes to the human who owns the agent; Registered Agent to the agent itself,
@@ -133,6 +151,32 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
 
       const counts = await service.runAchievementRules({ notify: false })
       for (const id of ['self-sovereign', 'supporter', 'community-backed', 'trusted', 'agent-builder', 'registered-agent']) assert.equal(counts[id], 1, id)
+    })
+
+    await t.test("OG needs posts, comments and replies before the cutoff; standing is the community's call", async () => {
+      // Near misses: two replies short, a deleted post leaving four, replies only after the cutoff.
+      await activity(wallet(8), { replies: 2 })
+      await activity(wallet(9), { deleted: 1 })
+      await activity(wallet(10), { repliesAt: '2026-11-06 00:00:00' })
+      // wallet(11) clears the bar; wallet(12) does too, but five OG holders have blocked it.
+      await activity(wallet(11))
+      await activity(wallet(12))
+      await makeOgHolders()
+      await block(ogHolders, wallet(12))
+      assert.deepEqual(await rules.og(), [{ wallet: wallet(11), scope: '' }])
+
+      // Blocks from accounts that are not OG, and blocking yourself, count for nothing.
+      await block([wallet(500), wallet(501), wallet(502), wallet(503), wallet(504)], b)
+      await block([b], b)
+      assert.equal((await service.readAchievementSummary(b)).hidden, false)
+
+      // Five OG blockers hide what a wallet holds — nothing is deleted — and lifting one block restores it.
+      const before = await service.readAchievementSummary(a)
+      assert.ok(before.earned.length > 0)
+      await block(ogHolders, a)
+      assert.deepEqual(await service.readAchievementSummary(a), { earned: [], featured: null, hidden: true })
+      await db.query('DELETE FROM user_blocks WHERE blocker_address = ? AND blocked_address = ?', [ogHolders[0], a])
+      assert.deepEqual((await service.readAchievementSummary(a)).earned, before.earned)
     })
 
     await t.test('a closed season awards exactly its top ten once with a season scope', async () => {
@@ -235,13 +279,13 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
         import assert from 'node:assert/strict';
         import pool from './src/lib/db.js';
         import { readAchievementSummary, readHolderCounts, runAchievementRules } from './src/lib/achievementsServer.js';
-        assert.deepEqual(await readAchievementSummary('${a}'), {earned: [], featured: null});
+        assert.deepEqual(await readAchievementSummary('${a}'), {earned: [], featured: null, hidden: false});
         assert.deepEqual(await readHolderCounts(), {});
         await assert.rejects(runAchievementRules(), {status:503});
         const catalog = await import('./src/app/api/v1/achievements/route.js');
         assert.equal((await catalog.GET()).status, 200);
         const users = await import('./src/app/api/v1/users/[address]/achievements/route.js');
-        assert.deepEqual((await (await users.GET(null, {params: Promise.resolve({address:'${a}'})})).json()).data, {earned: [], featured: null});
+        assert.deepEqual((await (await users.GET(null, {params: Promise.resolve({address:'${a}'})})).json()).data, {earned: [], featured: null, hidden: false});
         const admin = await import('./src/app/api/v1/admin/achievements/route.js');
         assert.equal((await admin.GET(new Request('http://localhost/api/v1/admin/achievements?id=og'))).status, 503);
         await pool.end();

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { CaretUpIcon, CaretDownIcon } from '@phosphor-icons/react'
 import { useConnection, useSignMessage } from 'wagmi'
-import { RARITIES } from '@/config/achievements'
+import { COMMUNITY_STANDING, RARITIES } from '@/config/achievements'
 import useAchievementCatalog from '@/hooks/useAchievementCatalog'
 import { sameAddress, isEvmAddress } from '@/lib/address'
 import { featuredAchievementMessage } from '@/lib/achievements'
@@ -81,7 +81,13 @@ export default function AchievementsRow({ achievements, address: wallet, owner =
     }
   }
 
-  if (!earned.length) return owner ? <p className={styles.achievementsRow__empty}>No achievements yet · <Link href="/achievements">See all achievements →</Link></p> : null
+  if (!earned.length) {
+    if (!owner) return null
+    // Standing is the community's call, so its owner is told plainly rather than left guessing.
+    return achievements?.hidden
+      ? <p className={styles.achievementsRow__empty}>Your achievements are hidden while {COMMUNITY_STANDING.blockedByOg} or more OG members have you blocked. They come back when enough of them unblock you.</p>
+      : <p className={styles.achievementsRow__empty}>No achievements yet · <Link href="/achievements">See all achievements →</Link></p>
+  }
   return (
     <section className={styles.achievementsRow} aria-label="Earned achievements">
       <header className={styles.achievementsRow__heading}>
