@@ -18,6 +18,7 @@ import {
   ImageIcon,
   ListChecksIcon,
   MagnifyingGlassIcon,
+  MedalIcon,
   PlusIcon,
   PlayCircleIcon,
   PulseIcon,
@@ -76,6 +77,7 @@ export const NAV_ITEMS_SCHEMA = [
 ]
 
 export const MORE_NAV_ITEMS_SCHEMA = [
+  { id: 'achievements', name: 'Achievements', path: '/achievements', icon: MedalIcon },
   { id: 'live', name: 'Live', path: '/live', icon: BroadcastIcon },
   { id: 'polls', name: 'Polls', path: '/polls', icon: ListChecksIcon },
   { id: 'fund', name: 'Fundraise', path: '/fund', icon: CurrencyCircleDollarIcon },
