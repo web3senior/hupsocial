@@ -85,6 +85,13 @@ const parseTags = (tags) => {
   }
 }
 
+/** Directory membership requires the explicit ai-agent tag, rather than a broader badge claim. */
+export function hasAiAgentTag(profile) {
+  return parseTags(profile?.tags).some((tag) =>
+    typeof tag === 'string' && tag.trim().toLowerCase() === 'ai-agent',
+  )
+}
+
 /**
  * The mark a profile has claimed for itself, or null.
  *

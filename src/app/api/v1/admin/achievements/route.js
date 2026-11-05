@@ -19,7 +19,7 @@ function failure(error) {
 export async function GET(request) {
   try {
     const params = new URL(request.url).searchParams
-    const holders = await listAchievementHolders(params.get('id') ?? 'og', params.get('scope') ?? '')
+    const holders = params.has('id') ? await listAchievementHolders(params.get('id'), params.get('scope') ?? '') : []
     const catalog = await readAchievementCatalog()
     return NextResponse.json({ success: true, data: { holders, catalog } }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
@@ -43,7 +43,7 @@ export async function POST(request) {
     if (!await verifyWalletSignature(ADMIN_WALLET, message, claim.signature, { chainId: claim.chainId })) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
-    if (!await achievementsAreMigrated()) return NextResponse.json({ success: false, error: 'Run deploy/migrations/20261105-user-achievements.sql first.' }, { status: 503 })
+    if (!isSetting && !await achievementsAreMigrated()) return NextResponse.json({ success: false, error: 'Run deploy/migrations/20261105-user-achievements.sql first.' }, { status: 503 })
     const [burn] = await pool.execute('DELETE FROM nonces WHERE nonce = ? AND wallet_address = ? AND expires_at > NOW()', [claim.nonce, ADMIN_WALLET])
     if (!burn.affectedRows) return NextResponse.json({ success: false, error: 'Invalid or expired nonce' }, { status: 401 })
     let data

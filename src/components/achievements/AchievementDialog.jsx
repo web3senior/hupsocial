@@ -2,7 +2,7 @@
 
 import { forwardRef, useId } from 'react'
 import NativeDialog from '@/components/ui/NativeDialog'
-import AchievementBadge from '@/components/ui/AchievementBadge'
+import AchievementEmblem from './AchievementEmblem'
 import { Spinner } from '@/components/Loading'
 import useAchievementCatalog from '@/hooks/useAchievementCatalog'
 import styles from './AchievementDialog.module.scss'
@@ -17,7 +17,7 @@ const AchievementDialog = forwardRef(function AchievementDialog({ earned, featur
       onClose={(event) => event.stopPropagation()} onCancel={(event) => { event.stopPropagation(); if (busy) event.preventDefault() }}>
       {item && <>
         <div className={styles.achievementDialog__heading}>
-          <AchievementBadge featured={earned} size="lg" linked={false} />
+          <AchievementEmblem item={item} size={56} />
           <h2 id={titleId}>{item.name}</h2>
           <button type="button" onClick={() => ref.current?.close()} disabled={busy} aria-label="Close achievement details">×</button>
         </div>

@@ -1,0 +1,149 @@
+@use './card' as *;
+
+.card {
+  @include achievement-card;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  isolation: isolate;
+  font: inherit;
+  text-align: center;
+  transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
+
+  &:is(button) {
+    cursor: pointer;
+  }
+
+  &:hover,
+  &:focus-visible,
+  &:focus-within {
+    transform: translateY(-2px);
+
+    // Plays the emblem's sheen while the card around it is hovered
+    [data-achievement-emblem] {
+      --emblem-shine: 1;
+    }
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--accent-primary, currentColor);
+    outline-offset: 3px;
+  }
+
+  // A shared #id link lands on its card
+  &:target {
+    outline: 3px solid var(--accent-primary, currentColor);
+    outline-offset: 4px;
+  }
+
+  // Earned legendary cards glow a little warmer than the rest
+  &--legendary:not(&--locked) {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 35%, transparent),
+      0 12px 32px -16px #e9a800;
+  }
+
+  &--locked {
+    filter: saturate(0.25);
+    opacity: 0.8;
+  }
+
+  // The spotlight: a soft pool of light under the pointer, faded in on hover
+  &__light {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(200px circle at var(--light-x, 50%) var(--light-y, 0%), color-mix(in srgb, #fff 32%, transparent), transparent 70%);
+    opacity: 0;
+    transition: opacity 250ms ease;
+    pointer-events: none;
+  }
+
+  &:hover &__light,
+  &:focus-visible &__light {
+    opacity: 1;
+  }
+
+  &__heading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+  }
+
+  &__name {
+    width: 100%;
+    margin: 0;
+    color: inherit;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem;
+  }
+
+  &__rarity {
+    opacity: 0.85;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  &__description {
+    align-self: stretch;
+    margin: 0;
+    padding-top: 0.85rem;
+    border-top: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    text-align: left;
+  }
+
+  // Catalog: the full card
+  &--lg {
+    gap: 1rem;
+    padding: 1.6rem 1.25rem 1.25rem;
+
+    .card__heading { gap: 0.45rem; }
+    .card__name { font-size: 1.125rem; line-height: 1.3; }
+    .card__rarity { font-size: 0.6875rem; }
+  }
+
+  // Profile rail: just enough to recognise it; the dialog has the rest
+  &--md {
+    gap: 0.55rem;
+    padding: 0.9rem 0.6rem 0.75rem;
+    border-width: 4px;
+    border-radius: 12px;
+
+    .card__heading { gap: 0.2rem; }
+    .card__name { font-size: 0.8125rem; line-height: 1.25; }
+    .card__rarity { font-size: 0.625rem; }
+
+    // A scrolling rail clips anything wide, so the legendary glow stays close to the card
+    &.card--legendary:not(.card--locked) {
+      box-shadow:
+        inset 0 1px 0 color-mix(in srgb, #fff 35%, transparent),
+        0 4px 10px -4px #e9a800;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover,
+    &:focus-visible,
+    &:focus-within {
+      transform: none;
+    }
+  }
+}

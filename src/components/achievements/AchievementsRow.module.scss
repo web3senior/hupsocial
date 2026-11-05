@@ -25,25 +25,22 @@
   }
 
   &__track {
-    --rail-top: #000;
-    --rail-bottom: #000;
+    --rail-left: #000;
+    --rail-right: #000;
 
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-auto-rows: 36px;
-    gap: 4px;
-    max-height: 120px;
+    display: flex;
+    gap: 8px;
+    padding: 8px 6px;
     min-width: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    scroll-snap-type: y mandatory;
-    overscroll-behavior-y: contain;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
-    mask-image: linear-gradient(to bottom, var(--rail-top), #000 12px, #000 calc(100% - 12px), var(--rail-bottom));
+    mask-image: linear-gradient(to right, var(--rail-left), #000 12px, #000 calc(100% - 12px), var(--rail-right));
 
-    &[data-scroll-up='true'] { --rail-top: transparent; }
-    &[data-scroll-down='true'] { --rail-bottom: transparent; }
+    &[data-scroll-left='true'] { --rail-left: transparent; }
+    &[data-scroll-right='true'] { --rail-right: transparent; }
   }
 
   &__arrow {
@@ -75,24 +72,10 @@
     outline-offset: 2px;
   }
 
-  &__chip {
-    min-width: 0;
-    text-align: left;
+  // A card's width on the rail; AchievementCard draws the rest
+  &__card {
+    flex: 0 0 132px;
     scroll-snap-align: start;
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 8px 12px;
-    border: 1px solid var(--border, #8884);
-    border-radius: 12px;
-    background: var(--surface-muted);
-    color: inherit;
-    font: inherit;
-    font-size: 12px;
-    cursor: pointer;
-
-    &:hover { background: color-mix(in srgb, currentColor 6%, transparent); }
-    &:focus-visible { outline: 2px solid var(--brand-500, #287cdb); outline-offset: 2px; }
   }
 
   &__empty { font-size: 12px; opacity: 0.65; margin: 16px 0; }

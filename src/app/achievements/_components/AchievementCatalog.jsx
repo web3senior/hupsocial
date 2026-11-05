@@ -2,18 +2,17 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import clsx from 'clsx'
 import useSWR from 'swr'
 import { Rise } from 'cube-motion/react'
 import { CheckCircleIcon, LightningIcon, LockSimpleIcon, PushPinIcon, ShieldCheckIcon } from '@phosphor-icons/react'
-import { RARITIES, RARITY_LABELS } from '@/config/achievements'
+import { RARITIES } from '@/config/achievements'
 import { achievementBonusLabel } from '@/config/points'
 import { getUserAchievements } from '@/lib/api'
 import useAchievementCatalog from '@/hooks/useAchievementCatalog'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { profilePath } from '@/lib/username'
 import SegmentedControl from '@/components/ui/SegmentedControl'
-import { ACHIEVEMENT_ICONS, DEFAULT_ACHIEVEMENT_ICON } from '@/components/achievements/achievementIcons'
+import AchievementCard from '@/components/achievements/AchievementCard'
 import styles from './AchievementCatalog.module.scss'
 
 const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
@@ -52,7 +51,7 @@ function holdersText(count, total) {
 
 /**
  * The /achievements catalog: how achievements work, the viewer's progress when a wallet is
- * connected, and every achievement rarest first. Rows render from the static catalog at once;
+ * connected, and every achievement rarest first. Cards render from the catalog at once;
  * holder counts and the viewer's own awards fill in as they arrive, so nothing shifts or spins.
  */
 export default function AchievementCatalog() {
@@ -128,28 +127,24 @@ export default function AchievementCatalog() {
       ) : (
         <Rise as="ul" className={styles.catalog__list} targets="children" key={activeFilter}>
           {visible.map((item) => {
-            const Icon = ACHIEVEMENT_ICONS[item.icon] ?? DEFAULT_ACHIEVEMENT_ICON
             const awards = earnedById.get(item.id) ?? []
             const earned = awards.length > 0
 
             return (
-              <li key={item.id} id={item.id} className={clsx(styles.achievementRow, styles[`achievementRow--${item.rarity}`], earned && styles['achievementRow--earned'])}>
-                <span className={styles.achievementRow__icon} aria-hidden="true">
-                  <Icon size={26} weight={earned ? 'fill' : 'duotone'} />
-                </span>
-
-                <div className={styles.achievementRow__body}>
-                  <div className={styles.achievementRow__heading}>
-                    <h3>{item.name}</h3>
-                    <span className={styles.achievementRow__rarity}>{RARITY_LABELS[item.rarity]}</span>
-                    {achievementBonusLabel(item.id) && <span className={styles.achievementRow__bonus}>{achievementBonusLabel(item.id)}</span>}
-                  </div>
-                  <p className={styles.achievementRow__description}>{item.description}</p>
-                  <p className={styles.achievementRow__meta}>
-                    {howToEarn(item)}
-                    {stats && <> · {holdersText(stats.holders[item.id] ?? 0, stats.totalWallets)}</>}
-                  </p>
-                </div>
+              <AchievementCard
+                key={item.id}
+                id={item.id}
+                as="li"
+                item={item}
+                size="lg"
+                // Dimmed only once we know: a signed-out reader sees every card at full colour
+                locked={knowsMine && !earned}
+                tags={achievementBonusLabel(item.id) && <span className={styles.achievementRow__bonus}>{achievementBonusLabel(item.id)}</span>}
+              >
+                <p className={styles.achievementRow__meta}>
+                  {howToEarn(item)}
+                  {stats && <> · {holdersText(stats.holders[item.id] ?? 0, stats.totalWallets)}</>}
+                </p>
 
                 {knowsMine && (
                   <div className={styles.achievementRow__status}>
@@ -169,7 +164,7 @@ export default function AchievementCatalog() {
                     )}
                   </div>
                 )}
-              </li>
+              </AchievementCard>
             )
           })}
         </Rise>

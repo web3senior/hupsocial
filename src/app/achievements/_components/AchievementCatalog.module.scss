@@ -1,5 +1,3 @@
-@use '../../../components/achievements/rarity' as *;
-
 .catalog {
   display: flex;
   flex-direction: column;
@@ -72,15 +70,12 @@
   }
 
   &__list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 1.25rem;
     margin: 0;
     padding: 0;
     list-style: none;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    background-color: var(--background);
-    overflow: hidden;
   }
 
   &__empty {
@@ -143,126 +138,46 @@
   }
 }
 
+// The page's own parts inside each AchievementCard; the card itself draws everything else
 .achievementRow {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 1rem 1.1rem;
-  scroll-margin-top: 100px;
-
-  @include rarity-modifiers;
-
-  & + & {
-    border-top: 1px solid var(--border);
-  }
-
-  // A shared #id link lands here: mark which row it meant.
-  &:target {
-    background-color: color-mix(in srgb, var(--achievement-color) 8%, transparent);
-  }
-
-  &__icon {
-    display: grid;
-    place-items: center;
-    width: 48px;
-    height: 48px;
-    border-radius: 14px;
-    color: var(--achievement-color);
-    background-color: color-mix(in srgb, var(--achievement-color) 12%, transparent);
-  }
-
-  &__body {
-    min-width: 0;
-  }
-
-  &__heading {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-
-    h3 {
-      margin: 0;
-      color: var(--text);
-      font-size: var(--system-15-font-size);
-      line-height: var(--system-15-line-height);
-      font-weight: 700;
-    }
-  }
-
-  &__rarity {
-    padding: 0.1rem 0.5rem;
-    border-radius: 999px;
-    color: var(--achievement-color);
-    background-color: color-mix(in srgb, var(--achievement-color) 12%, transparent);
-    font-size: var(--system-11-font-size);
-    line-height: var(--system-11-line-height);
-    font-weight: 600;
-  }
-
-  // What it adds to the $HUP airdrop, in the season accent the leaderboard and /token use
+  // What it adds to the $HUP airdrop
   &__bonus {
-    padding: 0.1rem 0.5rem;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
     border-radius: 999px;
-    color: #fd1669;
-    background-color: color-mix(in srgb, #fd1669 10%, transparent);
-    font-size: var(--system-11-font-size);
-    line-height: var(--system-11-line-height);
+    font-size: 0.6875rem;
     font-weight: 600;
-  }
-
-  &__description {
-    margin: 0.2rem 0 0;
-    color: var(--text);
-    font-size: var(--system-14-font-size);
-    line-height: 1.45;
+    line-height: 1.4;
   }
 
   &__meta {
-    margin: 0.3rem 0 0;
-    color: var(--text-muted);
-    font-size: var(--system-12-font-size);
-    line-height: var(--system-12-line-height);
+    align-self: stretch;
+    margin: 0;
+    opacity: 0.85;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    text-align: left;
   }
 
   &__status {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 0.25rem;
-    font-size: var(--system-12-font-size);
+    align-self: stretch;
+    gap: 0.35rem;
+    margin-top: auto;
+    padding-top: 0.85rem;
+    border-top: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    font-size: 0.75rem;
     font-weight: 600;
-    white-space: nowrap;
   }
 
   &__earned,
   &__locked {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 0.3rem;
-  }
+    gap: 0.35rem;
+    text-align: left;
 
-  &__earned {
-    color: var(--success, #1f9d55);
-  }
-
-  &__locked {
-    color: var(--text-muted);
-  }
-
-  // Locked rows recede, so the eye lands on what the viewer already has.
-  &:not(&--earned) &__icon {
-    opacity: 0.7;
-  }
-
-  @container achievements (max-width: 560px) {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-
-    &__status {
-      grid-column: 2;
-      align-items: flex-start;
-    }
+    svg { flex-shrink: 0; }
   }
 }

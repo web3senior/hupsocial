@@ -1,13 +1,9 @@
-@use '../achievements/rarity' as *;
-
+// AchievementEmblem draws the mark; this only places it in a row of name marks
 .achievementBadge {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
   vertical-align: middle;
-  color: var(--achievement-color);
-
-  @include rarity-modifiers;
 
   &:focus-visible {
     outline: 2px solid currentColor;

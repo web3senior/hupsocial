@@ -29,10 +29,23 @@ export default function AchievementsSection() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [holdersError, setHoldersError] = useState(null)
   const [result, setResult] = useState(null)
   const [revision, setRevision] = useState(0)
   const item = catalog.find((entry) => entry.id === id)
-  const scope = item.perSeason ? season : ''
+  const scope = item?.perSeason ? season : ''
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch('/api/v1/admin/achievements', { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const json = await response.json()
+        if (!response.ok || !json.success) throw new Error(json.error || 'Could not load achievement settings')
+        if (!controller.signal.aborted) setCatalog(json.data.catalog)
+      })
+      .catch((err) => { if (!controller.signal.aborted) setError(err.message) })
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -41,15 +54,17 @@ export default function AchievementsSection() {
       .then(async (response) => {
         const json = await response.json()
         if (!response.ok || !json.success) throw new Error(json.error || 'Could not read holders')
-        if (!signal.aborted) { setHolders(json.data.holders); setCatalog(json.data.catalog); setError(null) }
+        if (!signal.aborted) { setHolders(json.data.holders); setHoldersError(null) }
       })
-      .catch((err) => { if (!signal.aborted) { setError(err.message); setHolders([]) } })
+      .catch((err) => { if (!signal.aborted) { setHoldersError(err.message); setHolders([]) } })
       .finally(() => { if (!signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [id, scope, revision])
 
   const submit = async (action, target = '', all = false, setting = null) => {
+    if (busy || !address) return
     setBusy(true)
+    setError(null)
     setResult(null)
     try {
       const nonce = await requestAuthNonce(address)
@@ -61,7 +76,7 @@ export default function AchievementsSection() {
       if (!response.ok || !json.success) throw new Error(json.error || 'Could not update achievements')
       if (setting) {
         setCatalog(json.data.catalog)
-        await mutate('achievements:catalog')
+        await mutate('achievements:catalog', (current) => ({ ...current, catalog: json.data.catalog }), { revalidate: false })
       }
       const text = setting ? 'Achievement settings saved.' : action === 'run' ? `New awards: ${Object.entries(json.data).map(([key, count]) => `${catalog.find((entry) => entry.id === key)?.name || achievementById(key)?.name}: ${count}`).join(', ')}`
         : action === 'grant' ? (json.data.inserted.length ? 'Achievement granted.' : 'Wallet already holds this achievement.')
@@ -81,10 +96,24 @@ export default function AchievementsSection() {
     <section className={styles.achievementsAdmin}>
       <h2>Achievements</h2>
       <p>Permanent milestones. Only admin-granted awards can be revoked. Rule awards remain with their holders.</p>
+      <ul className={styles.achievementsAdmin__catalog} aria-label="Achievement catalog">
+        {catalog.map((entry) => (
+          <li key={entry.id}>
+            <button type="button" disabled={busy} aria-pressed={id === entry.id}
+              className={clsx(styles.achievementsAdmin__catalogItem, id === entry.id && styles['achievementsAdmin__catalogItem--selected'])}
+              onClick={() => { if (id !== entry.id) setLoading(true); setId(entry.id); setResult(null) }}>
+              <strong>{entry.name}</strong>
+              <span>{entry.kind} · {entry.rarity}{entry.listed === false ? ' · hidden' : ''}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {item && <AchievementSettingsEditor key={JSON.stringify(item)} item={item} disabled={busy || !address}
+        onSave={(setting) => submit(setting.action, '', false, setting)} />}
       <fieldset disabled={busy} className={styles.achievementsAdmin__form}>
         <label htmlFor="achievement-id">Achievement</label>
         <select id="achievement-id" value={id} onChange={(event) => { setLoading(true); setId(event.target.value) }}>{catalog.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {entry.kind}{entry.listed === false ? ' · hidden' : ''}</option>)}</select>
-        {item.perSeason && <><label htmlFor="achievement-season">Season</label><select id="achievement-season" value={season} onChange={(event) => { setLoading(true); setSeason(event.target.value) }}>{POINTS_SEASONS.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></>}
+        {item?.perSeason && <><label htmlFor="achievement-season">Season</label><select id="achievement-season" value={season} onChange={(event) => { setLoading(true); setSeason(event.target.value) }}>{POINTS_SEASONS.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></>}
         <label htmlFor="achievement-wallet">Wallet address</label>
         <input id="achievement-wallet" value={wallet} onChange={(event) => setWallet(event.target.value)} placeholder="0x…" />
         <label htmlFor="achievement-note">Note (optional)</label>
@@ -95,16 +124,15 @@ export default function AchievementsSection() {
         <p className={styles.achievementsAdmin__hint}>Running a rule for the first time awards everyone who already qualifies. Untick this to backfill without notifying them.</p>
         <div className={styles.achievementsAdmin__actions}>
           <button type="button" disabled={!wallet.trim() || !address} onClick={() => submit('grant', wallet.trim())}>Grant achievement</button>
-          {item.kind === 'auto' && <button type="button" disabled={!address} onClick={() => submit('run')}>Run this rule now</button>}
+          {item?.kind === 'auto' && <button type="button" disabled={!address} onClick={() => submit('run')}>Run this rule now</button>}
           <button type="button" disabled={!address} onClick={() => submit('run', '', true)}>Run all rules now</button>
         </div>
       </fieldset>
-      {!loading && <AchievementSettingsEditor key={JSON.stringify(item)} item={item} disabled={busy || !address}
-        onSave={(setting) => submit(setting.action, '', false, setting)} />}
       {busy && <Spinner size={20} label="Signing and updating achievements" />}
       {error && <p role="alert" className={styles.achievementsAdmin__error}>{error}</p>}
       {result && <p role="status">{result}</p>}
       <h3>Holders {holders.length ? `(${holders.length}${holders.length === 500 ? '+' : ''})` : ''}</h3>
+      {holdersError && <p role="alert" className={styles.achievementsAdmin__error}>{holdersError}</p>}
       {loading ? <Spinner size={20} /> : !holders.length ? <p>No holders in this scope.</p> : <ul className={styles.achievementsAdmin__holders}>
         {holders.map((holder) => <li key={holder.wallet} className={styles.achievementsAdmin__holder}>
           <Link href={`/${holder.username ? `@${holder.username}` : holder.wallet}`}>{holder.name || shortAddress(holder.wallet)}</Link>

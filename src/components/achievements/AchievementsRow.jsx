@@ -1,15 +1,16 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { CaretUpIcon, CaretDownIcon } from '@phosphor-icons/react'
+import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import { useConnection, useSignMessage } from 'wagmi'
 import { COMMUNITY_STANDING, RARITIES } from '@/config/achievements'
+import useRailScroll from '@/hooks/useRailScroll'
 import useAchievementCatalog from '@/hooks/useAchievementCatalog'
 import { sameAddress, isEvmAddress } from '@/lib/address'
 import { featuredAchievementMessage } from '@/lib/achievements'
 import { getAchievementCatalog, requestAuthNonce, setFeaturedAchievement } from '@/lib/api'
-import AchievementBadge from '@/components/ui/AchievementBadge'
+import AchievementCard from './AchievementCard'
 import AchievementDialog from './AchievementDialog'
 import styles from './AchievementsRow.module.scss'
 
@@ -26,35 +27,7 @@ export default function AchievementsRow({ achievements, address: wallet, owner =
   const earned = (achievements?.earned ?? []).filter((row) => achievementById(row.id)).slice().sort((a, b) =>
     RARITIES.indexOf(achievementById(b.id).rarity) - RARITIES.indexOf(achievementById(a.id).rarity) || b.awardedAt - a.awardedAt)
   const canFeature = owner && isEvmAddress(wallet) && sameAddress(address, wallet)
-  const [canScrollUp, setCanScrollUp] = useState(false)
-  const [canScrollDown, setCanScrollDown] = useState(false)
-
-  useEffect(() => {
-    const track = trackRef.current
-    if (!track) return
-    const measure = () => {
-      setCanScrollUp(track.scrollTop > 1)
-      setCanScrollDown(track.scrollTop + track.clientHeight < track.scrollHeight - 1)
-    }
-    measure()
-    track.addEventListener('scroll', measure, { passive: true })
-    const observer = new ResizeObserver(measure)
-    observer.observe(track)
-    return () => {
-      track.removeEventListener('scroll', measure)
-      observer.disconnect()
-    }
-  }, [achievements, earned.length])
-
-  const scrollRow = (direction) => {
-    const track = trackRef.current
-    if (!track || track.children.length < 2) return
-    const rowHeight = track.children[1].getBoundingClientRect().top - track.children[0].getBoundingClientRect().top
-    track.scrollBy({
-      top: direction * rowHeight,
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
-    })
-  }
+  const { canScrollLeft, canScrollRight, scrollByPage } = useRailScroll(trackRef, [achievements, earned.length])
 
   const open = (row) => {
     setSelected(row)
@@ -94,24 +67,26 @@ export default function AchievementsRow({ achievements, address: wallet, owner =
         <h3>Achievements</h3>
         <div className={styles.achievementsRow__actions}>
           <Link href="/achievements">See all →</Link>
-          {(canScrollUp || canScrollDown) && (
+          {(canScrollLeft || canScrollRight) && (
             <div className={styles.achievementsRow__arrows}>
-              <button type="button" className={styles.achievementsRow__arrow} aria-label="Scroll achievements up" disabled={!canScrollUp} onClick={() => scrollRow(-1)}>
-                <CaretUpIcon size={12} aria-hidden="true" />
+              <button type="button" className={styles.achievementsRow__arrow} aria-label="Scroll achievements left" disabled={!canScrollLeft} onClick={() => scrollByPage(-1)}>
+                <CaretLeftIcon size={12} aria-hidden="true" />
               </button>
-              <button type="button" className={styles.achievementsRow__arrow} aria-label="Scroll achievements down" disabled={!canScrollDown} onClick={() => scrollRow(1)}>
-                <CaretDownIcon size={12} aria-hidden="true" />
+              <button type="button" className={styles.achievementsRow__arrow} aria-label="Scroll achievements right" disabled={!canScrollRight} onClick={() => scrollByPage(1)}>
+                <CaretRightIcon size={12} aria-hidden="true" />
               </button>
             </div>
           )}
         </div>
       </header>
-      <div ref={trackRef} className={styles.achievementsRow__track} data-scroll-up={canScrollUp} data-scroll-down={canScrollDown} tabIndex={0} role="region" aria-label="Achievements list">
-        {earned.map((row) => <button type="button" key={`${row.id}:${row.scope}`} className={styles.achievementsRow__chip}
-          aria-label={`${achievementById(row.id).name}${row.scope ? ` · Season ${row.scope}` : ''}`} onClick={() => open(row)}>
-          <AchievementBadge featured={row} linked={false} size="lg" />
-          {achievementById(row.id).name}{row.scope ? ` · Season ${row.scope}` : ''}
-        </button>)}
+      <div ref={trackRef} className={styles.achievementsRow__track} data-scroll-left={canScrollLeft} data-scroll-right={canScrollRight} tabIndex={0} role="region" aria-label="Achievements list">
+        {earned.map((row) => {
+          const item = achievementById(row.id)
+          return (
+            <AchievementCard key={`${row.id}:${row.scope}`} item={item} size="md" as="button" scope={row.scope}
+              className={styles.achievementsRow__card} onClick={() => open(row)} />
+          )
+        })}
       </div>
       <AchievementDialog ref={dialogRef} earned={selected} featured={achievements.featured} owner={canFeature} busy={busy} error={error} onFeature={feature}
         holders={selected && rarity ? (rarity.holders[selected.id] ?? 0) : undefined} totalWallets={rarity?.totalWallets} />

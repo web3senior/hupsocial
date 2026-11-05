@@ -1,0 +1,22 @@
+// The achievement card's palette: one colour per rarity, drawn the same in every theme so a
+// legendary card is the same gold on every screen. AchievementCard is the only consumer.
+@mixin achievement-card {
+  --achievement-card-background: #33363b;
+  --achievement-card-text: #fff;
+
+  color: var(--achievement-card-text);
+  // A touch lighter at the top, so the card reads as a raised tile rather than a flat swatch
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent 55%),
+    var(--achievement-card-background);
+  border: 5px solid color-mix(in srgb, var(--achievement-card-background) 72%, #000);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
+
+  &--rare { --achievement-card-background: #0879c9; }
+  &--epic { --achievement-card-background: #7432b4; }
+  &--legendary {
+    --achievement-card-background: #ffd335;
+    --achievement-card-text: #4d3600;
+  }
+}
