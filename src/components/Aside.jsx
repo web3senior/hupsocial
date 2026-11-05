@@ -458,12 +458,12 @@ export default function Aside({ inLayoutGrid = false }) {
       {isComponentOpen && <NewPost onClose={() => setIsComponentOpen(false)} />}
 
       <div className={styles.floatingActions}>
-        <Hupi className={styles.floatingActions__button} />
+        {pathname !== '/agents' && <Hupi className={styles.floatingActions__button} />}
 
         <BatchLikeTrigger className={styles.floatingActions__button} badgeClassName={styles.floatingActions__badge} />
 
         <button
-          className={styles.floatingActions__button}
+          className={clsx(styles.floatingActions__button, styles['floatingActions__button--create'])}
           onClick={() => {
             if (!canCompose) {
               if (!openConnect()) toast('Please connect wallet', 'error')

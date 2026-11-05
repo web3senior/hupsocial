@@ -455,6 +455,12 @@
     }
   }
 
+  &__button--create {
+    @include md-down() {
+      display: none;
+    }
+  }
+
   // Element: Overlay Badge
   &__badge {
     position: absolute;
