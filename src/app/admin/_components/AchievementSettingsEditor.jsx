@@ -39,7 +39,7 @@ export default function AchievementSettingsEditor({ item, disabled, onSave }) {
         <label className={styles.achievementsAdmin__checkbox}>
           <input type="checkbox" checked={listed} onChange={(event) => setListed(event.target.checked)} />Visible in catalog and profiles
         </label>
-        <p className={styles.achievementsAdmin__hint}>Hidden achievements can still be earned. Threshold changes apply on the next rule run. Update the description to match your thresholds. Existing awards are retained.</p>
+        <p className={styles.achievementsAdmin__hint}>Hidden achievements stop being awarded and disappear from profiles; holders keep them and see them again once it is visible. Threshold changes apply on the next rule run. Update the description to match your thresholds. Existing awards are retained.</p>
         <div className={styles.achievementsAdmin__actions}>
           <button type="submit">Save settings</button>
           <button type="button" disabled={!item.overridden} onClick={() => onSave({ action: 'reset-settings', id: item.id })}>Reset to code defaults</button>
