@@ -10,6 +10,7 @@ import {
   CalendarBlankIcon,
   ChartBarIcon,
   ChartLineUpIcon,
+  CoinVerticalIcon,
   VaultIcon,
   CurrencyCircleDollarIcon,
   CurrencyDollarIcon,
@@ -61,6 +62,8 @@ export const NAV_ITEMS_SCHEMA = [
   { id: 'communities', name: 'Communities', path: '/communities', icon: UsersIcon },
   { id: 'leaderboard', name: 'Leaderboard', path: '/leaderboard', icon: TrophyIcon },
   { id: 'bazaar', name: 'Marketplace', path: sectionLanding(SECTIONS.bazaar), icon: ImageIcon, activePaths: sectionPaths(SECTIONS.bazaar) },
+  // The platform token's page. Launchpad, staking and buyback stay off the nav until they ship.
+  { id: 'token', name: '$HUP', path: '/token', icon: CoinVerticalIcon },
   { id: 'predict', name: 'Predict', path: '/predict', icon: ChartLineUpIcon },
   { id: 'tasks', name: 'Tasks', path: '/tasks', icon: ToolboxIcon },
   { id: 'apps', name: 'Apps', path: '/apps', icon: SquaresFourIcon },
