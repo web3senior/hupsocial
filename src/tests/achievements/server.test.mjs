@@ -19,7 +19,7 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
     const wallet = (n) => `0x${n.toString(16).padStart(40, '0')}`
     const a = wallet(1)
     const b = wallet(2)
-    await db.query('CREATE TABLE users (wallet_address VARCHAR(64) PRIMARY KEY, name TEXT, username TEXT, profileImage TEXT, tags TEXT, created_at DATETIME, is_universal_profile TINYINT NOT NULL DEFAULT 0)')
+    await db.query('CREATE TABLE users (wallet_address VARCHAR(64) PRIMARY KEY, name TEXT, username TEXT, profileImage TEXT, tags TEXT, created_at DATETIME, lastUpdate BIGINT NULL)')
     await db.query('CREATE TABLE posts (wallet_address VARCHAR(64), is_comment BIGINT NULL, is_repost BIGINT NULL, created_at DATETIME NOT NULL, id BIGINT AUTO_INCREMENT PRIMARY KEY, network_id INT NOT NULL DEFAULT 1, is_deleted TINYINT NOT NULL DEFAULT 0)')
     await db.query('CREATE TABLE post_likes (liker_address VARCHAR(64))')
     await db.query('CREATE TABLE follows (follower_address VARCHAR(42), followed_address VARCHAR(42), is_following TINYINT)')
@@ -50,6 +50,24 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
     const makeOgHolders = () => db.query("INSERT IGNORE INTO user_achievements (wallet_address, achievement_id, scope, source, awarded_at) VALUES ?",
       [ogHolders.map((holder) => [holder, 'og', '', 'rule', 1])])
     const block = (blockers, target) => db.query('INSERT INTO user_blocks VALUES ?', [blockers.map((blocker) => [blocker, target])])
+
+    await t.test('profile-cache migration installs the Self-Sovereign prerequisite and is repeatable', async () => {
+      const sql = await readFile(new URL('../../../deploy/migrations/20261105-profile-index-cache.sql', import.meta.url), 'utf8')
+      const migrationDb = await mysql.createConnection({ host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD, port: Number(process.env.DB_PORT || 3306), database, multipleStatements: true })
+      try {
+        await migrationDb.query(sql)
+        await db.execute('INSERT INTO users (wallet_address, is_universal_profile) VALUES (?, 1)', [wallet(9000)])
+        await migrationDb.query(sql)
+        const [[row]] = await db.execute('SELECT is_universal_profile FROM users WHERE wallet_address = ?', [wallet(9000)])
+        assert.equal(row.is_universal_profile, 1, 'reapplying preserves verified identities')
+        await db.execute('DELETE FROM users WHERE wallet_address = ?', [wallet(9000)])
+      } finally {
+        await migrationDb.end()
+      }
+      const [[column]] = await db.query("SHOW COLUMNS FROM users LIKE 'is_universal_profile'")
+      assert.equal(column.Null, 'YES')
+      assert.equal(column.Default, null, 'unknown wallets must not be presumed EOAs or UPs')
+    })
 
     await t.test('concurrent grants preserve the first award and notify once', async () => {
       const awards = await Promise.all(Array.from({ length: 3 }, () => service.awardAchievement({ wallets: [a, a], id: 'bug-hunter', source: 'admin', grantedBy: b })))

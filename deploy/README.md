@@ -36,6 +36,12 @@ Block/Unblock updates require a wallet signature and consume a single-use authen
 
 ## Scheduled work
 
+### Self-Sovereign achievement prerequisite
+
+Apply `deploy/migrations/20261105-profile-index-cache.sql` before activating achievements. It adds the nullable `users.is_universal_profile` and `profile_indexed_stamp` cache columns, with the earlier profile-cache prerequisites. It is idempotent and preserves existing identity values.
+
+Without `is_universal_profile`, the Self-Sovereign rule safely returns no winners. After migration, profile reads verify identities on LUKSO and populate the cache; the achievement scheduler awards eligible human UP wallets on its next run. A newly added flag starts as NULL (unknown), never as a presumed EOA or UP. Existing deployments can apply the migration and restart to clear a cached missing-column probe immediately.
+
 The repository has an author-authenticated scheduled-post delivery endpoint, but no Vercel cron configuration or general cron-authenticated delivery endpoint was found during deployment preparation. Do not attach a privileged timer to that endpoint or trigger deliveries as a health check. Confirm any external scheduler/indexer configuration separately before retiring Vercel.
 
 ## Operational checks

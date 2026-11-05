@@ -27,7 +27,7 @@ export const ACHIEVEMENTS = [
   { id: 'rising-voice', name: 'Rising Voice', kind: 'auto', rarity: 'rare', icon: 'megaphone', threshold: 100, description: 'Reached 100 qualified followers.' },
   // Identity and trust: each one costs something real to fake — an onchain profile, money, other
   // people's tips, months of standing.
-  { id: 'self-sovereign', name: 'Self-Sovereign', kind: 'auto', rarity: 'rare', icon: 'fingerprint', description: 'Uses a LUKSO Universal Profile.' },
+  { id: 'self-sovereign', name: 'Self-Sovereign', kind: 'auto', rarity: 'rare', icon: 'universal-profile', description: 'Uses a LUKSO Universal Profile.' },
   { id: 'supporter', name: 'Supporter', kind: 'auto', rarity: 'rare', icon: 'heart', description: 'Paid for Premium to support Hup.' },
   { id: 'community-backed', name: 'Community Backed', kind: 'auto', rarity: 'rare', icon: 'handshake', threshold: 5, description: 'Tipped by 5 different people.' },
   { id: 'trusted', name: 'Trusted', kind: 'auto', rarity: 'epic', icon: 'shield-star', minDays: 90, minFollowers: 25,

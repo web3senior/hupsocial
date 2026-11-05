@@ -17,6 +17,7 @@ import {
   ShieldStarIcon,
   TrophyIcon,
 } from '@phosphor-icons/react'
+import UniversalProfileIcon from './UniversalProfileIcon'
 
 export const ACHIEVEMENT_ICONS = {
   crown: CrownIcon,
@@ -28,6 +29,7 @@ export const ACHIEVEMENT_ICONS = {
   flask: FlaskIcon,
   bug: BugIcon,
   fingerprint: FingerprintIcon,
+  'universal-profile': UniversalProfileIcon,
   heart: HeartIcon,
   handshake: HandshakeIcon,
   'shield-star': ShieldStarIcon,
