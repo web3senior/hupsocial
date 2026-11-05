@@ -59,7 +59,10 @@ const MONEY_TYPES = [
 // ("You liked a post", "Your post was indexed"), so the split needs no per-type list and keeps
 // working for action types added later.
 const SELF_ROW = 'actor_wallet_address = recipient_wallet_address'
-const OTHERS_ROW = `actor_wallet_address IS NOT NULL AND NOT (${SELF_ROW})`
+// A row with no actor is Hup itself speaking — an achievement unlocked, a role an admin gave. Not
+// something you did, so it belongs with what others did; requiring an actor here hid those rows
+// from every tab, since `NULL = recipient` never matches the self filter either.
+const OTHERS_ROW = `(actor_wallet_address IS NULL OR NOT (${SELF_ROW}))`
 
 const FILTER_CLAUSES = {
   inbox: OTHERS_ROW,
