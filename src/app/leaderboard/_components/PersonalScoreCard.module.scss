@@ -1,0 +1,429 @@
+// A gilded collectible. Every colour is a light-dark() pair, so it follows the theme's
+// color-scheme: warm parchment in light, deep bronze in dark and terminal.
+.score {
+  --score-gold: light-dark(#94650f, #efd18f);
+  --score-gold-strong: light-dark(#7a520a, #ffe6a1);
+  --score-ink: light-dark(#2b1f0c, #fff2d2);
+  --score-muted: light-dark(#7a6a4c, #c6b99e);
+  --score-line: light-dark(#c9a45c55, #b18c4255);
+  --score-border: light-dark(#e2c27f, #82602e);
+  // light-dark() takes colours only, so gradients and shadows are assembled from these stops
+  --score-bg-1: light-dark(#fff1cc, #493217);
+  --score-bg-2: light-dark(#fdf8ec, #18140e);
+  --score-bg-3: light-dark(#fffdf8, #100f10);
+  --score-face-1: light-dark(#fffdf6, #282033);
+  --score-face-2: light-dark(#f7eedb, #141119);
+  --score-face-back: light-dark(#fbf4e3, #191612);
+  --score-face-border: light-dark(#d9b56a, #b18c42);
+  --score-tile: light-dark(#ffffffb3, #ffffff08);
+  --score-halo: light-dark(#f2c45a40, #e9b64c38);
+  --score-value-1: light-dark(#a87412, #fff6d6);
+  --score-value-2: light-dark(#5e3d06, #e2b457);
+  --score-collar: light-dark(#f0dcae, #513b1e);
+  --score-drop: light-dark(#6b4a1430, #0009);
+  --score-pedestal-1: light-dark(#f6dc9a66, #ddaa4233);
+  --score-pedestal-2: light-dark(#eed39a, #443019);
+  --score-pedestal-3: light-dark(#e4c789, #15120d);
+  --score-step-1: light-dark(#d9bb7c, #362615);
+  --score-step-2: light-dark(#c8a560, #1d170f);
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 2rem;
+  margin-block: 1.5rem;
+  padding: clamp(1.25rem, 4vw, 3rem);
+  border: 1px solid var(--score-border);
+  border-radius: 24px;
+  background: radial-gradient(ellipse at 75% 50%, var(--score-bg-1) 0, var(--score-bg-2) 42%, var(--score-bg-3) 78%);
+  color: var(--score-ink);
+  overflow: hidden;
+
+  &__intro {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+  }
+
+  &__eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--score-gold);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  &__title {
+    margin: 1rem 0 0.75rem;
+    font-size: clamp(1.75rem, 3vw, 2.8rem);
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__titleSub {
+    color: var(--score-gold);
+  }
+
+  &__lede {
+    max-width: 36ch;
+    margin: 0;
+    color: var(--score-muted);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  &__totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--score-muted);
+    font-size: var(--system-13-font-size);
+    line-height: 1.5;
+
+    strong {
+      color: var(--score-ink);
+      font-weight: 700;
+    }
+
+    // The run-until line is a sentence, not a figure, so it takes its own row
+    li:last-child {
+      flex-basis: 100%;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-top: 1.5rem;
+  }
+
+  &__button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.15rem;
+    border: 1px solid var(--score-gold-strong);
+    border-radius: 999px;
+    background: linear-gradient(125deg, #ffedb4, #d8a63d);
+    color: #2b1c06;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 150ms ease;
+
+    &:hover:not(:disabled) {
+      filter: brightness(1.08);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: progress;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--score-gold);
+      outline-offset: 4px;
+    }
+  }
+
+  &__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--score-gold);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      color: var(--score-gold-strong);
+      text-decoration: underline;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--score-gold);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+  }
+
+  &__error {
+    margin: 0.75rem 0 0;
+    color: var(--status-error);
+    font-size: 0.8rem;
+  }
+
+  &__stage {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    min-width: 0;
+    padding: 1rem 0 3.5rem;
+    isolation: isolate;
+  }
+
+  &__halo {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(ellipse, var(--score-halo), transparent 65%);
+  }
+
+  &__card {
+    position: relative;
+    width: min(100%, 280px);
+    padding: 7px;
+    border: 1px solid #ffdf87;
+    border-radius: 19px;
+    background: linear-gradient(135deg, #fff1af, #b98120 24%, #ffe7a0 49%, #825014 75%, #efc56a);
+    box-shadow: 0 0 0 3px var(--score-collar), 0 0 35px #eeb34a30, 0 24px 40px var(--score-drop);
+
+    // A foil glint that brightens under the pointer
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 7px;
+      border-radius: 12px;
+      background: linear-gradient(125deg, transparent 25%, #fff3 40%, transparent 55%);
+      opacity: 0.3;
+      pointer-events: none;
+      transition: opacity 200ms ease;
+    }
+
+    &:hover::after {
+      opacity: 0.7;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      &--ready::after {
+        background-size: 300% 100%;
+        animation: scoreFoilSweep 1.2s ease-out both;
+      }
+    }
+  }
+
+  &__face {
+    display: flex;
+    flex-direction: column;
+    min-height: 356px;
+    border: 1px solid var(--score-face-border);
+    border-radius: 12px;
+    background: linear-gradient(145deg, var(--score-face-1), var(--score-face-2));
+    overflow: hidden;
+
+    &--back {
+      background:
+        repeating-linear-gradient(45deg, #cda54a10 0 1px, transparent 1px 15px),
+        repeating-linear-gradient(-45deg, #cda54a10 0 1px, transparent 1px 15px),
+        var(--score-face-back);
+    }
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.85rem;
+    border-bottom: 1px solid var(--score-line);
+  }
+
+  &__placeholder {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    opacity: 0.6;
+  }
+
+  &__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 1rem;
+    text-align: center;
+  }
+
+  &__rank {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
+    color: var(--score-gold);
+    font-size: 0.8rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+
+    &--muted {
+      color: var(--score-muted);
+      font-weight: 500;
+    }
+  }
+
+  &__badge {
+    padding: 0.1rem 0.45rem;
+    border: 1px solid color-mix(in srgb, var(--score-gold) 45%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--score-gold) 12%, transparent);
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+  }
+
+  &__value {
+    max-width: 100%;
+    font-size: clamp(2rem, 4vw, 2.6rem);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+    background: linear-gradient(180deg, var(--score-value-1), var(--score-value-2));
+    background-clip: text;
+    color: transparent;
+  }
+
+  &__unit {
+    color: var(--score-gold);
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  // How far up the board the wallet sits: full means first place
+  &__meter {
+    width: 80%;
+    height: 4px;
+    margin-top: 0.9rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--score-ink) 10%, transparent);
+    overflow: hidden;
+
+    span {
+      display: block;
+      width: var(--score-meter, 0%);
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #825014, #ffe6a1);
+
+      @media (prefers-reduced-motion: no-preference) {
+        transition: width 600ms ease-out;
+
+        @starting-style {
+          width: 0;
+        }
+      }
+    }
+  }
+
+  &__stats {
+    display: grid;
+    flex: 1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0.85rem;
+  }
+
+  &__stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--score-line);
+    border-radius: 8px;
+    background: var(--score-tile);
+    text-align: start;
+
+    dt {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: var(--score-muted);
+      font-size: 0.68rem;
+    }
+
+    dd {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.55rem 0.85rem;
+    border-top: 1px solid var(--score-line);
+    color: var(--score-gold);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+
+    > :last-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__pedestal {
+    position: absolute;
+    bottom: 0;
+    z-index: -1;
+    width: min(115%, 360px);
+    height: 70px;
+    border: 2px solid #c99a44;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, var(--score-pedestal-1), var(--score-pedestal-2) 60%, var(--score-pedestal-3) 70%);
+    box-shadow: 0 8px 0 var(--score-step-1), 0 15px 0 var(--score-step-2), 0 0 25px #f5c44b25;
+  }
+
+  @container leaderboard (max-width: 650px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+
+    &__intro {
+      text-align: center;
+    }
+
+    &__lede {
+      margin-inline: auto;
+    }
+
+    &__eyebrow,
+    &__actions,
+    &__totals {
+      justify-content: center;
+    }
+  }
+}
+
+@keyframes scoreFoilSweep {
+  from {
+    background-position: 100% 50%;
+  }
+
+  to {
+    background-position: 0% 50%;
+  }
+}

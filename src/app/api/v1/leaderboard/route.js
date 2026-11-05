@@ -7,6 +7,7 @@ import {
   normalizePeriod,
   serializeLeader,
 } from '@/lib/leaderboard'
+import { readHeldAchievementIds } from '@/lib/achievementsServer'
 
 export const runtime = 'nodejs'
 
@@ -50,13 +51,17 @@ export async function GET(request) {
         return jsonResponse({ error: 'Wallet address profile score record not found on leaderboard' }, { status: 404 })
       }
 
+      const held = await readHeldAchievementIds([leader.wallet_address]).catch(() => new Map())
+
       return jsonResponse({
         success: true,
-        data: serializeLeader(leader, leader.global_rank),
+        data: withAchievements(serializeLeader(leader, leader.global_rank), held),
         nextPage: null,
         meta: {
           page: 1,
           count: 1,
+          // How many wallets this ranking holds, so a single row can say "top 4%"
+          total: snapshot.rows.length,
           hasMore: false,
           period,
           sort,
@@ -70,10 +75,12 @@ export async function GET(request) {
 
     const leaders = snapshot.rows.slice(offset, offset + limit)
     const hasMore = offset + limit < snapshot.rows.length
+    // A ranking still answers if the achievements table is missing or unreachable
+    const held = await readHeldAchievementIds(leaders.map((row) => row.wallet_address)).catch(() => new Map())
 
     return jsonResponse({
       success: true,
-      data: leaders.map((row) => serializeLeader(row, row.global_rank)),
+      data: leaders.map((row) => withAchievements(serializeLeader(row, row.global_rank), held)),
       nextPage: hasMore ? page + 1 : null,
       meta: {
         page,
@@ -98,6 +105,11 @@ export async function GET(request) {
       { status: 500 },
     )
   }
+}
+
+/** A ranking row with the achievement ids its wallet holds, for the marks beside its name. */
+function withAchievements(row, held) {
+  return { ...row, achievements: held.get(String(row.wallet_address).toLowerCase()) ?? [] }
 }
 
 function clampNumber(value, min, max, fallback) {

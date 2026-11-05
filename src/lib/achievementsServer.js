@@ -42,6 +42,29 @@ export async function readAchievementSummary(address) {
   return { earned, featured, hidden: false }
 }
 
+/**
+ * The achievement ids each of `wallets` holds, for the marks on a ranking row — one query for a
+ * whole page of rows. Wallets in bad standing read as holding none, as on their profiles.
+ * @param {string[]} wallets
+ * @returns {Promise<Map<string, string[]>>} Keyed by lowercase wallet.
+ */
+export async function readHeldAchievementIds(wallets) {
+  const held = new Map()
+  const lower = [...new Set(wallets.map((wallet) => normalizeAddress(wallet)).filter(isEvmAddress))]
+  if (!lower.length || !await hasTable('user_achievements')) return held
+  const hidden = await readBadStanding()
+  const [rows] = await pool.query(
+    `SELECT wallet_address AS wallet, achievement_id AS id FROM user_achievements WHERE wallet_address IN (${lower.map(() => '?').join(',')}) ORDER BY awarded_at`,
+    lower,
+  )
+  for (const row of rows) {
+    if (hidden.has(row.wallet) || !achievementById(row.id)) continue
+    if (!held.has(row.wallet)) held.set(row.wallet, [])
+    if (!held.get(row.wallet).includes(row.id)) held.get(row.wallet).push(row.id)
+  }
+  return held
+}
+
 export async function readHolderCounts() {
   if (!await hasTable('user_achievements')) return {}
   if (holderCache?.expiresAt > Date.now()) return holderCache.value

@@ -29,6 +29,45 @@ export const POINTS_RULES = {
 }
 
 /**
+ * The leaderboard score's weights — lib/leaderboard.js builds its SQL from these, and the season
+ * page explains points with them, so the two can never disagree. Every action a wallet takes
+ * (post, comment, repost, like, tip) also earns `perAction` on top of its own weight. Followers
+ * score `followerScale × √followers`, so follow farming flattens out fast.
+ */
+export const SOCIAL_SCORE_WEIGHTS = {
+  post: 10,
+  comment: 4,
+  repost: 5,
+  likeReceived: 8,
+  likeGiven: 1,
+  view: 1,
+  tipReceived: 25,
+  tipGiven: 10,
+  followerScale: 40,
+  perAction: 2,
+}
+
+/**
+ * Orders the season standings can be read in (the "Rank by" filter). Only `points` decides the
+ * airdrop; the rest re-order the same ranked wallets by one row field, so a reader can see who
+ * leads at what. Shared by /api/v1/points and the filter so both list the same choices.
+ */
+export const STANDINGS_SORTS = [
+  { value: 'points', label: 'Season points', field: 'points' },
+  { value: 'social', label: 'Social points', field: 'social_points' },
+  { value: 'achievements', label: 'Achievement points', field: 'achievement_points' },
+  { value: 'posts', label: 'Posts', field: 'root_posts' },
+  { value: 'likes', label: 'Likes received', field: 'likes_received' },
+  { value: 'tips', label: 'Tips received', field: 'tips_received' },
+  { value: 'followers', label: 'Followers', field: 'follower_count' },
+]
+
+export const standingsSort = (value) => STANDINGS_SORTS.find((sort) => sort.value === value) ?? STANDINGS_SORTS[0]
+
+/** What `followers` qualified followers add to a score. */
+export const followerPoints = (followers) => Math.floor(Math.sqrt(followers) * SOCIAL_SCORE_WEIGHTS.followerScale)
+
+/**
  * Achievement bonuses (config/achievements.js ids), added to a wallet's season points. Only rare and
  * rarer ones count: the common ones reward what points already score. A bonus lands in the season
  * the achievement was earned (`awarded_at` inside it), except:

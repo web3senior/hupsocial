@@ -7,6 +7,8 @@ import pool from '@/lib/db'
 import { MEMBER_ROW_SQL } from '@/lib/members'
 import { hasColumn } from '@/lib/schema'
 import { readPremiumCounts } from '@/lib/premiumServer'
+import { hasAiAgentTag } from '@/lib/agentProfile'
+import { SOCIAL_SCORE_WEIGHTS } from '@/config/points'
 
 export const PERIODS = {
   all: null,
@@ -49,40 +51,45 @@ const TX_COUNT_SQL = `
  * Tips are counted, never summed: `amount` is raw token units, so an 18-decimal
  * LYX tip and a 6-decimal USDC tip cannot be added into one number here.
  */
+// Weights live in config/points.js, where the season page reads them to explain points.
+const W = SOCIAL_SCORE_WEIGHTS
 const SCORE_SQL = `
-  (COALESCE(activity.root_posts, 0) * 10) +
-  (COALESCE(activity.comments_made, 0) * 4) +
-  (COALESCE(activity.reposts_made, 0) * 5) +
-  (COALESCE(received.likes_received, 0) * 8) +
-  (COALESCE(given.likes_given, 0) * 1) +
-  (COALESCE(views.views_received, 0) * 1) +
-  (COALESCE(tips_in.tips_received, 0) * 25) +
-  (COALESCE(tips_out.tips_given, 0) * 10) +
-  FLOOR(SQRT(COALESCE(followers.follower_count, 0)) * 40) +
-  (${TX_COUNT_SQL}) * 2
+  (COALESCE(activity.root_posts, 0) * ${W.post}) +
+  (COALESCE(activity.comments_made, 0) * ${W.comment}) +
+  (COALESCE(activity.reposts_made, 0) * ${W.repost}) +
+  (COALESCE(received.likes_received, 0) * ${W.likeReceived}) +
+  (COALESCE(given.likes_given, 0) * ${W.likeGiven}) +
+  (COALESCE(views.views_received, 0) * ${W.view}) +
+  (COALESCE(tips_in.tips_received, 0) * ${W.tipReceived}) +
+  (COALESCE(tips_out.tips_given, 0) * ${W.tipGiven}) +
+  FLOOR(SQRT(COALESCE(followers.follower_count, 0)) * ${W.followerScale}) +
+  (${TX_COUNT_SQL}) * ${W.perAction}
 `
 
 /**
  * Returns the cached { rows, stats, networks } snapshot for a leaderboard
  * scope, recomputing at most once per LEADERBOARD_CACHE_TTL_MS. `since` is
- * derived from `period`, so the key only carries the period label.
+ * derived from `period`, so the key only carries the period label; a caller
+ * with a fixed window of its own (a points season, with `until` as its end)
+ * names it as `scope` instead.
  */
-export async function getLeaderboardSnapshot({ period, sort, networkId, since }) {
-  const cacheKey = `${period}:${sort}:${networkId || 'all'}`
+export async function getLeaderboardSnapshot({ period, sort, networkId, since, until = null, scope = null }) {
+  const cacheKey = `${scope ?? period}:${sort}:${networkId || 'all'}`
   const cached = leaderboardCache.get(cacheKey)
   if (cached && cached.expiresAt > Date.now()) return cached.value
 
-  const value = await computeLeaderboardSnapshot({ sort, networkId, since })
+  const value = await computeLeaderboardSnapshot({ sort, networkId, since, until })
   leaderboardCache.set(cacheKey, { value, expiresAt: Date.now() + LEADERBOARD_CACHE_TTL_MS })
   return value
 }
 
-async function computeLeaderboardSnapshot({ sort, networkId, since }) {
+async function computeLeaderboardSnapshot({ sort, networkId, since, until }) {
   const activityFilter = buildWhere({
     alias: 'p',
     timeColumn: 'created_at',
     networkId,
     since,
+    until,
     baseConditions: ['p.wallet_address IS NOT NULL'],
   })
 
@@ -92,6 +99,7 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     timeColumn: 'inserted_at',
     networkId,
     since,
+    until,
     baseConditions: ['pl.is_active = 1'],
   })
 
@@ -100,6 +108,7 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     timeColumn: 'inserted_at',
     networkId,
     since,
+    until,
     baseConditions: ['pl.liker_address IS NOT NULL', 'pl.is_active = 1'],
   })
 
@@ -108,6 +117,7 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     timeColumn: 'viewed_at',
     networkId,
     since,
+    until,
   })
 
   /* tips.tipped_at is the onchain unix second, not a datetime, so the period bound converts */
@@ -117,6 +127,7 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     timeAsUnix: true,
     networkId,
     since,
+    until,
   })
 
   const tipsGivenFilter = buildWhere({
@@ -125,6 +136,7 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     timeAsUnix: true,
     networkId,
     since,
+    until,
   })
 
   /*
@@ -138,6 +150,7 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
     timeColumn: 'updated_at',
     networkId: null,
     since,
+    until,
     baseConditions: ['f.is_following = 1'],
   })
 
@@ -289,11 +302,20 @@ async function computeLeaderboardSnapshot({ sort, networkId, since }) {
   /* Premium is held across every chain, so neither the network nor the period narrows it:
      the card is who holds it now, and the delta is who first bought it in the last day */
   const premium = await readPremiumCounts(toUnixSeconds(daySince))
+  // Like users, agents belong to the community across networks. A window counts profiles
+  // created in it that currently carry the explicit ai-agent tag.
+  const [agentRows] = await pool.execute(
+    `SELECT tags, created_at >= ? AS recent,
+            (? IS NULL OR created_at >= ?) AS in_period
+     FROM users WHERE LOWER(tags) LIKE '%ai-agent%'`,
+    [daySince, since, since],
+  )
+  const agents = agentRows.filter(hasAiAgentTag)
 
   return {
     rows,
-    stats: { ...serializeStats(statsRows[0]), premium: premium.total },
-    stats_24h: { ...serializeStats(dayRows[0]), premium: premium.recent },
+    stats: { ...serializeStats(statsRows[0]), premium: premium.total, agents: agents.filter((agent) => Number(agent.in_period) === 1).length },
+    stats_24h: { ...serializeStats(dayRows[0]), premium: premium.recent, agents: agents.filter((agent) => Number(agent.recent) === 1).length },
     networks,
   }
 }
@@ -348,7 +370,7 @@ function buildStatsFilters(networkId, since) {
   }
 }
 
-function buildWhere({ alias, timeColumn, networkId, since, baseConditions = [], timeAsUnix = false }) {
+function buildWhere({ alias, timeColumn, networkId, since, until = null, baseConditions = [], timeAsUnix = false }) {
   const conditions = [...baseConditions]
   const params = []
 
@@ -360,6 +382,11 @@ function buildWhere({ alias, timeColumn, networkId, since, baseConditions = [], 
   if (since) {
     conditions.push(`${alias}.${timeColumn} >= ?`)
     params.push(timeAsUnix ? toUnixSeconds(since) : since)
+  }
+
+  if (until) {
+    conditions.push(`${alias}.${timeColumn} < ?`)
+    params.push(timeAsUnix ? toUnixSeconds(until) : until)
   }
 
   return {
