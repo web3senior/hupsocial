@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { useConnection } from 'wagmi'
-import { ArrowRightIcon, ArrowUpIcon, CheckIcon, PlusIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowRightIcon, ArrowUpIcon, CheckIcon, PencilSimpleIcon, PlusIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 import { ContentSpinner, ThinkingOrb } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
 import NativeDialog from '@/components/ui/NativeDialog'
@@ -11,6 +11,7 @@ import { config } from '@/config/wagmi'
 import { onboardingChainId } from '@/config/gasless'
 import { renderMarkdown } from '@/lib/markdown'
 import { carryOutProposal, deleteAgentSession, fetchAgent, resolveAgentProposal, streamAgentChat } from '@/lib/agentWallet'
+import { AGENT_POST_MAX } from '@/lib/hostedAgentMessages'
 import styles from './AgentChat.module.scss'
 
 const isCancel = (error) => error?.code === 4001 || error?.name === 'UserRejectedRequestError'
@@ -47,6 +48,9 @@ const readProfile = (value) => {
   }
 }
 
+// Cards whose words the owner may change before approving; the rest act on fixed targets
+const EDITABLE_KINDS = new Set(['post', 'edit', 'reply'])
+
 // A tip or transfer names its network by id; the card shows its coin and name
 const chainOf = (networkId) => config.chains.find((item) => item.id === Number(networkId)) ?? null
 
@@ -76,7 +80,6 @@ export default function AgentChat({ token, agent, initialSession = null }) {
   // The open session (null until a fresh chat's first message creates it) and the recent ones
   const [session, setSession] = useState(null)
   const [sessions, setSessions] = useState([])
-  const isTaskRun = session?.kind === 'task'
 
   useEffect(() => {
     // A fresh chat is set up by newChat itself; there is nothing to load
@@ -142,7 +145,7 @@ export default function AgentChat({ token, agent, initialSession = null }) {
   const send = async (event) => {
     event.preventDefault()
     const text = draft.trim()
-    if (!text || isBusy || isTaskRun) return
+    if (!text || isBusy) return
 
     setDraft('')
     setIsBusy(true)
@@ -198,25 +201,28 @@ export default function AgentChat({ token, agent, initialSession = null }) {
     }
   }
 
-  const approve = async (proposal) => {
+  // `text` is the owner's edited wording of a post, edit or reply card, when they changed it
+  const approve = async (proposal, text = null) => {
     if (!chain) {
       toast('Agent posting is not set up on this deployment', 'error')
       return
     }
+    const edited = text !== null && text !== proposal.text ? text : null
+    const toCarryOut = edited ? { ...proposal, text: edited } : proposal
     setProposalStatus(proposal.id, 'publishing')
     let result
     try {
-      result = await carryOutProposal({ agent, proposal, chain, owner })
+      result = await carryOutProposal({ agent, proposal: toCarryOut, chain, owner })
     } catch (error) {
       setProposalStatus(proposal.id, 'pending')
       if (!isCancel(error)) toast(error.message, 'error')
       return
     }
 
-    setProposalStatus(proposal.id, 'published', { txHash: result.txHash })
+    setProposalStatus(proposal.id, 'published', { txHash: result.txHash, text: toCarryOut.text })
     toast(`${agent.name} ${CARD_COPY[proposal.kind ?? 'post'].success}`, 'success')
     // Done onchain either way; a failed record only means the card may show as pending after a reload
-    resolveAgentProposal(token, agent.address, proposal.id, { status: 'published', ...result }).catch(() => {})
+    resolveAgentProposal(token, agent.address, proposal.id, { status: 'published', ...result, ...(edited ? { text: edited } : {}) }).catch(() => {})
   }
 
   // Messages and drafts in the order they happened. Sort is stable, so a reply and the draft it
@@ -309,13 +315,13 @@ export default function AgentChat({ token, agent, initialSession = null }) {
           aria-label={`Message ${agent.name}`}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={isTaskRun ? 'A task run is read-only. Start a new chat to reply.' : `Message ${agent.name}`}
+          placeholder={session?.kind === 'task' ? `Reply to ${agent.name} about this task run` : `Message ${agent.name}`}
           maxLength={2000}
-          disabled={isBusy || isTaskRun}
+          disabled={isBusy}
         />
         <div className={styles.chat__composerFooter}>
           <span className={styles.chat__hint}>Enter for a new line</span>
-          <button type="submit" className={styles.chat__send} disabled={isBusy || isTaskRun || !draft.trim()} aria-label="Send message">
+          <button type="submit" className={styles.chat__send} disabled={isBusy || !draft.trim()} aria-label="Send message">
             <ArrowUpIcon size={18} />
           </button>
         </div>
@@ -328,6 +334,13 @@ function ProposalCard({ proposal, onApprove, onDiscard }) {
   const isPublishing = proposal.status === 'publishing'
   const kind = proposal.kind ?? 'post'
   const copy = CARD_COPY[kind]
+  const isPending = proposal.status === 'pending' || isPublishing
+  const canEdit = EDITABLE_KINDS.has(kind) && isPending
+  // null while the card shows the draft as written; the owner's wording while editing
+  const [editText, setEditText] = useState(null)
+  const isEditing = canEdit && editText !== null
+  const trimmed = editText?.trim() ?? ''
+  const isEditValid = !isEditing || (trimmed.length > 0 && trimmed.length <= AGENT_POST_MAX)
 
   return (
     <div className={clsx(styles.proposal, styles[`proposal--${proposal.status}`], styles[`proposal--${kind}`])}>
@@ -349,10 +362,29 @@ function ProposalCard({ proposal, onApprove, onDiscard }) {
         </p>
       )}
       {kind === 'profile' && <ProfileChange before={readProfile(proposal.originalText)} after={readProfile(proposal.text)} />}
-      {kind !== 'transfer' && kind !== 'profile' && (
-        <p className={clsx(styles.proposal__text, kind === 'delete' && styles['proposal__text--removed'])}>
-          {kind === 'delete' || kind === 'like' || kind === 'tip' ? proposal.originalText : proposal.text}
-        </p>
+      {isEditing ? (
+        <div className={styles.proposal__editor}>
+          <textarea
+            className={styles.proposal__input}
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            maxLength={AGENT_POST_MAX}
+            rows={Math.min(12, Math.max(3, editText.split('\n').length + 1))}
+            aria-label="Edit the draft"
+            disabled={isPublishing}
+            autoFocus
+          />
+          <span className={clsx(styles.proposal__count, trimmed.length > AGENT_POST_MAX && styles['proposal__count--over'])}>
+            {trimmed.length}/{AGENT_POST_MAX}
+          </span>
+        </div>
+      ) : (
+        kind !== 'transfer' &&
+        kind !== 'profile' && (
+          <p className={clsx(styles.proposal__text, kind === 'delete' && styles['proposal__text--removed'])}>
+            {kind === 'delete' || kind === 'like' || kind === 'tip' ? proposal.originalText : proposal.text}
+          </p>
+        )
       )}
       {proposal.status === 'published' ? (
         <span className={styles.proposal__done}>
@@ -362,10 +394,28 @@ function ProposalCard({ proposal, onApprove, onDiscard }) {
         <span className={styles.proposal__done}>Discarded</span>
       ) : (
         <div className={styles.proposal__actions}>
-          <button type="button" className={styles.proposal__discard} onClick={() => onDiscard(proposal)} disabled={isPublishing}>
-            <XIcon size={14} /> Discard
-          </button>
-          <button type="button" className={styles.proposal__approve} onClick={() => onApprove(proposal)} disabled={isPublishing}>
+          {isEditing ? (
+            <button type="button" className={styles.proposal__discard} onClick={() => setEditText(null)} disabled={isPublishing}>
+              Cancel edit
+            </button>
+          ) : (
+            <>
+              <button type="button" className={styles.proposal__discard} onClick={() => onDiscard(proposal)} disabled={isPublishing}>
+                <XIcon size={14} /> Discard
+              </button>
+              {canEdit && (
+                <button type="button" className={styles.proposal__discard} onClick={() => setEditText(proposal.text ?? '')} disabled={isPublishing}>
+                  <PencilSimpleIcon size={14} /> Edit
+                </button>
+              )}
+            </>
+          )}
+          <button
+            type="button"
+            className={styles.proposal__approve}
+            onClick={() => onApprove(proposal, isEditing ? trimmed : null)}
+            disabled={isPublishing || !isEditValid}
+          >
             {isPublishing ? <ContentSpinner size={14} /> : <CheckIcon size={14} />} {copy.approve}
           </button>
         </div>

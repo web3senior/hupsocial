@@ -249,8 +249,43 @@
     color: var(--text-muted);
   }
 
+  &__editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  &__input {
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--global-border-radius);
+    background-color: var(--background, transparent);
+    color: inherit;
+    font-family: inherit;
+    font-size: var(--font-size-14, 0.875rem);
+    line-height: 1.5;
+    resize: vertical;
+
+    &:focus-visible {
+      outline: 2px solid var(--primary, #0d6efd);
+      outline-offset: 1px;
+    }
+  }
+
+  &__count {
+    align-self: flex-end;
+    font-size: var(--font-size-12);
+    color: var(--text-muted);
+
+    &--over {
+      color: var(--danger-600, #dc2626);
+    }
+  }
+
   &__actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 0.5rem;
   }

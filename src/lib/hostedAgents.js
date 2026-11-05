@@ -15,7 +15,7 @@ import { ethers } from 'ethers'
 import { z } from 'zod'
 import pool from '@/lib/db'
 import { isEvmAddress, normalizeAddress } from '@/lib/address'
-import { AGENT_LIMIT, AGENT_NAME_MAX, AGENT_PERSONA_MAX, agentKeyMessage, agentOwnershipMessage } from '@/lib/hostedAgentMessages'
+import { AGENT_LIMIT, AGENT_NAME_MAX, AGENT_PERSONA_MAX, AGENT_POST_MAX, agentKeyMessage, agentOwnershipMessage } from '@/lib/hostedAgentMessages'
 import { INTERFACEID_LSP0 } from '@/lib/drops'
 import { getServerProvider } from '@/lib/serverRpc'
 import { DEFAULT_AGENT_MODEL, isAgentModel } from '@/config/agentModels'
@@ -421,11 +421,17 @@ const resolveSchema = z.object({
   // Null for a profile change, which is a signed save rather than a transaction
   txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).nullish(),
   networkId: z.number().int().positive().nullish(),
+  // The words as published, when the owner edited a post, edit or reply card before approving
+  text: z.string().trim().min(1).max(AGENT_POST_MAX).nullish(),
 })
+
+// Cards whose words the owner may change before approving
+const EDITABLE_KINDS = new Set(['post', 'edit', 'reply'])
 
 /**
  * Records what the owner did with a draft. Only a pending draft changes, so a published post can
- * never be marked discarded afterwards.
+ * never be marked discarded afterwards. A published post, edit or reply keeps the words that went
+ * out, so the agent later sees what was really posted, not its own first draft.
  */
 export const resolveProposal = async (owner, address, id, input) => {
   const parsed = resolveSchema.safeParse(input)
@@ -438,9 +444,10 @@ export const resolveProposal = async (owner, address, id, input) => {
   if (parsed.data.status === 'published' && draft.kind !== 'profile' && !parsed.data.txHash) throw new AgentError(400, 'Invalid change')
 
   const { status, txHash = null, networkId = null } = parsed.data
+  const text = status === 'published' && EDITABLE_KINDS.has(draft.kind) && parsed.data.text ? parsed.data.text : draft.text
   const [result] = await pool.execute(
-    "UPDATE agent_proposals SET status = ?, tx_hash = ?, network_id = ? WHERE id = ? AND agent_address = ? AND status = 'pending'",
-    [status, txHash, networkId, Number(id), agent.address],
+    "UPDATE agent_proposals SET status = ?, tx_hash = ?, network_id = ?, text = ? WHERE id = ? AND agent_address = ? AND status = 'pending'",
+    [status, txHash, networkId, text, Number(id), agent.address],
   )
   if (result.affectedRows === 0) throw new AgentError(409, 'This draft was already handled')
 

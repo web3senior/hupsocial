@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server'
 import { chatAddressFromRequest } from '@/lib/chatSession'
 import { AgentError, appendMessage, createSession, getAgent, getSession } from '@/lib/hostedAgents'
 import { assertCanRun, runAgentTurn } from '@/lib/agentRuntime'
+import { readTaskForSession } from '@/lib/agentTasks'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -30,14 +31,16 @@ export async function POST(request, { params }) {
 
   let agent
   let sessionId
+  let followUp = null
   try {
     agent = await getAgent(owner, address)
     assertCanRun(agent)
-    // No session means a new chat; a given one must be one of this agent's chats, not a task run
+    // No session means a new chat. A task run can be replied to as well: the agent then keeps the
+    // task's instructions in view, now talking with its owner live
     if (body?.sessionId) {
       const session = await getSession(agent.address, body.sessionId)
-      if (session.kind !== 'chat') return NextResponse.json({ success: false, error: 'Task runs cannot be continued; start a new chat' }, { status: 409 })
       sessionId = session.id
+      followUp = await readTaskForSession(agent.address, session)
     } else {
       sessionId = await createSession(agent.address, { kind: 'chat' })
     }
@@ -62,7 +65,7 @@ export async function POST(request, { params }) {
 
       try {
         send({ type: 'session', id: sessionId })
-        await runAgentTurn({ agent, owner, send, signal: request.signal, sessionId })
+        await runAgentTurn({ agent, owner, send, signal: request.signal, sessionId, followUp })
         send({ type: 'done' })
       } catch (error) {
         if (error instanceof AgentError) {

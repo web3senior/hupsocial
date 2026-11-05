@@ -54,6 +54,21 @@ const readTask = async (agentAddress, id) => {
   return row
 }
 
+/**
+ * The task a run came from, for when the owner replies in that run: its title and current
+ * instructions, or null when the task has been deleted since.
+ */
+export const readTaskForSession = async (agentAddress, session) => {
+  if (session?.kind !== 'task' || !session.taskId) return null
+  try {
+    const row = await readTask(agentAddress, session.taskId)
+    return { id: Number(row.id), title: row.title, instructions: row.instructions }
+  } catch (error) {
+    if (error instanceof AgentError && error.status === 404) return null
+    throw error
+  }
+}
+
 export const createTask = async (owner, agentAddress, input) => {
   const parsed = taskSchema.safeParse(input)
   if (!parsed.success) throw new AgentError(400, 'A task needs a title, instructions and a schedule')
