@@ -19,12 +19,15 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
     const wallet = (n) => `0x${n.toString(16).padStart(40, '0')}`
     const a = wallet(1)
     const b = wallet(2)
-    await db.query('CREATE TABLE users (wallet_address VARCHAR(64) PRIMARY KEY, name TEXT, username TEXT, profileImage TEXT, tags TEXT, created_at DATETIME)')
-    await db.query('CREATE TABLE posts (wallet_address VARCHAR(64), is_comment BIGINT NULL, is_repost BIGINT NULL, created_at DATETIME NOT NULL)')
+    await db.query('CREATE TABLE users (wallet_address VARCHAR(64) PRIMARY KEY, name TEXT, username TEXT, profileImage TEXT, tags TEXT, created_at DATETIME, is_universal_profile TINYINT NOT NULL DEFAULT 0)')
+    await db.query('CREATE TABLE posts (wallet_address VARCHAR(64), is_comment BIGINT NULL, is_repost BIGINT NULL, created_at DATETIME NOT NULL, id BIGINT AUTO_INCREMENT PRIMARY KEY, network_id INT NOT NULL DEFAULT 1)')
     await db.query('CREATE TABLE post_likes (liker_address VARCHAR(64))')
     await db.query('CREATE TABLE follows (follower_address VARCHAR(42), followed_address VARCHAR(42), is_following TINYINT)')
-    await db.query('CREATE TABLE tips (tipper VARCHAR(42))')
-    await db.query('CREATE TABLE hosted_agents (agent_address VARCHAR(42))')
+    await db.query('CREATE TABLE tips (tipper VARCHAR(42), creator VARCHAR(42) NULL)')
+    await db.query('CREATE TABLE hosted_agents (agent_address VARCHAR(42), owner_address VARCHAR(42) NULL)')
+    await db.query('CREATE TABLE premium_subscriptions (account VARCHAR(42), complimentary TINYINT NOT NULL DEFAULT 0, purchase_count INT NOT NULL DEFAULT 0)')
+    await db.query('CREATE TABLE agent_identities (wallet_address VARCHAR(42))')
+    await db.query('CREATE TABLE user_reports (post_id BIGINT, network_id INT, status VARCHAR(20))')
     await db.query('CREATE TABLE nonces (nonce VARCHAR(64), wallet_address VARCHAR(42), expires_at DATETIME)')
     await db.query('CREATE TABLE notifications (recipient_wallet_address VARCHAR(64), action_type VARCHAR(80), entity_type VARCHAR(80), entity_id VARCHAR(191), title VARCHAR(191), message TEXT, action_url VARCHAR(500), email_status VARCHAR(20))')
     const migration = (await readFile(new URL('../../../deploy/migrations/20261105-user-achievements.sql', import.meta.url), 'utf8')).replace(/^--.*$/gm, '')
@@ -52,22 +55,22 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
     })
 
     await t.test('automatic rules use qualifying activity, normalize addresses and exclude agents', async () => {
-      await db.query('INSERT INTO users VALUES ?', [[
+      await db.query('INSERT INTO users (wallet_address, name, username, profileImage, tags, created_at) VALUES ?', [[
         [a, 'Human', null, null, '[]', '2026-11-03 12:00:00'],
         [b, 'Later', null, null, '[]', '2026-11-05 00:00:00'],
         [wallet(3), 'Bot', null, null, '["ai-agent"]', '2026-11-01 00:00:00'],
         [wallet(4), 'Hosted', null, null, null, '2026-11-01 00:00:00'],
       ]])
-      await db.execute('INSERT INTO hosted_agents VALUES (?)', [wallet(4)])
+      await db.execute('INSERT INTO hosted_agents (agent_address) VALUES (?)', [wallet(4)])
       // OG: `a` posted before the cutoff; `b` only replied after it; wallet(5) only reposted before it;
       // the bot posted early but agents never qualify.
-      await db.query('INSERT INTO posts VALUES ?', [[
+      await db.query('INSERT INTO posts (wallet_address, is_comment, is_repost, created_at) VALUES ?', [[
         [a.toUpperCase().replace('0X', '0x'), null, null, '2026-11-03 12:00:00'],
         [b, 10, null, '2026-11-06 00:00:00'],
         [wallet(5), null, 7, '2026-11-01 00:00:00'],
         [wallet(3), null, null, '2026-11-01 00:00:00'],
       ]])
-      await db.query('INSERT INTO tips VALUES ?', [Array.from({ length: 50 }, () => [a])])
+      await db.query('INSERT INTO tips (tipper) VALUES ?', [Array.from({ length: 50 }, () => [a])])
       await db.query('INSERT INTO post_likes VALUES ?', [Array.from({ length: 100 }, (_, i) => [wallet(i + 100)])])
       await db.query('INSERT INTO follows VALUES ?', [Array.from({ length: 100 }, (_, i) => [wallet(i + 100), a, 1]).concat([[wallet(999), b, 1]])])
       assert.deepEqual(await rules.og(), [{ wallet: a, scope: '' }])
@@ -84,7 +87,7 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
       assert.equal(count.n, 1, 'silent backfill and repeat runs do not notify')
 
       // Left unset (the scheduler), a rule that already has holders announces newcomers…
-      await db.query('INSERT INTO tips VALUES ?', [Array.from({ length: 50 }, () => [b])])
+      await db.query('INSERT INTO tips (tipper) VALUES ?', [Array.from({ length: 50 }, () => [b])])
       assert.equal((await service.runAchievementRules({ only: 'generous' })).generous, 1)
       const [[announced]] = await db.query("SELECT COUNT(*) AS n FROM notifications WHERE recipient_wallet_address = ? AND entity_id = 'generous'", [b])
       assert.equal(announced.n, 1, 'a newcomer to a held rule is notified')
@@ -94,6 +97,42 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
       assert.equal((await service.runAchievementRules({ only: 'og' })).og, 1)
       const [[afterBackfill]] = await db.query('SELECT COUNT(*) AS n FROM notifications')
       assert.equal(afterBackfill.n, 2, 'the first run of a rule notifies nobody')
+    })
+
+    await t.test('identity, trust and agent rules reward costly signals and keep agents to their own', async () => {
+      // Self-Sovereign: a's Universal Profile counts; the hosted agent's does not.
+      await db.query('UPDATE users SET is_universal_profile = 1 WHERE wallet_address IN (?, ?)', [a, wallet(4)])
+      assert.deepEqual(await rules['self-sovereign'](), [{ wallet: a, scope: '' }])
+
+      // Supporter: paid Premium only; b's complimentary one supports nothing.
+      await db.query('INSERT INTO premium_subscriptions (account, complimentary, purchase_count) VALUES ?', [[[a, 0, 1], [b, 1, 1]]])
+      assert.deepEqual(await rules.supporter(), [{ wallet: a, scope: '' }])
+
+      // Community Backed: b by five different people (repeats and self-tips add nothing); a by four.
+      await db.query('INSERT INTO tips (tipper, creator) VALUES ?', [[
+        ...Array.from({ length: 5 }, (_, i) => [wallet(300 + i), b]),
+        [wallet(300), b], [b, b], [b, b],
+        ...Array.from({ length: 4 }, (_, i) => [wallet(310 + i), a]),
+      ]])
+      assert.deepEqual(await rules['community-backed'](), [{ wallet: b, scope: '' }])
+
+      // Trusted: wallet(6) and wallet(7) both posted 100 days ago with 25 qualified followers, but
+      // moderation acted on a report against wallet(7). wallet(6)'s dismissed report counts for nothing.
+      const [early6] = await db.query('INSERT INTO posts (wallet_address, created_at) VALUES (?, NOW() - INTERVAL 100 DAY)', [wallet(6)])
+      const [early7] = await db.query('INSERT INTO posts (wallet_address, created_at) VALUES (?, NOW() - INTERVAL 100 DAY)', [wallet(7)])
+      await db.query('INSERT INTO follows VALUES ?', [[6, 7].flatMap((n) => Array.from({ length: 25 }, (_, i) => [wallet(100 + i), wallet(n), 1]))])
+      await db.query('INSERT INTO user_reports VALUES ?', [[[early6.insertId, 1, 'dismissed'], [early7.insertId, 1, 'actioned']]])
+      assert.deepEqual(await rules.trusted(), [{ wallet: wallet(6), scope: '' }])
+
+      // Agent Builder goes to the human who owns the agent; Registered Agent to the agent itself,
+      // the one rule the agent filter lets an agent win.
+      await db.query('UPDATE hosted_agents SET owner_address = ? WHERE agent_address = ?', [a, wallet(4)])
+      await db.query('INSERT INTO agent_identities VALUES (?)', [wallet(4)])
+      assert.deepEqual(await rules['agent-builder'](), [{ wallet: a, scope: '' }])
+      assert.deepEqual(await rules['registered-agent'](), [{ wallet: wallet(4), scope: '' }])
+
+      const counts = await service.runAchievementRules({ notify: false })
+      for (const id of ['self-sovereign', 'supporter', 'community-backed', 'trusted', 'agent-builder', 'registered-agent']) assert.equal(counts[id], 1, id)
     })
 
     await t.test('a closed season awards exactly its top ten once with a season scope', async () => {

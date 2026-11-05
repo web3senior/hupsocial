@@ -42,11 +42,47 @@ async function newWinners(id, query, params = []) {
       SELECT 1 FROM user_achievements a
       WHERE a.wallet_address = ${collate('eligible.wallet')} AND a.achievement_id = ? AND a.scope = ''
     )`, [...params, id])
-  return excludeAchievementAgents(rows)
+  // Achievements for agent accounts are the one place an agent may win; every other rule is for people.
+  return achievementById(id)?.audience === 'agents' ? rows : excludeAchievementAgents(rows)
 }
+
+/* A rule over a table some databases have not migrated yet reads as nobody qualifying, rather than
+   failing the whole run (runAchievementRules evaluates every rule back to back). */
+const whenTable = (table, rule) => async () => ((await hasTable(table)) ? rule() : [])
 
 const tipsRule = (id, threshold) => () => newWinners(id,
   'SELECT LOWER(tipper) AS wallet FROM tips GROUP BY LOWER(tipper) HAVING COUNT(*) >= ?', [threshold])
+
+/* Wallets followed by at least `?` qualified followers — followers who have posted or liked, the
+   leaderboard's own definition (lib/leaderboard.js), so follow farms count for nothing. */
+const FOLLOWED_BY_QUALIFIED = `
+  SELECT LOWER(f.followed_address) AS wallet FROM follows f
+  JOIN (
+    SELECT ${collate('wallet_address')} AS wallet FROM posts WHERE wallet_address IS NOT NULL
+    UNION
+    SELECT ${collate('liker_address')} AS wallet FROM post_likes WHERE liker_address IS NOT NULL
+  ) qualified ON qualified.wallet = ${collate('f.follower_address')}
+  WHERE f.is_following = 1
+  GROUP BY LOWER(f.followed_address) HAVING COUNT(DISTINCT f.follower_address) >= ?`
+
+/** Trusted: standing over time, people who chose to follow, and a record moderation never acted on. */
+async function trustedRule() {
+  const { minDays, minFollowers } = achievementById('trusted')
+  // Without a reports table there is nothing on anyone's record.
+  const cleanRecord = (await hasTable('user_reports'))
+    ? `AND NOT EXISTS (
+        SELECT 1 FROM user_reports r JOIN posts p ON p.id = r.post_id AND p.network_id = r.network_id
+        WHERE r.status = 'actioned' AND ${collate('LOWER(p.wallet_address)')} = ${collate('veteran.wallet')}
+      )`
+    : ''
+  return newWinners('trusted', `
+    SELECT veteran.wallet FROM (
+      SELECT LOWER(wallet_address) AS wallet FROM posts WHERE is_repost IS NULL
+      GROUP BY LOWER(wallet_address) HAVING MIN(created_at) <= NOW() - INTERVAL ? DAY
+    ) veteran
+    JOIN (${FOLLOWED_BY_QUALIFIED}) followed ON ${collate('followed.wallet')} = ${collate('veteran.wallet')}
+    WHERE 1 = 1 ${cleanRecord}`, [minDays, minFollowers])
+}
 
 export const RULES = {
   // A post or reply before the cutoff, never a repost. Read off the posts themselves, not the users
@@ -55,16 +91,24 @@ export const RULES = {
   'first-post': () => newWinners('first-post', 'SELECT LOWER(wallet_address) AS wallet FROM posts WHERE is_comment IS NULL AND is_repost IS NULL'),
   'first-tip': tipsRule('first-tip', 1),
   generous: tipsRule('generous', achievementById('generous').threshold),
-  'rising-voice': () => newWinners('rising-voice', `
-    SELECT LOWER(f.followed_address) AS wallet FROM follows f
-    JOIN (
-      SELECT ${collate('wallet_address')} AS wallet FROM posts WHERE wallet_address IS NOT NULL
-      UNION
-      SELECT ${collate('liker_address')} AS wallet FROM post_likes WHERE liker_address IS NOT NULL
-    ) qualified ON qualified.wallet = ${collate('f.follower_address')}
-    WHERE f.is_following = 1
-    GROUP BY LOWER(f.followed_address) HAVING COUNT(DISTINCT f.follower_address) >= ?`,
-  [achievementById('rising-voice').threshold]),
+  'rising-voice': () => newWinners('rising-voice', FOLLOWED_BY_QUALIFIED, [achievementById('rising-voice').threshold]),
+  'self-sovereign': async () => ((await hasColumn('users', 'is_universal_profile'))
+    ? newWinners('self-sovereign', 'SELECT LOWER(wallet_address) AS wallet FROM users WHERE is_universal_profile = 1')
+    : []),
+  // Paid, not complimentary: a Premium the team gave away supports nothing.
+  supporter: whenTable('premium_subscriptions', () => newWinners('supporter',
+    'SELECT LOWER(account) AS wallet FROM premium_subscriptions WHERE COALESCE(complimentary, 0) = 0 AND purchase_count > 0')),
+  // Different people, counted once each; tipping yourself proves nothing.
+  'community-backed': () => newWinners('community-backed', `
+    SELECT LOWER(creator) AS wallet FROM tips
+    WHERE creator IS NOT NULL AND tipper IS NOT NULL AND LOWER(tipper) <> LOWER(creator)
+    GROUP BY LOWER(creator) HAVING COUNT(DISTINCT LOWER(tipper)) >= ?`, [achievementById('community-backed').threshold]),
+  trusted: trustedRule,
+  'agent-builder': whenTable('hosted_agents', () => newWinners('agent-builder',
+    'SELECT LOWER(owner_address) AS wallet FROM hosted_agents WHERE owner_address IS NOT NULL')),
+  // agent_identities only holds links the Identity Registry confirmed (lib/agentIdentities.js).
+  'registered-agent': whenTable('agent_identities', () => newWinners('registered-agent',
+    'SELECT LOWER(wallet_address) AS wallet FROM agent_identities')),
   'season-top-10': async () => {
     const winners = []
     for (const season of POINTS_SEASONS) {

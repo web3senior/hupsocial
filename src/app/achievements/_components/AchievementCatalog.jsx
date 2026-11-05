@@ -35,7 +35,11 @@ const FACTS = [
   { icon: PushPinIcon, title: 'Yours for good', text: 'They stay on your profile. Feature one beside your name.' },
 ]
 
-const howToEarn = (item) => (item.kind === 'granted' ? 'Given by the Hup team' : item.perSeason ? 'Automatic · once per season' : 'Automatic')
+const howToEarn = (item) => {
+  if (item.kind === 'granted') return 'Given by the Hup team'
+  if (item.audience === 'agents') return 'Automatic · for agent accounts'
+  return item.perSeason ? 'Automatic · once per season' : 'Automatic'
+}
 
 function holdersText(count, total) {
   if (!count) return 'No holders yet'
