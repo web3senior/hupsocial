@@ -175,6 +175,20 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
       assert.equal((await perform('revoke', 2)).status, 200)
       assert.equal(await service.readFeaturedAchievement(b), null)
       assert.equal((await perform('run', 3, 'first-tip')).status, 200)
+      const { achievementSettingMessage } = await import('../../lib/achievementSettings.js')
+      await db.query(await readFile(new URL('../../../deploy/migrations/20261105-achievement-settings.sql', import.meta.url), 'utf8'))
+      const nonce = 'c'.repeat(32)
+      await db.execute('INSERT INTO nonces VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE))', [nonce, signer.address.toLowerCase()])
+      const setting = { action: 'settings', id: 'early-tester', name: 'Pioneer', description: 'Helped test Hup.', rarity: 'rare', listed: false, thresholds: {}, nonce, chainId: 42 }
+      const signature = await signer.signMessage(achievementSettingMessage(setting, nonce))
+      const request = (body) => new Request('http://localhost/api/v1/admin/achievements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      assert.equal((await POST(request({ ...setting, name: 'Tampered', signature }))).status, 403)
+      const saved = await POST(request({ ...setting, signature }))
+      assert.equal(saved.status, 200)
+      assert.equal((await saved.json()).data.catalog.find((item) => item.id === 'early-tester').name, 'Pioneer')
+      assert.equal((await POST(request({ ...setting, signature }))).status, 401)
+      const { saveAchievementSetting } = await import('../../lib/achievementCatalog.js')
+      await saveAchievementSetting({ action: 'reset-settings', id: 'early-tester' }, signer.address.toLowerCase())
     })
 
     await t.test('featured API verifies an EOA signature, rejects tampering and replay', async () => {
@@ -194,6 +208,23 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
       assert.deepEqual((await response.json()).data.featured, { id: 'early-tester', scope: '' })
       assert.equal((await POST(request({ ...claim, signature }))).status, 401)
       assert.equal((await POST(request({ ...claim, achievementId: 'unknown', signature }))).status, 400)
+    })
+
+    await t.test('settings persist, change rule thresholds and reset without losing awards', async () => {
+      const { readAchievementCatalog, saveAchievementSetting } = await import('../../lib/achievementCatalog.js')
+      assert.equal((await readAchievementCatalog()).find((item) => item.id === 'generous').threshold, 50)
+      const sql = await readFile(new URL('../../../deploy/migrations/20261105-achievement-settings.sql', import.meta.url), 'utf8')
+      await db.query(sql)
+      const candidate = wallet(9998)
+      await db.execute('INSERT INTO tips (tipper) VALUES (?)', [candidate])
+      assert.equal((await rules.generous()).some((row) => row.wallet === candidate), false)
+      await saveAchievementSetting({ action: 'settings', id: 'generous', name: 'Giving', description: 'Sent a tip.', rarity: 'epic', listed: false, thresholds: { threshold: 1 } }, b)
+      assert.equal((await readAchievementCatalog()).find((item) => item.id === 'generous').listed, false)
+      assert.equal((await rules.generous()).some((row) => row.wallet === candidate), true)
+      await saveAchievementSetting({ action: 'reset-settings', id: 'generous' }, b)
+      assert.equal((await rules.generous()).some((row) => row.wallet === candidate), false)
+      assert.equal((await readAchievementCatalog()).find((item) => item.id === 'generous').name, 'Generous')
+      await db.execute('DELETE FROM tips WHERE tipper = ?', [candidate])
     })
 
     await t.test('missing tables return empty reads and reject writes with migration instructions', async () => {

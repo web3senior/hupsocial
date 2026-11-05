@@ -1,4 +1,5 @@
 .achievementsRow {
+  min-width: 0;
   margin: 20px 0;
 
   &__heading {
@@ -12,15 +13,79 @@
     a { font-size: 12px; color: var(--brand-500, #287cdb); }
   }
 
-  &__grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__arrows {
+    display: flex;
+    gap: 0.15rem;
+  }
+
+  &__track {
+    --rail-top: #000;
+    --rail-bottom: #000;
+
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: 36px;
+    gap: 4px;
+    max-height: 120px;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    mask-image: linear-gradient(to bottom, var(--rail-top), #000 12px, #000 calc(100% - 12px), var(--rail-bottom));
+
+    &[data-scroll-up='true'] { --rail-top: transparent; }
+    &[data-scroll-down='true'] { --rail-bottom: transparent; }
+  }
+
+  &__arrow {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--surface-muted);
+      color: var(--text);
+    }
+
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+  }
+
+  &__arrow:focus-visible,
+  &__track:focus-visible {
+    outline: 2px solid var(--text-muted);
+    outline-offset: 2px;
+  }
+
   &__chip {
+    min-width: 0;
+    text-align: left;
+    scroll-snap-align: start;
     display: inline-flex;
     align-items: center;
     gap: 7px;
     padding: 8px 12px;
     border: 1px solid var(--border, #8884);
     border-radius: 12px;
-    background: transparent;
+    background: var(--surface-muted);
     color: inherit;
     font: inherit;
     font-size: 12px;

@@ -6,8 +6,10 @@ import clsx from 'clsx'
 import useSWR from 'swr'
 import { Rise } from 'cube-motion/react'
 import { CheckCircleIcon, LightningIcon, LockSimpleIcon, PushPinIcon, ShieldCheckIcon } from '@phosphor-icons/react'
-import { ACHIEVEMENTS, RARITIES, RARITY_LABELS } from '@/config/achievements'
-import { getAchievementCatalog, getUserAchievements } from '@/lib/api'
+import { RARITIES, RARITY_LABELS } from '@/config/achievements'
+import { achievementBonusLabel } from '@/config/points'
+import { getUserAchievements } from '@/lib/api'
+import useAchievementCatalog from '@/hooks/useAchievementCatalog'
 import { useActiveWallet } from '@/hooks/useActiveWallet'
 import { profilePath } from '@/lib/username'
 import SegmentedControl from '@/components/ui/SegmentedControl'
@@ -19,7 +21,7 @@ const percent = new Intl.NumberFormat(undefined, { style: 'percent', maximumFrac
 const earnedDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 
 // Rarest first: the list reads from the marks people chase down to the ones everyone collects.
-const ORDERED = [...ACHIEVEMENTS].sort((a, b) => RARITIES.indexOf(b.rarity) - RARITIES.indexOf(a.rarity))
+
 
 const FILTERS = [
   { value: 'all', label: 'All' },
@@ -56,7 +58,8 @@ function holdersText(count, total) {
 export default function AchievementCatalog() {
   const { address, isConnected } = useActiveWallet()
   const [filter, setFilter] = useState('all')
-  const { data: stats, error: statsError } = useSWR('achievements:catalog', getAchievementCatalog, { revalidateOnFocus: false })
+  const { data: stats, error: statsError, catalog } = useAchievementCatalog()
+  const ordered = [...catalog].sort((a, b) => RARITIES.indexOf(b.rarity) - RARITIES.indexOf(a.rarity))
   const { data: mine } = useSWR(isConnected && address ? ['achievements:mine', address] : null, ([, wallet]) => getUserAchievements(wallet))
 
   // Every award per achievement: a seasonal one can be held once per season.
@@ -67,9 +70,9 @@ export default function AchievementCatalog() {
   }, [mine])
 
   const knowsMine = Boolean(isConnected && mine)
-  const earnedCount = earnedById.size
+  const earnedCount = catalog.filter((item) => earnedById.has(item.id)).length
   const activeFilter = knowsMine ? filter : 'all'
-  const visible = ORDERED.filter((item) => activeFilter === 'all' || (activeFilter === 'earned') === earnedById.has(item.id))
+  const visible = ordered.filter((item) => activeFilter === 'all' || (activeFilter === 'earned') === earnedById.has(item.id))
 
   return (
     <div className={styles.catalog}>
@@ -89,7 +92,7 @@ export default function AchievementCatalog() {
         <section className={styles.progress} aria-label="Your progress">
           <div className={styles.progress__summary}>
             <span>
-              <strong>{knowsMine ? earnedCount : '–'}</strong> of {ACHIEVEMENTS.length} earned
+              <strong>{knowsMine ? earnedCount : '–'}</strong> of {catalog.length} earned
             </span>
             {earnedCount > 0 && (
               <Link className={styles.progress__link} href={profilePath(address)}>
@@ -102,9 +105,9 @@ export default function AchievementCatalog() {
             role="progressbar"
             aria-label="Achievements earned"
             aria-valuemin={0}
-            aria-valuemax={ACHIEVEMENTS.length}
+            aria-valuemax={catalog.length}
             aria-valuenow={earnedCount}
-            style={{ '--progress': `${(earnedCount / ACHIEVEMENTS.length) * 100}%` }}
+            style={{ '--progress': `${(earnedCount / (catalog.length || 1)) * 100}%` }}
           />
         </section>
       ) : (
@@ -139,6 +142,7 @@ export default function AchievementCatalog() {
                   <div className={styles.achievementRow__heading}>
                     <h3>{item.name}</h3>
                     <span className={styles.achievementRow__rarity}>{RARITY_LABELS[item.rarity]}</span>
+                    {achievementBonusLabel(item.id) && <span className={styles.achievementRow__bonus}>{achievementBonusLabel(item.id)}</span>}
                   </div>
                   <p className={styles.achievementRow__description}>{item.description}</p>
                   <p className={styles.achievementRow__meta}>

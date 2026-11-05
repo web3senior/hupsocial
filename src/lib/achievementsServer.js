@@ -3,6 +3,7 @@ import { isEvmAddress, normalizeAddress } from '@/lib/address'
 import { hasColumn, hasTable } from '@/lib/schema'
 import { achievementById } from '@/config/achievements'
 import { AchievementError, validateAchievementScope } from '@/lib/achievements'
+import { readAchievementCatalog } from '@/lib/achievementCatalog'
 
 export const achievementsAreMigrated = async () => await hasTable('user_achievements') && await hasTable('user_featured_achievement')
 const requireMigration = async () => {
@@ -112,7 +113,7 @@ export async function awardAchievement({ wallets, id, scope = '', source, grante
     return winners
   })
   if (notify && inserted.length) {
-    const item = achievementById(id)
+    const item = (await readAchievementCatalog()).find((entry) => entry.id === id)
     for (const batch of batches(inserted)) {
       try {
         await pool.query(`INSERT INTO notifications (recipient_wallet_address, action_type, entity_type, entity_id, title, message, action_url, email_status) VALUES ?`,
@@ -180,9 +181,12 @@ export async function runAchievementRules({ only, notify } = {}) {
   await requireMigration()
   const { RULES } = await import('@/lib/achievementRules')
   if (only && !RULES[only]) throw new AchievementError('Unknown automatic rule')
+  // An achievement the admin hid is off the page and every profile, so it stops being awarded too:
+  // otherwise it would keep notifying people about something they cannot see.
+  const hidden = new Set((await readAchievementCatalog()).filter((item) => item.listed === false).map((item) => item.id))
   const counts = {}
   for (const [id, rule] of Object.entries(RULES)) {
-    if (only && only !== id) continue
+    if ((only && only !== id) || hidden.has(id)) continue
     const winners = await rule()
     const scopes = new Set(winners.map((row) => row.scope))
     counts[id] = 0

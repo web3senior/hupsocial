@@ -150,7 +150,7 @@ export const RARITIES = ['common', 'rare', 'epic', 'legendary']
 
 // The date OG is measured against. users.created_at strictly before this = OG.
 // Default: Season 1 start (config/points.js). ⚠ Product owner to confirm — see §7.
-export const OG_CUTOFF = '2026-11-04 00:00:00'
+export const OG_CUTOFF = '2026-11-05 00:00:00'
 
 export const ACHIEVEMENTS = [
   { id: 'og',            name: 'OG',            kind: 'auto',    rarity: 'legendary', icon: 'crown',
@@ -375,7 +375,7 @@ profile header only in this pass. Leave a `// TODO(achievements): byline` next t
 
 | Decision | Default in this plan |
 |---|---|
-| What counts as OG | `users.created_at` before Season 1 start (`2026-11-04 00:00:00` UTC). Alternatives: first N wallets, or first post before a date |
+| What counts as OG | `users.created_at` before Season 1 start (`2026-11-05 00:00:00` UTC). Alternatives: first N wallets, or first post before a date |
 | Starting achievement set | The 8 in §4.2 |
 | Notify on OG backfill | Yes by default. Admin can run it silently |
 | Byline display | Phase 2 (§4.9) |

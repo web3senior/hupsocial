@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import clsx from 'clsx'
-import { achievementById } from '@/config/achievements'
+import useAchievementCatalog from '@/hooks/useAchievementCatalog'
 import { ACHIEVEMENT_ICONS, DEFAULT_ACHIEVEMENT_ICON } from '@/components/achievements/achievementIcons'
 import styles from './AchievementBadge.module.scss'
 
 export default function AchievementBadge({ featured, size = 'sm', linked = true, className }) {
+  const { achievementById } = useAchievementCatalog()
   const item = achievementById(featured?.id)
   if (!item) return null
   const Icon = ACHIEVEMENT_ICONS[item.icon] ?? DEFAULT_ACHIEVEMENT_ICON

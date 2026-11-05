@@ -4,6 +4,9 @@ import { hasAiAgentTag } from '@/lib/agentProfile'
 import { ACHIEVEMENTS, achievementById, OG_CUTOFF } from '@/config/achievements'
 import { POINTS_SEASONS } from '@/config/points'
 import { getSeasonStandings } from '@/lib/points'
+import { readAchievementCatalog } from '@/lib/achievementCatalog'
+
+const ruleSetting = async (id) => (await readAchievementCatalog()).find((item) => item.id === id)
 
 const collate = (column) => `CONVERT(${column} USING utf8mb4) COLLATE utf8mb4_general_ci`
 
@@ -67,7 +70,7 @@ const FOLLOWED_BY_QUALIFIED = `
 
 /** Trusted: standing over time, people who chose to follow, and a record moderation never acted on. */
 async function trustedRule() {
-  const { minDays, minFollowers } = achievementById('trusted')
+  const { minDays, minFollowers } = await ruleSetting('trusted')
   // Without a reports table there is nothing on anyone's record.
   const cleanRecord = (await hasTable('user_reports'))
     ? `AND NOT EXISTS (
@@ -90,8 +93,8 @@ export const RULES = {
   og: () => newWinners('og', 'SELECT LOWER(wallet_address) AS wallet FROM posts WHERE is_repost IS NULL AND created_at < ?', [OG_CUTOFF]),
   'first-post': () => newWinners('first-post', 'SELECT LOWER(wallet_address) AS wallet FROM posts WHERE is_comment IS NULL AND is_repost IS NULL'),
   'first-tip': tipsRule('first-tip', 1),
-  generous: tipsRule('generous', achievementById('generous').threshold),
-  'rising-voice': () => newWinners('rising-voice', FOLLOWED_BY_QUALIFIED, [achievementById('rising-voice').threshold]),
+  generous: async () => tipsRule('generous', (await ruleSetting('generous')).threshold)(),
+  'rising-voice': async () => newWinners('rising-voice', FOLLOWED_BY_QUALIFIED, [(await ruleSetting('rising-voice')).threshold]),
   'self-sovereign': async () => ((await hasColumn('users', 'is_universal_profile'))
     ? newWinners('self-sovereign', 'SELECT LOWER(wallet_address) AS wallet FROM users WHERE is_universal_profile = 1')
     : []),
@@ -99,10 +102,10 @@ export const RULES = {
   supporter: whenTable('premium_subscriptions', () => newWinners('supporter',
     'SELECT LOWER(account) AS wallet FROM premium_subscriptions WHERE COALESCE(complimentary, 0) = 0 AND purchase_count > 0')),
   // Different people, counted once each; tipping yourself proves nothing.
-  'community-backed': () => newWinners('community-backed', `
+  'community-backed': async () => newWinners('community-backed', `
     SELECT LOWER(creator) AS wallet FROM tips
     WHERE creator IS NOT NULL AND tipper IS NOT NULL AND LOWER(tipper) <> LOWER(creator)
-    GROUP BY LOWER(creator) HAVING COUNT(DISTINCT LOWER(tipper)) >= ?`, [achievementById('community-backed').threshold]),
+    GROUP BY LOWER(creator) HAVING COUNT(DISTINCT LOWER(tipper)) >= ?`, [(await ruleSetting('community-backed')).threshold]),
   trusted: trustedRule,
   'agent-builder': whenTable('hosted_agents', () => newWinners('agent-builder',
     'SELECT LOWER(owner_address) AS wallet FROM hosted_agents WHERE owner_address IS NOT NULL')),

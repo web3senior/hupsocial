@@ -201,6 +201,17 @@
     font-weight: 600;
   }
 
+  // What it adds to the $HUP airdrop, in the season accent the leaderboard and /token use
+  &__bonus {
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    color: #fd1669;
+    background-color: color-mix(in srgb, #fd1669 10%, transparent);
+    font-size: var(--system-11-font-size);
+    line-height: var(--system-11-line-height);
+    font-weight: 600;
+  }
+
   &__description {
     margin: 0.2rem 0 0;
     color: var(--text);

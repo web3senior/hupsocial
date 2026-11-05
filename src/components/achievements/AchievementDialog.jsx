@@ -4,10 +4,11 @@ import { forwardRef, useId } from 'react'
 import NativeDialog from '@/components/ui/NativeDialog'
 import AchievementBadge from '@/components/ui/AchievementBadge'
 import { Spinner } from '@/components/Loading'
-import { achievementById } from '@/config/achievements'
+import useAchievementCatalog from '@/hooks/useAchievementCatalog'
 import styles from './AchievementDialog.module.scss'
 
 const AchievementDialog = forwardRef(function AchievementDialog({ earned, featured, owner, holders, totalWallets, busy, error, onFeature }, ref) {
+  const { achievementById } = useAchievementCatalog()
   const titleId = useId()
   const item = achievementById(earned?.id)
   const selected = featured?.id === earned?.id && featured?.scope === earned?.scope

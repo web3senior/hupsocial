@@ -10,11 +10,16 @@ import { achievementAdminMessage } from '@/lib/achievements'
 import { requestAuthNonce } from '@/lib/api'
 import { shortAddress } from '@/lib/address'
 import { Spinner } from '@/components/Loading'
+import { useSWRConfig } from 'swr'
+import { achievementSettingMessage } from '@/lib/achievementSettings'
+import AchievementSettingsEditor from './AchievementSettingsEditor'
 import styles from './AchievementsSection.module.scss'
 
 export default function AchievementsSection() {
   const { address, chainId } = useConnection()
   const { signMessageAsync } = useSignMessage()
+  const { mutate } = useSWRConfig()
+  const [catalog, setCatalog] = useState(ACHIEVEMENTS)
   const [id, setId] = useState('early-tester')
   const [season, setSeason] = useState(String(POINTS_SEASONS[0].id))
   const [wallet, setWallet] = useState('')
@@ -26,7 +31,7 @@ export default function AchievementsSection() {
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
   const [revision, setRevision] = useState(0)
-  const item = achievementById(id)
+  const item = catalog.find((entry) => entry.id === id)
   const scope = item.perSeason ? season : ''
 
   useEffect(() => {
@@ -36,25 +41,29 @@ export default function AchievementsSection() {
       .then(async (response) => {
         const json = await response.json()
         if (!response.ok || !json.success) throw new Error(json.error || 'Could not read holders')
-        if (!signal.aborted) { setHolders(json.data.holders); setError(null) }
+        if (!signal.aborted) { setHolders(json.data.holders); setCatalog(json.data.catalog); setError(null) }
       })
       .catch((err) => { if (!signal.aborted) { setError(err.message); setHolders([]) } })
       .finally(() => { if (!signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [id, scope, revision])
 
-  const submit = async (action, target = '', all = false) => {
+  const submit = async (action, target = '', all = false, setting = null) => {
     setBusy(true)
     setResult(null)
     try {
       const nonce = await requestAuthNonce(address)
       if (!nonce) throw new Error('Could not get a nonce')
-      const claim = { action, wallet: target, id: all ? null : id, scope: action === 'run' ? '' : scope, note: action === 'grant' ? note : '', notify, nonce, chainId }
-      const signature = await signMessageAsync({ message: achievementAdminMessage(claim) })
+      const claim = setting ? { ...setting, nonce, chainId } : { action, wallet: target, id: all ? null : id, scope: action === 'run' ? '' : scope, note: action === 'grant' ? note : '', notify, nonce, chainId }
+      const signature = await signMessageAsync({ message: setting ? achievementSettingMessage(claim, nonce) : achievementAdminMessage(claim) })
       const response = await fetch('/api/v1/admin/achievements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...claim, signature }) })
       const json = await response.json()
       if (!response.ok || !json.success) throw new Error(json.error || 'Could not update achievements')
-      const text = action === 'run' ? `New awards: ${Object.entries(json.data).map(([key, count]) => `${achievementById(key).name}: ${count}`).join(', ')}`
+      if (setting) {
+        setCatalog(json.data.catalog)
+        await mutate('achievements:catalog')
+      }
+      const text = setting ? 'Achievement settings saved.' : action === 'run' ? `New awards: ${Object.entries(json.data).map(([key, count]) => `${catalog.find((entry) => entry.id === key)?.name || achievementById(key)?.name}: ${count}`).join(', ')}`
         : action === 'grant' ? (json.data.inserted.length ? 'Achievement granted.' : 'Wallet already holds this achievement.')
           : (json.data.revoked ? 'Achievement revoked.' : 'Wallet did not hold this achievement.')
       setResult(text)
@@ -74,7 +83,7 @@ export default function AchievementsSection() {
       <p>Permanent milestones. Only admin-granted awards can be revoked. Rule awards remain with their holders.</p>
       <fieldset disabled={busy} className={styles.achievementsAdmin__form}>
         <label htmlFor="achievement-id">Achievement</label>
-        <select id="achievement-id" value={id} onChange={(event) => { setLoading(true); setId(event.target.value) }}>{ACHIEVEMENTS.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {entry.kind}</option>)}</select>
+        <select id="achievement-id" value={id} onChange={(event) => { setLoading(true); setId(event.target.value) }}>{catalog.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {entry.kind}{entry.listed === false ? ' · hidden' : ''}</option>)}</select>
         {item.perSeason && <><label htmlFor="achievement-season">Season</label><select id="achievement-season" value={season} onChange={(event) => { setLoading(true); setSeason(event.target.value) }}>{POINTS_SEASONS.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></>}
         <label htmlFor="achievement-wallet">Wallet address</label>
         <input id="achievement-wallet" value={wallet} onChange={(event) => setWallet(event.target.value)} placeholder="0x…" />
@@ -90,6 +99,8 @@ export default function AchievementsSection() {
           <button type="button" disabled={!address} onClick={() => submit('run', '', true)}>Run all rules now</button>
         </div>
       </fieldset>
+      {!loading && <AchievementSettingsEditor key={JSON.stringify(item)} item={item} disabled={busy || !address}
+        onSave={(setting) => submit(setting.action, '', false, setting)} />}
       {busy && <Spinner size={20} label="Signing and updating achievements" />}
       {error && <p role="alert" className={styles.achievementsAdmin__error}>{error}</p>}
       {result && <p role="status">{result}</p>}
