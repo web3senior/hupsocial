@@ -1,6 +1,5 @@
 import pool from '@/lib/db'
 import { hasColumn, hasTable } from '@/lib/schema'
-import { hasAiAgentTag } from '@/lib/agentProfile'
 import { ACHIEVEMENTS, achievementById, OG_CUTOFF } from '@/config/achievements'
 import { POINTS_SEASONS } from '@/config/points'
 import { getSeasonStandings } from '@/lib/points'
@@ -11,34 +10,6 @@ const ruleSetting = async (id) => (await readAchievementCatalog()).find((item) =
 
 const collate = (column) => `CONVERT(${column} USING utf8mb4) COLLATE utf8mb4_general_ci`
 
-/* Every rule filters through the agent list, and building it scans every tagged user. One run
-   evaluates all the rules back to back, so the list is built once and shared for a short while
-   instead of once per rule. */
-const AGENT_LIST_TTL_MS = 60_000
-let agentList = null
-
-async function readAgentWallets() {
-  if (agentList?.expiresAt > Date.now()) return agentList.wallets
-  const wallets = new Set()
-  if (await hasTable('hosted_agents')) {
-    const [rows] = await pool.execute('SELECT LOWER(agent_address) AS wallet FROM hosted_agents')
-    for (const row of rows) wallets.add(row.wallet)
-  }
-  if (await hasColumn('users', 'tags')) {
-    const [rows] = await pool.execute('SELECT LOWER(wallet_address) AS wallet, tags FROM users WHERE tags IS NOT NULL')
-    for (const row of rows) if (hasAiAgentTag(row)) wallets.add(row.wallet)
-  }
-  agentList = { wallets, expiresAt: Date.now() + AGENT_LIST_TTL_MS }
-  return wallets
-}
-
-/** Hosted wallets and explicitly tagged bots are excluded, including mixed-case addresses. */
-export async function excludeAchievementAgents(candidates) {
-  if (!candidates.length) return candidates
-  const excluded = await readAgentWallets()
-  return candidates.filter(({ wallet }) => !excluded.has(wallet.toLowerCase()))
-}
-
 async function newWinners(id, query, params = []) {
   const [rows] = await pool.execute(`
     SELECT DISTINCT eligible.wallet, '' AS scope FROM (${query}) eligible
@@ -46,8 +17,8 @@ async function newWinners(id, query, params = []) {
       SELECT 1 FROM user_achievements a
       WHERE a.wallet_address = ${collate('eligible.wallet')} AND a.achievement_id = ? AND a.scope = ''
     )`, [...params, id])
-  // Achievements for agent accounts are the one place an agent may win; every other rule is for people.
-  return excludeBadStanding(achievementById(id)?.audience === 'agents' ? rows : await excludeAchievementAgents(rows))
+  // People and AI agents qualify through the same activity and identity requirements.
+  return excludeBadStanding(rows)
 }
 
 /** No automatic achievement for a wallet the community has blocked (lib/achievementStanding.js). */
@@ -140,7 +111,7 @@ export const RULES = {
         if (row.rank !== null && row.rank <= 10 && !existing.has(wallet)) winners.push({ wallet, scope })
       }
     }
-    return excludeBadStanding(await excludeAchievementAgents(winners))
+    return excludeBadStanding(winners)
   },
 }
 

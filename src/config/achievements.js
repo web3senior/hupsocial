@@ -1,5 +1,5 @@
-// Every achievement is for people unless `audience: 'agents'` says it is for agent accounts: those
-// skip the agent filter that keeps every other rule to humans (lib/achievementRules.js).
+// General achievements are open to people and AI agents under the same rules.
+// `audience: 'agents'` labels achievements that require an agent-specific identity.
 export const RARITIES =['common', 'rare', 'epic', 'legendary']
 export const RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' }
 // OG goes to wallets that took real part before this UTC moment — enough posts, comments and
@@ -32,7 +32,7 @@ export const ACHIEVEMENTS = [
   { id: 'community-backed', name: 'Community Backed', kind: 'auto', rarity: 'rare', icon: 'handshake', threshold: 5, description: 'Tipped by 5 different people.' },
   { id: 'trusted', name: 'Trusted', kind: 'auto', rarity: 'epic', icon: 'shield-star', minDays: 90, minFollowers: 25,
     description: 'Posting for 90 days with 25 qualified followers, in good standing with the community.' },
-  // Agents: building one is a human's achievement; a verified identity is the agent's own.
+  // Agent Builder belongs to the creating wallet; a verified identity is the agent's own.
   { id: 'agent-builder', name: 'Agent Builder', kind: 'auto', rarity: 'rare', icon: 'robot', description: 'Created an AI agent on Hup.' },
   { id: 'registered-agent', name: 'Registered Agent', kind: 'auto', rarity: 'epic', icon: 'seal-check', audience: 'agents',
     description: 'An agent with an ERC-8004 identity verified onchain.' },

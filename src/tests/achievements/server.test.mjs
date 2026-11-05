@@ -90,7 +90,7 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
       assert.equal((await service.readHolderCounts())['bug-hunter'], undefined)
     })
 
-    await t.test('automatic rules use qualifying activity, normalize addresses and exclude agents', async () => {
+    await t.test('automatic rules use qualifying activity for humans, tagged agents and hosted agents', async () => {
       await db.query('INSERT INTO users (wallet_address, name, username, profileImage, tags, created_at) VALUES ?', [[
         [a, 'Human', null, null, '[]', '2026-11-03 12:00:00'],
         [b, 'Later', null, null, '[]', '2026-11-05 00:00:00'],
@@ -99,22 +99,24 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
       ]])
       await db.execute('INSERT INTO hosted_agents (agent_address) VALUES (?)', [wallet(4)])
       // OG: `a` took full part before the cutoff, one post under a mixed-case address; `b` only
-      // commented after it; wallet(5) only reposted; the bot did everything, but agents never qualify.
+      // commented after it; wallet(5) only reposted; the tagged bot meets the same OG bar.
       await post(a.toUpperCase().replace('0X', '0x'))
       await activity(a, { posts: 4 })
       await post(b, { comment: 1, at: '2026-11-06 00:00:00' })
       await post(wallet(5), { repost: 1 })
       await activity(wallet(3))
+      await post(wallet(4))
       await db.query('INSERT INTO tips (tipper) VALUES ?', [Array.from({ length: 50 }, () => [a])])
       await db.query('INSERT INTO post_likes VALUES ?', [Array.from({ length: 100 }, (_, i) => [wallet(i + 100)])])
       await db.query('INSERT INTO follows VALUES ?', [Array.from({ length: 100 }, (_, i) => [wallet(i + 100), a, 1]).concat([[wallet(999), b, 1]])])
-      assert.deepEqual(await rules.og(), [{ wallet: a, scope: '' }])
-      assert.deepEqual(await rules['first-post'](), [{ wallet: a, scope: '' }])
+      assert.deepEqual(await rules.og(), [{ wallet: a, scope: '' }, { wallet: wallet(3), scope: '' }])
+      assert.deepEqual(await rules['first-post'](), [a, wallet(3), wallet(4)].map((wallet) => ({ wallet, scope: '' })))
       assert.deepEqual(await rules.generous(), [{ wallet: a, scope: '' }])
       assert.deepEqual(await rules['rising-voice'](), [{ wallet: a, scope: '' }])
       assert.deepEqual(await rules['season-top-10'](), [])
       const counts = await service.runAchievementRules({ notify: false })
-      assert.equal(counts.og, 1)
+      assert.equal(counts.og, 2)
+      assert.equal(counts['first-post'], 3)
       assert.equal(counts.generous, 1)
       assert.ok(Object.values(await service.runAchievementRules()).every((n) => n === 0))
       await assert.rejects(service.revokeAchievement({ wallet: a, id: 'og' }), { status: 403 })
@@ -129,15 +131,15 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
 
       // …while a rule's first run, with no holders yet, is a silent backfill.
       await db.query("DELETE FROM user_achievements WHERE achievement_id = 'og'")
-      assert.equal((await service.runAchievementRules({ only: 'og' })).og, 1)
+      assert.equal((await service.runAchievementRules({ only: 'og' })).og, 2)
       const [[afterBackfill]] = await db.query('SELECT COUNT(*) AS n FROM notifications')
       assert.equal(afterBackfill.n, 2, 'the first run of a rule notifies nobody')
     })
 
-    await t.test('identity, trust and agent rules reward costly signals and keep agents to their own', async () => {
-      // Self-Sovereign: a's Universal Profile counts; the hosted agent's does not.
+    await t.test('identity, trust and agent rules apply their requirements to every account', async () => {
+      // Self-Sovereign: both the human and hosted agent qualify with a verified UP.
       await db.query('UPDATE users SET is_universal_profile = 1 WHERE wallet_address IN (?, ?)', [a, wallet(4)])
-      assert.deepEqual(await rules['self-sovereign'](), [{ wallet: a, scope: '' }])
+      assert.deepEqual(await rules['self-sovereign'](), [{ wallet: a, scope: '' }, { wallet: wallet(4), scope: '' }])
 
       // Supporter: paid Premium only; b's complimentary one supports nothing.
       await db.query('INSERT INTO premium_subscriptions (account, complimentary, purchase_count) VALUES ?', [[[a, 0, 1], [b, 1, 1]]])
@@ -160,15 +162,34 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
       await block([...ogHolders.slice(0, 4), wallet(500), wallet(501), wallet(502)], wallet(6))
       assert.deepEqual(await rules.trusted(), [{ wallet: wallet(6), scope: '' }])
 
-      // Agent Builder goes to the human who owns the agent; Registered Agent to the agent itself,
-      // the one rule the agent filter lets an agent win.
+      // Agent Builder goes to the creating wallet; Registered Agent requires a verified identity.
       await db.query('UPDATE hosted_agents SET owner_address = ? WHERE agent_address = ?', [a, wallet(4)])
       await db.query('INSERT INTO agent_identities VALUES (?)', [wallet(4)])
       assert.deepEqual(await rules['agent-builder'](), [{ wallet: a, scope: '' }])
       assert.deepEqual(await rules['registered-agent'](), [{ wallet: wallet(4), scope: '' }])
 
       const counts = await service.runAchievementRules({ notify: false })
-      for (const id of ['self-sovereign', 'supporter', 'community-backed', 'trusted', 'agent-builder', 'registered-agent']) assert.equal(counts[id], 1, id)
+      assert.equal(counts['self-sovereign'], 2)
+      for (const id of ['supporter', 'community-backed', 'trusted', 'agent-builder', 'registered-agent']) assert.equal(counts[id], 1, id)
+    })
+
+    await t.test('agents display earned badges, retain standing checks and never receive duplicate awards', async () => {
+      const earned = (await service.readAchievementSummary(wallet(4))).earned
+      assert.ok(earned.some((row) => row.id === 'first-post'))
+      assert.ok(earned.some((row) => row.id === 'self-sovereign'))
+      assert.deepEqual(await rules['first-post'](), [])
+      assert.deepEqual(await rules['self-sovereign'](), [])
+      await block(ogHolders, wallet(4))
+      try {
+        assert.deepEqual(await service.readAchievementSummary(wallet(4)), { earned: [], featured: null, hidden: true })
+        await db.query('INSERT INTO tips (tipper) VALUES (?)', [wallet(4)])
+        assert.deepEqual(await rules['first-tip'](), [])
+      } finally {
+        await db.execute('DELETE FROM user_blocks WHERE blocked_address = ?', [wallet(4)])
+      }
+      assert.deepEqual(await rules['first-tip'](), [{ wallet: wallet(4), scope: '' }])
+      await service.runAchievementRules({ only: 'first-tip', notify: false })
+      assert.deepEqual(await rules['first-tip'](), [])
     })
 
     await t.test("OG needs posts, comments and replies before the cutoff; standing is the community's call", async () => {
@@ -202,12 +223,14 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
       const season = { id: 2, name: 'Test season', startsAt: '2020-01-01 00:00:00', endsAt: '2020-02-01 00:00:00' }
       POINTS_SEASONS.push(season)
       globalThis.__achievementTestStandings = { rows: Array.from({ length: 12 }, (_, index) => ({ wallet_address: wallet(200 + index), rank: index === 11 ? null : index + 1 })) }
+      globalThis.__achievementTestStandings.rows[0].wallet_address = wallet(3)
       try {
         const standingsModule = 'data:text/javascript,export const getSeasonStandings = async () => globalThis.__achievementTestStandings'
         const source = (await readFile(new URL('../../lib/achievementRules.js', import.meta.url), 'utf8')).replace("'@/lib/points'", JSON.stringify(standingsModule))
         const { RULES: scopedRules } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
         const winners = await scopedRules['season-top-10']()
         assert.equal(winners.length, 10)
+        assert.ok(winners.some((winner) => winner.wallet === wallet(3)), 'a ranked AI agent earns the seasonal achievement')
         assert.ok(winners.every((winner) => winner.scope === '2'))
         await service.awardAchievement({ wallets: winners.map((row) => row.wallet), id: 'season-top-10', scope: '2', source: 'rule', notify: false })
         assert.deepEqual(await scopedRules['season-top-10'](), [])
