@@ -374,65 +374,58 @@ dialog.newPost {
   }
 }
 
+/* One item shows at its own shape, full width; several scroll sideways as a strip */
 .mediaGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 10px;
+  display: flex;
+  gap: 8px;
   margin: 4px 0 16px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  &--single {
+    overflow: visible;
+  }
 }
 
 .mediaItem {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  flex: 0 0 auto;
+  height: 260px;
+  aspect-ratio: 4 / 5;
+  max-width: 85%;
   overflow: hidden;
   margin: 0;
   background: var(--surface-muted);
   border: 1px solid var(--border);
   border-radius: 12px;
+  scroll-snap-align: start;
 
-  img,
-  video {
+  .mediaGrid--single & {
+    height: auto;
+    width: 100%;
+    max-width: 100%;
+    max-height: 520px;
+  }
+
+  &__media {
     display: block;
     width: 100%;
-    aspect-ratio: 1 / 1;
+    height: 100%;
     object-fit: cover;
+    transition: filter 0.2s ease;
   }
 
-  /* Actions sit under the media, always visible. They used to fade in on hover, floating over
-     the picture — there is no hover on a phone, and the always-on mobile fallback was white
-     pills over whatever the photo happened to be. */
-  figcaption {
-    display: flex;
-    gap: 6px;
-    padding: 6px;
-    border-top: 1px solid var(--border);
+  &--spoiler &__media {
+    filter: blur(24px) brightness(0.85);
   }
 
-  figcaption button {
-    flex: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    min-width: 0;
-    padding: 6px 4px;
-    color: var(--text-muted);
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.75rem;
-    white-space: nowrap;
-
-    &:hover {
-      color: inherit;
-      border-color: var(--text-muted);
-    }
-  }
-
-  &--uploading img,
-  &--uploading video {
+  &--uploading &__media {
     opacity: 0.55;
   }
 
@@ -440,11 +433,88 @@ dialog.newPost {
     border-color: #cb2e2e;
   }
 
+  &__spoilerLabel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 999px;
+    font-size: var(--font-size-14);
+    font-weight: 600;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    backdrop-filter: blur(6px);
+  }
+
+  &__altBadge {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    padding: 2px 6px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    pointer-events: none;
+  }
+
+  /* Round controls over the media: remove top-right, options bottom-left */
+  &__remove,
+  &__more {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: background 0.15s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.75);
+    }
+
+    &:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+  }
+
+  &__remove {
+    top: 10px;
+    right: 10px;
+  }
+
+  &__more {
+    bottom: 10px;
+    left: 10px;
+  }
+
+  &__more--retry {
+    background: #cb2e2e;
+
+    &:hover {
+      background: #a92424;
+    }
+  }
+
   /* Percent while uploading, "Upload failed" after — over the media, top-left */
   &__badge {
     position: absolute;
-    top: 8px;
-    left: 8px;
+    top: 12px;
+    left: 12px;
     padding: 2px 8px;
     color: #fff;
     background: rgba(0, 0, 0, 0.6);
@@ -460,10 +530,14 @@ dialog.newPost {
     background: #cb2e2e;
   }
 
-  /* A thin track between the media and the action row */
+  /* A thin track along the bottom edge of the media */
   &__progress {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
     height: 4px;
-    background: var(--border);
+    background: rgba(0, 0, 0, 0.35);
   }
 
   &__progressBar {
@@ -471,6 +545,174 @@ dialog.newPost {
     height: 100%;
     background: var(--network-color-primary, var(--color-primary));
     transition: width 0.15s linear;
+  }
+}
+
+.mediaMenu {
+  padding: 6px;
+  min-width: 240px;
+  border-radius: 16px;
+}
+
+.mediaMenu__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mediaMenu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 14px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  font-size: var(--font-size-16, 1rem);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--hover);
+  }
+}
+
+.altEditor {
+  flex-direction: column;
+  gap: 12px;
+  width: min(440px, calc(100vw - 48px));
+  padding: 20px;
+  color: var(--text);
+  background: var(--background);
+  border: 0;
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &[open] {
+    display: flex;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-16);
+  }
+
+  &__body {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-14);
+  }
+
+  &__input {
+    width: 100%;
+    padding: 10px 12px;
+    color: inherit;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font: inherit;
+    font-size: var(--font-size-14);
+    resize: vertical;
+
+    &:focus {
+      outline: none;
+      border-color: var(--text-muted);
+    }
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  &__cancel,
+  &__save {
+    padding: 0.45rem 1rem;
+    border-radius: 999px;
+    font-size: var(--font-size-14);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  &__cancel {
+    color: inherit;
+    background: transparent;
+    border: 1px solid var(--border);
+  }
+
+  &__save {
+    color: var(--background);
+    background: var(--text);
+    border: 1px solid var(--text);
+  }
+}
+
+/* Header Cancel's "Save to drafts?" sheet — stacked full-width actions split by hairlines */
+.closePrompt {
+  flex-direction: column;
+  width: min(420px, calc(100vw - 48px));
+  padding: 0;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--background);
+  border: 0;
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+
+  &[open] {
+    display: flex;
+  }
+
+  &__head {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 28px 28px 24px;
+    text-align: center;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--font-size-18, 1.1rem);
+    font-weight: 700;
+  }
+
+  &__body {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-16, 1rem);
+    line-height: 1.45;
+  }
+
+  &__action {
+    width: 100%;
+    padding: 18px;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    border-top: 1px solid var(--border);
+    font-size: var(--font-size-16, 1rem);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--hover);
+    }
+
+    &--primary {
+      font-weight: 700;
+    }
+
+    &--danger {
+      color: #ff3040;
+    }
   }
 }
 
@@ -533,10 +775,6 @@ dialog.newPost {
     border-color: #cb2e2e;
     background: rgba(203, 46, 46, 0.06);
   }
-}
-
-.spoiler {
-  filter: blur(10px);
 }
 
 /* ■■■ [Thread Parts] ■■■ */

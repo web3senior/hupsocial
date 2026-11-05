@@ -67,10 +67,12 @@
       }
     }
 
-    // Phones keep only the balance: Deposit lives inside its panel, New post in the footer nav,
-    // and the centred brand mark needs the room
+    // Phones drop the whole cluster: the balance and Deposit live on the profile, New post in the
+    // footer nav, and the centred brand mark needs the room
     &--primary,
-    &--create {
+    &--create,
+    &--balance,
+    &--loading {
       @include md-down() {
         display: none;
       }

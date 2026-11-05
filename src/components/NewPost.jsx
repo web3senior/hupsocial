@@ -8,7 +8,7 @@ import { gaslessCooldown, isGaslessEnabled, relayHupAction } from '@/lib/relayGa
 import { formatWait } from '@/config/gasless'
 import HupCommunityABI from '@/abis/HupCommunity'
 import { getCachedIdentityPrivKeyHex, unwrapContentKey, encryptPostContent } from '@/lib/communityVault'
-import { ArrowClockwiseIcon, ArticleIcon, BankIcon, CalendarDotsIcon, CaretDownIcon, CaretRightIcon, UsersThreeIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextBIcon, TextItalicIcon, ToolboxIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, ArticleIcon, BankIcon, CalendarDotsIcon, CaretDownIcon, CaretRightIcon, UsersThreeIcon, ChartLineUpIcon, CheckIcon, CoinsIcon, DotsThreeIcon, EyeSlashIcon, GifIcon, GlobeHemisphereWestIcon, BagIcon, ImageIcon, ImagesSquareIcon, ListChecksIcon, LockSimpleIcon, MicrophoneIcon, MonitorPlayIcon, PlusIcon, PuzzlePieceIcon, SlidersHorizontalIcon, StorefrontIcon, TextAaIcon, TextBIcon, TextItalicIcon, ToolboxIcon, TrashIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import abi from '@/abi/post.json'
 import { toast } from '@/components/NextToast'
 import { trackPostPublication } from '@/lib/postPublication'
@@ -237,6 +237,9 @@ const getMediaType = (file) => {
 // Premium raises the video ceiling only — an image that large is a mistake, not a perk.
 const getMaxSizeMb = (mediaType, isPremium = false) =>
   mediaType === 'video' ? (isPremium ? PREMIUM_VIDEO_MB : MAX_VIDEO_SIZE_MB) : MAX_MEDIA_SIZE_MB
+
+// Every attachment starts with a generated "Hup asset …" description; anything else the author wrote
+const hasCustomAlt = (item) => Boolean(item?.alt) && !item.alt.startsWith('Hup asset')
 
 const getMediaPreviewSrc = (item) =>
   item.localUrl || (item.type === 'image' ? resolveIPFSImageUrl(item.cid, { width: 800 }) : resolveIPFSUrl(item.cid))
@@ -1765,6 +1768,26 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
     )
   }
 
+  // Alt text editor: which tile it's describing, and the draft. Saving an empty draft falls back
+  // to the generated description so the post never ships an image with no alt at all.
+  const [altEditor, setAltEditor] = useState(null)
+  const altDialogRef = useRef(null)
+
+  const openAltEditor = (itemIndex, partId, item) => {
+    setAltEditor({ index: itemIndex, partId, draft: hasCustomAlt(item) ? item.alt : '', fallback: item.alt || '' })
+    altDialogRef.current?.open()
+  }
+
+  const saveAltText = () => {
+    if (!altEditor) return
+    const { index: itemIndex, partId, draft, fallback } = altEditor
+    const alt = draft.trim() || fallback
+    setPartContent(partId, (prevContent) =>
+      withMediaItems(prevContent, (items) => items.map((item, index) => (index === itemIndex ? { ...item, alt } : item)))
+    )
+    altDialogRef.current?.close()
+  }
+
   useEffect(() => {
     if (moderationWarning) moderationDialogRef.current?.open()
   }, [moderationWarning])
@@ -2412,6 +2435,34 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
   // only one draft slot — the post being written now owns it, not the one that already failed.
   const persistsDraft = mounted && canPersistDraft && !restoreState
 
+  // Header Cancel asks before leaving anything behind: a post that keeps a draft offers to save
+  // it (the autosave already did — "Don't save" is what clears it); one with no draft slot (edit,
+  // quote, recovered) can only be discarded. An empty composer just closes.
+  const closePromptRef = useRef(null)
+  const closeChoiceRef = useRef(null)
+  const hasAnyBody = hasPostBody || threadParts.some(partHasBody)
+  const requestClose = () => {
+    if (!hasAnyBody || isBusy) {
+      handleClose()
+      return
+    }
+    closeChoiceRef.current = null
+    closePromptRef.current?.open()
+  }
+  const resolveClosePrompt = () => {
+    const choice = closeChoiceRef.current
+    closeChoiceRef.current = null
+    if (!choice) return
+    if (choice === 'discard' && persistsDraft) {
+      try {
+        clearPostDrafts(draftScope)
+      } catch (error) {
+        console.error('Failed to clear post draft:', error)
+      }
+    }
+    handleClose()
+  }
+
   // Persist the draft so an accidental refresh doesn't lose it — restored via loadDraftContent()
   useEffect(() => {
     if (!persistsDraft) return
@@ -2464,26 +2515,40 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
   const renderMedia = (items, partId) => (
     <>
       {items.some((item) => item.type !== 'audio') && (
-        <div className={styles.mediaGrid}>
+        <div
+          className={clsx(styles.mediaGrid, {
+            [styles['mediaGrid--single']]: items.filter((item) => item.type !== 'audio').length === 1,
+          })}
+        >
           {items.map((item, index) => {
             if (item.type === 'audio') return null
             const mediaSrc = getMediaPreviewSrc(item)
             const isUploadingItem = isTransferring(item)
             const isFailedItem = item.status === 'failed'
             const percent = Math.floor((item.progress || 0) * 100)
+            const aspectRatio = item.width && item.height ? `${item.width} / ${item.height}` : undefined
             return (
               <figure
                 key={`${item.uploadId || item.cid || item.localUrl || index}`}
                 className={clsx(styles.mediaItem, {
                   [styles['mediaItem--uploading']]: isUploadingItem,
                   [styles['mediaItem--failed']]: isFailedItem,
+                  [styles['mediaItem--spoiler']]: item.spoiler,
                 })}
+                style={aspectRatio ? { aspectRatio } : undefined}
               >
                 {item.type === 'image' ? (
-                  <img src={mediaSrc} alt={item.alt || ''} className={item.spoiler ? styles.spoiler : undefined} />
+                  <img src={mediaSrc} alt={item.alt || ''} className={styles.mediaItem__media} />
                 ) : (
-                  <video src={mediaSrc} controls className={item.spoiler ? styles.spoiler : undefined} />
+                  <video src={mediaSrc} controls={!item.spoiler} className={styles.mediaItem__media} />
                 )}
+                {item.spoiler && (
+                  <span className={styles.mediaItem__spoilerLabel}>
+                    <EyeSlashIcon size={16} weight="bold" />
+                    Spoiler
+                  </span>
+                )}
+                {hasCustomAlt(item) && <span className={styles.mediaItem__altBadge}>ALT</span>}
                 {isUploadingItem && (
                   <span className={styles.mediaItem__badge}>
                     {item.status === 'optimizing' ? `Optimizing ${percent}%` : `${percent}%`}
@@ -2504,24 +2569,74 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
                     <span className={styles.mediaItem__progressBar} style={{ width: `${percent}%` }} />
                   </div>
                 )}
-                {/* Actions sit under the media, always visible — there is no hover on a phone */}
-                <figcaption>
-                  {isFailedItem ? (
-                    <button type="button" onClick={() => retryUpload(item.uploadId)}>
-                      <ArrowClockwiseIcon size={14} />
-                      <span>Retry</span>
-                    </button>
-                  ) : (
-                    <button type="button" onClick={() => toggleSpoiler(index, partId)}>
-                      <XIcon size={14} />
-                      <span>{item.spoiler ? 'Show' : 'Spoiler'}</span>
-                    </button>
-                  )}
-                  <button type="button" onClick={() => handleRemoveMedia(index, partId)}>
-                    <TrashIcon size={14} />
-                    <span>{isUploadingItem ? 'Cancel' : 'Remove'}</span>
+                {/* Controls float over the media and are always visible — there is no hover on a phone */}
+                <button
+                  type="button"
+                  className={styles.mediaItem__remove}
+                  onClick={() => handleRemoveMedia(index, partId)}
+                  aria-label={isUploadingItem ? 'Cancel upload' : 'Remove media'}
+                  title={isUploadingItem ? 'Cancel upload' : 'Remove'}
+                >
+                  <XIcon size={16} weight="bold" />
+                </button>
+                {isFailedItem ? (
+                  <button
+                    type="button"
+                    className={clsx(styles.mediaItem__more, styles['mediaItem__more--retry'])}
+                    onClick={() => retryUpload(item.uploadId)}
+                    aria-label="Retry upload"
+                    title="Retry upload"
+                  >
+                    <ArrowClockwiseIcon size={16} weight="bold" />
                   </button>
-                </figcaption>
+                ) : (
+                  <NativePopover
+                    placement="top-start"
+                    className={styles.mediaMenu}
+                    trigger={
+                      <button
+                        type="button"
+                        className={styles.mediaItem__more}
+                        onMouseDown={(e) => e.preventDefault()}
+                        aria-label="Media options"
+                        title="Media options"
+                      >
+                        <DotsThreeIcon size={20} weight="bold" />
+                      </button>
+                    }
+                  >
+                    {({ close }) => (
+                      <ul className={styles.mediaMenu__list}>
+                        <li>
+                          <button
+                            type="button"
+                            className={styles.mediaMenu__item}
+                            onClick={() => {
+                              close()
+                              toggleSpoiler(index, partId)
+                            }}
+                          >
+                            <span>{item.spoiler ? 'Remove spoiler' : 'Mark spoiler'}</span>
+                            <EyeSlashIcon size={22} />
+                          </button>
+                        </li>
+                        <li>
+                          <button
+                            type="button"
+                            className={styles.mediaMenu__item}
+                            onClick={() => {
+                              close()
+                              openAltEditor(index, partId, item)
+                            }}
+                          >
+                            <span>{hasCustomAlt(item) ? 'Edit alt text' : 'Add alt text'}</span>
+                            <TextAaIcon size={22} />
+                          </button>
+                        </li>
+                      </ul>
+                    )}
+                  </NativePopover>
+                )}
               </figure>
             )
           })}
@@ -2659,7 +2774,7 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
       onExited={finishClose}
     >
       <DialogHeader
-        onCancel={handleClose}
+        onCancel={requestClose}
         // Where the post lands, top right — only while no edit, reply, quote or community has fixed it
         actions={isChainPinned ? null : <NetworkSelect placement="bottom-end" />}
         title={
@@ -2741,7 +2856,7 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
           <div className={styles.composerRow}>
             {/* The avatar column carries the thread's rail down to "Add to thread", as Threads does */}
             <div className={styles.rail}>
-              <Profile variant="imageOnly" size={RAIL_AVATAR_SIZE} creator={signerAddress} className={styles.composerAvatar} />
+              <Profile variant="imageOnly" size={RAIL_AVATAR_SIZE} creator={signerAddress} fingerprint={false} className={styles.composerAvatar} />
               {canThread && <span className={styles.rail__line} aria-hidden="true" />}
             </div>
 
@@ -2977,7 +3092,7 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
             threadParts.map((part, index) => (
               <div key={part.id} className={clsx(styles.composerRow, styles['composerRow--part'])}>
                 <div className={styles.rail}>
-                  <Profile variant="imageOnly" size={RAIL_AVATAR_SIZE} creator={signerAddress} className={styles.composerAvatar} />
+                  <Profile variant="imageOnly" size={RAIL_AVATAR_SIZE} creator={signerAddress} fingerprint={false} className={styles.composerAvatar} />
                   <span className={styles.rail__line} aria-hidden="true" />
                 </div>
                 <div className={styles.composerBody}>
@@ -3146,6 +3261,85 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
           onClose={() => setShowSellNftModal(false)}
         />
       )}
+
+      <NativeDialog
+        ref={closePromptRef}
+        className={styles.closePrompt}
+        aria-label={persistsDraft ? 'Save to drafts?' : 'Discard post?'}
+        lightDismiss
+        onClick={(e) => e.stopPropagation()}
+        onCancel={(e) => e.stopPropagation()}
+        onClose={(e) => {
+          // Nested dialog: without this, closing the prompt also closes the composer
+          e.stopPropagation()
+          resolveClosePrompt()
+        }}
+      >
+        <div className={styles.closePrompt__head}>
+          <h3 className={styles.closePrompt__title}>{persistsDraft ? 'Save to drafts?' : 'Discard post?'}</h3>
+          <p className={styles.closePrompt__body}>
+            {persistsDraft ? 'Save to drafts to edit and post at a later time.' : "What you've written will be lost."}
+          </p>
+        </div>
+        {persistsDraft && (
+          <button
+            type="button"
+            className={clsx(styles.closePrompt__action, styles['closePrompt__action--primary'])}
+            onClick={() => {
+              closeChoiceRef.current = 'save'
+              closePromptRef.current?.close()
+            }}
+          >
+            Save
+          </button>
+        )}
+        <button
+          type="button"
+          className={clsx(styles.closePrompt__action, styles['closePrompt__action--danger'])}
+          onClick={() => {
+            closeChoiceRef.current = 'discard'
+            closePromptRef.current?.close()
+          }}
+        >
+          {persistsDraft ? "Don't save" : 'Discard'}
+        </button>
+        <button type="button" className={styles.closePrompt__action} onClick={() => closePromptRef.current?.close()}>
+          Cancel
+        </button>
+      </NativeDialog>
+
+      <NativeDialog
+        ref={altDialogRef}
+        className={styles.altEditor}
+        aria-label="Alt text"
+        onClick={(e) => e.stopPropagation()}
+        onCancel={(e) => e.stopPropagation()}
+        onClose={(e) => {
+          // Nested dialog: without this, closing the alt editor also closes the composer
+          e.stopPropagation()
+        }}
+        onExited={() => setAltEditor(null)}
+      >
+        <h3 className={styles.altEditor__title}>Alt text</h3>
+        <p className={styles.altEditor__body}>Describe this media for people who use screen readers.</p>
+        <textarea
+          className={styles.altEditor__input}
+          value={altEditor?.draft ?? ''}
+          onChange={(e) => setAltEditor((prev) => (prev ? { ...prev, draft: e.target.value } : prev))}
+          maxLength={1000}
+          rows={4}
+          placeholder="Describe what's in the image"
+          autoFocus
+        />
+        <div className={styles.altEditor__actions}>
+          <button type="button" className={styles.altEditor__cancel} onClick={() => altDialogRef.current?.close()}>
+            Cancel
+          </button>
+          <button type="button" className={styles.altEditor__save} onClick={saveAltText}>
+            Save
+          </button>
+        </div>
+      </NativeDialog>
 
       {moderationWarning && (
         <NativeDialog
