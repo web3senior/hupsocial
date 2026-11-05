@@ -8,6 +8,7 @@ import {
   HandCoinsIcon,
   HandshakeIcon,
   HeartIcon,
+  ListChecksIcon,
   LockKeyOpenIcon,
   NotePencilIcon,
   PulseIcon,
@@ -29,8 +30,8 @@ export const TABS = [
   {
     id: 'social',
     label: 'Social',
-    kinds: ['post', 'comment', 'repost', 'like', 'follow', 'community_created', 'community_joined'],
-    empty: 'No posts, likes, follows or communities yet.',
+    kinds: ['post', 'comment', 'repost', 'like', 'follow', 'community_created', 'community_joined', 'poll_created', 'poll_vote'],
+    empty: 'No posts, likes, follows, communities or polls yet.',
   },
   {
     id: 'nfts',
@@ -72,6 +73,8 @@ export const KIND_META = {
   sell_unlock: { icon: LockKeyOpenIcon, tone: 'money', weight: 'fill', previews: true, label: 'Key released' },
   task_posted: { icon: ToolboxIcon, tone: 'money', weight: 'fill', previews: true, label: 'Task posted' },
   task_paid: { icon: HandCoinsIcon, tone: 'money', weight: 'fill', previews: true, label: 'Task paid' },
+  poll_created: { icon: ListChecksIcon, tone: 'market', weight: 'bold', label: 'Poll opened' },
+  poll_vote: { icon: ListChecksIcon, tone: 'market', label: 'Vote' },
 }
 
 export function getKindMeta(kind) {
@@ -164,6 +167,7 @@ export function hrefOf(row) {
   if (kind === 'follow' && subject) return `/${subject}`
   if (kind === 'nft_sale' && networkId && entityId) return `/nfts/${networkId}/${entityId}`
   if (kind === 'bet' && networkId && entityId) return `/predict/${networkId}/${entityId}`
+  if (row.entity_type === 'poll' && networkId && entityId) return `/polls/${networkId}/${entityId}`
   if (kind === 'swap') return `${ARCO_URL}/swap`
   if (row.entity_type === 'drop' && networkId && entityId) return `/drops/${networkId}/${entityId}`
   if (row.entity_type === 'community' && networkId && entityId) return `/communities/${networkId}/${entityId}`

@@ -68,6 +68,7 @@ function subjectOf(row) {
   if (row.kind === 'swap') return `${row.meta?.token_in_symbol || '?'} → ${row.meta?.token_out_symbol || '?'}`
   if (row.kind === 'follow' && row.subject) return shortAddress(row.subject)
   if (row.entity_type === 'drop') return row.meta?.name || `drop #${row.entity_id}`
+  if (row.entity_type === 'poll') return row.meta?.question || `poll #${row.entity_id}`
   if (row.entity_type === 'post' && row.entity_id) return `post #${row.entity_id}`
   return ''
 }

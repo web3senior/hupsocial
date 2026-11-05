@@ -357,6 +357,21 @@ function Sentence({ row, amount, asset, nftName }) {
           ) : null}
         </>
       )
+    case 'poll_created':
+      return (
+        <>
+          {actor} <span className={styles.row__verb}>opened the poll</span>{' '}
+          <span className={styles.row__asset}>{row.meta?.question || `#${row.entity_id}`}</span>
+        </>
+      )
+    // Never the option picked — a running poll withholds standings, and choices are the tally.
+    case 'poll_vote':
+      return (
+        <>
+          {actor} <span className={styles.row__verb}>voted on</span>{' '}
+          <span className={styles.row__asset}>{row.meta?.question || `poll #${row.entity_id}`}</span>
+        </>
+      )
     case 'swap':
       return (
         <>

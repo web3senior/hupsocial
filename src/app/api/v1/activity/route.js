@@ -25,6 +25,8 @@
  *   mint                 drop_mints       — HupDrops writes no notification, and the mint row is
  *                                           the only place the quantity and what was paid live.
  *   drop_created         drops            — the same table names the collection both verbs print.
+ *   poll_created/        polls,           — HupPolls writes no notification; cidex's poll tables
+ *   poll_vote            poll_votes         carry the question, and the vote's choice stays out.
  *
  * Deferred verbs. Each becomes one more SOURCES entry when its turn comes; nothing else in this
  * file has to change.
@@ -52,6 +54,8 @@
  *   ALTER TABLE market_bets ADD KEY idx_market_bets_recent (bet_at);
  *   ALTER TABLE drop_mints ADD KEY idx_drop_mints_recent (minted_at);
  *   ALTER TABLE drops ADD KEY idx_drops_recent (created_at);
+ *   ALTER TABLE polls ADD KEY idx_polls_recent (opened_at);
+ *   ALTER TABLE poll_votes ADD KEY idx_poll_votes_recent (voted_at);
  * The drops pair ships as cidex/scripts/add-activity-drop-indexes.sql — drops already has
  * idx_drop_feed, but it leads with network_id and cannot order the whole table by created_at.
  */
@@ -320,6 +324,104 @@ const SOURCES = [
         `,
         params,
       }
+    },
+  },
+
+  // HupPolls emits no notification, so both verbs read cidex's own poll tables. Both timestamps
+  // are already unix seconds. A vote line never names the option picked: standings are withheld
+  // while a poll runs (see api/v1/polls/[id]), and a voter list with choices is the tally spelled
+  // out. The tx hash and log index ride the same gate — the calldata carries the choice.
+  {
+    id: 'polls',
+    kinds: ['poll_created', 'poll_vote'],
+    build: ({ kinds, networkId, before, limit }) => {
+      const branches = []
+
+      if (kinds.includes('poll_created')) {
+        const where = ['p.hidden = 0', 'p.metadata_fetched = 1']
+        const params = []
+
+        if (networkId !== null) {
+          where.push('p.network_id = ?')
+          params.push(networkId)
+        }
+        if (before !== null) {
+          where.push('p.opened_at < ?')
+          params.push(before)
+        }
+
+        params.push(limit)
+
+        branches.push({
+          sql: `
+            SELECT
+              ${text("'poll_created'")} AS kind,
+              ${text('p.creator')} AS actor,
+              ${text('NULL')} AS subject,
+              p.network_id AS network_id,
+              ${text("'poll'")} AS entity_type,
+              ${text('CAST(p.poll_id AS CHAR)')} AS entity_id,
+              p.opened_at AS ts,
+              ${text("CONCAT('poll:', p.id)")} AS uid,
+              p.block_number AS block_number,
+              ${text('p.tx_hash')} AS tx_hash,
+              p.log_index AS log_index,
+              ${text(`JSON_OBJECT(
+                'question', COALESCE(p.question, ''),
+                'option_count', p.option_count
+              )`)} AS meta
+            FROM polls p
+            WHERE ${where.join(' AND ')}
+            ORDER BY p.opened_at DESC
+            LIMIT ?
+          `,
+          params,
+        })
+      }
+
+      if (kinds.includes('poll_vote')) {
+        const where = ['p.hidden = 0', 'p.metadata_fetched = 1']
+        const params = []
+
+        if (networkId !== null) {
+          where.push('v.network_id = ?')
+          params.push(networkId)
+        }
+        if (before !== null) {
+          where.push('v.voted_at < ?')
+          params.push(before)
+        }
+
+        params.push(limit)
+
+        const votingClosed = '(p.closed_at > 0 OR p.closes_at <= UNIX_TIMESTAMP())'
+
+        branches.push({
+          sql: `
+            SELECT
+              ${text("'poll_vote'")} AS kind,
+              ${text('v.voter')} AS actor,
+              ${text('p.creator')} AS subject,
+              v.network_id AS network_id,
+              ${text("'poll'")} AS entity_type,
+              ${text('CAST(v.poll_id AS CHAR)')} AS entity_id,
+              v.voted_at AS ts,
+              ${text("CONCAT('pollvote:', v.id)")} AS uid,
+              v.block_number AS block_number,
+              ${text(`CASE WHEN ${votingClosed} THEN v.tx_hash ELSE NULL END`)} AS tx_hash,
+              CASE WHEN ${votingClosed} THEN v.log_index ELSE NULL END AS log_index,
+              ${text(`JSON_OBJECT('question', COALESCE(p.question, ''))`)} AS meta
+            FROM poll_votes v
+            JOIN polls p ON p.network_id = v.network_id AND p.poll_id = v.poll_id
+            WHERE ${where.join(' AND ')}
+            ORDER BY v.voted_at DESC
+            LIMIT ?
+          `,
+          params,
+        })
+      }
+
+      return branches
     },
   },
 
