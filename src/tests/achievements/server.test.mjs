@@ -20,7 +20,7 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
     const a = wallet(1)
     const b = wallet(2)
     await db.query('CREATE TABLE users (wallet_address VARCHAR(64) PRIMARY KEY, name TEXT, username TEXT, profileImage TEXT, tags TEXT, created_at DATETIME)')
-    await db.query('CREATE TABLE posts (wallet_address VARCHAR(64), is_comment BIGINT NULL, is_repost BIGINT NULL)')
+    await db.query('CREATE TABLE posts (wallet_address VARCHAR(64), is_comment BIGINT NULL, is_repost BIGINT NULL, created_at DATETIME NOT NULL)')
     await db.query('CREATE TABLE post_likes (liker_address VARCHAR(64))')
     await db.query('CREATE TABLE follows (follower_address VARCHAR(42), followed_address VARCHAR(42), is_following TINYINT)')
     await db.query('CREATE TABLE tips (tipper VARCHAR(42))')
@@ -54,12 +54,19 @@ test('achievement storage, concurrent awards, rules, nonce consumption and migra
     await t.test('automatic rules use qualifying activity, normalize addresses and exclude agents', async () => {
       await db.query('INSERT INTO users VALUES ?', [[
         [a, 'Human', null, null, '[]', '2026-11-03 12:00:00'],
-        [b, 'Later', null, null, '[]', '2026-11-04 00:00:00'],
+        [b, 'Later', null, null, '[]', '2026-11-05 00:00:00'],
         [wallet(3), 'Bot', null, null, '["ai-agent"]', '2026-11-01 00:00:00'],
         [wallet(4), 'Hosted', null, null, null, '2026-11-01 00:00:00'],
       ]])
       await db.execute('INSERT INTO hosted_agents VALUES (?)', [wallet(4)])
-      await db.query('INSERT INTO posts VALUES ?', [[[a.toUpperCase().replace('0X', '0x'), null, null], [b, 10, null], [wallet(3), null, null]]])
+      // OG: `a` posted before the cutoff; `b` only replied after it; wallet(5) only reposted before it;
+      // the bot posted early but agents never qualify.
+      await db.query('INSERT INTO posts VALUES ?', [[
+        [a.toUpperCase().replace('0X', '0x'), null, null, '2026-11-03 12:00:00'],
+        [b, 10, null, '2026-11-06 00:00:00'],
+        [wallet(5), null, 7, '2026-11-01 00:00:00'],
+        [wallet(3), null, null, '2026-11-01 00:00:00'],
+      ]])
       await db.query('INSERT INTO tips VALUES ?', [Array.from({ length: 50 }, () => [a])])
       await db.query('INSERT INTO post_likes VALUES ?', [Array.from({ length: 100 }, (_, i) => [wallet(i + 100)])])
       await db.query('INSERT INTO follows VALUES ?', [Array.from({ length: 100 }, (_, i) => [wallet(i + 100), a, 1]).concat([[wallet(999), b, 1]])])

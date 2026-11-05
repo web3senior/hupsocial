@@ -49,7 +49,9 @@ const tipsRule = (id, threshold) => () => newWinners(id,
   'SELECT LOWER(tipper) AS wallet FROM tips GROUP BY LOWER(tipper) HAVING COUNT(*) >= ?', [threshold])
 
 export const RULES = {
-  og: () => newWinners('og', 'SELECT LOWER(wallet_address) AS wallet FROM users WHERE created_at IS NOT NULL AND created_at < ?', [OG_CUTOFF]),
+  // A post or reply before the cutoff, never a repost. Read off the posts themselves, not the users
+  // row: that row can be written after a wallet's first post, and would cost an early poster OG.
+  og: () => newWinners('og', 'SELECT LOWER(wallet_address) AS wallet FROM posts WHERE is_repost IS NULL AND created_at < ?', [OG_CUTOFF]),
   'first-post': () => newWinners('first-post', 'SELECT LOWER(wallet_address) AS wallet FROM posts WHERE is_comment IS NULL AND is_repost IS NULL'),
   'first-tip': tipsRule('first-tip', 1),
   generous: tipsRule('generous', achievementById('generous').threshold),
