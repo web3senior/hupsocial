@@ -1,17 +1,16 @@
 /**
  * @file lib/follow.js
- * @description The one way the browser follows and unfollows (config/socialGraph.js). A follow is
- * offchain: the signed-in session writes it through api/v1/follows — one signature per week, then
- * every tap is instant and free, on any chain. The only onchain step left is undoing a LUKSO LSP26
- * follow: an unfollow of someone the viewer also follows there sends LSP26 `unfollow` from the
- * wallet, otherwise the onchain row would keep them listed as following.
+ * @description Universal Profiles follow through LUKSO's LSP26 registry. Other wallets use
+ * the signed-in offchain API. Existing mixed follows are cleared when unfollowing.
  */
 
-import { getConnection, switchChain, waitForTransactionReceipt, writeContract } from 'wagmi/actions'
+import { getConnection, getPublicClient, switchChain, waitForTransactionReceipt, writeContract } from 'wagmi/actions'
 import followerSystemAbi from '@/abis/LSP26FollowerSystem'
-import { SOCIAL_GRAPH_CHAIN_ID, socialGraphAddress } from '@/config/socialGraph'
+import { MAX_FOLLOW_TARGETS, SOCIAL_GRAPH_CHAIN_ID, socialGraphAddress } from '@/config/socialGraph'
 import { config } from '@/config/wagmi'
+import { isEvmAddress } from './address'
 import { clearChatToken, ensureChatSession } from './chatApi'
+import { isOnchainFollowAccount } from './followAccount'
 
 const json = async (response) => {
   const body = await response.json().catch(() => null)
@@ -25,15 +24,15 @@ const json = async (response) => {
 
 /**
  * Which of `targets` the viewer follows. `onchain` is the subset followed on LUKSO's LSP26.
- * @returns {Promise<{following: Set<string>, onchain: Set<string>}>} Lowercased addresses.
+ * @returns {Promise<{following: Set<string>, onchain: Set<string>, offchain: Set<string>}>} Lowercased addresses.
  */
 export const fetchFollowRelations = async (viewer, targets) => {
   const list = [...new Set(targets.map((target) => target.toLowerCase()))].filter((target) => target !== viewer?.toLowerCase())
-  if (!viewer || list.length === 0) return { following: new Set(), onchain: new Set() }
+  if (!viewer || list.length === 0) return { following: new Set(), onchain: new Set(), offchain: new Set() }
 
   const params = new URLSearchParams({ viewer, targets: list.join(',') })
   const data = await json(await fetch(`/api/v1/follows?${params}`, { cache: 'no-store' }))
-  return { following: new Set(data.following), onchain: new Set(data.onchain) }
+  return { following: new Set(data.following), onchain: new Set(data.onchain), offchain: new Set(data.offchain) }
 }
 
 const putFollows = (token, targets, following) =>
@@ -43,21 +42,35 @@ const putFollows = (token, targets, following) =>
     body: JSON.stringify({ targets, following }),
   }).then(json)
 
-// The wallet half of an unfollow: LSP26 on LUKSO, for the targets followed there
-const unfollowOnchain = async (targets) => {
+const setOnchainFollowing = async (client, address, targets, following) => {
+  if (targets.length === 0) return
   const registry = socialGraphAddress()
-  if (!registry || targets.length === 0) return
+  if (!registry) throw new Error('The LUKSO follow registry is not configured')
 
-  if (getConnection(config).chainId !== SOCIAL_GRAPH_CHAIN_ID) await switchChain(config, { chainId: SOCIAL_GRAPH_CHAIN_ID })
-  const hash = await writeContract(config, {
+  // LSP26 reverts the whole batch for an already-followed or not-followed target.
+  // Read the live registry because the indexer can lag behind a confirmed transaction.
+  const states = await Promise.all(targets.map((target) => client.readContract({
     address: registry,
     abi: followerSystemAbi,
-    functionName: targets.length === 1 ? 'unfollow' : 'unfollowBatch',
-    args: targets.length === 1 ? targets : [targets],
+    functionName: 'isFollowing',
+    args: [address, target],
+  })))
+  const changes = targets.filter((_, index) => states[index] !== following)
+  if (changes.length === 0) return
+
+  if (getConnection(config).chainId !== SOCIAL_GRAPH_CHAIN_ID) await switchChain(config, { chainId: SOCIAL_GRAPH_CHAIN_ID })
+  if (getConnection(config).address?.toLowerCase() !== address.toLowerCase()) throw new Error('Your wallet changed. Please try again')
+  const action = following ? 'follow' : 'unfollow'
+  const hash = await writeContract(config, {
+    account: address,
+    address: registry,
+    abi: followerSystemAbi,
+    functionName: changes.length === 1 ? action : `${action}Batch`,
+    args: changes.length === 1 ? changes : [changes],
     chainId: SOCIAL_GRAPH_CHAIN_ID,
   })
   const receipt = await waitForTransactionReceipt(config, { chainId: SOCIAL_GRAPH_CHAIN_ID, hash })
-  if (receipt.status !== 'success') throw new Error('The LUKSO unfollow did not go through')
+  if (receipt.status !== 'success') throw new Error(`The LUKSO ${action} did not go through`)
 }
 
 /**
@@ -70,10 +83,37 @@ const unfollowOnchain = async (targets) => {
  * @param {number} [params.chainId] The wallet's chain, passed to the sign-in.
  * @param {Iterable<string>} [params.onchain] Targets followed on LUKSO (fetchFollowRelations), whose
  *   unfollow also goes onchain.
- * @throws {Error} code 'ONCHAIN_UNFOLLOW_FAILED' when the offchain unfollow landed but the LUKSO one did not.
+ * @returns {Promise<{onchain: boolean}>} The confirmed route for the new follow state.
  */
 export const setFollowing = async ({ address, targets, following, signMessageAsync, chainId, onchain = [] }) => {
+  if (getConnection(config).address?.toLowerCase() !== address?.toLowerCase()) throw new Error('Your wallet changed. Please try again')
   const wallet = address.toLowerCase()
+  const uniqueTargets = [...new Set(targets.map((target) => target.toLowerCase()))].filter((target) => target !== wallet)
+  if (uniqueTargets.length === 0) throw new Error('Name at least one other account')
+  if (uniqueTargets.length > MAX_FOLLOW_TARGETS) throw new Error(`Follow up to ${MAX_FOLLOW_TARGETS} accounts at a time`)
+  if (!uniqueTargets.every(isEvmAddress)) throw new Error('Every account must be a wallet address')
+  const client = getPublicClient(config, { chainId: SOCIAL_GRAPH_CHAIN_ID })
+  const isProfile = await isOnchainFollowAccount(client, address)
+
+  if (isProfile) {
+    if (!following) {
+      const { offchain } = await fetchFollowRelations(address, uniqueTargets)
+      const legacyTargets = uniqueTargets.filter((target) => offchain.has(target))
+      if (legacyTargets.length > 0) await setOffchainFollowing(wallet, legacyTargets, false, signMessageAsync, chainId)
+    }
+    await setOnchainFollowing(client, address, uniqueTargets, following)
+    return { onchain: following }
+  }
+
+  await setOffchainFollowing(wallet, uniqueTargets, following, signMessageAsync, chainId)
+  if (!following) {
+    const onchainSet = new Set([...onchain].map((target) => target.toLowerCase()))
+    await setOnchainFollowing(client, address, uniqueTargets.filter((target) => onchainSet.has(target)), false)
+  }
+  return { onchain: false }
+}
+
+const setOffchainFollowing = async (wallet, targets, following, signMessageAsync, chainId) => {
   let token = await ensureChatSession(wallet, signMessageAsync, chainId, 'follow')
 
   try {
@@ -84,17 +124,5 @@ export const setFollowing = async ({ address, targets, following, signMessageAsy
     clearChatToken(wallet)
     token = await ensureChatSession(wallet, signMessageAsync, chainId, 'follow')
     await putFollows(token, targets, following)
-  }
-
-  if (following) return
-
-  const onchainSet = new Set([...onchain].map((target) => target.toLowerCase()))
-  const onchainTargets = targets.filter((target) => onchainSet.has(target.toLowerCase()))
-  try {
-    await unfollowOnchain(onchainTargets)
-  } catch (cause) {
-    const error = new Error(`Unfollowed on Hup, but the LUKSO follow is still onchain`, { cause })
-    error.code = 'ONCHAIN_UNFOLLOW_FAILED'
-    throw error
   }
 }

@@ -9,9 +9,9 @@ import { isEvmAddress, sameAddress } from '@/lib/address'
 import { toast } from '@/components/NextToast'
 
 /**
- * Whether the viewer follows `target`, and the toggle that flips it. Following is offchain and the
- * same on every chain (lib/follow.js); an unfollow also clears a LUKSO LSP26 follow when there is
- * one. Shared by the profile page, the profile hover card and the post activity list.
+ * Whether the viewer follows `target`, and the toggle that flips it. Universal Profiles use
+ * LUKSO LSP26; other wallets use offchain follows (lib/follow.js). Shared by the profile page,
+ * the profile hover card and the post activity list.
  * @param {string} target Wallet to follow.
  * @param {{ onConfirmed?: (following: boolean) => void }} [options] Runs after a follow/unfollow is saved.
  */
@@ -41,7 +41,7 @@ export function useFollowState(target, { onConfirmed } = {}) {
     setIsBusy(true)
     mutate({ ...relation, following: !wasFollowing }, { revalidate: false })
     try {
-      await setFollowing({
+      const confirmed = await setFollowing({
         address,
         targets: [target],
         following: !wasFollowing,
@@ -49,8 +49,8 @@ export function useFollowState(target, { onConfirmed } = {}) {
         chainId,
         onchain: relation.onchain ? [target] : [],
       })
-      // Trusted rather than re-read: an onchain unfollow reaches the table only once cidex indexes it
-      mutate({ following: !wasFollowing, onchain: wasFollowing ? false : relation.onchain }, { revalidate: false })
+      // Keep the confirmed result while cidex catches up with the onchain transaction.
+      mutate({ following: !wasFollowing, onchain: confirmed.onchain }, { revalidate: false })
       onConfirmed?.(!wasFollowing)
     } catch (error) {
       toast(error.shortMessage || error.message || 'Failed to update follow status', 'error')

@@ -7,7 +7,7 @@
  * row's Follow vs Following comes with the page that lists it.
  *
  * Rows the viewer doesn't follow yet carry a checkbox — the selection is followed in
- * one go from the action bar, offchain and free (lib/follow.js).
+ * one go from the action bar, using the connected wallet's follow route (lib/follow.js).
  */
 
 import Link from 'next/link'
@@ -194,7 +194,7 @@ const FollowListDialog = forwardRef(function FollowListDialog({ addr }, ref) {
     setIsBatchSending(true)
 
     try {
-      // Following someone already followed is a no-op offchain, so nothing needs weeding out first
+      // The shared follow helper filters existing relations before onchain batches.
       for (const batch of chunk(queue, MAX_FOLLOW_TARGETS)) {
         await setFollowing({ address, targets: batch, following: true, signMessageAsync, chainId })
         // Marked per batch, so the remainder stays selected if a later one fails
@@ -302,6 +302,7 @@ const ProfileRow = ({ profileAddress, following, isSelected, isBatchSending, onT
   const [isBusy, setIsBusy] = useState(false)
 
   const handleFollow = async () => {
+    if (isBusy || isBatchSending) return
     if (!isConnected) {
       toast(`Please connect wallet`, `error`)
       return
@@ -314,8 +315,8 @@ const ProfileRow = ({ profileAddress, following, isSelected, isBatchSending, onT
       await setFollowing({ address, targets: [profileAddress], following: !following, signMessageAsync, chainId, onchain })
     } catch (error) {
       toast(error.shortMessage || error.message || 'Failed to update follow status', 'error')
-      // Put the row back unless only the onchain half failed — the offchain change did land
-      if (error.code !== 'ONCHAIN_UNFOLLOW_FAILED') onFollowChanged?.([profileAddress], following)
+      // A failed onchain unfollow must remain retryable even if legacy offchain cleanup landed.
+      onFollowChanged?.([profileAddress], following)
     } finally {
       setIsBusy(false)
     }

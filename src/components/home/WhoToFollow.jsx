@@ -137,8 +137,8 @@ const SuggestionCard = ({ user }) => {
 }
 
 /**
- * One offchain follow (lib/follow.js). The list already leaves out anyone the viewer follows, so the
- * button starts at "Follow" and flips as soon as it is tapped; a failure flips it back with a word.
+ * One follow using the connected wallet's route (lib/follow.js). Suggestions exclude followed
+ * accounts, so the button starts at "Follow" and flips on tap; a failure flips it back.
  */
 const FollowButton = ({ target }) => {
   const { address, isConnected } = useConnection()
@@ -148,6 +148,7 @@ const FollowButton = ({ target }) => {
   const [isBusy, setIsBusy] = useState(false)
 
   const handleFollow = async () => {
+    if (isBusy || isFollowing) return
     if (!isConnected) {
       if (!openConnect()) toast(`Please connect wallet`, `error`)
       return

@@ -10,6 +10,7 @@ import {
   OFFCHAIN_FOLLOW_CONTRACT,
   OFFCHAIN_FOLLOW_NETWORK_ID,
   SOCIAL_GRAPH_CHAIN_ID,
+  socialGraphAddress,
 } from '@/config/socialGraph'
 
 export class FollowError extends Error {
@@ -102,21 +103,24 @@ export async function setFollows(db, follower, targets, following) {
  * Which of `targets` the viewer follows. `following` is every way of following (offchain, LUKSO, or
  * an older follow on another chain); `onchain` is the subset followed on LUKSO's LSP26, which an
  * unfollow has to undo there too.
- * @returns {Promise<{following: string[], onchain: string[]}>}
+ * @returns {Promise<{following: string[], onchain: string[], offchain: string[]}>}
  */
 export async function readFollowRelations(db, viewer, targets) {
   const placeholders = targets.map(() => '?').join(',')
   const [rows] = await db.execute(
-    `SELECT followed_address, MAX(network_id = ?) AS onchain
+    `SELECT followed_address,
+       MAX(network_id = ? AND contract_address = ?) AS onchain,
+       MAX(network_id = ? AND contract_address = ?) AS offchain
      FROM follows
      WHERE follower_address = ? AND is_following = 1 AND followed_address IN (${placeholders})
      GROUP BY followed_address`,
-    [SOCIAL_GRAPH_CHAIN_ID, viewer, ...targets],
+    [SOCIAL_GRAPH_CHAIN_ID, socialGraphAddress(), OFFCHAIN_FOLLOW_NETWORK_ID, OFFCHAIN_FOLLOW_CONTRACT, viewer, ...targets],
   )
 
   return {
     following: rows.map((row) => row.followed_address),
     onchain: rows.filter((row) => Number(row.onchain) === 1).map((row) => row.followed_address),
+    offchain: rows.filter((row) => Number(row.offchain) === 1).map((row) => row.followed_address),
   }
 }
 

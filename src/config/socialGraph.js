@@ -1,11 +1,9 @@
 /**
  * @file config/socialGraph.js
- * @description Where the follow graph lives. Following is offchain: a follow or unfollow is a row in
- * the `follows` table, written through the signed-in session (api/v1/follows), free and the same on
- * every chain. The one onchain follow system kept is LSP26 on LUKSO, the canonical registry the rest
- * of the Universal Profile ecosystem reads. cidex indexes it into the same table, so a LUKSO follow
- * made anywhere counts here too. Dependency-free apart from the contract map, so server routes and
- * the browser can both import it.
+ * @description Universal Profiles follow onchain through LUKSO's canonical LSP26 registry.
+ * Other wallets follow offchain through api/v1/follows. cidex indexes LSP26 into the same
+ * `follows` table as offchain rows, so lists, counts and feeds aggregate both routes.
+ * Dependency-free apart from the contract map, for server and browser imports.
  */
 
 import { CONTRACTS } from './contracts'
