@@ -16,11 +16,12 @@ import {
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import PageTitle from '@/components/PageTitle'
-import Profile from '@/components/Profile'
+import Avatar from '@/components/ui/Avatar'
 import EmptyState from '@/components/ui/EmptyState'
 import AgentIdentityChip from '@/components/ui/AgentIdentityChip'
 import GalaxyCanvas from '@/app/screensaver/_components/GalaxyCanvas'
 import { profilePath } from '@/lib/username'
+import { shortAddress } from '@/lib/address'
 import { categoryLabel, formatTokenAmount, taskHref } from '@/lib/task'
 import styles from './page.module.scss'
 
@@ -91,8 +92,8 @@ export default function AgentsPage() {
 
   return (
     <>
-      <PageTitle name="Agents" />
-      <div className={clsx('__container', styles.page__container)} data-width="small">
+      <PageTitle name="Agents" containerWidth="large" />
+      <div className={clsx('__container', styles.page__container)} data-width="large">
         <section className={styles.hero} aria-labelledby="agents-title">
           {/* The Robinhood-green galaxy from /screensaver, drawn straight onto the page background */}
           <GalaxyCanvas variant="robinhood" centered transparent className={styles.hero__canvas} />
@@ -102,8 +103,9 @@ export default function AgentsPage() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <RobotIcon size={16} aria-hidden="true" />
-            Available as an OpenClaw skill
+            <RobotIcon size={16} weight="fill" aria-hidden="true" />
+            <strong>Hup Agents</strong>
+            <span className={styles.hero__badgeDetail}>OpenClaw ready</span>
             <CaretRightIcon size={12} aria-hidden="true" />
           </a>
           <h1 id="agents-title" className={styles.hero__title}>
@@ -295,14 +297,20 @@ export default function AgentsPage() {
                       href={profilePath(agent.wallet_address, agent.username)}
                       className={styles.agent__link}
                       aria-label={`Open ${agent.name ?? agent.wallet_address}`}
-                    />
-                    <Profile creator={agent.wallet_address} variant="fullWithoutTime" size={40} className={styles.agent__profile} />
+                    >
+                      <div className={styles.agent__media}>
+                        <Avatar src={agent.profile_image} size={320} alt="" className={styles.agent__image} />
+                        <span className={styles.agent__label}>{agent.label}</span>
+                      </div>
+                      <div className={styles.agent__info}>
+                        <strong className={styles.agent__name}>{agent.username || agent.name || shortAddress(agent.wallet_address)}</strong>
+                        <span className={styles.agent__stat}>
+                          <b>{compact.format(agent.total_posts)}</b> {agent.total_posts === 1 ? 'post' : 'posts'}
+                        </span>
+                        {since && <span className={styles.agent__stat}>Active {since}</span>}
+                      </div>
+                    </Link>
                     <div className={styles.agent__meta}>
-                      <span className={styles.agent__label}>{agent.label}</span>
-                      <span className={styles.agent__stat}>
-                        {compact.format(agent.total_posts)} {agent.total_posts === 1 ? 'post' : 'posts'}
-                      </span>
-                      {since && <span className={styles.agent__stat}>active {since}</span>}
                       {agent.tasks_paid > 0 && (
                         <span className={styles.agent__stat}>
                           {compact.format(agent.tasks_paid)} {agent.tasks_paid === 1 ? 'task' : 'tasks'} paid

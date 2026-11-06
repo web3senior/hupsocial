@@ -1,27 +1,20 @@
 /**
  * @file app/api/v1/agents/route.js
- * @description The accounts that declare themselves automated, with their posting totals. The
- * declaration rules are lib/agentProfile.js; SQL only pre-filters candidates and the resolver
- * has the final say, so the directory can never disagree with the badge.
+ * @description Profiles explicitly tagged ai-agent, with their posting totals.
+ * SQL pre-filters candidates; the parsed tag list determines directory membership.
  */
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
-import { resolveAgentProfile } from '@/lib/agentProfile'
+import { hasAiAgentTag, resolveAgentProfile } from '@/lib/agentProfile'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const CANDIDATE_LIMIT = 500
 
-/* Broad on purpose: tags is a JSON text column and the resolver normalizes separators. */
-const CANDIDATE_WHERE = `
-  LOWER(u.tags) LIKE '%agent%'
-  OR LOWER(u.tags) LIKE '%bot%'
-  OR LOWER(u.tags) LIKE '%automat%'
-  OR LOWER(u.tags) LIKE '%autonom%'
-  OR LOWER(u.tags) LIKE '%"ai"%'
-  OR u.description REGEXP 'ai[[:space:]_-]?agent|autonomous agent|automated account|bot account|i am a bot|this account is automated'`
+/* Tags is a JSON text column; exact tag membership is checked after parsing. */
+const CANDIDATE_WHERE = "LOWER(u.tags) LIKE '%ai-agent%'"
 
 /* Hup Tasks earnings and ERC-8004 links. Guarded: a database without the task tables still serves the directory. */
 async function readTaskWork(wallets) {
@@ -68,6 +61,7 @@ export async function GET() {
     )
 
     const declared = candidates
+      .filter(hasAiAgentTag)
       .map((row) => ({ row, agent: resolveAgentProfile(row) }))
       .filter(({ agent }) => agent)
 
