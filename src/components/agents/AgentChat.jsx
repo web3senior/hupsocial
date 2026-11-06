@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { useConnection } from 'wagmi'
-import { ArrowRightIcon, ArrowUpIcon, CheckIcon, PencilSimpleIcon, PlusIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
+import { ArrowRightIcon, ArrowUpIcon, CheckIcon, PaperclipIcon, PencilSimpleIcon, PlusIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 import { ContentSpinner, ThinkingOrb } from '@/components/Loading'
 import { toast } from '@/components/NextToast'
 import NativeDialog from '@/components/ui/NativeDialog'
@@ -12,6 +12,10 @@ import { onboardingChainId } from '@/config/gasless'
 import { renderMarkdown } from '@/lib/markdown'
 import { carryOutProposal, deleteAgentSession, fetchAgent, resolveAgentProposal, streamAgentChat } from '@/lib/agentWallet'
 import { AGENT_POST_MAX } from '@/lib/hostedAgentMessages'
+import { EDITABLE_PROPOSAL_KINDS, PROPOSAL_FILE_MAX, PROPOSAL_FILE_MAX_BYTES, proposalFileType } from '@/lib/agentProposalContent'
+import { uploadFileToIPFS } from '@/lib/ipfs'
+import { resolveIPFSUrl } from '@/lib/storageHelper'
+import MediaGallery from '@/components/Gallery'
 import styles from './AgentChat.module.scss'
 
 const isCancel = (error) => error?.code === 4001 || error?.name === 'UserRejectedRequestError'
@@ -49,7 +53,7 @@ const readProfile = (value) => {
 }
 
 // Cards whose words the owner may change before approving; the rest act on fixed targets
-const EDITABLE_KINDS = new Set(['post', 'edit', 'reply'])
+const EDITABLE_KINDS = EDITABLE_PROPOSAL_KINDS
 
 // A tip or transfer names its network by id; the card shows its coin and name
 const chainOf = (networkId) => config.chains.find((item) => item.id === Number(networkId)) ?? null
@@ -201,17 +205,25 @@ export default function AgentChat({ token, agent, initialSession = null }) {
     }
   }
 
-  // `text` is the owner's edited wording of a post, edit or reply card, when they changed it
-  const approve = async (proposal, text = null) => {
+  const saveProposal = async (proposal, changes) => {
+    await resolveAgentProposal(token, agent.address, proposal.id, { status: 'pending', ...changes })
+    setProposalStatus(proposal.id, 'pending', changes)
+    toast('Draft updated', 'success')
+  }
+
+  const approve = async (proposal, changes = null) => {
     if (!chain) {
       toast('Agent posting is not set up on this deployment', 'error')
       return
     }
-    const edited = text !== null && text !== proposal.text ? text : null
-    const toCarryOut = edited ? { ...proposal, text: edited } : proposal
+    const toCarryOut = changes ? { ...proposal, ...changes } : proposal
     setProposalStatus(proposal.id, 'publishing')
     let result
     try {
+      if (changes) {
+        await resolveAgentProposal(token, agent.address, proposal.id, { status: 'pending', ...changes })
+        setProposalStatus(proposal.id, 'publishing', changes)
+      }
       result = await carryOutProposal({ agent, proposal: toCarryOut, chain, owner })
     } catch (error) {
       setProposalStatus(proposal.id, 'pending')
@@ -219,10 +231,10 @@ export default function AgentChat({ token, agent, initialSession = null }) {
       return
     }
 
-    setProposalStatus(proposal.id, 'published', { txHash: result.txHash, text: toCarryOut.text })
+    setProposalStatus(proposal.id, 'published', { txHash: result.txHash, text: toCarryOut.text, attachments: toCarryOut.attachments ?? [] })
     toast(`${agent.name} ${CARD_COPY[proposal.kind ?? 'post'].success}`, 'success')
     // Done onchain either way; a failed record only means the card may show as pending after a reload
-    resolveAgentProposal(token, agent.address, proposal.id, { status: 'published', ...result, ...(edited ? { text: edited } : {}) }).catch(() => {})
+    resolveAgentProposal(token, agent.address, proposal.id, { status: 'published', ...result, ...(changes ?? {}) }).catch(() => {})
   }
 
   // Messages and drafts in the order they happened. Sort is stable, so a reply and the draft it
@@ -287,7 +299,7 @@ export default function AgentChat({ token, agent, initialSession = null }) {
         {messages !== null &&
           timeline.map((item) =>
             item.kind === 'proposal' ? (
-              <ProposalCard key={item.key} proposal={item.proposal} onApprove={approve} onDiscard={discard} />
+              <ProposalCard key={item.key} proposal={item.proposal} onApprove={approve} onDiscard={discard} onSave={saveProposal} uploadAddress={owner} />
             ) : item.content ? (
               <div key={item.key} className={clsx(styles.chat__message, styles[`chat__message--${item.role}`])}>
                 {item.role === 'assistant' ? (
@@ -330,7 +342,7 @@ export default function AgentChat({ token, agent, initialSession = null }) {
   )
 }
 
-function ProposalCard({ proposal, onApprove, onDiscard }) {
+function ProposalCard({ proposal, onApprove, onDiscard, onSave, uploadAddress }) {
   const isPublishing = proposal.status === 'publishing'
   const kind = proposal.kind ?? 'post'
   const copy = CARD_COPY[kind]
@@ -338,9 +350,78 @@ function ProposalCard({ proposal, onApprove, onDiscard }) {
   const canEdit = EDITABLE_KINDS.has(kind) && isPending
   // null while the card shows the draft as written; the owner's wording while editing
   const [editText, setEditText] = useState(null)
+  const [editAttachments, setEditAttachments] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
+  const fileRef = useRef(null)
+  const uploadRef = useRef(null)
+  useEffect(() => () => uploadRef.current?.abort(), [])
   const isEditing = canEdit && editText !== null
+  const attachments = isEditing ? (editAttachments ?? proposal.attachments ?? []) : (proposal.attachments ?? [])
+  const isWorking = isPublishing || isSaving || isUploading
   const trimmed = editText?.trim() ?? ''
   const isEditValid = !isEditing || (trimmed.length > 0 && trimmed.length <= AGENT_POST_MAX)
+  const changes = { text: trimmed, attachments }
+
+  const startEdit = () => {
+    setEditText(proposal.text ?? '')
+    setEditAttachments(proposal.attachments ?? [])
+  }
+  const cancelEdit = () => {
+    setEditText(null)
+    setEditAttachments(null)
+  }
+  const save = async () => {
+    if (isWorking || !isEditValid) return
+    setIsSaving(true)
+    try {
+      await onSave(proposal, changes)
+      cancelEdit()
+    } catch (error) {
+      toast(error.message, 'error')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+  const attach = async (event) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    if (!files.length || isWorking) return
+    if (files.length + attachments.length > PROPOSAL_FILE_MAX) {
+      toast(`Attach up to ${PROPOSAL_FILE_MAX} files`, 'error')
+      return
+    }
+    if (files.some((file) => !file.size || file.size > PROPOSAL_FILE_MAX_BYTES || file.name.length > 255)) {
+      toast('Choose non-empty files up to 10 MB, with names under 256 characters', 'error')
+      return
+    }
+    if (!isEditing) startEdit()
+    const controller = new AbortController()
+    uploadRef.current = controller
+    setIsUploading(true)
+    try {
+      for (const [index, file] of files.entries()) {
+        setUploadProgress(`Uploading ${index + 1}/${files.length}…`)
+        const cid = await uploadFileToIPFS(file, {
+          address: uploadAddress,
+          signal: controller.signal,
+          onProgress: (fraction) => setUploadProgress(`Uploading ${index + 1}/${files.length} · ${Math.floor(fraction * 100)}%`),
+        })
+        if (controller.signal.aborted) return
+        const attachment = { cid, type: proposalFileType(file), name: file.name, mimeType: file.type, size: file.size, storage: 'IPFS' }
+        setEditAttachments((current) => [...(current ?? proposal.attachments ?? []), attachment])
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) toast(error.message || 'The file could not be uploaded', 'error')
+    } finally {
+      if (!controller.signal.aborted) {
+        setIsUploading(false)
+        setUploadProgress('')
+      }
+      uploadRef.current = null
+    }
+  }
 
   return (
     <div className={clsx(styles.proposal, styles[`proposal--${proposal.status}`], styles[`proposal--${kind}`])}>
@@ -371,7 +452,7 @@ function ProposalCard({ proposal, onApprove, onDiscard }) {
             maxLength={AGENT_POST_MAX}
             rows={Math.min(12, Math.max(3, editText.split('\n').length + 1))}
             aria-label="Edit the draft"
-            disabled={isPublishing}
+            disabled={isWorking}
             autoFocus
           />
           <span className={clsx(styles.proposal__count, trimmed.length > AGENT_POST_MAX && styles['proposal__count--over'])}>
@@ -386,6 +467,31 @@ function ProposalCard({ proposal, onApprove, onDiscard }) {
           </p>
         )
       )}
+      {attachments.length > 0 && (
+        <div className={styles.proposal__attachments}>
+          <MediaGallery data={attachments.filter((item) => item.type !== 'file')} />
+          {attachments.map((item, index) => (
+            <div key={`${item.cid}-${index}`} className={styles.proposal__attachment}>
+              <a href={resolveIPFSUrl(item.cid)} target="_blank" rel="noopener noreferrer">{item.name}</a>
+              {canEdit && (
+                <button type="button" className={styles.proposal__remove} disabled={isWorking} aria-label={`Remove ${item.name}`} onClick={() => {
+                  if (!isEditing) startEdit()
+                  setEditAttachments(attachments.filter((_, position) => position !== index))
+                }}>
+                  <XIcon size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {canEdit && (
+        <>
+          <input ref={fileRef} className={styles.proposal__fileInput} type="file" multiple onChange={attach} disabled={isWorking} aria-label="Attach files to draft" />
+          <span className={styles.proposal__hint}>Up to {PROPOSAL_FILE_MAX} files · 10 MB each</span>
+          {isUploading && <span className={styles.proposal__upload} role="status"><ContentSpinner size={14} /> {uploadProgress}</span>}
+        </>
+      )}
       {proposal.status === 'published' ? (
         <span className={styles.proposal__done}>
           <CheckIcon size={14} /> {copy.done}
@@ -395,26 +501,36 @@ function ProposalCard({ proposal, onApprove, onDiscard }) {
       ) : (
         <div className={styles.proposal__actions}>
           {isEditing ? (
-            <button type="button" className={styles.proposal__discard} onClick={() => setEditText(null)} disabled={isPublishing}>
+            <button type="button" className={styles.proposal__discard} onClick={cancelEdit} disabled={isWorking}>
               Cancel edit
             </button>
           ) : (
             <>
-              <button type="button" className={styles.proposal__discard} onClick={() => onDiscard(proposal)} disabled={isPublishing}>
+              <button type="button" className={styles.proposal__discard} onClick={() => onDiscard(proposal)} disabled={isWorking}>
                 <XIcon size={14} /> Discard
               </button>
               {canEdit && (
-                <button type="button" className={styles.proposal__discard} onClick={() => setEditText(proposal.text ?? '')} disabled={isPublishing}>
+                <button type="button" className={styles.proposal__discard} onClick={startEdit} disabled={isWorking}>
                   <PencilSimpleIcon size={14} /> Edit
                 </button>
               )}
             </>
           )}
+          {canEdit && (
+            <button type="button" className={styles.proposal__discard} onClick={() => fileRef.current?.click()} disabled={isWorking || attachments.length >= PROPOSAL_FILE_MAX}>
+              <PaperclipIcon size={14} /> Attach files
+            </button>
+          )}
+          {isEditing && (
+            <button type="button" className={styles.proposal__discard} onClick={save} disabled={isWorking || !isEditValid}>
+              {isSaving ? <ContentSpinner size={14} /> : <CheckIcon size={14} />} Save changes
+            </button>
+          )}
           <button
             type="button"
             className={styles.proposal__approve}
-            onClick={() => onApprove(proposal, isEditing ? trimmed : null)}
-            disabled={isPublishing || !isEditValid}
+            onClick={() => onApprove(proposal, isEditing ? changes : null)}
+            disabled={isWorking || !isEditValid}
           >
             {isPublishing ? <ContentSpinner size={14} /> : <CheckIcon size={14} />} {copy.approve}
           </button>

@@ -1,6 +1,21 @@
 .galleryWrapper {
 }
 
+.gallery__files {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.gallery__file {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--global-border-radius);
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+
 // A host can retune the tiles through --gallery-radius, --gallery-strip-height and --gallery-gap
 // (a post sets Threads' 8px / 280px / 6px); everywhere else keeps these defaults.
 .mediaItem {

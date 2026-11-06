@@ -1,6 +1,6 @@
 /**
  * @file app/api/v1/agents/hosted/[address]/proposals/[id]/route.js
- * @description Records what the owner did with one of their agent's drafts: published (with the
+ * @description Saves owner edits to a pending draft, or records its resolution: published (with the
  * transaction the browser sent) or discarded. Publishing itself never happens here — the agent's
  * key lives only in the owner's browser.
  */

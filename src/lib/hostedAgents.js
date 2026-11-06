@@ -21,6 +21,7 @@ import { getServerProvider } from '@/lib/serverRpc'
 import { DEFAULT_AGENT_MODEL, isAgentModel } from '@/config/agentModels'
 import { AVATAR_MAX_SIZE, resolveAvatarImageUrl } from '@/lib/storageHelper'
 import { BOT_TRAITS, isBotTraits } from '@/lib/botAvatar'
+import { EDITABLE_PROPOSAL_KINDS, proposalAttachmentsSchema } from '@/lib/agentProposalContent'
 
 export const MEMORY_MAX = 12000
 
@@ -358,12 +359,18 @@ export const appendMessage = async (address, role, content, sessionId) => {
 
 const PROPOSAL_HISTORY = 20
 
+const readAttachments = (value) => {
+  if (!value) return []
+  return typeof value === 'string' ? JSON.parse(value) : value
+}
+
 const toProposal = (row) => ({
   id: Number(row.id),
   kind: row.kind,
   postId: row.post_id === null ? null : String(row.post_id),
   networkId: row.network_id === null ? null : Number(row.network_id),
   text: row.text,
+  attachments: readAttachments(row.attachments),
   originalText: row.original_text,
   allowComments: row.allow_comments === null ? null : Boolean(row.allow_comments),
   // A tip or transfer: how much of the network's coin, and to whom
@@ -417,16 +424,17 @@ export const readProposals = async (address, { sessionId = null, limit = PROPOSA
 }
 
 const resolveSchema = z.object({
-  status: z.enum(['published', 'discarded']),
+  status: z.enum(['pending', 'published', 'discarded']),
   // Null for a profile change, which is a signed save rather than a transaction
   txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).nullish(),
   networkId: z.number().int().positive().nullish(),
   // The words as published, when the owner edited a post, edit or reply card before approving
   text: z.string().trim().min(1).max(AGENT_POST_MAX).nullish(),
+  attachments: proposalAttachmentsSchema.optional(),
 })
 
 // Cards whose words the owner may change before approving
-const EDITABLE_KINDS = new Set(['post', 'edit', 'reply'])
+const EDITABLE_KINDS = EDITABLE_PROPOSAL_KINDS
 
 /**
  * Records what the owner did with a draft. Only a pending draft changes, so a published post can
@@ -438,16 +446,31 @@ export const resolveProposal = async (owner, address, id, input) => {
   if (!parsed.success) throw new AgentError(400, 'Invalid change')
 
   const agent = await getAgent(owner, address)
-  const [[draft]] = await pool.execute('SELECT kind, text FROM agent_proposals WHERE id = ? AND agent_address = ?', [Number(id), agent.address])
+  const [[draft]] = await pool.execute('SELECT kind, text, attachments, status FROM agent_proposals WHERE id = ? AND agent_address = ?', [Number(id), agent.address])
   if (!draft) throw new AgentError(404, 'Draft not found')
+  if (draft.status !== 'pending') throw new AgentError(409, 'This draft was already handled')
+  const hasContent = parsed.data.text != null || parsed.data.attachments !== undefined
+  if (hasContent && !EDITABLE_KINDS.has(draft.kind)) throw new AgentError(400, 'This proposal cannot be edited')
+  if (parsed.data.status === 'pending') {
+    if (!hasContent || parsed.data.txHash != null || parsed.data.networkId != null) throw new AgentError(400, 'Invalid change')
+    const text = parsed.data.text ?? draft.text
+    const attachments = parsed.data.attachments ?? readAttachments(draft.attachments)
+    const [result] = await pool.execute(
+      "UPDATE agent_proposals SET text = ?, attachments = ? WHERE id = ? AND agent_address = ? AND status = 'pending'",
+      [text, JSON.stringify(attachments), Number(id), agent.address],
+    )
+    if (result.affectedRows === 0) throw new AgentError(409, 'This draft was already handled')
+    return
+  }
   // A profile change is a signed save, not a transaction; everything else published has a hash
   if (parsed.data.status === 'published' && draft.kind !== 'profile' && !parsed.data.txHash) throw new AgentError(400, 'Invalid change')
 
   const { status, txHash = null, networkId = null } = parsed.data
   const text = status === 'published' && EDITABLE_KINDS.has(draft.kind) && parsed.data.text ? parsed.data.text : draft.text
+  const attachments = status === 'published' && parsed.data.attachments !== undefined ? parsed.data.attachments : readAttachments(draft.attachments)
   const [result] = await pool.execute(
-    "UPDATE agent_proposals SET status = ?, tx_hash = ?, network_id = ?, text = ? WHERE id = ? AND agent_address = ? AND status = 'pending'",
-    [status, txHash, networkId, text, Number(id), agent.address],
+    "UPDATE agent_proposals SET status = ?, tx_hash = ?, network_id = ?, text = ?, attachments = ? WHERE id = ? AND agent_address = ? AND status = 'pending'",
+    [status, txHash, networkId, text, JSON.stringify(attachments), Number(id), agent.address],
   )
   if (result.affectedRows === 0) throw new AgentError(409, 'This draft was already handled')
 

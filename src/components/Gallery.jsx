@@ -76,8 +76,9 @@ export default function MediaGallery({ data = [] }) {
   const hoverAnchorRef = useRef(null)
   const hoverMediaRef = useRef(null)
 
-  const visualData = data.filter((item) => item.type !== 'audio')
+  const visualData = data.filter((item) => item.type !== 'audio' && item.type !== 'file')
   const audioData = data.filter((item) => item.type === 'audio')
+  const fileData = data.filter((item) => item.type === 'file')
   const isCarousel = visualData.length > 1
   const isLightboxOpen = selectedIndex !== null
 
@@ -709,6 +710,16 @@ export default function MediaGallery({ data = [] }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {fileData.length > 0 && (
+        <div className={styles.gallery__files}>
+          {fileData.map((item, index) => (
+            <a key={`${item.cid}-${index}`} className={styles.gallery__file} href={resolveIPFSUrl(item.cid)} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()}>
+              {item.name || 'Download file'}
+            </a>
+          ))}
         </div>
       )}
 

@@ -15,6 +15,7 @@ import { config, CONTRACTS } from '@/config/wagmi'
 import hupAbi from '@/abi/post.json'
 import { ContentType } from './content'
 import { uploadFileToIPFS, uploadObjectToIPFS, withAuthor } from './ipfs'
+import { proposalElements } from './agentProposalContent'
 import { hexToBytes } from '@noble/hashes/utils.js'
 import { deriveChildV2, KEY_LABELS } from './keyDerivationV2.mjs'
 import { deriveKeyFromMasterV2, ensureMasterV2, rejectMasterV2 } from './keyVaultV2'
@@ -217,7 +218,7 @@ export const updateAgent = async (token, address, changes) =>
 
 /**
  * Records the owner's decision on a draft: `{ status: 'discarded' }`, or `{ status: 'published',
- * txHash, networkId }` once the post is sent.
+ * txHash, networkId }` once the post is sent, or `{ status: 'pending', text, attachments }` to save edits.
  */
 export const resolveAgentProposal = async (token, address, id, decision) =>
   readJson(
@@ -685,16 +686,13 @@ const tipFromAgent = async ({ wallet, chain, postId, amount }) => {
  * label in the metadata — every agent post says so itself, not only its profile.
  * @returns {Promise<string>} The metadata URI.
  */
-const pinAgentContent = async (wallet, text, author = wallet.address) => {
+const pinAgentContent = async (wallet, text, author = wallet.address, attachments = []) => {
   const body = String(text ?? '').trim()
   if (!body || body.length > AGENT_POST_MAX) throw new Error(`A post needs text of at most ${AGENT_POST_MAX} characters`)
 
   const content = {
     version: '1',
-    elements: [
-      { type: 'text', data: { text: body } },
-      { type: 'media', data: { items: [] } },
-    ],
+    elements: proposalElements({ text: body, attachments }),
     // Posting as its owner's profile, the post still names the agent that wrote it
     agent: author === wallet.address ? { kind: 'ai-agent' } : { kind: 'ai-agent', address: wallet.address },
   }
@@ -815,11 +813,11 @@ export const carryOutProposal = async ({ agent, proposal, chain, owner = null })
 
   let txHash
   if (asProfile) {
-    const metadata = await pinAgentContent(wallet, proposal.text, owner)
+    const metadata = await pinAgentContent(wallet, proposal.text, owner, proposal.attachments)
     const parentId = proposal.kind === 'reply' ? BigInt(proposal.postId) : 0n
     txHash = await postAsProfile({ wallet, profile: owner, canRelay: grant.canRelay, metadata, parentId })
   } else if (proposal.kind === 'reply') {
-    const metadata = await pinAgentContent(wallet, proposal.text)
+    const metadata = await pinAgentContent(wallet, proposal.text, wallet.address, proposal.attachments)
     const args = [wallet.address, ContentType.Comment, metadata, BigInt(proposal.postId), true]
     txHash = await sendAgentAction({ wallet, chain: target, functionName: 'create', args, verb: 'replying' })
   } else if (proposal.kind === 'like') {
@@ -827,10 +825,10 @@ export const carryOutProposal = async ({ agent, proposal, chain, owner = null })
   } else if (proposal.kind === 'tip') {
     txHash = await tipFromAgent({ wallet, chain: target, postId: proposal.postId, amount: proposal.amount })
   } else if (proposal.kind === 'post') {
-    const metadata = await pinAgentContent(wallet, proposal.text)
+    const metadata = await pinAgentContent(wallet, proposal.text, wallet.address, proposal.attachments)
     txHash = await sendAgentAction({ wallet, chain: target, functionName: 'create', args: [wallet.address, ContentType.Post, metadata, 0n, true], verb: 'posting' })
   } else if (proposal.kind === 'edit') {
-    const metadata = await pinAgentContent(wallet, proposal.text)
+    const metadata = await pinAgentContent(wallet, proposal.text, wallet.address, proposal.attachments)
     const args = [wallet.address, BigInt(proposal.postId), metadata, proposal.allowComments ?? true]
     txHash = await sendAgentAction({ wallet, chain: target, functionName: 'update', args, verb: 'editing' })
   } else {
