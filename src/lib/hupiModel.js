@@ -32,7 +32,7 @@ export const createModelClient = () => {
  * (2,000,000 credits to the dollar); hosted agents are billed from it, Hupi ignores it.
  * @returns {Promise<{text: string, calls: object[], creditsUsed: number}>}
  */
-export const streamRound = async ({ client, model, messages, tools, signal, onText, maxCompletionTokens = DEFAULT_MAX_COMPLETION_TOKENS }) => {
+export const streamRound = async ({ client, model, messages, tools, signal, onText, maxCompletionTokens = DEFAULT_MAX_COMPLETION_TOKENS, suppressToolMarkup = false }) => {
   const reasoningEffort = process.env.AIMLAPI_REASONING_EFFORT || DEFAULT_REASONING_EFFORT
   const stream = await client.chat.completions.create(
     {
@@ -50,14 +50,41 @@ export const streamRound = async ({ client, model, messages, tools, signal, onTe
   let text = ''
   let creditsUsed = 0
   const calls = []
+  let pendingText = ''
+  let toolMarkup = ''
+  const emitText = (piece, done = false) => {
+    if (!suppressToolMarkup) {
+      text += piece
+      onText(piece)
+      return
+    }
+    if (toolMarkup) {
+      toolMarkup += piece
+      return
+    }
+    pendingText += piece
+    const marker = /<[｜|]\s*DSML\s*[｜|]/i.exec(pendingText)
+    if (marker) {
+      toolMarkup = pendingText.slice(marker.index)
+      pendingText = pendingText.slice(0, marker.index)
+    }
+    // Hold a possible opening token across chunk boundaries, without delaying normal prose.
+    const opening = pendingText.lastIndexOf('<')
+    const hold = !done && !toolMarkup && opening >= 0 && /^<[｜|]?\s*[DSML]*\s*$/i.test(pendingText.slice(opening))
+    const visible = hold ? pendingText.slice(0, opening) : pendingText
+    pendingText = hold ? pendingText.slice(opening) : ''
+    if (visible) {
+      text += visible
+      onText(visible)
+    }
+  }
   for await (const chunk of stream) {
     if (chunk.meta?.usage?.credits_used) creditsUsed = Number(chunk.meta.usage.credits_used) || 0
     const delta = chunk.choices?.[0]?.delta
     if (!delta) continue
 
     if (delta.content) {
-      text += delta.content
-      onText(delta.content)
+      emitText(delta.content)
     }
 
     for (const part of delta.tool_calls ?? []) {
@@ -69,5 +96,28 @@ export const streamRound = async ({ client, model, messages, tools, signal, onTe
     }
   }
 
-  return { text, calls: calls.filter((call) => call?.function.name), creditsUsed }
+  if (suppressToolMarkup) emitText('', true)
+  return { text, calls: calls.filter((call) => call?.function.name), creditsUsed, toolMarkup }
+}
+
+/** Retry leaked tool syntax once through the provider's structured tool interface. */
+export const streamToolRound = async (options) => {
+  const first = await streamRound({ ...options, suppressToolMarkup: true })
+  if (!first.toolMarkup || first.calls.length > 0 || !options.tools?.length) return first
+
+  if (first.text.trim()) options.onText('\n\n')
+  const repaired = await streamRound({
+    ...options,
+    suppressToolMarkup: true,
+    messages: [
+      ...options.messages,
+      { role: 'assistant', content: first.text + first.toolMarkup },
+      { role: 'user', content: '(Note from Hup, not your owner.) Your last response printed tool markup instead of calling a tool. Use the supplied structured function tools to perform the intended call. Do not print DSML or tool syntax. If the draft is too long, shorten it to the tool limit.' },
+    ],
+  })
+  return {
+    ...repaired,
+    toolMarkup: repaired.calls.length ? repaired.toolMarkup : first.toolMarkup,
+    creditsUsed: first.creditsUsed + repaired.creditsUsed,
+  }
 }

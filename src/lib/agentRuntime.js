@@ -13,7 +13,7 @@
  */
 
 import { hupiTools, hupiToolStatus, readHupiMember, runHupiTool } from '@/lib/hupiTools'
-import { createModelClient, streamRound } from '@/lib/hupiModel'
+import { createModelClient, streamRound, streamToolRound } from '@/lib/hupiModel'
 import {
   addProposal,
   AgentError,
@@ -239,6 +239,8 @@ const hupiToolDefs = () =>
   )
 
 const agentToolDefs = Object.entries(AGENT_TOOLS).map(([name, { description, parameters }]) => ({ type: 'function', function: { name, description, parameters } }))
+// After research is exhausted, leave room to hand the owner the resulting draft.
+const proposalToolDefs = agentToolDefs.filter(({ function: tool }) => tool.name.startsWith('propose_') || tool.name === 'hup_update_profile')
 
 const taskSection = (task) =>
   task
@@ -538,11 +540,11 @@ export const runAgentTurn = async ({ agent, owner, send, signal, task = null, fo
   let toolCalls = 0
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
-      const { text: roundText, calls, creditsUsed } = await streamRound({
+      const { text: roundText, calls, creditsUsed, toolMarkup } = await streamToolRound({
         client,
         model,
         messages,
-        tools: round < MAX_TOOL_ROUNDS && toolCalls < MAX_TOOL_CALLS ? tools : null,
+        tools: round < MAX_TOOL_ROUNDS && toolCalls < MAX_TOOL_CALLS ? tools : proposalToolDefs,
         signal,
         onText: (piece) => send({ type: 'delta', text: piece }),
         maxCompletionTokens: MAX_COMPLETION_TOKENS,
@@ -550,7 +552,8 @@ export const runAgentTurn = async ({ agent, owner, send, signal, task = null, fo
       credits += creditsUsed
 
       if (calls.length === 0) {
-        reply = roundText.trim()
+        if (toolMarkup && cardsShown === 0) throw new AgentError(502, `${agent.name} could not create the proposal card, try again`)
+        reply = toolMarkup ? '' : roundText.trim()
         break
       }
 
@@ -575,18 +578,19 @@ export const runAgentTurn = async ({ agent, owner, send, signal, task = null, fo
 
     // Tools ran but no words came back: ask once more, without tools and with room to think
     if (!reply && toolCalls > 0) {
-      const { text, creditsUsed } = await streamRound({
+      const { text, creditsUsed, toolMarkup } = await streamRound({
         client,
         model,
         // A user turn, not a system one: every provider accepts it after tool results
         messages: [...messages, { role: 'user', content: '(Note from Hup, not your owner.) Now answer in a few short sentences from the tool results above. Do not call tools.' }],
         tools: null,
+        suppressToolMarkup: true,
         signal,
         onText: (piece) => send({ type: 'delta', text: piece }),
         maxCompletionTokens: RECOVERY_COMPLETION_TOKENS,
       })
       credits += creditsUsed
-      reply = text.trim()
+      reply = toolMarkup ? '' : text.trim()
     }
   } finally {
     // Charged whether or not the turn finished: the model was used either way
