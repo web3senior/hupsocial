@@ -16,6 +16,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { shortUploadError } from '@/lib/uploadErrors'
 import { FREE_VIDEO_MB, PREMIUM_VIDEO_MB } from '@/lib/premium'
 import { readPremium } from '@/lib/premiumServer'
+import { hostedClient, newHostedObject, registerStorageAsset } from '@/lib/postStorageServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,7 +81,7 @@ async function filebasePresign({ name, mimeType, size }) {
 
 export async function POST(request) {
   try {
-    const { name, mimeType, size, address } = await request.json()
+    const { name, mimeType, size, address, storageMode } = await request.json()
 
     const declaredSize = Number(size)
     if (!Number.isInteger(declaredSize) || declaredSize <= 0) {
@@ -97,6 +98,21 @@ export async function POST(request) {
 
     if (declaredSize > ceiling) {
       return NextResponse.json({ error: `File exceeds the ${Math.floor(ceiling / (1024 * 1024))}MB upload limit` }, { status: 413 })
+    }
+
+    if (storageMode === 'hosted') {
+      const client = hostedClient()
+      const { key, uri } = newHostedObject(name)
+      const command = new PutObjectCommand({
+        Bucket: process.env.HUP_STORAGE_BUCKET, Key: key,
+        ContentType: mimeType || 'application/octet-stream', ContentLength: declaredSize,
+      })
+      const url = await getSignedUrl(client, command, {
+        expiresIn: SIGNED_URL_TTL_SECONDS,
+        signableHeaders: new Set(['content-length', 'content-type']),
+      })
+      await registerStorageAsset(uri, 'hosted', key)
+      return NextResponse.json({ provider: 'hosted', url, key, uri, method: 'PUT' })
     }
 
     if (!filebaseConfigured()) {

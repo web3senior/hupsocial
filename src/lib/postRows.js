@@ -135,7 +135,7 @@ const readPageRow = unstable_cache(
     return JSON.parse(JSON.stringify(post))
   },
   ['post-page-row'],
-  { revalidate: PAGE_ROW_REVALIDATE_SECONDS },
+  { revalidate: PAGE_ROW_REVALIDATE_SECONDS, tags: ['post-page-rows'] },
 )
 
 /**

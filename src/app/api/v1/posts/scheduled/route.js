@@ -15,6 +15,8 @@ import { normalizeAddress } from '@/lib/address'
 import { hasTable } from '@/lib/schema'
 import { scheduleAddressFromRequest } from '@/lib/scheduleSession'
 import { checkScheduledRequest, scheduleContractsFor, serializeScheduledRow, validateScheduledAt } from '@/lib/scheduledDelivery'
+import { hostedKey } from '@/lib/postStorage'
+import { storageOrigin } from '@/lib/postStorageServer'
 
 export const runtime = 'nodejs'
 
@@ -71,7 +73,7 @@ export async function POST(request) {
     if (!Number.isInteger(networkId) || !scheduleContractsFor(networkId)) return bad('Scheduling is not supported on this network')
 
     const metadata = typeof body?.metadata === 'string' ? body.metadata.trim() : ''
-    if (!metadata.startsWith('ipfs://') || metadata.length > 255) return bad('The post has to be pinned before it can be scheduled')
+    if ((!metadata.startsWith('ipfs://') && !hostedKey(metadata, storageOrigin())) || metadata.length > 255) return bad('Save the post to IPFS or Hup storage before scheduling it')
 
     const content = body?.content
     if (!content || typeof content !== 'object' || !Array.isArray(content.elements)) return bad('The post content is missing')

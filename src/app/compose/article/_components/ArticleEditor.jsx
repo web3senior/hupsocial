@@ -38,6 +38,7 @@ import {
   readingTimeLabel,
 } from '@/lib/article'
 import { uploadFileToIPFS, uploadObjectToIPFS, withAuthor } from '@/lib/ipfs'
+import { getPostStoragePreference } from '@/hooks/usePostStoragePreference'
 import { renderArticleMarkdown } from '@/lib/markdown'
 import { resolveIPFSImageUrl } from '@/lib/storageHelper'
 import { handleBrokenImage } from '@/lib/utils'
@@ -302,7 +303,7 @@ export default function ArticleEditor() {
 
     setIsUploadingCover(true)
     try {
-      patch({ cover: await uploadFileToIPFS(file) })
+      patch({ cover: await uploadFileToIPFS(file, { storageMode: getPostStoragePreference() }) })
     } catch (error) {
       toast(error.message || 'Could not upload the cover', 'error')
     } finally {
@@ -354,7 +355,7 @@ export default function ArticleEditor() {
       /* The body is pinned before the composer opens, so by the time a transaction is signed the
          CID it references already resolves. Re-publishing identical markdown yields the identical
          CID, so a retry after a rejected transaction costs nothing and pins nothing new. */
-      const bodyCid = await uploadObjectToIPFS(withAuthor(makeArticleBody(markdown), address))
+      const bodyCid = await uploadObjectToIPFS(withAuthor(makeArticleBody(markdown), address), { storageMode: getPostStoragePreference() })
       setPendingArticle(makeArticleRef({ title: trimmedTitle, subtitle: subtitle.trim(), cover, tags, bodyCid, markdown }))
     } catch (error) {
       toast(error.message || 'Could not pin the article body', 'error')

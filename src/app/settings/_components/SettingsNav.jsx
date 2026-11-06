@@ -8,12 +8,13 @@ import InAppWallet from './InAppWallet'
 import SecurityVault from './SecurityVault'
 import LanguagePreference from './LanguagePreference'
 import PlaybackPreference from './PlaybackPreference'
+import StoragePreference from './StoragePreference'
 import EmailNotifications from './EmailNotifications'
 import EmailWallet from './EmailWallet'
 import PushNotificationManager from '@/components/ui/PushNotificationManager'
 
 // The tabs that render a real pane — everything else in navItems is a disabled placeholder
-const VALID_TABS = ['security', 'in-app-wallet', 'email-wallet', 'notification', 'email-notifications', 'language', 'playback']
+const VALID_TABS = ['security', 'in-app-wallet', 'email-wallet', 'notification', 'email-notifications', 'language', 'playback', 'storage']
 
 export default function SettingsNav() {
   // Deep-linkable: other pages send users here with /settings?tab=security instead of
@@ -28,6 +29,12 @@ export default function SettingsNav() {
 
   // Sidebar primary navigation mapping with disabled options added
   const navItems = [
+    {
+      id: 'storage',
+      label: 'Post storage',
+      desc: 'Choose IPFS or Hup storage, which is not on IPFS.',
+      icon: <GlobeIcon size={20} />,
+    },
     {
       id: 'security',
       label: 'Security Vault',
@@ -161,6 +168,7 @@ export default function SettingsNav() {
         {activeTab === 'email-notifications' && <EmailNotifications />}
         {activeTab === 'language' && <LanguagePreference />}
         {activeTab === 'playback' && <PlaybackPreference />}
+        {activeTab === 'storage' && <StoragePreference />}
 
         <div className={styles.subMenuList}>
           {subMenuContent[activeTab]?.map((subItem) => (

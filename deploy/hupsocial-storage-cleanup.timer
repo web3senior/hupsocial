@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry Hup post storage cleanup every minute
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60
+Unit=hupsocial-storage-cleanup.service
+
+[Install]
+WantedBy=timers.target

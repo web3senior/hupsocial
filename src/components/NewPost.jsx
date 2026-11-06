@@ -72,6 +72,7 @@ import MentionPicker from './MentionPicker'
 import clsx from 'clsx'
 import { resolveIPFSUrl, resolveIPFSImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
 import { uploadFileToIPFS as uploadToIPFS, withAuthor } from '@/lib/ipfs'
+import { getPostStoragePreference } from '@/hooks/usePostStoragePreference'
 import { captureVideoPoster } from '@/lib/videoPoster'
 import { shortUploadError } from '@/lib/uploadErrors'
 import { describeWalletError } from '@/lib/walletErrors'
@@ -1507,7 +1508,8 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
           updateMediaItem(uploadId, (item) => ({ ...item, status: 'uploading', progress: 0 }))
         }
 
-        const cid = await uploadToIPFS(upload, { signal: controller.signal, onProgress: reportProgress, address })
+        const storageMode = getPostStoragePreference()
+        const cid = await uploadToIPFS(upload, { signal: controller.signal, onProgress: reportProgress, address, storageMode })
 
         /* A still, pinned separately, so feed cards render a thumbnail without pulling the video
            through a gateway, plus the inline preview that paints before the still arrives. Best-effort
@@ -1519,7 +1521,7 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
         if (!captured && upload !== file) captured = await captureVideoPoster(upload)
         if (captured) {
           preview = captured.preview
-          poster = await uploadToIPFS(captured.file, { signal: controller.signal }).catch(() => undefined)
+          poster = await uploadToIPFS(captured.file, { signal: controller.signal, storageMode }).catch(() => undefined)
         }
 
         updateMediaItem(uploadId, ({ status, progress, error, ...item }) => ({ ...item, cid, poster, preview }))
@@ -1572,7 +1574,7 @@ function NewPostEditor({ text = '', url = '', seedFiles = null, startWithGif = f
   const uploadObjectToIPFS = async (json) => {
     beginUpload('Uploading post...')
     try {
-      const uploadRequest = await fetch('/api/ipfs/object', {
+      const uploadRequest = await fetch(getPostStoragePreference() === 'hosted' ? '/api/post-storage' : '/api/ipfs/object', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(json),

@@ -45,9 +45,10 @@ function sendUpload({ method, url, body, headers = {}, onProgress, signal }) {
 
 // Upload through the server-side /api/ipfs/file route, which pins to Filebase.
 // Subject to the Vercel 4.5 MB function payload limit.
-async function uploadViaServer(file, filename, { onProgress, signal }) {
+async function uploadViaServer(file, filename, { onProgress, signal, storageMode }) {
   const form = new FormData()
   form.append('file', file, filename)
+  if (storageMode === 'hosted') form.append('storageMode', 'hosted')
   const res = await sendUpload({ method: 'POST', url: '/api/ipfs/file', body: form, onProgress, signal })
   if (!res.ok) throw new Error(await readFailure(res, 'Upload failed'))
   const { cid } = await res.json()
@@ -62,13 +63,13 @@ async function uploadViaServer(file, filename, { onProgress, signal }) {
 const PRESIGN_THRESHOLD_BYTES = 4 * 1024 * 1024
 
 // Ask the server for a Filebase (S3) URL to upload to.
-async function requestPresign(file, filename, signal, address) {
+async function requestPresign(file, filename, signal, address, storageMode) {
   const res = await fetch('/api/ipfs/presign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     /* The wallet is sent so a premium subscriber gets their larger ceiling. The route treats
        it as a claim, not proof — see MAX_PREMIUM_UPLOAD_BYTES there. */
-    body: JSON.stringify({ name: filename, mimeType: file.type, size: file.size, address: address ?? null }),
+    body: JSON.stringify({ name: filename, mimeType: file.type, size: file.size, address: address ?? null, storageMode }),
     signal,
   })
   if (!res.ok) throw new Error(await readFailure(res, 'Could not create an upload URL'))
@@ -115,7 +116,7 @@ const describeEdgeRejection = (status) =>
     ? 'Storage rejected the upload (403): stale Filebase keys, an expired upload link, or a header mismatch'
     : `Storage rejected the upload (${status})`
 
-async function uploadViaFilebasePresign(file, { url, key }, { onProgress, signal }) {
+async function uploadViaFilebasePresign(file, { url, key, uri }, { onProgress, signal }) {
   const uploadRes = await sendUpload({
     method: 'PUT',
     url,
@@ -126,11 +127,12 @@ async function uploadViaFilebasePresign(file, { url, key }, { onProgress, signal
   })
   if (!uploadRes.ok) throw new Error(await readFailure(uploadRes, describeEdgeRejection(uploadRes.status)))
 
+  if (uri) return uri
   return resolveFilebaseCid(key, signal)
 }
 
 async function uploadViaPresign(file, filename, transfer) {
-  const presigned = await requestPresign(file, filename, transfer.signal, transfer.address)
+  const presigned = await requestPresign(file, filename, transfer.signal, transfer.address, transfer.storageMode)
   return uploadViaFilebasePresign(file, presigned, transfer)
 }
 
@@ -203,9 +205,9 @@ export const withAuthor = (payload, author) => (typeof author === 'string' && au
  * CID string — used for post/community metadata payloads (small, so no presign needed).
  * Rejects rather than hanging if the service does not answer within `timeoutMs`.
  */
-export async function uploadObjectToIPFS(contentObj, { timeoutMs = OBJECT_UPLOAD_TIMEOUT_MS } = {}) {
+export async function uploadObjectToIPFS(contentObj, { timeoutMs = OBJECT_UPLOAD_TIMEOUT_MS, storageMode = 'ipfs' } = {}) {
   try {
-    const res = await fetch('/api/ipfs/object', {
+    const res = await fetch(storageMode === 'hosted' ? '/api/post-storage' : '/api/ipfs/object', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(contentObj),

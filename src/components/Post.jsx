@@ -6,7 +6,8 @@ import { isArticle } from '@/lib/article'
 import Link from 'next/link'
 import { openPost } from '@/stores/usePostOverlayStore'
 import { useWaitForTransactionReceipt, useConnection, useSignTypedData, useWriteContract, usePublicClient } from 'wagmi'
-import { getPublicClient } from 'wagmi/actions'
+import { getPublicClient, waitForTransactionReceipt } from 'wagmi/actions'
+import { completePostDeletion, preparePostDeletion } from '@/lib/postDeletion'
 import { getPostById, recordPostView } from '@/lib/api'
 import { useClientMounted } from '@/hooks/useClientMount'
 import { useProfile, profileFallbackFromRow } from '@/hooks/useProfile'
@@ -715,14 +716,8 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
   const isMounted = useClientMounted()
   const router = useRouter()
   const { address, isConnected } = useConnection()
-  const { data: hash, isPending, mutate: writeContract } = useWriteContract()
-  const {
-    isLoading: isConfirming,
-    isSuccess: isConfirmed,
-    error: receiptError,
-  } = useWaitForTransactionReceipt({
-    hash,
-  })
+  const { isPending, mutateAsync: writeDeleteContract } = useWriteContract()
+  const isConfirming = isDeleting
   const publicClient = usePublicClient()
   const { signTypedDataAsync } = useSignTypedData()
   const sellPopoverRef = useRef(null)
@@ -797,18 +792,24 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
    * @param {'success'|'error'} type The outcome.
    */
   const finishDelete = (message, type) => {
+    if (type === 'success') {
+      const handle = deleteToastRef.current
+      deleteToastRef.current = null
+      handle?.update('Post deleted. Removing stored content…', 'loading')
+      completePostDeletion(item).then((completed) => {
+        const copy = completed ? 'Post deleted and storage cleanup completed' : 'Post deleted. Storage cleanup is queued for retry.'
+        if (!handle?.update(copy, completed ? 'success' : 'info')) toast(copy, completed ? 'success' : 'info')
+      }).catch(() => {
+        if (!handle?.update('Post deleted. Storage cleanup is queued for retry.', 'info')) toast('Post deleted. Storage cleanup is queued for retry.', 'info')
+      })
+      setIsDeleting(false)
+      return
+    }
     if (type !== 'success') onRemovedChange?.(false)
     if (!deleteToastRef.current?.update(message, type)) toast(message, type)
     deleteToastRef.current = null
     setIsDeleting(false)
   }
-
-  useEffect(() => {
-    if (!deleteToastRef.current || (!isConfirmed && !receiptError)) return
-    // Mirrors wagmi's receipt state into the toast and the parent's hidden flag
-    finishDelete(...(isConfirmed ? ['Post deleted onchain', 'success'] : [shortTxError(receiptError, 'Could not delete the post'), 'error']))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConfirmed, receiptError])
 
   const deletePost = async (e, id) => {
     e.stopPropagation()
@@ -825,6 +826,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
       setIsDeleting(true)
       startOptimisticDelete()
       try {
+        await preparePostDeletion(item)
         const networkId = Number(item.network_id)
         await sendHupAction({
           networkId,
@@ -854,6 +856,7 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
     try {
       setIsDeleting(true)
       startOptimisticDelete()
+      await preparePostDeletion(item)
 
       if (await tryGaslessDelete(id)) {
         finishDelete('Post deleted onchain', 'success')
@@ -861,19 +864,14 @@ const Nav = ({ item, setShowEditModal, setShowReportModal, tipPost, onTip, onRem
       }
 
       deleteToastRef.current?.update('Confirm the delete in your wallet…', 'loading')
-      // The receipt effect above resolves the toast once the transaction lands
-      writeContract(
-        {
-          abi,
-          address: targetChain.hup,
-          functionName: 'deleteContent',
-          args: [address, id],
-        },
-        {
-          onSuccess: () => deleteToastRef.current?.update('Deleting post…', 'loading'),
-          onError: (err) => finishDelete(shortTxError(err, 'Could not delete the post'), 'error'),
-        }
-      )
+      const txHash = await writeDeleteContract({
+        abi, address: targetChain.hup, functionName: 'deleteContent',
+        args: [address, BigInt(id)], chainId: Number(item.network_id),
+      })
+      deleteToastRef.current?.update('Deleting post…', 'loading')
+      const receipt = await waitForTransactionReceipt(config, { hash: txHash, chainId: Number(item.network_id) })
+      if (receipt.status !== 'success') throw new Error('The delete transaction was reverted')
+      finishDelete('Post deleted onchain', 'success')
     } catch (err) {
       console.error('Delete failed:', err)
       finishDelete(shortTxError(err, 'Could not delete the post'), 'error')

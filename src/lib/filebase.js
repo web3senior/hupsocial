@@ -18,6 +18,29 @@ const ATTEMPT_TIMEOUT_MS = 12_000
 
 const FILEBASE_RPC_ADD = 'https://rpc.filebase.io/api/v0/add'
 
+export async function unpinFromFilebase(cid) {
+  if (!process.env.FILEBASE_IPFS_RPC_TOKEN) throw new Error('Filebase RPC token is not configured')
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(`https://rpc.filebase.io/api/v0/pin/rm?arg=${encodeURIComponent(cid)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.FILEBASE_IPFS_RPC_TOKEN}` },
+        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+      })
+      if (response.ok) return
+      const message = await response.text()
+      // Repeating a completed cleanup is safe. Authentication failures are never ignored.
+      if (response.status === 500 && /not pinned|is not pinned/i.test(message)) return
+      const error = new Error(`Filebase unpin failed (${response.status})`)
+      error.status = response.status
+      throw error
+    } catch (error) {
+      if (attempt === ATTEMPTS || !isRetryable(error)) throw error
+      await sleep(BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length) - 1])
+    }
+  }
+}
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**

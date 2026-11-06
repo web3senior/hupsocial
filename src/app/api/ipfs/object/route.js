@@ -2,6 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { addToFilebase } from '@/lib/filebase'
+import { isStorageDeleted, registerStorageAsset } from '@/lib/postStorageServer'
 import { filebaseFailed, shortUploadError } from '@/lib/uploadErrors'
 import { gatewayUrl, raceIPFS } from '@/lib/ipfsGateways'
 
@@ -39,6 +40,7 @@ export async function POST(request) {
     }
 
     const cid = `ipfs://${rawCID}`
+    await registerStorageAsset(cid, 'ipfs')
     const url = gatewayUrl(rawCID)
     console.log('Upload complete. CID:', cid)
     return NextResponse.json({ url, cid }, { status: 200 })
@@ -71,6 +73,7 @@ const IMMUTABLE_CACHE = 'public, max-age=31536000, s-maxage=31536000, immutable'
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
   const cid = (searchParams.get('cid') || '').replace(/^(?:ipfs:\/\/)+/, '').trim()
+  if (await isStorageDeleted(`ipfs://${cid}`)) return new NextResponse(null, { status: 410, headers: { 'Cache-Control': 'no-store' } })
 
   // The gateway origins come from env and never from the caller; the CID is held to the shape of
   // a path segment so a crafted value cannot climb out of it

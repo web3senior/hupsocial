@@ -1,0 +1,16 @@
+[Unit]
+Description=Clean up deleted Hup post storage
+After=hupsocial.service
+
+[Service]
+Type=oneshot
+User=hupsocial
+Group=hupsocial
+WorkingDirectory=/srv/hupsocial/current
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node scripts/post-storage-cleanup.mjs
+TimeoutStartSec=75
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

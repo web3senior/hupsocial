@@ -5,6 +5,7 @@ import sharp from 'sharp'
 import { webpAnimationOptions } from '@/lib/webpAnimation'
 import { filebaseFailed, shortUploadError } from '@/lib/uploadErrors'
 import { addToFilebase } from '@/lib/filebase'
+import { isStorageDeleted, putHostedObject, registerStorageAsset } from '@/lib/postStorageServer'
 import { gatewayList, gatewayUrl } from '@/lib/ipfsGateways'
 import { DEAD_FAILURE_TTL_MS, DISCOVERY_FAILURE_TTL_MS, FAILURE_TTL_MS, TRANSIENT_FAILURE_TTL_MS, coalesceMedia, mediaSourceKey, readMedia, readMediaSource, writeMediaBody, writeMediaFailure, writeMediaRedirect, writeMediaSource } from '@/lib/mediaCache'
 import { readDurableFailure, recordDurableFailure } from '@/lib/mediaFailureStore'
@@ -68,6 +69,11 @@ export async function POST(request) {
       console.log(`[heic] transcoded to JPEG before pinning: ${jpegName}`)
     }
 
+    if (data.get('storageMode') === 'hosted') {
+      const uri = await putHostedObject(Buffer.from(await file.arrayBuffer()), file.name, file.type || 'application/octet-stream')
+      return NextResponse.json({ cid: uri, url: uri })
+    }
+
     let rawCID
     try {
       rawCID = await uploadToFilebase(file)
@@ -77,6 +83,7 @@ export async function POST(request) {
     }
 
     const cid = `ipfs://${rawCID}`
+    await registerStorageAsset(cid, 'ipfs')
     const url = gatewayUrl(rawCID)
     console.log('Upload complete. CID:', cid)
     return NextResponse.json({ url, cid }, { status: 200 })
@@ -668,6 +675,7 @@ export async function GET(req) {
   // Stripped before the cache key is built, so `ipfs://<cid>` and the bare CID are one entry —
   // and a document's doubled prefix cannot poison the durable-failure table with a dead key
   const cid = (searchParams.get('cid') || '').replace(/^(?:ipfs:\/\/)+/, '').trim()
+  if (await isStorageDeleted(`ipfs://${cid}`)) return new NextResponse(null, { status: 410, headers: { 'Cache-Control': 'no-store' } })
 
   const width = intParam(searchParams.get('w'), null, 1, 4096)
   const quality = intParam(searchParams.get('q'), 80, 1, 100)

@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server'
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { shortUploadError } from '@/lib/uploadErrors'
+import { registerStorageAsset } from '@/lib/postStorageServer'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -70,7 +71,10 @@ export async function GET(req) {
 
       /* The SDK lower-cases metadata keys, so x-amz-meta-cid arrives as Metadata.cid */
       const cid = head.Metadata?.cid
-      if (cid) return NextResponse.json({ cid: `ipfs://${cid}` }, { status: 200 })
+      if (cid) {
+        await registerStorageAsset(`ipfs://${cid}`, 'ipfs', key)
+        return NextResponse.json({ cid: `ipfs://${cid}` }, { status: 200 })
+      }
 
       lastError = 'Uploaded, but storage has not finished pinning it yet — try again'
       pending = true

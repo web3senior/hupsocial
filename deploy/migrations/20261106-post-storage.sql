@@ -1,0 +1,24 @@
+CREATE TABLE IF NOT EXISTS post_storage_assets (
+  uri VARCHAR(768) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+  object_key VARCHAR(255) NULL,
+  provider VARCHAR(16) NOT NULL,
+  deleted TINYINT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS post_storage_cleanup (
+  network_id BIGINT NOT NULL,
+  post_id BIGINT UNSIGNED NOT NULL,
+  refs LONGTEXT NOT NULL,
+  completed TINYINT NOT NULL DEFAULT 0,
+  last_error TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (network_id, post_id)
+);
+
+CREATE TABLE IF NOT EXISTS post_storage_objects (
+  object_key VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+  uri VARCHAR(768) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  INDEX post_storage_objects_uri (uri)
+);

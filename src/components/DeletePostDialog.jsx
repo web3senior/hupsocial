@@ -32,7 +32,7 @@ const DeletePostDialog = forwardRef(function DeletePostDialog({ onConfirm }, ref
         <h3 id="delete-post-title" className={styles.deletePost__title}>
           Delete post?
         </h3>
-        <p className={styles.deletePost__message}>If you delete this post, you won&apos;t be able to restore it.</p>
+        <p className={styles.deletePost__message}>This cannot be undone. Hup will remove its stored post and unused attachments, and unpin IPFS content. Historical blockchain references and copies saved by others may remain.</p>
       </div>
 
       <div className={styles.deletePost__actions}>

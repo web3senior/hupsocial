@@ -184,6 +184,15 @@ export function mediaSourceKey(cid) {
   return `source|${cid}`
 }
 
+export function invalidateMedia(cid) {
+  for (const [key, entry] of store) {
+    if (key.startsWith(`${cid}|`) || key === mediaSourceKey(cid)) {
+      store.delete(key)
+      setHeldBytes(heldBytes - (entry.bytes || 0))
+    }
+  }
+}
+
 /**
  * Reads the original bytes of a CID, if the fetch that paid for them was recent enough.
  * @param {string} cid Content address.

@@ -1,5 +1,6 @@
 import { gatewayList } from '@/lib/ipfsGateways'
 import { slugify } from '@/lib/utils'
+import { hostedKey } from '@/lib/postStorage'
 
 /**
  * Long-form articles on Hup.
@@ -213,6 +214,18 @@ const BODY_FETCH_TIMEOUT_MS = 8000
  * @returns {Promise<string|null>} The markdown, or null if no gateway could serve it.
  */
 export async function fetchArticleBody(bodyCid) {
+  const key = hostedKey(bodyCid, process.env.HUP_STORAGE_ORIGIN || 'https://hup.social')
+  if (key) {
+    try {
+      const response = await fetch(bodyCid, { cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(BODY_FETCH_TIMEOUT_MS) })
+      if (!response.ok) return null
+      const payload = await response.json()
+      return typeof payload?.markdown === 'string' ? payload.markdown : null
+    } catch {
+      return null
+    }
+  }
+  if (/^https?:/i.test(String(bodyCid))) return null
   const cid = String(bodyCid || '').replace(/^ipfs:\/\//, '').trim()
   if (!cid) return null
 
