@@ -9,6 +9,10 @@ import { hasColumn } from '@/lib/schema'
 import { readPremiumCounts } from '@/lib/premiumServer'
 import { hasAiAgentTag } from '@/lib/agentProfile'
 import { SOCIAL_SCORE_WEIGHTS } from '@/config/points'
+import { appChains } from '@/config/contracts'
+import { SOLANA_CHAINS } from '@/config/solana'
+
+const enabledNetworkIds = new Set([...appChains, ...SOLANA_CHAINS].map((chain) => String(chain.id)))
 
 export const PERIODS = {
   all: null,
@@ -316,7 +320,8 @@ async function computeLeaderboardSnapshot({ sort, networkId, since, until }) {
     rows,
     stats: { ...serializeStats(statsRows[0]), premium: premium.total, agents: agents.filter((agent) => Number(agent.in_period) === 1).length },
     stats_24h: { ...serializeStats(dayRows[0]), premium: premium.recent, agents: agents.filter((agent) => Number(agent.recent) === 1).length },
-    networks,
+    // Historical networks remain indexed, but only enabled Hup networks belong in the UI.
+    networks: networks.filter((network) => enabledNetworkIds.has(String(network.id))),
   }
 }
 
