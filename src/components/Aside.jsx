@@ -189,6 +189,7 @@ const NavLink = ({ item, isActive, isCompact, showTooltip, unreadCount, onNaviga
 
 export default function Aside({ inLayoutGrid = false }) {
   const pathname = usePathname()
+  const isAgentsPage = isActivePath(pathname, '/agents')
   // Identity follows the active network (hooks/useActiveWallet): profile link, avatar and
   // the notification badge all belong to the wallet that signs on this network
   const { address, isConnected } = useActiveWallet()
@@ -458,9 +459,12 @@ export default function Aside({ inLayoutGrid = false }) {
       {isComponentOpen && <NewPost onClose={() => setIsComponentOpen(false)} />}
 
       <div className={styles.floatingActions}>
-        {pathname !== '/agents' && <Hupi className={styles.floatingActions__button} />}
-
-        <BatchLikeTrigger className={styles.floatingActions__button} badgeClassName={styles.floatingActions__badge} />
+        {!isAgentsPage && (
+          <>
+            <Hupi className={styles.floatingActions__button} />
+            <BatchLikeTrigger className={styles.floatingActions__button} badgeClassName={styles.floatingActions__badge} />
+          </>
+        )}
 
         <button
           className={clsx(styles.floatingActions__button, styles['floatingActions__button--create'])}
