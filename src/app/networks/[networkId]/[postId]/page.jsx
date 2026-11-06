@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { readPostForPage } from '@/lib/postRows'
 import { commentsPageUrl } from '@/lib/commentsRequest'
 import { summarizePost } from '@/lib/postSummary'
+import { getPostPreviewText } from '@/lib/postPreview'
 import PreloadFetch from '@/components/PreloadFetch'
 import PostDetails from './_components/PostDetails'
 import styles from './page.module.scss'
@@ -35,8 +36,9 @@ export async function generateMetadata({ params }, parent) {
     /* summarizePost reads the text element by type rather than by index — an NFT listing or a
        media-only post does not necessarily lead with words — and describes the post when it
        has none of its own */
-    const title = summarizePost(item, TITLE_MAX)
-    const description = summarizePost(item, DESCRIPTION_MAX)
+    const previewText = await getPostPreviewText(item)
+    const title = summarizePost(item, TITLE_MAX, previewText)
+    const description = summarizePost(item, DESCRIPTION_MAX, previewText)
     const postUrl = `/networks/${networkId}/${postId}`
 
     /* No images here on purpose. opengraph-image.jsx in this segment supplies og:image, its

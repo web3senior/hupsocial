@@ -137,6 +137,7 @@ export const summarizePostContent = (post) => {
   const items = post?.content?.elements?.find((element) => element?.type === 'media')?.data?.items || []
 
   if (post?.nft_listing_id) return 'listed an NFT for sale'
+  if (post?.content?.poll) return 'shared a poll'
   if (items.some((item) => item?.type === 'video')) return 'posted a video'
   if (items.some((item) => item?.type === 'audio')) return 'posted audio'
   if (items.length === 1) return 'posted a photo'
@@ -148,10 +149,11 @@ export const summarizePostContent = (post) => {
  * The post's own words, or a description of it when it has none.
  * @param {Object} post - The post row from the API.
  * @param {number} max - Maximum length of the result.
+ * @param {string} [previewText] Server-resolved words, including attached poll questions.
  * @returns {string}
  */
-export const summarizePost = (post, max) => {
-  const bodyText = post?.content?.elements?.find((element) => element?.type === 'text')?.data?.text || ''
+export const summarizePost = (post, max, previewText) => {
+  const bodyText = previewText ?? post?.content?.elements?.find((element) => element?.type === 'text')?.data?.text ?? ''
   const summary = truncate(bodyText, max)
   if (summary) return summary
 

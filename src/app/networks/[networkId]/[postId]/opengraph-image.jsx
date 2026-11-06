@@ -37,6 +37,7 @@ import { getChainIconSvg } from '@/lib/chains'
 import { readUniversalProfile } from '@/lib/lukso'
 import { getNftMetadata } from '@/lib/nftMetadataCache'
 import { truncateToRuns, summarizePostContent } from '@/lib/postSummary'
+import { getPostPreviewText } from '@/lib/postPreview'
 import { OG_FONTS, OG_FONT_FAMILY, resolveArtworkUrl, svgToPngDataUri, toFetchable, toPngDataUri } from '@/lib/ogImage'
 import { resolveAvatarImageUrl } from '@/lib/storageHelper'
 
@@ -453,8 +454,8 @@ export default async function Image({ params }) {
       })
     }
 
-    const bodyText = post.content?.elements?.find((element) => element?.type === 'text')?.data?.text || ''
-    const [avatar, artwork, universalProfile, chainLogo] = await Promise.all([
+    const [bodyText, avatar, artwork, universalProfile, chainLogo] = await Promise.all([
+      getPostPreviewText(post),
       toPngDataUri(toFetchable(resolveAvatarImageUrl(post.profile_image, AVATAR_SLOT_PX), baseUrl), AVATAR_SLOT_PX * 2, AVATAR_TIMEOUT_MS, { background: COLORS.background }),
       resolvePostArtwork(post, baseUrl).then((url) => toPngDataUri(url, 760, ARTWORK_TIMEOUT_MS, { background: COLORS.background })),
       /* Both of these sit inside the artwork's own wait, so the identity row costs the card
