@@ -4,7 +4,7 @@
  * scope. Shared with the home feed's "Who to follow", which suggests only accounts ranked here.
  */
 import pool from '@/lib/db'
-import { memberFilter } from '@/lib/members'
+import { countActiveWallets } from '@/lib/activeWallets'
 import { hasColumn } from '@/lib/schema'
 import { readPremiumCounts } from '@/lib/premiumServer'
 import { hasAiAgentTag } from '@/lib/agentProfile'
@@ -298,11 +298,14 @@ async function computeLeaderboardSnapshot({ sort, networkId, since, until }) {
   ]
 
   const [rows] = await pool.execute(fullListQuery, params)
-  const tracksJoins = await hasColumn('users', 'joined_at')
-  const [statsRows] = await pool.execute(buildStatsQuery(networkId, since, tracksJoins), buildStatsParams(networkId, since, tracksJoins))
+  const [statsRows] = await pool.execute(buildStatsQuery(networkId, since), buildStatsParams(networkId, since))
   /* The summary's "+N in 24h" line: the same counts under the same network, bounded to the last day */
   const daySince = getSinceDate('24h')
-  const [dayRows] = await pool.execute(buildStatsQuery(networkId, daySince, tracksJoins), buildStatsParams(networkId, daySince, tracksJoins))
+  const [dayRows] = await pool.execute(buildStatsQuery(networkId, daySince), buildStatsParams(networkId, daySince))
+  /* Users are wallets that have acted anywhere on Hup, across networks: all time is everyone,
+     a window is who acted for the first time in it */
+  const activeDay = await countActiveWallets(daySince)
+  const users = since ? (await countActiveWallets(since)).recent : activeDay.total
   const [networks] = await pool.execute('SELECT id, name FROM networks ORDER BY name ASC')
   /* Premium is held across every chain, so neither the network nor the period narrows it:
      the card is who holds it now, and the delta is who first bought it in the last day */
@@ -319,19 +322,18 @@ async function computeLeaderboardSnapshot({ sort, networkId, since, until }) {
 
   return {
     rows,
-    stats: { ...serializeStats(statsRows[0]), premium: premium.total, agents: agents.filter((agent) => Number(agent.in_period) === 1).length },
-    stats_24h: { ...serializeStats(dayRows[0]), premium: premium.recent, agents: agents.filter((agent) => Number(agent.recent) === 1).length },
+    stats: { ...serializeStats(statsRows[0]), users, premium: premium.total, agents: agents.filter((agent) => Number(agent.in_period) === 1).length },
+    stats_24h: { ...serializeStats(dayRows[0]), users: activeDay.recent, premium: premium.recent, agents: agents.filter((agent) => Number(agent.recent) === 1).length },
     // Historical networks remain indexed, but only enabled Hup networks belong in the UI.
     networks: networks.filter((network) => enabledNetworkIds.has(String(network.id))),
   }
 }
 
-function buildStatsQuery(networkId, since, tracksJoins) {
-  const { memberFilter, postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since, tracksJoins)
+function buildStatsQuery(networkId, since) {
+  const { postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since)
 
   return `
     SELECT
-      (SELECT COUNT(*) FROM users ${memberFilter.where}) AS users,
       (SELECT COUNT(*) FROM posts p ${postFilter.where} AND p.is_comment IS NULL AND p.is_repost IS NULL) AS root_posts,
       (SELECT COUNT(*) FROM posts p ${postFilter.where} AND p.is_comment IS NOT NULL) AS comments,
       (SELECT COUNT(*) FROM post_likes pl ${likeFilter.where}) AS likes,
@@ -340,11 +342,10 @@ function buildStatsQuery(networkId, since, tracksJoins) {
   `
 }
 
-function buildStatsParams(networkId, since, tracksJoins) {
-  const { memberFilter, postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since, tracksJoins)
+function buildStatsParams(networkId, since) {
+  const { postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since)
 
   return [
-    ...memberFilter.params,
     ...postFilter.params,
     ...postFilter.params,
     ...likeFilter.params,
@@ -353,10 +354,8 @@ function buildStatsParams(networkId, since, tracksJoins) {
   ]
 }
 
-function buildStatsFilters(networkId, since, tracksJoins) {
+function buildStatsFilters(networkId, since) {
   return {
-    // Membership is cross-network; period counts use the first recorded Hup connection.
-    memberFilter: memberFilter(since, tracksJoins),
     postFilter: buildWhere({
       alias: 'p',
       timeColumn: 'created_at',
@@ -452,7 +451,6 @@ export function serializeLeader(row, rank) {
 
 function serializeStats(stats = {}) {
   return {
-    users: toNumber(stats.users),
     root_posts: toNumber(stats.root_posts),
     comments: toNumber(stats.comments),
     likes: toNumber(stats.likes),

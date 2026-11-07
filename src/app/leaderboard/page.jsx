@@ -68,7 +68,13 @@ export default function LeaderboardPage() {
       <div className={`${styles.page} animate fade`}>
         <div className={`__container ${styles.page__container}`} data-width="xlarge">
           <section className={styles.summary} aria-label="Platform summary">
-            <StatCard icon={UsersIcon} label="Users" value={stats.users} delta={dayStats.users} />
+            <StatCard
+              icon={UsersIcon}
+              label="Active users"
+              value={stats.users}
+              delta={dayStats.users}
+              description="All-time unique wallets that participated on Hup. Connecting or reading alone does not count. The 24h change counts first-time participants."
+            />
             <StatCard icon={RobotIcon} label="Agents" value={stats.agents} delta={dayStats.agents} href="/agents" />
             <StatCard icon={FlameIcon} label="Posts" value={stats.root_posts} delta={dayStats.root_posts} />
             <StatCard icon={ChatCircleIcon} label="Comments" value={stats.comments} delta={dayStats.comments} />
@@ -86,14 +92,14 @@ export default function LeaderboardPage() {
   )
 }
 
-function StatCard({ icon: Icon, label, value = 0, delta = 0, href }) {
+function StatCard({ icon: Icon, label, value = 0, delta = 0, href, description }) {
   const isUp = delta > 0
   const Card = href ? Link : 'div'
 
   return (
     <Card
       className={styles.statCard}
-      title={`${label}: ${numberFormatter.format(value)} (${delta === 0 ? 'no change' : deltaFormatter.format(delta)} in 24h)`}
+      title={`${label}: ${numberFormatter.format(value)} (${delta === 0 ? 'no change' : deltaFormatter.format(delta)} in 24h)${description ? `. ${description}` : ''}`}
       {...(href ? { href } : {})}
     >
       <span className={styles.statCard__label}>
