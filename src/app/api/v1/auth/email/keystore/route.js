@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import pool from '@/lib/db'
+import { ensureEmailMember } from '@/lib/members'
 import { sessionFromRequest } from '@/lib/emailAuthSession'
 
 const HEX_64_RE = /^[0-9a-f]{64}$/
@@ -110,6 +111,7 @@ export async function PUT(request) {
       [session.accountId, walletAddress, sealShare(serverShare), backupBlob, kdfParams],
     )
     await pool.execute(`UPDATE email_accounts SET wallet_address = ? WHERE id = ?`, [walletAddress, session.accountId])
+    await ensureEmailMember(session.accountId, walletAddress)
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -70,10 +70,10 @@ export default function LeaderboardPage() {
           <section className={styles.summary} aria-label="Platform summary">
             <StatCard
               icon={UsersIcon}
-              label="Active users"
+              label="Users"
               value={stats.users}
               delta={dayStats.users}
-              description="All-time unique wallets that participated on Hup. Connecting or reading alone does not count. The 24h change counts first-time participants."
+              description="Joined members, including the legacy profile baseline. New members count when they connect a wallet or verify an email login; linked email and wallet identities count once. The 24h change shows new joins."
             />
             <StatCard icon={RobotIcon} label="Agents" value={stats.agents} delta={dayStats.agents} href="/agents" />
             <StatCard icon={FlameIcon} label="Posts" value={stats.root_posts} delta={dayStats.root_posts} />

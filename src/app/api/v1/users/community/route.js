@@ -15,7 +15,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { resolveAvatarImageUrl } from '@/lib/storageHelper'
-import { memberFilter } from '@/lib/members'
+import { countMembers, memberFilter } from '@/lib/members'
 import { hasColumn } from '@/lib/schema'
 
 export const runtime = 'nodejs'
@@ -36,8 +36,8 @@ export async function GET() {
     }
 
     const members = memberFilter(null, await hasColumn('users', 'joined_at'))
-    const [[countRows], [faceRows]] = await Promise.all([
-      pool.execute(`SELECT COUNT(*) AS total FROM users ${members.where}`),
+    const [countRows, [faceRows]] = await Promise.all([
+      countMembers(),
       pool.execute(
         `SELECT wallet_address, profileImage AS profile_image
            FROM users
@@ -57,7 +57,7 @@ export async function GET() {
       }))
       .filter((user) => user.avatar)
 
-    const payload = { success: true, data: { count: Number(countRows[0]?.total) || 0, users } }
+    const payload = { success: true, data: { count: countRows.total, users } }
     cache = { at: Date.now(), payload }
 
     return NextResponse.json(payload)

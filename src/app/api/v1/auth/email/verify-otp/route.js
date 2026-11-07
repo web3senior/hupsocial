@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import pool from '@/lib/db'
+import { ensureEmailMember } from '@/lib/members'
 import { hashOtp, mintSessionToken, sessionCookieOptions, SESSION_COOKIE } from '@/lib/emailAuthSession'
 
 const MAX_ATTEMPTS = 5
@@ -53,6 +54,8 @@ export async function POST(request) {
        WHERE a.email = ?`,
       [normalized],
     )
+
+    await ensureEmailMember(account.id, account.wallet_address)
 
     const response = NextResponse.json({
       success: true,

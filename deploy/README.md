@@ -24,6 +24,16 @@ Hup runs as a single Next.js Node.js process on AlmaLinux, behind the server's e
 
 ## Updates and rollback
 
+### Wallet and email membership
+
+Apply `deploy/migrations/20261107-email-member-joined-at.sql` before deploying email membership counting.
+Verified email accounts count immediately, including accounts that have not created an embedded wallet.
+When an email account is linked to a wallet, the shared identity counts once and keeps its earliest join.
+Wallet connections continue to write `users.joined_at`; profile indexer writes do not establish membership.
+
+The November 7 legacy baseline was seeded once from profiles carrying a name or avatar, while preserving
+previously established joins. Do not seed all `users` rows: this table also contains indexer-only profiles.
+
 Build each update in a new release directory with the production environment linked. Only switch `current` after the build succeeds. Restart `hupsocial` and repeat health checks. Retain the previous release; rollback means restoring its symlink target and restarting the service. Switching releases restarts the single process and can cause a brief interruption.
 
 Changing `NEXT_PUBLIC_*` values requires rebuilding. Shared runtime secret changes require a service restart. Use versioned secure backups for environment changes so a release rollback can restore compatible configuration.

@@ -4,7 +4,7 @@
  * scope. Shared with the home feed's "Who to follow", which suggests only accounts ranked here.
  */
 import pool from '@/lib/db'
-import { countActiveWallets } from '@/lib/activeWallets'
+import { countMembers } from '@/lib/members'
 import { hasColumn } from '@/lib/schema'
 import { readPremiumCounts } from '@/lib/premiumServer'
 import { hasAiAgentTag } from '@/lib/agentProfile'
@@ -302,10 +302,8 @@ async function computeLeaderboardSnapshot({ sort, networkId, since, until }) {
   /* The summary's "+N in 24h" line: the same counts under the same network, bounded to the last day */
   const daySince = getSinceDate('24h')
   const [dayRows] = await pool.execute(buildStatsQuery(networkId, daySince), buildStatsParams(networkId, daySince))
-  /* Users are wallets that have acted anywhere on Hup, across networks: all time is everyone,
-     a window is who acted for the first time in it */
-  const activeDay = await countActiveWallets(daySince)
-  const users = since ? (await countActiveWallets(since)).recent : activeDay.total
+  const members = await countMembers(daySince)
+  const users = since ? (await countMembers(since)).recent : members.total
   const [networks] = await pool.execute('SELECT id, name FROM networks ORDER BY name ASC')
   /* Premium is held across every chain, so neither the network nor the period narrows it:
      the card is who holds it now, and the delta is who first bought it in the last day */
@@ -323,7 +321,7 @@ async function computeLeaderboardSnapshot({ sort, networkId, since, until }) {
   return {
     rows,
     stats: { ...serializeStats(statsRows[0]), users, premium: premium.total, agents: agents.filter((agent) => Number(agent.in_period) === 1).length },
-    stats_24h: { ...serializeStats(dayRows[0]), users: activeDay.recent, premium: premium.recent, agents: agents.filter((agent) => Number(agent.recent) === 1).length },
+    stats_24h: { ...serializeStats(dayRows[0]), users: members.recent, premium: premium.recent, agents: agents.filter((agent) => Number(agent.recent) === 1).length },
     // Historical networks remain indexed, but only enabled Hup networks belong in the UI.
     networks: networks.filter((network) => enabledNetworkIds.has(String(network.id))),
   }
