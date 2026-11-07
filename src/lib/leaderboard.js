@@ -4,7 +4,7 @@
  * scope. Shared with the home feed's "Who to follow", which suggests only accounts ranked here.
  */
 import pool from '@/lib/db'
-import { MEMBER_ROW_SQL } from '@/lib/members'
+import { memberFilter } from '@/lib/members'
 import { hasColumn } from '@/lib/schema'
 import { readPremiumCounts } from '@/lib/premiumServer'
 import { hasAiAgentTag } from '@/lib/agentProfile'
@@ -298,10 +298,11 @@ async function computeLeaderboardSnapshot({ sort, networkId, since, until }) {
   ]
 
   const [rows] = await pool.execute(fullListQuery, params)
-  const [statsRows] = await pool.execute(buildStatsQuery(networkId, since), buildStatsParams(networkId, since))
+  const tracksJoins = await hasColumn('users', 'joined_at')
+  const [statsRows] = await pool.execute(buildStatsQuery(networkId, since, tracksJoins), buildStatsParams(networkId, since, tracksJoins))
   /* The summary's "+N in 24h" line: the same counts under the same network, bounded to the last day */
   const daySince = getSinceDate('24h')
-  const [dayRows] = await pool.execute(buildStatsQuery(networkId, daySince), buildStatsParams(networkId, daySince))
+  const [dayRows] = await pool.execute(buildStatsQuery(networkId, daySince, tracksJoins), buildStatsParams(networkId, daySince, tracksJoins))
   const [networks] = await pool.execute('SELECT id, name FROM networks ORDER BY name ASC')
   /* Premium is held across every chain, so neither the network nor the period narrows it:
      the card is who holds it now, and the delta is who first bought it in the last day */
@@ -325,8 +326,8 @@ async function computeLeaderboardSnapshot({ sort, networkId, since, until }) {
   }
 }
 
-function buildStatsQuery(networkId, since) {
-  const { memberFilter, postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since)
+function buildStatsQuery(networkId, since, tracksJoins) {
+  const { memberFilter, postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since, tracksJoins)
 
   return `
     SELECT
@@ -339,8 +340,8 @@ function buildStatsQuery(networkId, since) {
   `
 }
 
-function buildStatsParams(networkId, since) {
-  const { memberFilter, postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since)
+function buildStatsParams(networkId, since, tracksJoins) {
+  const { memberFilter, postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since, tracksJoins)
 
   return [
     ...memberFilter.params,
@@ -352,16 +353,10 @@ function buildStatsParams(networkId, since) {
   ]
 }
 
-function buildStatsFilters(networkId, since) {
+function buildStatsFilters(networkId, since, tracksJoins) {
   return {
-    /* Members are cross-network, so only the period applies: all time is the whole community, a window is who joined in it */
-    memberFilter: buildWhere({
-      alias: 'users',
-      timeColumn: 'created_at',
-      networkId: null,
-      since,
-      baseConditions: [MEMBER_ROW_SQL],
-    }),
+    // Membership is cross-network; period counts use the first recorded Hup connection.
+    memberFilter: memberFilter(since, tracksJoins),
     postFilter: buildWhere({
       alias: 'p',
       timeColumn: 'created_at',

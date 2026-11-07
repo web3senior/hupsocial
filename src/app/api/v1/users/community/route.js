@@ -6,7 +6,7 @@
  * "Member" is deliberately narrower than "row in users". That table doubles as the profile cache
  * the LSP26 follower indexer writes into, so the vast majority of its rows are addresses nobody
  * ever signed up as — no name, no avatar, no signature. Counting those inflated the claim by two
- * orders of magnitude, so both queries below filter on a profile actually existing.
+ * orders of magnitude. Historical profile totals are retained, with recorded Hup joins included.
  *
  * The faces are random on purpose — the strip should look alive, not curated — but they come from
  * the same population as the number, and only members carrying both a name and an avatar qualify:
@@ -17,7 +17,8 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { resolveAvatarImageUrl } from '@/lib/storageHelper'
-import { MEMBER_ROW_SQL } from '@/lib/members'
+import { memberFilter } from '@/lib/members'
+import { hasColumn } from '@/lib/schema'
 
 export const runtime = 'nodejs'
 
@@ -36,8 +37,9 @@ export async function GET() {
       return NextResponse.json(cache.payload)
     }
 
+    const members = memberFilter(null, await hasColumn('users', 'joined_at'))
     const [[countRows], [faceRows]] = await Promise.all([
-      pool.execute(`SELECT COUNT(*) AS total FROM users WHERE ${MEMBER_ROW_SQL}`),
+      pool.execute(`SELECT COUNT(*) AS total FROM users ${members.where}`),
       pool.execute(
         `SELECT wallet_address, profileImage AS profile_image
            FROM users

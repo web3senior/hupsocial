@@ -12,6 +12,7 @@
 
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { ensureMember } from '@/lib/members'
 import { isEvmAddress, normalizeAddress, sameAddress } from '@/lib/address'
 import { hasColumn, hasTable } from '@/lib/schema'
 import { isReservedUsername } from '@/lib/reservedUsernames'
@@ -128,12 +129,7 @@ export async function POST(request) {
 
     /* The signature already proves the wallet, so a missing row (the connect upsert failed or
        never ran) is created here rather than turned away. */
-    await pool.execute(
-      `INSERT INTO users (wallet_address, created_at, last_seen_at, lastUpdate)
-       VALUES (?, NOW(), NOW(), CURRENT_TIMESTAMP)
-       ON DUPLICATE KEY UPDATE last_seen_at = NOW()`,
-      [address],
-    )
+    await ensureMember(address)
 
     const [[current]] = await pool.execute(
       'SELECT username, username_key, username_changed_at FROM users WHERE wallet_address = ? LIMIT 1',

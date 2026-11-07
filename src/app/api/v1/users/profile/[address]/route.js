@@ -1,6 +1,7 @@
 import { after, NextResponse } from 'next/server'
 import { isEvmAddress, isWalletAddress, normalizeAddress } from '@/lib/address'
 import pool from '@/lib/db'
+import { ensureMember } from '@/lib/members'
 import { AVATAR_MAX_SIZE, isSameStoredImage, resolveAvatarImageUrl, resolveStorageImageUrl } from '@/lib/storageHelper'
 import { readUniversalProfile } from '@/lib/lukso'
 import { moderateImages } from '@/lib/moderation'
@@ -804,20 +805,7 @@ export async function POST(request, { params }) {
 
     const walletAddress = normalizeAddress(address)
 
-    const [insert] = await pool.execute(
-      `
-      INSERT INTO users (
-        wallet_address,
-        created_at,
-        last_seen_at,
-        lastUpdate
-      )
-      VALUES (?, NOW(), NOW(), CURRENT_TIMESTAMP)
-      ON DUPLICATE KEY UPDATE
-        last_seen_at = NOW()
-      `,
-      [walletAddress],
-    )
+    const insert = await ensureMember(walletAddress)
 
     /* MariaDB reports 1 affected row for an insert and 2 for the update branch, which is how the
        client tells a wallet's first ever connect from its thousandth — the one moment it can ask
