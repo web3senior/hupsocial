@@ -34,7 +34,7 @@ test('active users exclude passive records, tolerate missing features, and count
   assert.deepEqual(await countActiveWallets(), { total: 0, recent: 0 })
   assert.equal(state.queries.length, 0)
 
-  state.columns = new Set(['posts.wallet_address', 'posts.created_at', 'tips.tipper', 'tips.tipped_at'])
+  state.columns = new Set(['posts.wallet_address', 'posts.created_at', 'post_likes.liker_address', 'post_likes.inserted_at', 'tips.tipper', 'tips.tipped_at'])
   state.counts = ['7', '5']
   assert.deepEqual(await countActiveWallets('2026-11-06 00:00:00'), { total: 7, recent: 2 })
   assert.equal(state.queries.length, 2)
@@ -42,7 +42,9 @@ test('active users exclude passive records, tolerate missing features, and count
   assert.match(all.sql, / UNION /)
   assert.doesNotMatch(all.sql, /UNION ALL|FROM users|post_views|chat_messages/)
   assert.match(all.sql, /wallet_address <> ''/)
-  assert.deepEqual(before.params, ['2026-11-06 00:00:00', Date.parse('2026-11-06T00:00:00Z') / 1000])
+  assert.match(all.sql, /FROM post_likes/)
+  assert.doesNotMatch(all.sql, /is_active/)
+  assert.deepEqual(before.params, ['2026-11-06 00:00:00', '2026-11-06 00:00:00', Date.parse('2026-11-06T00:00:00Z') / 1000])
 
   state.queries = []
   assert.deepEqual(await countActiveWallets(), { total: 7, recent: 0 })

@@ -20,7 +20,7 @@ import { hasColumn } from '@/lib/schema'
 export const ACTIVE_SOURCES = [
   // Social
   { table: 'posts', wallet: 'wallet_address', time: 'created_at' }, // posts, comments and reposts
-  { table: 'post_likes', wallet: 'liker_address', time: 'inserted_at', where: 'is_active = 1' },
+  { table: 'post_likes', wallet: 'liker_address', time: 'inserted_at' },
   { table: 'post_bookmarks', wallet: 'wallet_address', time: 'created_at' },
   { table: 'tips', wallet: 'tipper', time: 'tipped_at', unix: true },
   { table: 'polls', wallet: 'creator', time: 'created_at' },
@@ -76,7 +76,6 @@ async function availableSources() {
       const checks = source.probe
         ? [hasColumn(...source.probe), hasColumn('chat_users', 'id'), hasColumn(source.table, 'sender_id'), hasColumn(source.table, 'created_at')]
         : [hasColumn(source.table, source.wallet), hasColumn(source.table, source.time)]
-      if (source.table === 'post_likes') checks.push(hasColumn(source.table, 'is_active'))
       return (await Promise.all(checks)).every(Boolean)
     }),
   )
