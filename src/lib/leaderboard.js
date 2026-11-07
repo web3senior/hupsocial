@@ -326,12 +326,36 @@ async function computeLeaderboardSnapshot({ sort, networkId, since, until }) {
   }
 }
 
+/*
+ * The Users card. All time is everyone who has shown up on Hup: a recorded connection, or any
+ * wallet that has posted, liked or tipped. Join tracking has no backfill, so connections alone
+ * would read near zero. Indexer-only profiles stay out. A window counts new connections only,
+ * since activity in a window says nothing about when a wallet joined. Members are cross-network,
+ * so the network filter never applies here.
+ */
+function usersCountSql(since, tracksJoins) {
+  if (since) {
+    const members = memberFilter(since, tracksJoins)
+    return { sql: `(SELECT COUNT(*) FROM users ${members.where})`, params: members.params }
+  }
+
+  const wallet = (column) => `CONVERT(${column} USING utf8mb4) COLLATE utf8mb4_general_ci`
+  const sources = [
+    `SELECT ${wallet('wallet_address')} AS wallet_address FROM posts WHERE wallet_address IS NOT NULL`,
+    `SELECT ${wallet('liker_address')} FROM post_likes WHERE liker_address IS NOT NULL AND is_active = 1`,
+    `SELECT ${wallet('tipper')} FROM tips WHERE tipper IS NOT NULL`,
+  ]
+  if (tracksJoins) sources.unshift(`SELECT ${wallet('wallet_address')} AS wallet_address FROM users WHERE joined_at IS NOT NULL`)
+
+  return { sql: `(SELECT COUNT(*) FROM (${sources.join(' UNION ')}) community)`, params: [] }
+}
+
 function buildStatsQuery(networkId, since, tracksJoins) {
-  const { memberFilter, postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since, tracksJoins)
+  const { postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since)
 
   return `
     SELECT
-      (SELECT COUNT(*) FROM users ${memberFilter.where}) AS users,
+      ${usersCountSql(since, tracksJoins).sql} AS users,
       (SELECT COUNT(*) FROM posts p ${postFilter.where} AND p.is_comment IS NULL AND p.is_repost IS NULL) AS root_posts,
       (SELECT COUNT(*) FROM posts p ${postFilter.where} AND p.is_comment IS NOT NULL) AS comments,
       (SELECT COUNT(*) FROM post_likes pl ${likeFilter.where}) AS likes,
@@ -341,10 +365,10 @@ function buildStatsQuery(networkId, since, tracksJoins) {
 }
 
 function buildStatsParams(networkId, since, tracksJoins) {
-  const { memberFilter, postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since, tracksJoins)
+  const { postFilter, likeFilter, viewFilter, tipFilter } = buildStatsFilters(networkId, since)
 
   return [
-    ...memberFilter.params,
+    ...usersCountSql(since, tracksJoins).params,
     ...postFilter.params,
     ...postFilter.params,
     ...likeFilter.params,
@@ -353,10 +377,8 @@ function buildStatsParams(networkId, since, tracksJoins) {
   ]
 }
 
-function buildStatsFilters(networkId, since, tracksJoins) {
+function buildStatsFilters(networkId, since) {
   return {
-    // Membership is cross-network; period counts use the first recorded Hup connection.
-    memberFilter: memberFilter(since, tracksJoins),
     postFilter: buildWhere({
       alias: 'p',
       timeColumn: 'created_at',
