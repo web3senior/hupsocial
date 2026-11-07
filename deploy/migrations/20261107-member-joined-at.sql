@@ -3,7 +3,7 @@
 -- No backfill: created_at and last_seen_at are also written by profile indexers,
 -- and cannot establish when a wallet first connected to Hup. Existing wallets
 -- without a reliable join record receive their first observed connection date.
--- Historical named/avatar profiles remain in the all-time social-proof total.
+-- Both all-time and recent member counts require a recorded Hup connection.
 -- Apply before deployment to enable tracking immediately. Safe to re-run (MariaDB).
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS joined_at DATETIME NULL DEFAULT NULL

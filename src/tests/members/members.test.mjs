@@ -31,7 +31,11 @@ test('first Hup connection is independent of profile indexing', { skip: process.
     )`)
     await t.test('unmigrated sign-in still works', async () => {
       await ensureMember('legacy')
-      assert.deepEqual(memberFilter('2026-11-01 00:00:00', false).params, ['2026-11-01 00:00:00'])
+      for (const since of [null, '2026-11-01 00:00:00']) {
+        const filter = memberFilter(since, false)
+        const [[row]] = await db.execute(`SELECT COUNT(*) AS total FROM users ${filter.where}`, filter.params)
+        assert.equal(row.total, 0, 'missing tracking must never fall back to indexed profiles')
+      }
     })
     const migration = await readFile(new URL('../../../deploy/migrations/20261107-member-joined-at.sql', import.meta.url), 'utf8')
     await admin.query(`USE ${database}`)
@@ -66,10 +70,12 @@ test('first Hup connection is independent of profile indexing', { skip: process.
       const [[old]] = await db.execute("SELECT joined_at < UTC_TIMESTAMP() - INTERVAL 24 HOUR AS old FROM users WHERE wallet_address = 'old-join'")
       assert.equal(old.old, 1)
     })
-    await t.test('total includes unnamed joins and preserves legacy profiles', async () => {
+    await t.test('total includes unnamed connections and excludes indexer-only profiles', async () => {
       const filter = memberFilter(null, true)
       const [[row]] = await db.execute(`SELECT COUNT(*) AS total FROM users ${filter.where}`, filter.params)
-      assert.equal(row.total, 5)
+      assert.equal(row.total, 4)
+      const [rows] = await db.execute(`SELECT wallet_address FROM users ${filter.where}`, filter.params)
+      assert.deepEqual(rows.map((row) => row.wallet_address).sort(), ['fresh', 'indexed', 'migrated', 'old-join'])
     })
   } finally {
     if (db) await db.end()

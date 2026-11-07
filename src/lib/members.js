@@ -1,19 +1,12 @@
 import pool from '@/lib/db'
 import { hasColumn } from '@/lib/schema'
 
-// Legacy social proof includes named/avatar profiles cached before join tracking existed.
-export const MEMBER_ROW_SQL = `((name IS NOT NULL AND name <> '') OR (profileImage IS NOT NULL AND profileImage <> ''))`
-
+// Count only wallets with a recorded Hup connection, independent of profile metadata.
 export function memberFilter(since, tracksJoins) {
-  if (tracksJoins) {
-    return since
-      ? { where: 'WHERE users.joined_at >= ?', params: [since] }
-      : { where: `WHERE (users.joined_at IS NOT NULL OR ${MEMBER_ROW_SQL})`, params: [] }
-  }
-  return {
-    where: `WHERE ${MEMBER_ROW_SQL}${since ? ' AND users.created_at >= ?' : ''}`,
-    params: since ? [since] : [],
-  }
+  if (!tracksJoins) return { where: 'WHERE 1 = 0', params: [] }
+  return since
+    ? { where: 'WHERE users.joined_at >= ?', params: [since] }
+    : { where: 'WHERE users.joined_at IS NOT NULL', params: [] }
 }
 
 // Both EVM and Solana connect through the profile POST. Indexer cache writes never call this.

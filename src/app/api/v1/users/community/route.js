@@ -3,10 +3,8 @@
  * @description Social proof for the connect-wallet popup: how many members Hup has, and a few
  * real faces to put next to the number.
  *
- * "Member" is deliberately narrower than "row in users". That table doubles as the profile cache
- * the LSP26 follower indexer writes into, so the vast majority of its rows are addresses nobody
- * ever signed up as — no name, no avatar, no signature. Counting those inflated the claim by two
- * orders of magnitude. Historical profile totals are retained, with recorded Hup joins included.
+ * Members are wallets with a recorded Hup connection. Profile metadata alone cannot establish
+ * membership: the users table also caches wallets discovered by the follower indexer.
  *
  * The faces are random on purpose — the strip should look alive, not curated — but they come from
  * the same population as the number, and only members carrying both a name and an avatar qualify:
@@ -43,7 +41,8 @@ export async function GET() {
       pool.execute(
         `SELECT wallet_address, profileImage AS profile_image
            FROM users
-          WHERE profileImage IS NOT NULL AND profileImage <> ''
+          ${members.where}
+            AND profileImage IS NOT NULL AND profileImage <> ''
             AND name IS NOT NULL AND name <> ''
           ORDER BY RAND()
           LIMIT ?`,
